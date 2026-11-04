@@ -14,6 +14,10 @@ struct DiscoverView: View {
                     Text("下一段故事，\n从这里开始。").font(.system(size: 31, weight: .medium, design: .serif)).tracking(2).lineSpacing(8).foregroundStyle(Palette.green)
                     Text("在熟悉的名字里重逢，在陌生的世界里出发。").font(.system(size: 11)).foregroundStyle(Palette.muted).lineSpacing(4)
                 }
+                HStack(spacing: 12) {
+                    NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("search")) } label: { Label("多源搜索", systemImage: "square.stack").font(.system(size: 12)).frame(maxWidth: .infinity, minHeight: 45).background(Palette.green.opacity(0.07), in: .rect(cornerRadius: 10)) }.accessibilityIdentifier("discoverMultiSearch")
+                    NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("discover")) } label: { Label("分类与订阅", systemImage: "bell.badge").font(.system(size: 12)).frame(maxWidth: .infinity, minHeight: 45).background(Palette.green.opacity(0.07), in: .rect(cornerRadius: 10)) }
+                }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 9) {
                         ForEach(categories, id: \.self) { item in

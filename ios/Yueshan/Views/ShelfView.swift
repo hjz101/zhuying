@@ -35,6 +35,11 @@ struct ShelfView: View {
                         }.accessibilityLabel("搜索好书")
                     }
 
+                    HStack(spacing: 17) {
+                        ForEach(["shelf", "import", "fulltext"], id: \.self) { id in
+                            NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id)) } label: { Label(id == "shelf" ? "书架分组" : FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon).font(.system(size: 11)).frame(minHeight: 36) }.accessibilityIdentifier("shelf-feature-\(id)")
+                        }
+                    }
                     if !managing {
                         if let recent = store.recent { continueCard(recent) }
                         else { welcomeCard }

@@ -19,6 +19,7 @@ struct ReaderView: View {
     @State private var showContents = false
     @State private var showSettings = false
     @State private var showGestureGuide = false
+    @State private var demoFeature: DemoFeature?
     @State private var controlsVisible = true
     @State private var sliderValue: Double
     @State private var sliderEditing = false
@@ -110,6 +111,20 @@ struct ReaderView: View {
             ContentsView(book: book, currentChapter: chapter) { target in goChapter(target); showContents = false }
         }
         .sheet(isPresented: $showSettings, onDismiss: { restoreID += 1 }) { ReadingSettingsView() }
+        .sheet(item: $demoFeature) { feature in
+            NavigationStack {
+                FeatureDemoView(feature: feature, bookID: book.id) { item, chapter, paragraph, offset in
+                    if item.id == book.id {
+                        goChapter(chapter); anchor = .init(paragraph: paragraph, offset: offset); restoreID += 1; save()
+                        demoFeature = nil
+                    } else {
+                        demoFeature = nil
+                        store.record(item, chapter: chapter, paragraph: paragraph, characterOffset: offset)
+                        store.read(item, chapter: chapter)
+                    }
+                }.toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { demoFeature = nil } } }
+            }
+        }
         .sheet(isPresented: $showGestureGuide, onDismiss: { store.completeReadingGuide() }) {
             ReadingGestureGuideView(isFirstUse: true)
         }
@@ -153,6 +168,12 @@ struct ReaderView: View {
                 tool("设置", icon: "textformat.size") { save(); showSettings = true }.accessibilityIdentifier("readerSettings")
                 Spacer()
                 tool(store.isFavorite(book) ? "已收藏" : "收藏", icon: store.isFavorite(book) ? "bookmark.fill" : "bookmark") { store.toggleFavorite(book); haptic() }
+                Spacer()
+                Menu {
+                    ForEach(["fulltext", "sourceSwitch", "bookmarks", "chapterCache", "systemTTS", "onlineTTS", "aiRoles", "purify", "highlight", "comments"], id: \.self) { id in
+                        Button(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { save(); demoFeature = FeatureCatalog.feature(id) }
+                    }
+                } label: { VStack(spacing: 5) { Image(systemName: "ellipsis").font(.system(size: 17)); Text("更多").font(.system(size: 9)) }.frame(width: 45, height: 45) }.accessibilityLabel("更多阅读工具").accessibilityIdentifier("readerMoreTools")
             }
             .padding(.horizontal, 32)
         }.padding(.top, 8).padding(.bottom, 4).overlay(alignment: .top) { Rectangle().fill(theme.secondary.opacity(0.2)).frame(height: 0.5) }
@@ -212,13 +233,15 @@ struct ContentsView: View {
     let book: Book
     let currentChapter: Int?
     let onSelect: (Int) -> Void
+    @State private var query = ""
+    @State private var reversed = false
 
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
                 List {
                     Section {
-                        ForEach(book.chapters.indices, id: \.self) { index in
+                        ForEach((reversed ? Array(book.chapters.indices.reversed()) : Array(book.chapters.indices)).filter { query.isEmpty || book.chapterTitle($0).contains(query) }, id: \.self) { index in
                             Button { onSelect(index) } label: {
                                 HStack {
                                     Text(book.chapterTitle(index)).font(.system(size: 14))
@@ -233,6 +256,8 @@ struct ContentsView: View {
                 .onAppear { if let currentChapter { proxy.scrollTo(currentChapter, anchor: .center) } }
             }
             .navigationTitle("章节目录").navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, prompt: "搜索章节")
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button(reversed ? "倒序" : "正序", systemImage: "arrow.up.arrow.down") { reversed.toggle() } } }
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
         }.tint(Palette.green).presentationDetents([.large]).presentationDragIndicator(.visible)
     }

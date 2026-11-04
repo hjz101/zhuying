@@ -1,8 +1,8 @@
 # 阅山 · iOS 小说阅读器 Demo
 
-首发平台已确认为 **iOS**。原生 Demo v0.2 位于 `ios/`，使用 SwiftUI、原生导航与底部标签栏，支持滚动／左右分页、历史、模拟追更和书架批量管理，内置 8 本原创模拟小说，不连接真实后端。用 Xcode 打开 `ios/Yueshan.xcodeproj`，选择 `Yueshan` scheme 和 iPhone 模拟器后运行。
+首发平台已确认为 **iOS**。原生 Demo v0.3 位于 `ios/`，使用 SwiftUI、原生导航与底部标签栏，支持滚动／左右分页、历史、模拟追更和书架批量管理，内置 8 本原创模拟小说，不连接真实后端。用 Xcode 打开 `ios/Yueshan.xcodeproj`，选择 `Yueshan` scheme 和 iPhone 模拟器后运行。
 
-原生版使用与测试方式见 [iOS 说明](ios/README.md)。下方保留的是之前的网页草稿，仅供历史设计参考。
+原生版使用与测试方式见 [iOS 说明](ios/README.md)，47 个模块的覆盖与模拟边界见 [功能清单](ios/FEATURES.md)。下方保留的是之前的网页草稿，仅供历史设计参考。
 
 ## 旧网页草稿启动
 

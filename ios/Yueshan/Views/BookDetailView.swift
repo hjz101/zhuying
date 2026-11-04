@@ -31,6 +31,11 @@ struct BookDetailView: View {
                     SectionHeading(title: "故事简介")
                     Text(book.intro).font(.system(size: 14)).lineSpacing(9).foregroundStyle(Color(hex: 0x7A856F))
                     Text("原创示例小说 · 用于预览阅读体验").font(.system(size: 10)).foregroundStyle(Palette.muted).padding(.bottom, 5)
+                    HStack {
+                        ForEach(["sourceSwitch", "chapterCache", "covers"], id: \.self) { id in
+                            NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id), bookID: book.id) } label: { Label(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon).font(.system(size: 10)).frame(maxWidth: .infinity, minHeight: 40) }
+                        }
+                    }
                     Divider().overlay(Palette.line)
                     Button { showContents = true } label: {
                         HStack {

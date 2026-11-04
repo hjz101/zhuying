@@ -26,12 +26,18 @@ struct ProfileView: View {
                 Button { showSettings = true } label: {
                     HStack { Label("阅读偏好", systemImage: "textformat.size"); Spacer(); Image(systemName: "chevron.right").font(.system(size: 12)) }.font(.system(size: 14)).foregroundStyle(Palette.green).padding(20).background(.white.opacity(0.6), in: .rect(cornerRadius: 15))
                 }
+                VStack(spacing: 0) {
+                    ForEach(["statistics", "backup", "icloud", "themes", "files", "cache"], id: \.self) { id in
+                        NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id)) } label: { FeatureRow(feature: FeatureCatalog.feature(id)) }.buttonStyle(.plain)
+                        if id != "cache" { Divider() }
+                    }
+                }.padding(.horizontal, 15).background(.white.opacity(0.6), in: .rect(cornerRadius: 15))
                 VStack(alignment: .leading, spacing: 16) {
                     Label("关于这个 Demo", systemImage: "leaf").font(.system(size: 14, weight: .medium)).foregroundStyle(Palette.green)
                     Text("阅山，一个安静的私人阅读角落。").font(.system(size: 20, design: .serif)).lineSpacing(7).foregroundStyle(Palette.green)
                     Text("这是 iOS 原生界面预览。8 本原创模拟小说，可体验搜索、收藏、选章、阅读和进度恢复。").font(.system(size: 12)).lineSpacing(7).foregroundStyle(Palette.muted)
                     Text("阅读数据保存在当前设备，不连接真实书源。演示章节包含复用段落，书籍字数与状态仅用于界面展示。").font(.system(size: 11)).lineSpacing(7).foregroundStyle(Palette.muted)
-                    Text("YUESHAN FOR iOS · DESIGN PREVIEW 0.2").font(.system(size: 8)).tracking(1.3).foregroundStyle(Palette.muted).padding(.top, 5)
+                    Text("YUESHAN FOR iOS · DESIGN PREVIEW 0.3").font(.system(size: 8)).tracking(1.3).foregroundStyle(Palette.muted).padding(.top, 5)
                 }.padding(23).frame(maxWidth: .infinity, alignment: .leading).background(Color(hex: 0xEEEFE4), in: .rect(cornerRadius: 17))
             }.padding(23)
         }.background(Palette.background).navigationTitle("我的").navigationBarTitleDisplayMode(.inline)
@@ -96,6 +102,11 @@ struct ReadingSettingsView: View {
                 Section("阅读预览") {
                     Text("山海有相逢，长风自有归处。\n在字里行间，遇见另一个世界。")
                         .font(.system(size: store.settings.fontSize, design: .serif)).lineSpacing(store.settings.lineSpacing).foregroundStyle(theme.ink).padding(.vertical, 15).listRowBackground(theme.background)
+                }
+                Section("更多阅读设置") {
+                    ForEach(["pageStyle", "typography", "themes", "fonts", "titleDesign", "purify", "highlight", "comments"], id: \.self) { id in
+                        NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id)) } label: { Label(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon).font(.system(size: 13)) }
+                    }
                 }
                 Section {
                     Button("恢复默认设置") { store.settings = .init() }.foregroundStyle(Palette.green)

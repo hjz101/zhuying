@@ -148,11 +148,29 @@ struct ReaderView: View {
                 Text(book.chapterTitle(chapter)).font(.system(size: 9)).foregroundStyle(theme.secondary).accessibilityIdentifier("chapterTitle")
             }
             Spacer(minLength: 0)
-            Button { store.toggleFavorite(book); haptic() } label: { Image(systemName: store.isFavorite(book) ? "bookmark.fill" : "bookmark").frame(width: 44, height: 44) }.accessibilityLabel(store.isFavorite(book) ? "已收藏" : "加入书架")
+            Menu {
+                Section {
+                    Button {
+                        let added = store.toggleFavorite(book)
+                        haptic()
+                        showMessage(added ? "已加入书架" : "已移出书架，阅读进度已保留")
+                    } label: {
+                        Label(store.isFavorite(book) ? "取消收藏" : "加入书架", systemImage: store.isFavorite(book) ? "bookmark.slash" : "bookmark")
+                    }.accessibilityIdentifier("readerFavoriteAction")
+                }
+                Section {
+                    ForEach(["fulltext", "sourceSwitch", "bookmarks", "chapterCache", "purify", "highlight"], id: \.self) { id in
+                        Button(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { openFeature(id) }
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 20, weight: .medium)).frame(width: 44, height: 44)
+            }.accessibilityLabel("更多阅读工具").accessibilityIdentifier("readerMoreTools")
         }
         .padding(.horizontal, 5).padding(.vertical, 4)
         .frame(maxWidth: 520)
         .readerFloatingSurface()
+        .accessibilityElement(children: .contain).accessibilityIdentifier("readerTopToolbar")
         .padding(.horizontal, 18).padding(.top, 8)
     }
 
@@ -180,13 +198,11 @@ struct ReaderView: View {
                 Spacer()
                 tool("设置", icon: "textformat.size") { save(); showSettings = true }.accessibilityIdentifier("readerSettings")
                 Spacer()
-                tool(store.isFavorite(book) ? "已收藏" : "收藏", icon: store.isFavorite(book) ? "bookmark.fill" : "bookmark") { store.toggleFavorite(book); haptic() }
+                featureMenu("朗读", icon: "headphones", features: ["systemTTS", "onlineTTS", "aiRoles"])
+                    .accessibilityIdentifier("readerNarration")
                 Spacer()
-                Menu {
-                    ForEach(["fulltext", "sourceSwitch", "bookmarks", "chapterCache", "systemTTS", "onlineTTS", "aiRoles", "purify", "highlight", "comments"], id: \.self) { id in
-                        Button(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { save(); demoFeature = FeatureCatalog.feature(id) }
-                    }
-                } label: { VStack(spacing: 5) { Image(systemName: "ellipsis").font(.system(size: 20, weight: .medium)); Text("更多").font(.system(size: 10)) }.frame(width: 55, height: 48) }.accessibilityLabel("更多阅读工具").accessibilityIdentifier("readerMoreTools")
+                featureMenu("皮肤", icon: "tshirt", features: ["themes", "comments"])
+                    .accessibilityIdentifier("readerSkins")
             }
             .padding(.horizontal, 18).frame(height: 64)
             .readerFloatingSurface()
@@ -202,7 +218,23 @@ struct ReaderView: View {
         }.buttonStyle(.plain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
     private func tool(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { VStack(spacing: 5) { Image(systemName: icon).font(.system(size: 20, weight: .medium)); Text(title).font(.system(size: 10)) }.frame(width: 55, height: 48) }.foregroundStyle(theme.ink.opacity(0.9))
+        Button(action: action) { toolLabel(title, icon: icon) }
+    }
+    private func featureMenu(_ title: String, icon: String, features: [String]) -> some View {
+        Menu {
+            ForEach(features, id: \.self) { id in
+                Button(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { openFeature(id) }
+            }
+        } label: { toolLabel(title, icon: icon) }.accessibilityLabel(title)
+    }
+    private func toolLabel(_ title: String, icon: String) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: icon).font(.system(size: 20, weight: .medium)).frame(height: 24)
+            Text(title).font(.system(size: 10))
+        }.frame(width: 55, height: 48).foregroundStyle(theme.ink.opacity(0.9))
+    }
+    private func openFeature(_ id: String) {
+        save(); demoFeature = FeatureCatalog.feature(id)
     }
     private func layoutKey(_ size: CGSize) -> String {
         "\(chapter)-\(Int(size.width))-\(Int(size.height))-\(store.settings.fontSize)-\(store.settings.lineSpacing)-\(theme.rawValue)-\(store.settings.mode.rawValue)-\(restoreID)-\(initialized)"

@@ -83,9 +83,14 @@ final class ReaderFlowTests: XCTestCase {
         XCTAssertLessThanOrEqual(bar.frame.maxX, app.frame.maxX - 14)
         XCTAssertLessThan(bar.frame.maxY, app.frame.maxY - 20)
         XCTAssertLessThanOrEqual(bar.frame.height, 80, "The primary toolbar should stay compact like the home tab bar")
-        for id in ["readerContents", "readerSettings", "readerMoreTools"] {
-            XCTAssertTrue(app.buttons[id].isHittable, "Floating controls must remain accessible: \(id)")
+        for id in ["readerContents", "readerSettings", "readerNarration", "readerSkins"] {
+            XCTAssertTrue(bar.buttons[id].isHittable, "Bottom controls must remain accessible: \(id)")
         }
+        XCTAssertFalse(bar.buttons["readerMoreTools"].exists)
+        let more = app.otherElements["readerTopToolbar"].buttons["readerMoreTools"]
+        XCTAssertTrue(more.isHittable)
+        XCTAssertGreaterThan(more.frame.minX, app.frame.midX)
+        XCTAssertLessThan(more.frame.maxY, app.frame.minY + app.frame.height * 0.25)
     }
 
     @MainActor
@@ -94,6 +99,43 @@ final class ReaderFlowTests: XCTestCase {
         preview.name = name
         preview.lifetime = .keepAlways
         add(preview)
+    }
+
+    @MainActor
+    func testReaderToolbarRoutesFavoriteNarrationAndSkins() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        app.buttons["continueReading"].tap()
+        acknowledgeFirstGuide(in: app)
+        assertFloatingToolbar(in: app)
+        let chapter = app.staticTexts["chapterTitle"].label
+        let progress = app.staticTexts["readerPageStatus"].label
+
+        app.buttons["readerMoreTools"].tap()
+        XCTAssertTrue(app.buttons["取消收藏"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["系统朗读"].exists)
+        XCTAssertFalse(app.buttons["段评与皮肤"].exists)
+        capture(app, name: "ReaderMoreMenu")
+        app.buttons["取消收藏"].tap()
+        app.buttons["readerMoreTools"].tap()
+        XCTAssertTrue(app.buttons["加入书架"].waitForExistence(timeout: 5))
+        app.buttons["加入书架"].tap()
+        XCTAssertEqual(app.staticTexts["readerPageStatus"].label, progress)
+
+        for (entry, target, choices) in [
+            ("readerNarration", "系统朗读", ["系统朗读", "在线朗读", "AI 多角色朗读"]),
+            ("readerSkins", "段评与皮肤", ["主题管理", "段评与皮肤"])
+        ] {
+            app.buttons[entry].tap()
+            for choice in choices { XCTAssertTrue(app.buttons[choice].waitForExistence(timeout: 5)) }
+            app.buttons[target].tap()
+            XCTAssertTrue(app.navigationBars[target].waitForExistence(timeout: 5))
+            app.navigationBars.buttons["完成"].tap()
+            XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
+            XCTAssertEqual(app.staticTexts["readerPageStatus"].label, progress)
+        }
     }
 
     @MainActor

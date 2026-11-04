@@ -1,8 +1,20 @@
 import SwiftUI
 
+private enum ShelfCategory: String, CaseIterable {
+    case novel, comic, audio
+
+    var title: String {
+        switch self { case .novel: "小说"; case .comic: "漫画"; case .audio: "听书" }
+    }
+    var icon: String {
+        switch self { case .novel: "book.closed"; case .comic: "photo.on.rectangle"; case .audio: "headphones" }
+    }
+}
+
 struct ShelfView: View {
     @EnvironmentObject private var store: LibraryStore
     let onDiscover: () -> Void
+    @State private var category: ShelfCategory = .novel
     @State private var filter = 0
     @State private var listLayout = false
     @State private var removal: ShelfRemoval?
@@ -10,8 +22,11 @@ struct ShelfView: View {
     @State private var selection = Set<String>()
     @State private var confirmRemoval = false
     @State private var showUpdates = false
+    // The bundled library currently contains novels only.
+    private var categoryBooks: [Book] { category == .novel ? store.shelf : [] }
+    private var categoryReadingCount: Int { categoryBooks.filter { store.progress[$0.id] != nil }.count }
     private var filteredBooks: [Book] {
-        store.shelf.filter { filter == 0 || (filter == 1 ? store.progress[$0.id] != nil : store.progress[$0.id] == nil) }
+        categoryBooks.filter { filter == 0 || (filter == 1 ? store.progress[$0.id] != nil : store.progress[$0.id] == nil) }
     }
 
     var body: some View {
@@ -74,11 +89,34 @@ struct ShelfView: View {
                     }
 
                     VStack(spacing: 20) {
+                        HStack(spacing: 8) {
+                            ForEach(ShelfCategory.allCases, id: \.self) { item in
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        category = item
+                                        filter = 0
+                                        selection = []
+                                    }
+                                } label: {
+                                    Text(item.title)
+                                        .font(.system(size: 17, weight: category == item ? .semibold : .regular))
+                                        .frame(maxWidth: .infinity, minHeight: 46)
+                                        .foregroundStyle(category == item ? Palette.green : Palette.muted)
+                                        .background(category == item ? Palette.green.opacity(0.08) : .clear, in: .rect(cornerRadius: 10))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("shelf-category-\(item.rawValue)")
+                                .accessibilityAddTraits(category == item ? .isSelected : [])
+                            }
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("书架栏目")
+
                         HStack(spacing: 0) {
                             HStack(spacing: 20) {
-                                filterButton("全部收藏", value: 0, count: store.favorites.count)
-                                filterButton("正在阅读", value: 1, count: store.readingCount)
-                                filterButton("未读", value: 2, count: store.favorites.count - store.readingCount)
+                                filterButton("全部收藏", value: 0, count: categoryBooks.count)
+                                filterButton("正在阅读", value: 1, count: categoryReadingCount)
+                                filterButton("未读", value: 2, count: categoryBooks.count - categoryReadingCount)
                             }
                             Spacer(minLength: 8)
                             Button { withAnimation(.easeInOut(duration: 0.2)) { listLayout.toggle() } } label: {
@@ -88,10 +126,14 @@ struct ShelfView: View {
 
                         if filteredBooks.isEmpty {
                             ContentUnavailableView {
-                                Label("这里还没有故事", systemImage: "books.vertical")
-                            } description: { Text("去发现一本喜欢的书，开启下一段旅程。") } actions: {
-                                Button("去发现好书", action: onDiscover).buttonStyle(.borderedProminent)
-                            }.padding(.vertical, 25)
+                                Label(category == .novel ? "这里还没有故事" : "还没有收藏的\(category.title)", systemImage: category.icon)
+                            } description: {
+                                Text(category == .novel ? "去发现一本喜欢的书，开启下一段旅程。" : "收藏的\(category.title)会显示在这里。")
+                            } actions: {
+                                if category == .novel {
+                                    Button("去发现好书", action: onDiscover).buttonStyle(.borderedProminent)
+                                }
+                            }.padding(.vertical, 25).accessibilityIdentifier("shelfEmptyState")
                         } else if listLayout {
                             LazyVStack(spacing: 21) {
                                 ForEach(filteredBooks) { book in
@@ -159,7 +201,7 @@ struct ShelfView: View {
             }.foregroundStyle(filter == value ? Palette.green : Palette.muted)
                 .frame(minHeight: 46)
                 .overlay(alignment: .bottom) { if filter == value { Rectangle().fill(Palette.green).frame(height: 2) } }
-        }.buttonStyle(.plain).accessibilityAddTraits(filter == value ? .isSelected : [])
+        }.buttonStyle(.plain).accessibilityIdentifier("shelf-filter-\(value)").accessibilityAddTraits(filter == value ? .isSelected : [])
     }
 
     private func continueCard(_ book: Book) -> some View {

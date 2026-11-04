@@ -2,6 +2,46 @@ import XCTest
 
 final class ReaderFlowTests: XCTestCase {
     @MainActor
+    func testShelfPrimaryCategoriesAndSecondaryFilters() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        let novel = app.buttons["shelf-category-novel"]
+        reveal(novel, in: app)
+        XCTAssertTrue(novel.isSelected)
+        let all = app.buttons["shelf-filter-0"]
+        XCTAssertLessThan(novel.frame.maxY, all.frame.minY)
+        XCTAssertTrue(all.label.contains("6"))
+        app.buttons["shelf-filter-1"].tap()
+        XCTAssertTrue(app.buttons["shelf-filter-1"].isSelected)
+
+        for (id, title) in [("comic", "漫画"), ("audio", "听书")] {
+            let tab = app.buttons["shelf-category-\(id)"]
+            tab.tap()
+            XCTAssertTrue(tab.isSelected)
+            XCTAssertFalse(novel.isSelected)
+            XCTAssertTrue(all.isSelected, "Changing categories resets the secondary filter")
+            XCTAssertTrue(all.label.contains("0"))
+            XCTAssertTrue(app.staticTexts["还没有收藏的\(title)"].exists)
+            XCTAssertFalse(app.buttons["read-changfeng"].exists)
+            app.buttons["shelf-filter-1"].tap()
+            XCTAssertTrue(app.staticTexts["还没有收藏的\(title)"].exists)
+        }
+
+        novel.tap()
+        XCTAssertTrue(novel.isSelected)
+        XCTAssertTrue(all.isSelected)
+        XCTAssertTrue(all.label.contains("6"))
+        XCTAssertFalse(app.otherElements["shelfEmptyState"].exists)
+        app.buttons["列表布局"].tap()
+        XCTAssertTrue(app.buttons["list-read-changfeng"].exists)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "ShelfPrimaryCategories"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    @MainActor
     func testShelfReaderContentsAndPreferences() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]

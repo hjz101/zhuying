@@ -1,0 +1,572 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0C294654163573BBB0F751AC /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E028908BB149ACE0D9068E09 /* ReaderView.swift */; };
+		147C7FC815E626A5AF1604C0 /* ShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157DB7F47871493B1C150FCE /* ShelfView.swift */; };
+		19C3968A46509CF2B996D29D /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9289365055BAF46AB29BE23 /* Library.swift */; };
+		6828FC5D2BCAC22DA475D116 /* YueshanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1EF88112E9BCF2AA554A011 /* YueshanApp.swift */; };
+		7C872E4094E6A69A900602E7 /* library.json in Resources */ = {isa = PBXBuildFile; fileRef = ED34B9FD984E86378B53939E /* library.json */; };
+		88982BFF18464205AB968129 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4528CFED3A929E851318E867 /* BookDetailView.swift */; };
+		9A74CD16D9989025CD51B5BB /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9B7EE3953D8B799E5165D /* Components.swift */; };
+		CB1391D0B52F09CC449D26BD /* ReaderFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59DCA55E8AAF052A9402AEF /* ReaderFlowTests.swift */; };
+		F00566231EA114EE40039C0A /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FDC3DF433A8D6AAC2C3ADED /* ProfileView.swift */; };
+		F7F8BAC539D8E0EB142DE063 /* LibraryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C401D3B8BABD9D2346932CBA /* LibraryStoreTests.swift */; };
+		F93C4FD5D4F9020783E7B376 /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACACA7229E9ADD7C6542E52B /* DiscoverView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		090FFA941F55B863F2277EA5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 65328ECE03CD12305027B8A7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6982B206C6A0D6BF06406E0F;
+			remoteInfo = Yueshan;
+		};
+		2DBE3BFC6AD28F06074B844D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 65328ECE03CD12305027B8A7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6982B206C6A0D6BF06406E0F;
+			remoteInfo = Yueshan;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		151E092F112F6FB8DE8D6E67 /* Yueshan.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Yueshan.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		157DB7F47871493B1C150FCE /* ShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
+		4528CFED3A929E851318E867 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
+		50ACA04140C18EF9CF50FB5F /* YueshanTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = YueshanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B7D68AC6B44F2527944461D /* YueshanUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = YueshanUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9FDC3DF433A8D6AAC2C3ADED /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		ACACA7229E9ADD7C6542E52B /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
+		C401D3B8BABD9D2346932CBA /* LibraryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStoreTests.swift; sourceTree = "<group>"; };
+		C9289365055BAF46AB29BE23 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
+		D9E9B7EE3953D8B799E5165D /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		E028908BB149ACE0D9068E09 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
+		E1EF88112E9BCF2AA554A011 /* YueshanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YueshanApp.swift; sourceTree = "<group>"; };
+		E59DCA55E8AAF052A9402AEF /* ReaderFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFlowTests.swift; sourceTree = "<group>"; };
+		ED34B9FD984E86378B53939E /* library.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = library.json; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		10049A22F1516EA82488C4D7 = {
+			isa = PBXGroup;
+			children = (
+				7F0F4C3ECC61A12B3627F6A1 /* Yueshan */,
+				C0FD3E694346FFCF7990B38A /* YueshanTests */,
+				A9874440E9D383B0743FA68D /* YueshanUITests */,
+				FE8977DF748FD4075F8B52A6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4A77447F5C308C0900CAC317 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				4528CFED3A929E851318E867 /* BookDetailView.swift */,
+				D9E9B7EE3953D8B799E5165D /* Components.swift */,
+				ACACA7229E9ADD7C6542E52B /* DiscoverView.swift */,
+				9FDC3DF433A8D6AAC2C3ADED /* ProfileView.swift */,
+				E028908BB149ACE0D9068E09 /* ReaderView.swift */,
+				157DB7F47871493B1C150FCE /* ShelfView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		6046D651312A268A180470F1 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				C9289365055BAF46AB29BE23 /* Library.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		773ED8A4BD344425926D1A22 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				ED34B9FD984E86378B53939E /* library.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		7F0F4C3ECC61A12B3627F6A1 /* Yueshan */ = {
+			isa = PBXGroup;
+			children = (
+				E1EF88112E9BCF2AA554A011 /* YueshanApp.swift */,
+				6046D651312A268A180470F1 /* Models */,
+				773ED8A4BD344425926D1A22 /* Resources */,
+				4A77447F5C308C0900CAC317 /* Views */,
+			);
+			path = Yueshan;
+			sourceTree = "<group>";
+		};
+		A9874440E9D383B0743FA68D /* YueshanUITests */ = {
+			isa = PBXGroup;
+			children = (
+				E59DCA55E8AAF052A9402AEF /* ReaderFlowTests.swift */,
+			);
+			path = YueshanUITests;
+			sourceTree = "<group>";
+		};
+		C0FD3E694346FFCF7990B38A /* YueshanTests */ = {
+			isa = PBXGroup;
+			children = (
+				C401D3B8BABD9D2346932CBA /* LibraryStoreTests.swift */,
+			);
+			path = YueshanTests;
+			sourceTree = "<group>";
+		};
+		FE8977DF748FD4075F8B52A6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				151E092F112F6FB8DE8D6E67 /* Yueshan.app */,
+				50ACA04140C18EF9CF50FB5F /* YueshanTests.xctest */,
+				7B7D68AC6B44F2527944461D /* YueshanUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		23063E7EF791E7B4A1984626 /* YueshanUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A5EB6B083D5EC08DD393C12A /* Build configuration list for PBXNativeTarget "YueshanUITests" */;
+			buildPhases = (
+				24CA8457601344C578C9D110 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				44C2434C983912AE37485F89 /* PBXTargetDependency */,
+			);
+			name = YueshanUITests;
+			packageProductDependencies = (
+			);
+			productName = YueshanUITests;
+			productReference = 7B7D68AC6B44F2527944461D /* YueshanUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		309B901A2EDEA372058CC879 /* YueshanTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 067F32CA618034B6B5953518 /* Build configuration list for PBXNativeTarget "YueshanTests" */;
+			buildPhases = (
+				D92B0BA200EA857B1A5782B3 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				60841B8E50556582FBBD0E99 /* PBXTargetDependency */,
+			);
+			name = YueshanTests;
+			packageProductDependencies = (
+			);
+			productName = YueshanTests;
+			productReference = 50ACA04140C18EF9CF50FB5F /* YueshanTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		6982B206C6A0D6BF06406E0F /* Yueshan */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF9D7F043F23C62A3D5CEDDE /* Build configuration list for PBXNativeTarget "Yueshan" */;
+			buildPhases = (
+				082BCEDE90D6BADF2BAD9C52 /* Sources */,
+				A9D6B69BB1E7624DFDC3D7EC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Yueshan;
+			packageProductDependencies = (
+			);
+			productName = Yueshan;
+			productReference = 151E092F112F6FB8DE8D6E67 /* Yueshan.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		65328ECE03CD12305027B8A7 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					23063E7EF791E7B4A1984626 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 6982B206C6A0D6BF06406E0F;
+					};
+					309B901A2EDEA372058CC879 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					6982B206C6A0D6BF06406E0F = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 2BDCCDD33F8D4389210F6C55 /* Build configuration list for PBXProject "Yueshan" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 10049A22F1516EA82488C4D7;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = FE8977DF748FD4075F8B52A6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6982B206C6A0D6BF06406E0F /* Yueshan */,
+				309B901A2EDEA372058CC879 /* YueshanTests */,
+				23063E7EF791E7B4A1984626 /* YueshanUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A9D6B69BB1E7624DFDC3D7EC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7C872E4094E6A69A900602E7 /* library.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		082BCEDE90D6BADF2BAD9C52 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				88982BFF18464205AB968129 /* BookDetailView.swift in Sources */,
+				9A74CD16D9989025CD51B5BB /* Components.swift in Sources */,
+				F93C4FD5D4F9020783E7B376 /* DiscoverView.swift in Sources */,
+				19C3968A46509CF2B996D29D /* Library.swift in Sources */,
+				F00566231EA114EE40039C0A /* ProfileView.swift in Sources */,
+				0C294654163573BBB0F751AC /* ReaderView.swift in Sources */,
+				147C7FC815E626A5AF1604C0 /* ShelfView.swift in Sources */,
+				6828FC5D2BCAC22DA475D116 /* YueshanApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		24CA8457601344C578C9D110 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CB1391D0B52F09CC449D26BD /* ReaderFlowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D92B0BA200EA857B1A5782B3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7F8BAC539D8E0EB142DE063 /* LibraryStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		44C2434C983912AE37485F89 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6982B206C6A0D6BF06406E0F /* Yueshan */;
+			targetProxy = 2DBE3BFC6AD28F06074B844D /* PBXContainerItemProxy */;
+		};
+		60841B8E50556582FBBD0E99 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6982B206C6A0D6BF06406E0F /* Yueshan */;
+			targetProxy = 090FFA941F55B863F2277EA5 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		017C1747168BE4588B7B965B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		1A8509358959077B697CD3FB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "阅山";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.reader.demo;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3838768536A7166599108F50 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.YueshanTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Yueshan.app/Yueshan";
+			};
+			name = Release;
+		};
+		419FAF8D66589A48F9FC1908 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.YueshanTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Yueshan.app/Yueshan";
+			};
+			name = Debug;
+		};
+		4E64682C8434D43EB619FA22 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		7DB49B72F04733DE7878E3A1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.YueshanUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Yueshan;
+			};
+			name = Release;
+		};
+		A0805405E377B256BE1CF511 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.YueshanUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Yueshan;
+			};
+			name = Debug;
+		};
+		ACEC92913886CBE1F29F67D2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "阅山";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.reader.demo;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		067F32CA618034B6B5953518 /* Build configuration list for PBXNativeTarget "YueshanTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				419FAF8D66589A48F9FC1908 /* Debug */,
+				3838768536A7166599108F50 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2BDCCDD33F8D4389210F6C55 /* Build configuration list for PBXProject "Yueshan" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4E64682C8434D43EB619FA22 /* Debug */,
+				017C1747168BE4588B7B965B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A5EB6B083D5EC08DD393C12A /* Build configuration list for PBXNativeTarget "YueshanUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A0805405E377B256BE1CF511 /* Debug */,
+				7DB49B72F04733DE7878E3A1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AF9D7F043F23C62A3D5CEDDE /* Build configuration list for PBXNativeTarget "Yueshan" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A8509358959077B697CD3FB /* Debug */,
+				ACEC92913886CBE1F29F67D2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 65328ECE03CD12305027B8A7 /* Project object */;
+}

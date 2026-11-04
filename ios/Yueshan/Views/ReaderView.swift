@@ -81,7 +81,7 @@ struct ReaderView: View {
         // Controls never participate in text layout, so hiding them reveals the
         // full page without repagination or changing the current scroll position.
         .overlay(alignment: .top) {
-            if controlsVisible { header.background(theme.background) }
+            if controlsVisible { header }
         }
         .overlay(alignment: .bottom) {
             VStack(spacing: 0) {
@@ -89,7 +89,7 @@ struct ReaderView: View {
                     Text(message).font(.system(size: 11)).padding(13).foregroundStyle(theme.ink).background(.regularMaterial, in: Capsule()).padding(.bottom, 9)
                 }
                 if controlsVisible {
-                    footer.background(theme.background)
+                    footer
                 } else {
                     Button { controlsVisible = true; haptic() } label: {
                         Label("显示工具栏", systemImage: "ellipsis").font(.system(size: 10)).padding(.horizontal, 14).frame(height: 20).foregroundStyle(theme.secondary).background(theme.background.opacity(0.92), in: Capsule())
@@ -140,37 +140,41 @@ struct ReaderView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Button { save(); dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }.accessibilityLabel("返回书架")
-                Spacer(minLength: 0)
-                VStack(spacing: 5) {
-                    Text(book.title).font(.system(size: 13, weight: .medium, design: .serif)).tracking(2)
-                    Text(book.chapterTitle(chapter)).font(.system(size: 9)).foregroundStyle(theme.secondary).accessibilityIdentifier("chapterTitle")
-                }
-                Spacer(minLength: 0)
-                Button { store.toggleFavorite(book); haptic() } label: { Image(systemName: store.isFavorite(book) ? "bookmark.fill" : "bookmark").frame(width: 44, height: 44) }.accessibilityLabel(store.isFavorite(book) ? "已收藏" : "加入书架")
-            }.padding(.horizontal, 9).padding(.bottom, 8)
-            Rectangle().fill(theme.secondary.opacity(0.2)).frame(height: 0.5)
+        HStack(spacing: 10) {
+            Button { save(); dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }.accessibilityLabel("返回书架")
+            Spacer(minLength: 0)
+            VStack(spacing: 5) {
+                Text(book.title).font(.system(size: 13, weight: .medium, design: .serif)).tracking(2)
+                Text(book.chapterTitle(chapter)).font(.system(size: 9)).foregroundStyle(theme.secondary).accessibilityIdentifier("chapterTitle")
+            }
+            Spacer(minLength: 0)
+            Button { store.toggleFavorite(book); haptic() } label: { Image(systemName: store.isFavorite(book) ? "bookmark.fill" : "bookmark").frame(width: 44, height: 44) }.accessibilityLabel(store.isFavorite(book) ? "已收藏" : "加入书架")
         }
+        .padding(.horizontal, 5).padding(.vertical, 4)
+        .frame(maxWidth: 520)
+        .readerFloatingSurface()
+        .padding(.horizontal, 18).padding(.top, 8)
     }
 
     private var footer: some View {
-        VStack(spacing: 5) {
-            HStack {
-                Button { flip(forward: false) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 34) }.disabled(chapter == 0 && (store.settings.mode == .scroll || page == 0)).accessibilityLabel(store.settings.mode == .paged ? "上一页" : "上一章").accessibilityIdentifier("previousChapter")
-                Spacer(minLength: 0)
-                VStack(spacing: 3) {
-                    Text(sliderEditing ? "跳至 · \(book.chapterTitle(Int(sliderValue)))" : "第 \(chapter + 1) / \(book.chapters.count) 章").font(.system(size: 10)).lineLimit(1)
-                    Text(store.settings.mode == .paged ? "本章 \(page + 1) / \(max(1, ranges.count)) 页" : "上下滚动 · 已读 \(store.percent(book))%").font(.system(size: 8)).foregroundStyle(theme.secondary).accessibilityIdentifier("readerPageStatus")
+        VStack(spacing: 10) {
+            HStack(spacing: 4) {
+                Button { flip(forward: false) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.disabled(chapter == 0 && (store.settings.mode == .scroll || page == 0)).accessibilityLabel(store.settings.mode == .paged ? "上一页" : "上一章").accessibilityIdentifier("previousChapter")
+                VStack(spacing: 0) {
+                    HStack(spacing: 6) {
+                        Text(sliderEditing ? "跳至 · \(book.chapterTitle(Int(sliderValue)))" : "第 \(chapter + 1) / \(book.chapters.count) 章").font(.system(size: 10)).lineLimit(1)
+                        Spacer(minLength: 0)
+                        Text(store.settings.mode == .paged ? "本章 \(page + 1) / \(max(1, ranges.count)) 页" : "已读 \(store.percent(book))%").font(.system(size: 9)).foregroundStyle(theme.secondary).accessibilityIdentifier("readerPageStatus")
+                    }
+                    Slider(value: $sliderValue, in: 0...Double(max(1, book.chapters.count - 1)), step: 1) { editing in
+                        sliderEditing = editing
+                        if !editing { goChapter(min(book.chapters.count - 1, Int(sliderValue))) }
+                    }.tint(theme.ink.opacity(0.65)).accessibilityLabel("章节进度").accessibilityValue(book.chapterTitle(Int(sliderValue))).accessibilityIdentifier("chapterSlider")
                 }
-                Spacer(minLength: 0)
-                Button { flip(forward: true) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 34) }.disabled(chapter == book.chapters.count - 1 && (store.settings.mode == .scroll || page == ranges.count - 1)).accessibilityLabel(store.settings.mode == .paged ? "下一页" : "下一章").accessibilityIdentifier("nextChapter")
+                Button { flip(forward: true) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.disabled(chapter == book.chapters.count - 1 && (store.settings.mode == .scroll || page == ranges.count - 1)).accessibilityLabel(store.settings.mode == .paged ? "下一页" : "下一章").accessibilityIdentifier("nextChapter")
             }
-            Slider(value: $sliderValue, in: 0...Double(max(1, book.chapters.count - 1)), step: 1) { editing in
-                sliderEditing = editing
-                if !editing { goChapter(min(book.chapters.count - 1, Int(sliderValue))) }
-            }.tint(theme.secondary).padding(.horizontal, 24).accessibilityLabel("章节进度").accessibilityValue(book.chapterTitle(Int(sliderValue))).accessibilityIdentifier("chapterSlider")
+            .padding(.horizontal, 5).padding(.vertical, 8)
+            .readerFloatingSurface()
             HStack {
                 tool("目录", icon: "list.bullet") { save(); showContents = true }.accessibilityIdentifier("readerContents")
                 Spacer()
@@ -182,10 +186,14 @@ struct ReaderView: View {
                     ForEach(["fulltext", "sourceSwitch", "bookmarks", "chapterCache", "systemTTS", "onlineTTS", "aiRoles", "purify", "highlight", "comments"], id: \.self) { id in
                         Button(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { save(); demoFeature = FeatureCatalog.feature(id) }
                     }
-                } label: { VStack(spacing: 5) { Image(systemName: "ellipsis").font(.system(size: 17)); Text("更多").font(.system(size: 9)) }.frame(width: 45, height: 45) }.accessibilityLabel("更多阅读工具").accessibilityIdentifier("readerMoreTools")
+                } label: { VStack(spacing: 5) { Image(systemName: "ellipsis").font(.system(size: 20, weight: .medium)); Text("更多").font(.system(size: 10)) }.frame(width: 55, height: 48) }.accessibilityLabel("更多阅读工具").accessibilityIdentifier("readerMoreTools")
             }
-            .padding(.horizontal, 32)
-        }.padding(.top, 8).padding(.bottom, 4).overlay(alignment: .top) { Rectangle().fill(theme.secondary.opacity(0.2)).frame(height: 0.5) }
+            .padding(.horizontal, 18).frame(height: 64)
+            .readerFloatingSurface()
+            .accessibilityElement(children: .contain).accessibilityIdentifier("readerFloatingToolbar")
+        }
+        .frame(maxWidth: 520)
+        .padding(.horizontal, 18).padding(.bottom, 8)
     }
 
     private func tapArea(_ fraction: Double, label: String, id: String) -> some View {
@@ -194,7 +202,7 @@ struct ReaderView: View {
         }.buttonStyle(.plain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
     private func tool(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { VStack(spacing: 5) { Image(systemName: icon).font(.system(size: 17)); Text(title).font(.system(size: 9)) }.frame(width: 55, height: 45) }.foregroundStyle(theme.ink.opacity(0.8))
+        Button(action: action) { VStack(spacing: 5) { Image(systemName: icon).font(.system(size: 20, weight: .medium)); Text(title).font(.system(size: 10)) }.frame(width: 55, height: 48) }.foregroundStyle(theme.ink.opacity(0.9))
     }
     private func layoutKey(_ size: CGSize) -> String {
         "\(chapter)-\(Int(size.width))-\(Int(size.height))-\(store.settings.fontSize)-\(store.settings.lineSpacing)-\(theme.rawValue)-\(store.settings.mode.rawValue)-\(restoreID)-\(initialized)"
@@ -237,6 +245,19 @@ struct ReaderView: View {
         Task { @MainActor in try? await Task.sleep(for: .seconds(2)); if message == value { message = nil } }
     }
 }
+
+private extension View {
+    @ViewBuilder func readerFloatingSurface() -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: Capsule())
+        } else {
+            self.background(.regularMaterial, in: Capsule())
+                .overlay { Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5) }
+                .shadow(color: .black.opacity(0.1), radius: 16, y: 6)
+        }
+    }
+}
+
 struct ContentsView: View {
     @Environment(\.dismiss) private var dismiss
     let book: Book

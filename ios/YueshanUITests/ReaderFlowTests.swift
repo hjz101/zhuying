@@ -30,6 +30,8 @@ final class ReaderFlowTests: XCTestCase {
         app.segmentedControls.buttons["24"].tap()
         XCTAssertTrue(app.segmentedControls.buttons["24"].isSelected)
         app.buttons["完成"].tap()
+        assertFloatingToolbar(in: app)
+        capture(app, name: "FloatingReaderToolbarDark")
         app.buttons["返回书架"].tap()
         XCTAssertTrue(resume.waitForExistence(timeout: 5))
         resume.tap()
@@ -71,6 +73,27 @@ final class ReaderFlowTests: XCTestCase {
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<5 { if element.isHittable { return }; app.swipeUp() }
+    }
+
+    @MainActor
+    private func assertFloatingToolbar(in app: XCUIApplication) {
+        let bar = app.otherElements["readerFloatingToolbar"]
+        XCTAssertTrue(bar.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(bar.frame.minX, app.frame.minX + 14)
+        XCTAssertLessThanOrEqual(bar.frame.maxX, app.frame.maxX - 14)
+        XCTAssertLessThan(bar.frame.maxY, app.frame.maxY - 20)
+        XCTAssertLessThanOrEqual(bar.frame.height, 80, "The primary toolbar should stay compact like the home tab bar")
+        for id in ["readerContents", "readerSettings", "readerMoreTools"] {
+            XCTAssertTrue(app.buttons[id].isHittable, "Floating controls must remain accessible: \(id)")
+        }
+    }
+
+    @MainActor
+    private func capture(_ app: XCUIApplication, name: String) {
+        let preview = XCTAttachment(screenshot: app.screenshot())
+        preview.name = name
+        preview.lifetime = .keepAlways
+        add(preview)
     }
 
     @MainActor
@@ -127,6 +150,8 @@ final class ReaderFlowTests: XCTestCase {
         acknowledgeFirstGuide(in: app)
         let text = app.textViews["continuousText"]
         XCTAssertTrue(text.waitForExistence(timeout: 5))
+        assertFloatingToolbar(in: app)
+        capture(app, name: "FloatingReaderToolbar")
         text.swipeUp()
         let frame = text.frame
         let progress = app.staticTexts["readerPageStatus"].label
@@ -184,7 +209,7 @@ final class ReaderFlowTests: XCTestCase {
         app.buttons["showReaderControls"].tap()
         XCTAssertEqual(app.staticTexts["readerPageStatus"].label, page, "Showing controls must preserve the current page and page count")
         XCTAssertEqual(text.frame, frame)
-        XCTAssertTrue(app.buttons["readerSettings"].isHittable)
+        assertFloatingToolbar(in: app)
     }
 
     @MainActor

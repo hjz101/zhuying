@@ -56,65 +56,80 @@ struct ReadingSettingsView: View {
     private var theme: ReadingTheme { store.settings.theme }
     var body: some View {
         NavigationStack {
-            Form {
-                Section("阅读方式") {
-                    Picker("翻页模式", selection: $store.settings.mode) {
-                        ForEach(ReadingMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
-                    }.pickerStyle(.segmented).accessibilityIdentifier("readingModePicker")
-                    Text("左右翻页按屏幕、字号与行距分页；两种模式共用阅读位置。").font(.system(size: 11)).foregroundStyle(.secondary)
-                    Button { showGestureGuide = true } label: {
-                        Label("查看阅读手势", systemImage: "hand.tap")
-                    }.accessibilityIdentifier("readingGestureHelp")
-                }
-                Section("单手操作") {
-                    Toggle("轻触翻页", isOn: $store.settings.tapToTurn).accessibilityIdentifier("tapToTurnToggle")
-                    HStack(spacing: 5) {
-                        tapZone("下一页")
-                        tapZone("显示／隐藏菜单")
-                        tapZone("下一页")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    AppPageHeader(title: "阅读，按你的习惯。", subtitle: "翻页、纸色与排版，找到舒服的阅读节奏。", icon: "textformat.size")
+                    AppSettingsCard("阅读方式", icon: "book.pages") {
+                        Picker("翻页模式", selection: $store.settings.mode) {
+                            ForEach(ReadingMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
+                        }.pickerStyle(.segmented).accessibilityIdentifier("readingModePicker").labelsHidden()
+                        Text("两种模式共用阅读位置，切换后可接着读。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        Button { showGestureGuide = true } label: {
+                            HStack { Label("查看阅读手势", systemImage: "hand.tap"); Spacer(); Image(systemName: "chevron.right").font(.system(size: 10)) }
+                                .font(.system(size: 12)).frame(minHeight: 32)
+                        }.accessibilityIdentifier("readingGestureHelp")
                     }
-                    Text("启用后，轻点左侧或右侧都前进一页，中间显示／隐藏菜单。滚动模式前进约一屏；上一页使用右滑或底部按钮。").font(.system(size: 11)).foregroundStyle(.secondary)
-                    Toggle("轻微触觉反馈", isOn: $store.settings.haptics).accessibilityIdentifier("hapticsToggle")
-                }
-                Section("阅读主题") {
-                    HStack(spacing: 12) {
-                        ForEach(ReadingTheme.allCases, id: \.self) { item in
-                            Button { store.settings.theme = item } label: {
-                                VStack(spacing: 10) {
-                                    Image(systemName: item == .dark ? "moon" : "sun.max").font(.system(size: 20))
-                                    Text(item.title).font(.system(size: 12))
-                                }.frame(maxWidth: .infinity).frame(height: 84).foregroundStyle(item.ink).background(item.background, in: .rect(cornerRadius: 12))
-                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(theme == item ? Color(hex: 0x8FA277) : Color.clear, lineWidth: 2))
-                            }.buttonStyle(.plain).accessibilityLabel(item.title).accessibilityAddTraits(item == theme ? .isSelected : [])
+                    AppSettingsCard("单手操作", icon: "hand.point.up.left") {
+                        Toggle("轻触翻页", isOn: $store.settings.tapToTurn).font(.system(size: 13)).accessibilityIdentifier("tapToTurnToggle")
+                        HStack(spacing: 5) {
+                            tapZone("下一页")
+                            tapZone("显示／隐藏菜单")
+                            tapZone("下一页")
                         }
-                    }.padding(.vertical, 5).listRowBackground(Color.clear).listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
-                }
-                Section {
-                    Picker("字号", selection: $store.settings.fontSize) {
-                        ForEach([16.0, 18, 20, 22, 24], id: \.self) { value in Text("\(Int(value))").tag(value) }
-                    }.pickerStyle(.segmented).accessibilityIdentifier("fontPicker")
-                } header: { Text("文字大小 · \(Int(store.settings.fontSize)) pt") }
-                Section("段落间距") {
-                    Picker("行距", selection: $store.settings.lineSpacing) {
-                        Text("紧凑").tag(6.0); Text("适中").tag(12.0); Text("宽松").tag(18.0)
-                    }.pickerStyle(.segmented)
-                }
-                Section("阅读预览") {
-                    Text("山海有相逢，长风自有归处。\n在字里行间，遇见另一个世界。")
-                        .font(.system(size: store.settings.fontSize, design: .serif)).lineSpacing(store.settings.lineSpacing).foregroundStyle(theme.ink).padding(.vertical, 15).listRowBackground(theme.background)
-                }
-                Section("更多阅读设置") {
-                    ForEach(["pageStyle", "typography", "themes", "fonts", "titleDesign", "purify", "highlight", "comments"], id: \.self) { id in
-                        NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id)) } label: { Label(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon).font(.system(size: 13)) }
+                        Text("轻点左右两侧均前进，中间唤出菜单。滚动模式前进约一屏；上一页可右滑或使用底部按钮。").font(.system(size: 11)).foregroundStyle(Palette.muted).lineSpacing(5)
+                        Divider().overlay(Palette.line)
+                        Toggle("轻微触觉反馈", isOn: $store.settings.haptics).font(.system(size: 13)).accessibilityIdentifier("hapticsToggle")
                     }
-                }
-                Section {
-                    Button("恢复默认设置") { store.settings = .init() }.foregroundStyle(Palette.green)
-                } footer: { Label("偏好自动保存在当前设备", systemImage: "checkmark.circle").font(.system(size: 11)) }
+                    AppSettingsCard("阅读主题", icon: "paintpalette") {
+                        HStack(spacing: 12) {
+                            ForEach(ReadingTheme.allCases, id: \.self) { item in
+                                Button { store.settings.theme = item } label: {
+                                    VStack(spacing: 10) {
+                                        Image(systemName: item == .dark ? "moon" : "sun.max").font(.system(size: 20))
+                                        Text(item.title).font(.system(size: 12))
+                                    }.frame(maxWidth: .infinity).frame(height: 78).foregroundStyle(item.ink).background(item.background, in: .rect(cornerRadius: 13))
+                                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(theme == item ? Palette.green : Palette.line, lineWidth: theme == item ? 2 : 0.5))
+                                }.buttonStyle(.plain).accessibilityLabel(item.title).accessibilityAddTraits(item == theme ? .isSelected : [])
+                            }
+                        }
+                    }
+                    AppSettingsCard("文字排版", icon: "text.alignleft") {
+                        Text("文字大小 · \(Int(store.settings.fontSize)) pt").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        Picker("字号", selection: $store.settings.fontSize) {
+                            ForEach([16.0, 18, 20, 22, 24], id: \.self) { value in Text("\(Int(value))").tag(value) }
+                        }.pickerStyle(.segmented).accessibilityIdentifier("fontPicker").labelsHidden()
+                        Text("行间距").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        Picker("行距", selection: $store.settings.lineSpacing) {
+                            Text("紧凑").tag(6.0); Text("适中").tag(12.0); Text("宽松").tag(18.0)
+                        }.pickerStyle(.segmented).accessibilityIdentifier("lineSpacingPicker").labelsHidden()
+                    }
+                    AppSettingsCard("阅读预览", icon: "doc.text") {
+                        Text("山海有相逢，长风自有归处。\n在字里行间，遇见另一个世界。")
+                            .font(.system(size: store.settings.fontSize, design: .serif)).lineSpacing(store.settings.lineSpacing)
+                            .foregroundStyle(theme.ink).frame(maxWidth: .infinity, alignment: .leading).padding(18)
+                            .background(theme.background, in: .rect(cornerRadius: 13)).accessibilityIdentifier("readingStylePreview")
+                    }
+                    AppSettingsCard("更多阅读设置", icon: "slider.horizontal.3") {
+                        VStack(spacing: 0) {
+                            ForEach(["pageStyle", "typography", "themes", "fonts", "titleDesign", "purify", "highlight", "comments"], id: \.self) { id in
+                                NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id)) } label: {
+                                    HStack {
+                                        Label(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon)
+                                        Spacer(); Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                                    }.font(.system(size: 13)).frame(minHeight: 44).contentShape(Rectangle())
+                                }.buttonStyle(.plain).accessibilityIdentifier("reading-option-\(id)")
+                                if id != "comments" { Divider().overlay(Palette.line) }
+                            }
+                        }
+                    }
+                    Button("恢复默认设置") { store.settings = .init() }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("resetReadingSettings")
+                    Label("偏好自动保存在当前设备", systemImage: "checkmark.circle").font(.system(size: 11)).foregroundStyle(Palette.muted).frame(maxWidth: .infinity)
+                }.padding(22)
             }
+            .appPageStyle()
             .navigationTitle("阅读偏好").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
-        }.tint(Palette.green).presentationDetents([.large]).presentationDragIndicator(.visible)
+        }.appPageStyle().presentationBackground(Palette.background).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(26)
             .sheet(isPresented: $showGestureGuide) { ReadingGestureGuideView(isFirstUse: false) }
     }
     private func tapZone(_ title: String) -> some View {

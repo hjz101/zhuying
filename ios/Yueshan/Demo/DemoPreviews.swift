@@ -175,6 +175,6 @@ struct DemoFilePreview: View {
             }.background(Palette.background).navigationTitle(file.name).navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
                 .safeAreaInset(edge: .bottom) { VStack(spacing: 8) { Slider(value: $page, in: 1...12, step: 1).tint(Palette.green); Text("\(Int(page)) / 12 · 模拟文件内容，无真实解析").font(.system(size: 10)).foregroundStyle(Palette.muted) }.padding(18).background(.regularMaterial) }
-        }
+        }.appPageStyle().presentationBackground(Palette.background).presentationCornerRadius(26)
     }
 }

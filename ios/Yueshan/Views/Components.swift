@@ -6,6 +6,55 @@ enum Palette {
     static let muted = Color(hex: 0x929986)
     static let line = Color(hex: 0xE3E6D9)
     static let accent = Color(hex: 0xB7815A)
+    static let card = Color.white.opacity(0.72)
+    static let soft = Color(hex: 0xEDF0E4)
+}
+
+/// App controls use the same palette as the shelf; reading paper is configured separately.
+extension View {
+    func appPageStyle() -> some View {
+        self.background(Palette.background)
+            .foregroundStyle(Palette.green)
+            .tint(Palette.green)
+            .toolbarBackground(Palette.background, for: .navigationBar)
+            .preferredColorScheme(.light)
+    }
+}
+
+struct AppPageHeader: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    var body: some View {
+        HStack(alignment: .top, spacing: 13) {
+            Image(systemName: icon).font(.system(size: 25, weight: .light))
+                .frame(width: 54, height: 54).background(Palette.soft, in: .rect(cornerRadius: 17))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 9) {
+                Text(title).font(.system(size: 25, weight: .medium, design: .serif))
+                Text(subtitle).font(.system(size: 11)).foregroundStyle(Palette.muted).lineSpacing(5)
+            }
+        }.foregroundStyle(Palette.green).frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct AppSettingsCard<Content: View>: View {
+    let title: String
+    let icon: String
+    let content: Content
+    init(_ title: String, icon: String, @ViewBuilder content: () -> Content) {
+        self.title = title; self.icon = icon; self.content = content()
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label(title, systemImage: icon).font(.system(size: 16, weight: .medium, design: .serif))
+                .foregroundStyle(Palette.green)
+            content
+        }
+        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.card, in: .rect(cornerRadius: 18))
+        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(Palette.line.opacity(0.55), lineWidth: 0.5) }
+    }
 }
 
 extension Color {

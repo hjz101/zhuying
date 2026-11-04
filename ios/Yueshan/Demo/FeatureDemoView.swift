@@ -87,19 +87,12 @@ struct FeatureDemoView: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 23) {
-                HStack(alignment: .top, spacing: 13) {
-                    Image(systemName: feature.icon).font(.system(size: 25, weight: .light)).foregroundStyle(Palette.green).padding(13).background(Palette.green.opacity(0.07), in: .rect(cornerRadius: 15))
-                    VStack(alignment: .leading, spacing: 9) {
-                        Text(feature.title).font(.system(size: 27, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
-                        Text(feature.summary).font(.system(size: 11)).foregroundStyle(Palette.muted).lineSpacing(5)
-                    }
-                }
+                AppPageHeader(title: feature.title, subtitle: feature.summary, icon: feature.icon)
                 DemoNotice()
                 if !feature.fields.isEmpty {
-                    VStack(alignment: .leading, spacing: 18) {
-                        SectionHeading(title: "配置与选项")
+                    AppSettingsCard("配置与选项", icon: "slider.horizontal.3") {
                         ForEach(feature.fields) { field in fieldView(field) }
-                    }.padding(17).background(.white.opacity(0.7), in: .rect(cornerRadius: 15))
+                    }
                 }
                 preview
                 if let outcome = demo.outcomes[outcomeKey] {
@@ -131,7 +124,7 @@ struct FeatureDemoView: View {
             withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo("demo-result", anchor: .center) }
         }
         }
-        .background(Palette.background).navigationTitle(feature.title).navigationBarTitleDisplayMode(.inline)
+        .appPageStyle().navigationTitle(feature.title).navigationBarTitleDisplayMode(.inline)
         .sheet(item: $filePreview) { item in DemoFilePreview(file: item) }
         .confirmationDialog("\(confirmAction ?? "")？", isPresented: Binding(get: { confirmAction != nil }, set: { if !$0 { confirmAction = nil } }), titleVisibility: .visible) {
             Button("确认演示") {

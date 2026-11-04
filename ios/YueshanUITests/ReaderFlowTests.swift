@@ -62,10 +62,12 @@ final class ReaderFlowTests: XCTestCase {
         app.buttons["完成"].tap()
         XCTAssertTrue(app.staticTexts["第五章 灯火入梦"].waitForExistence(timeout: 5))
         app.buttons["readerSettings"].tap()
+        capture(app, name: "UnifiedReadingPreferences")
         let dark = app.buttons["夜读"]
         XCTAssertTrue(dark.waitForExistence(timeout: 5))
         reveal(dark, in: app)
         dark.tap()
+        capture(app, name: "UnifiedReadingPreferencesNightSelection")
         reveal(app.segmentedControls.buttons["24"], in: app)
         app.segmentedControls.buttons["24"].tap()
         XCTAssertTrue(app.segmentedControls.buttons["24"].isSelected)
@@ -139,6 +141,51 @@ final class ReaderFlowTests: XCTestCase {
         preview.name = name
         preview.lifetime = .keepAlways
         add(preview)
+    }
+
+    @MainActor
+    func testThemedPreferencesResetAndContentsSearchPreserveProgress() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        app.buttons["continueReading"].tap()
+        acknowledgeFirstGuide(in: app)
+        let chapter = app.staticTexts["chapterTitle"].label
+        app.buttons["readerSettings"].tap()
+        app.segmentedControls.buttons["左右翻页"].tap()
+        let dark = app.buttons["夜读"]
+        reveal(dark, in: app); dark.tap()
+        let font = app.segmentedControls.buttons["22"]
+        reveal(font, in: app); font.tap()
+        let preview = app.staticTexts["readingStylePreview"]
+        reveal(preview, in: app)
+        XCTAssertTrue(preview.isHittable)
+        capture(app, name: "UnifiedReadingStylePreview")
+
+        let advanced = app.buttons["reading-option-typography"]
+        reveal(advanced, in: app); advanced.tap()
+        XCTAssertTrue(app.navigationBars["阅读排版"].waitForExistence(timeout: 5))
+        capture(app, name: "UnifiedAdvancedTypography")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let reset = app.buttons["resetReadingSettings"]
+        reveal(reset, in: app); reset.tap()
+        app.buttons["完成"].tap()
+        XCTAssertTrue(app.textViews["continuousText"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
+
+        app.buttons["readerContents"].tap()
+        XCTAssertTrue(app.buttons["chapter-2"].waitForExistence(timeout: 5))
+        capture(app, name: "UnifiedChapterContents")
+        // The system search field hides leading navigation actions while editing.
+        app.buttons["正序"].tap()
+        XCTAssertTrue(app.buttons["倒序"].exists)
+        let search = app.searchFields.firstMatch
+        search.tap(); search.typeText("灯火")
+        XCTAssertTrue(app.buttons["chapter-4"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["chapter-2"].exists)
+        app.buttons["chapter-4"].tap()
+        XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第五章 灯火入梦")
     }
 
     @MainActor

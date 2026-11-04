@@ -297,30 +297,43 @@ struct ContentsView: View {
     let onSelect: (Int) -> Void
     @State private var query = ""
     @State private var reversed = false
+    private var visibleChapters: [Int] {
+        (reversed ? Array(book.chapters.indices.reversed()) : Array(book.chapters.indices))
+            .filter { query.isEmpty || book.chapterTitle($0).contains(query) }
+    }
 
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
-                List {
-                    Section {
-                        ForEach((reversed ? Array(book.chapters.indices.reversed()) : Array(book.chapters.indices)).filter { query.isEmpty || book.chapterTitle($0).contains(query) }, id: \.self) { index in
-                            Button { onSelect(index) } label: {
-                                HStack {
-                                    Text(book.chapterTitle(index)).font(.system(size: 14))
-                                    Spacer()
-                                    if index == currentChapter { Text("正在阅读").font(.system(size: 10)); Image(systemName: "waveform").font(.system(size: 12)) }
-                                }.foregroundStyle(index == currentChapter ? Palette.green : Palette.green.opacity(0.7)).padding(.vertical, 8)
-                            }.listRowBackground(index == currentChapter ? Color(hex: 0xE7EEDC) : Palette.background).id(index).accessibilityIdentifier("chapter-\(index)")
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        AppPageHeader(title: book.title, subtitle: "共 \(book.chapters.count) 章 · 选择章节继续故事。", icon: "list.bullet")
+                        if visibleChapters.isEmpty { ContentUnavailableView.search(text: query) }
+                        LazyVStack(spacing: 0) {
+                            ForEach(visibleChapters, id: \.self) { index in
+                                Button { onSelect(index) } label: {
+                                    HStack(spacing: 12) {
+                                        Text(book.chapterTitle(index)).font(.system(size: 14))
+                                        Spacer()
+                                        if index == currentChapter { Text("正在阅读").font(.system(size: 10)); Image(systemName: "waveform").font(.system(size: 12)) }
+                                        else { Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted) }
+                                    }.foregroundStyle(Palette.green).padding(.horizontal, 16).frame(minHeight: 56)
+                                        .background(index == currentChapter ? Palette.soft : Color.clear)
+                                        .contentShape(Rectangle())
+                                }.buttonStyle(.plain).id(index).accessibilityIdentifier("chapter-\(index)")
+                                if index != visibleChapters.last { Divider().overlay(Palette.line).padding(.horizontal, 16) }
+                            }
                         }
-                    } header: { Text("\(book.title) · 共 \(book.chapters.count) 章示例").font(.system(size: 11)) }
+                        .background(Palette.card, in: .rect(cornerRadius: 18)).clipShape(.rect(cornerRadius: 18))
+                    }.padding(22)
                 }
-                .scrollContentBackground(.hidden).background(Palette.background)
+                .appPageStyle()
                 .onAppear { if let currentChapter { proxy.scrollTo(currentChapter, anchor: .center) } }
             }
             .navigationTitle("章节目录").navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: "搜索章节")
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button(reversed ? "倒序" : "正序", systemImage: "arrow.up.arrow.down") { reversed.toggle() } } }
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
-        }.tint(Palette.green).presentationDetents([.large]).presentationDragIndicator(.visible)
+        }.appPageStyle().presentationBackground(Palette.background).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(26)
     }
 }

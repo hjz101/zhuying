@@ -74,7 +74,7 @@ struct UpdatesView: View {
             }.background(Palette.background).navigationTitle("作品更新").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
         }
-        .tint(Palette.green).presentationDragIndicator(.visible)
+        .appPageStyle().presentationBackground(Palette.background).presentationDragIndicator(.visible).presentationCornerRadius(26)
         .onDisappear {
             guard let book = pendingBook else { return }
             Task { @MainActor in try? await Task.sleep(for: .milliseconds(300)); store.read(book, chapter: pendingChapter) }

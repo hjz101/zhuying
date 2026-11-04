@@ -29,6 +29,31 @@ final class FeatureDemoTests: XCTestCase {
         XCTAssertTrue(FeatureCatalog.search("不存在的模块").isEmpty)
     }
 
+    func testToolCategoriesCoverEveryFeatureExactlyOnce() {
+        let ids = ToolCategory.allCases.flatMap { $0.features.map(\.id) }
+        XCTAssertEqual(ToolCategory.allCases.count, 6)
+        XCTAssertEqual(ids.count, FeatureCatalog.all.count)
+        XCTAssertEqual(Set(ids), Set(FeatureCatalog.all.map(\.id)))
+        for category in ToolCategory.allCases {
+            XCTAssertFalse(category.features.isEmpty)
+            XCTAssertEqual(category.search("   ").map(\.id), category.features.map(\.id))
+        }
+        XCTAssertEqual(ToolCategory.data.search("备份").map(\.id), ["backup", "icloud"])
+        XCTAssertTrue(ToolCategory.reading.search("书源编辑").isEmpty)
+        XCTAssertEqual(ToolCategory.advanced.search("书源编辑").map(\.id), ["sourceEdit"])
+    }
+
+    func testCommonToolsAreUniqueAndSearchStillCoversAllCategories() {
+        let common = FeatureCatalog.commonTools
+        XCTAssertEqual(common.count, 6)
+        XCTAssertEqual(Set(common.map(\.id)).count, common.count)
+        XCTAssertEqual(common.map(\.id), ["import", "fulltext", "cache", "backup", "systemTTS", "themes"])
+        for feature in FeatureCatalog.all {
+            XCTAssertTrue(FeatureCatalog.search(feature.title).contains { $0.id == feature.id })
+        }
+        XCTAssertTrue(FeatureCatalog.search("不存在的模块").isEmpty)
+    }
+
     func testFieldsAreScopedToFeatureAndSource() {
         let feature = FeatureCatalog.feature("sourceEdit")
         let field = feature.fields.first { $0.id == "name" }!

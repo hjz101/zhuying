@@ -24,6 +24,58 @@ final class FeatureFlowTests: XCTestCase {
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
     }
 
+    @MainActor func testToolsHomeShortcutsAndCategoryNavigation() {
+        let app = launch()
+        app.tabBars.buttons["工具"].tap()
+        XCTAssertTrue(app.staticTexts["常用工具"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["feature-shelf"].exists, "Home should not expand the full feature catalogue")
+        capture(app, name: "Tools-CompactHome")
+        for id in ["import", "fulltext", "cache", "backup", "systemTTS", "themes"] {
+            let shortcut = app.buttons["tool-shortcut-\(id)"]
+            reveal(shortcut, app: app); shortcut.tap()
+            XCTAssertTrue(app.navigationBars.buttons.element(boundBy: 0).waitForExistence(timeout: 5))
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        let routes = [("reading", "阅读", "contents"), ("files", "导入", "txt"),
+                      ("audio", "朗读", "systemTTS"), ("style", "外观", "themes"),
+                      ("data", "数据", "backup"), ("advanced", "高级", "sources")]
+        for (id, title, featureID) in routes {
+            let category = app.buttons["tool-category-\(id)"]
+            reveal(category, app: app); category.tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+            let feature = app.buttons["feature-\(featureID)"]
+            reveal(feature, app: app)
+            XCTAssertTrue(feature.isHittable)
+            if id == "reading" { capture(app, name: "Tools-ReadingCategory") }
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+    }
+
+    @MainActor func testToolsSearchEmptyResultsAndCategoryScope() {
+        let app = launch()
+        app.tabBars.buttons["工具"].tap()
+        let search = app.searchFields.firstMatch
+        search.tap(); search.typeText("不存在的模块")
+        XCTAssertTrue(app.staticTexts["没有找到相关功能"].waitForExistence(timeout: 5))
+        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 7))
+        XCTAssertTrue(app.staticTexts["常用工具"].waitForExistence(timeout: 5))
+        search.typeText("书源编辑")
+        XCTAssertTrue(app.buttons["feature-sourceEdit"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["tool-shortcut-import"].exists)
+        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4))
+        let reading = app.buttons["tool-category-reading"]
+        reveal(reading, app: app); reading.tap()
+        let categorySearch = app.textFields["toolCategorySearch"]
+        categorySearch.tap(); categorySearch.typeText("书源编辑")
+        XCTAssertTrue(app.staticTexts["没有找到相关功能"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["feature-sourceEdit"].exists)
+        categorySearch.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4))
+        categorySearch.typeText("章节目录")
+        XCTAssertTrue(app.buttons["feature-contents"].waitForExistence(timeout: 5))
+        app.buttons["feature-contents"].tap()
+        XCTAssertTrue(app.navigationBars["章节目录"].waitForExistence(timeout: 5))
+    }
+
     @MainActor func testEveryFeaturePageIsReachable() {
         let app = launch()
         let routes = [

@@ -11,48 +11,129 @@ struct DemoNotice: View {
 struct FeatureHubView: View {
     var sourceOnly = false
     @State private var query = ""
-    @State private var group: DemoGroup?
+    private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 25) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(sourceOnly ? "YOUR SOURCES, YOUR STORIES" : "A PLACE FOR EVERY DETAIL").font(.system(size: 8)).tracking(2).foregroundStyle(Palette.muted)
-                    Text(sourceOnly ? "连接每一种故事。" : "把阅读，调成你的样子。").font(.system(size: 26, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
-                    Text(sourceOnly ? "书源、规则、订阅和调试，一处整理。" : "完整功能布局预览，先体验流程，再打磨细节。").font(.system(size: 11)).foregroundStyle(Palette.muted)
-                }
-                DemoNotice()
-                if sourceOnly { DemoSourceList(scope: "hub") }
-                else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            category("全部", selected: group == nil) { group = nil }
-                            ForEach(DemoGroup.allCases, id: \.self) { item in category(item.rawValue, selected: group == item) { group = item } }
-                        }
+            LazyVStack(alignment: .leading, spacing: 24) {
+                if sourceOnly {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("YOUR SOURCES, YOUR STORIES").font(.system(size: 8)).tracking(2).foregroundStyle(Palette.muted)
+                        Text("连接每一种故事。").font(.system(size: 26, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
+                        Text("书源、规则、订阅和调试，一处整理。").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     }
+                    DemoNotice()
+                    DemoSourceList(scope: "hub")
+                    featureResults(sourceOnly: true)
+                } else if isSearching {
+                    featureResults(sourceOnly: false)
+                } else {
+                    toolsHome
                 }
-                ForEach(sourceOnly ? [DemoGroup.sources] : DemoGroup.allCases, id: \.self) { section in
-                    let features = FeatureCatalog.search(query, group: section).filter { group == nil || $0.group == group }
-                    if !features.isEmpty {
-                        VStack(alignment: .leading, spacing: 15) {
-                            SectionHeading(title: section.rawValue, subtitle: "\(features.count) 个模块")
-                            VStack(spacing: 0) {
-                                ForEach(features) { feature in
-                                    NavigationLink { FeatureDemoView(feature: feature) } label: { FeatureRow(feature: feature) }
-                                        .buttonStyle(.plain).accessibilityIdentifier("feature-\(feature.id)")
-                                    if feature.id != features.last?.id { Divider().padding(.leading, 54) }
-                                }
-                            }.padding(.horizontal, 15).background(.white.opacity(0.65), in: .rect(cornerRadius: 15))
-                        }
-                    }
-                }
-                if FeatureCatalog.search(query, group: sourceOnly ? .sources : group).isEmpty { ContentUnavailableView.search(text: query) }
             }.padding(22)
         }.background(Palette.background).navigationTitle(sourceOnly ? "书源" : "工具")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: sourceOnly ? "搜索书源功能" : "搜索模块或功能")
     }
-    private func category(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Text(title).font(.system(size: 11)).padding(.horizontal, 14).frame(height: 34).background(selected ? Palette.green : Palette.line.opacity(0.4), in: Capsule()).foregroundStyle(selected ? .white : Palette.muted) }
+
+    private var toolsHome: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("把阅读，调成你的样子。")
+                    .font(.system(size: 25, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
+                Text("常用工具随手打开，更多功能按类查找。")
+                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
+            }
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeading(title: "常用工具")
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                    ForEach(FeatureCatalog.commonTools) { feature in
+                        NavigationLink { FeatureDemoView(feature: feature) } label: {
+                            VStack(spacing: 10) {
+                                Image(systemName: feature.icon).font(.system(size: 22, weight: .light))
+                                Text(feature.title).font(.system(size: 12, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
+                            }.foregroundStyle(Palette.green).frame(maxWidth: .infinity, minHeight: 86)
+                                .background(Palette.card, in: .rect(cornerRadius: 14))
+                        }.buttonStyle(.plain).accessibilityIdentifier("tool-shortcut-\(feature.id)")
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeading(title: "全部分类", subtitle: "6 个分类")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
+                    ForEach(ToolCategory.allCases) { category in
+                        NavigationLink { ToolCategoryView(category: category) } label: {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Image(systemName: category.icon).font(.system(size: 20, weight: .light))
+                                    Spacer()
+                                    Text("\(category.features.count)").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                                }
+                                Text(category.title).font(.system(size: 16, weight: .medium))
+                                Text(category.summary).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1).minimumScaleFactor(0.8)
+                            }.foregroundStyle(Palette.green).padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Palette.card, in: .rect(cornerRadius: 16))
+                        }.buttonStyle(.plain).accessibilityIdentifier("tool-category-\(category.id)")
+                    }
+                }
+            }
+        }.accessibilityIdentifier("toolsHome")
+    }
+
+    @ViewBuilder private func featureResults(sourceOnly: Bool) -> some View {
+        let results = FeatureCatalog.search(query, group: sourceOnly ? .sources : nil)
+        if results.isEmpty {
+            ContentUnavailableView("没有找到相关功能", systemImage: "magnifyingglass", description: Text("换个关键词试试。"))
+        } else {
+            if !sourceOnly { SectionHeading(title: "搜索结果", subtitle: "\(results.count) 个功能") }
+            ForEach(sourceOnly ? [DemoGroup.sources] : DemoGroup.allCases, id: \.self) { group in
+                let features = results.filter { $0.group == group }
+                if !features.isEmpty {
+                    VStack(alignment: .leading, spacing: 14) {
+                        SectionHeading(title: group.rawValue, subtitle: "\(features.count) 个功能")
+                        FeatureMenuList(features: features)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ToolCategoryView: View {
+    let category: ToolCategory
+    @State private var query = ""
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(category.summary).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Text("\(category.features.count) 个功能").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                }
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Palette.muted)
+                    TextField("搜索分类内功能", text: $query)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityIdentifier("toolCategorySearch")
+                }.font(.system(size: 14)).padding(.horizontal, 14).frame(minHeight: 46)
+                    .background(Palette.card, in: .rect(cornerRadius: 12))
+                let features = category.search(query)
+                if features.isEmpty { ContentUnavailableView("没有找到相关功能", systemImage: "magnifyingglass", description: Text("换个关键词试试。")) }
+                else { FeatureMenuList(features: features) }
+            }.padding(22)
+        }.background(Palette.background).navigationTitle(category.title).navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct FeatureMenuList: View {
+    let features: [DemoFeature]
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(features) { feature in
+                NavigationLink { FeatureDemoView(feature: feature) } label: { FeatureRow(feature: feature) }
+                    .buttonStyle(.plain).accessibilityIdentifier("feature-\(feature.id)")
+                if feature.id != features.last?.id { Divider().padding(.leading, 54) }
+            }
+        }.padding(.horizontal, 15).background(.white.opacity(0.65), in: .rect(cornerRadius: 15))
     }
 }
 

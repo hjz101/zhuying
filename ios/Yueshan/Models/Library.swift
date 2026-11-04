@@ -65,6 +65,19 @@ enum ShelfSort: String, Codable, CaseIterable {
     var title: String { switch self { case .recent: "最近阅读"; case .added: "加入时间"; case .title: "书名排序" } }
 }
 
+enum ShelfLayout: String, CaseIterable {
+    case spacious, standard, compact, list
+    var title: String {
+        switch self {
+        case .spacious: "两列 · 大封面"; case .standard: "三列 · 标准"
+        case .compact: "四列 · 紧凑"; case .list: "列表"
+        }
+    }
+    var columns: Int {
+        switch self { case .spacious: 2; case .standard: 3; case .compact: 4; case .list: 1 }
+    }
+}
+
 struct ReadingSettings: Codable, Equatable {
     var fontSize: Double = 20
     var lineSpacing: Double = 12
@@ -108,6 +121,7 @@ struct LibrarySnapshot: Codable {
     var sort: ShelfSort = .recent
     var updates: [String: UpdateNotice]? = nil
     var hasSeenReadingGuide: Bool? = nil
+    var shelfLayout: String? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -124,6 +138,7 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var progress: [String: ReadingProgress]
     @Published var settings: ReadingSettings { didSet { persist() } }
     @Published var sort: ShelfSort = .recent { didSet { persist() } }
+    @Published var shelfLayout: ShelfLayout = .standard { didSet { persist() } }
     @Published private(set) var updates: [String: UpdateNotice] = [:]
     @Published private(set) var hasSeenReadingGuide = false
     @Published var reader: ReaderSession?
@@ -162,6 +177,7 @@ final class LibraryStore: ObservableObject {
                 result[entry.key] = ReadingProgress(chapter: chapter, paragraph: paragraph, updatedAt: entry.value.updatedAt, characterOffset: min(max(0, entry.value.characterOffset), max(0, length - 1)))
             }
             sort = snapshot.sort
+            shelfLayout = ShelfLayout(rawValue: snapshot.shelfLayout ?? "") ?? .standard
             if let savedUpdates = snapshot.updates {
                 updates = savedUpdates.filter { ids.contains($0.key) }.mapValues { UpdateNotice(firstChapter: max(0, $0.firstChapter), readThrough: max(-1, $0.readThrough)) }
             }
@@ -272,7 +288,7 @@ final class LibraryStore: ObservableObject {
 
     func persist() {
         do {
-            let snapshot = LibrarySnapshot(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates, hasSeenReadingGuide: hasSeenReadingGuide)
+            let snapshot = LibrarySnapshot(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates, hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue)
             defaults.set(try JSONEncoder().encode(snapshot), forKey: Self.storageKey)
         } catch {
             storageMessage = "阅读记录保存失败，请稍后重试。"

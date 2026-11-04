@@ -33,12 +33,80 @@ final class ReaderFlowTests: XCTestCase {
         XCTAssertTrue(all.isSelected)
         XCTAssertTrue(all.label.contains("6"))
         XCTAssertFalse(app.otherElements["shelfEmptyState"].exists)
-        app.buttons["列表布局"].tap()
+        app.buttons["shelfLayout"].tap()
+        app.buttons["列表"].tap()
         XCTAssertTrue(app.buttons["list-read-changfeng"].exists)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "ShelfPrimaryCategories"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+    }
+
+    @MainActor
+    func testShelfDensityGeometryDetailsAndPersistence() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        let layout = app.buttons["shelfLayout"]
+        reveal(layout, in: app)
+        XCTAssertEqual(layout.value as? String, "三列 · 标准")
+        // Hide the hero while managing so the entire first row is visible.
+        app.buttons["manageShelf"].tap()
+        for (title, count) in [("两列 · 大封面", 2), ("三列 · 标准", 3), ("四列 · 紧凑", 4)] {
+            layout.tap(); app.buttons[title].tap()
+            XCTAssertEqual(layout.value as? String, title)
+            let books = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "select-"))
+            XCTAssertGreaterThanOrEqual(books.count, count + 1)
+            let first = books.element(boundBy: 0).frame
+            for index in 1..<count {
+                let frame = books.element(boundBy: index).frame
+                XCTAssertEqual(frame.minY, first.minY, accuracy: 2)
+                XCTAssertGreaterThan(frame.minX, books.element(boundBy: index - 1).frame.maxX)
+                XCTAssertLessThanOrEqual(frame.maxX, app.frame.maxX - 21)
+            }
+            XCTAssertGreaterThan(books.element(boundBy: count).frame.minY, first.maxY)
+            XCTAssertEqual(app.staticTexts["shelf-author-changfeng"].exists, count == 2)
+            XCTAssertEqual(app.descendants(matching: .any)["shelf-progress-changfeng"].exists, count != 4)
+            capture(app, name: "ShelfDensity-\(count)Columns")
+        }
+        app.buttons["select-changfeng"].tap()
+        layout.tap(); app.buttons["列表"].tap()
+        XCTAssertEqual(layout.value as? String, "列表")
+        XCTAssertTrue(app.buttons["移出书架 (1)"].exists)
+        app.buttons["manageShelf"].tap()
+        XCTAssertTrue(app.buttons["list-read-changfeng"].exists)
+        layout.tap(); app.buttons["四列 · 紧凑"].tap()
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "--preserve-ui-test-state"]
+        app.launch()
+        reveal(layout, in: app)
+        XCTAssertEqual(layout.value as? String, "四列 · 紧凑")
+        app.buttons["shelf-category-comic"].tap()
+        XCTAssertEqual(layout.value as? String, "四列 · 紧凑")
+        app.buttons["shelf-category-novel"].tap()
+        app.buttons["shelf-filter-2"].tap()
+        XCTAssertEqual(layout.value as? String, "四列 · 紧凑")
+    }
+
+    @MainActor
+    func testCompactShelfContextMenuAndReading() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        let layout = app.buttons["shelfLayout"]
+        reveal(layout, in: app)
+        layout.tap(); app.buttons["四列 · 紧凑"].tap()
+        let cover = app.buttons["read-changfeng"]
+        reveal(cover, in: app)
+        cover.press(forDuration: 1)
+        app.buttons["选择多本"].tap()
+        XCTAssertTrue(app.buttons["select-changfeng"].exists)
+        XCTAssertTrue(app.buttons["移出书架 (1)"].exists)
+        app.buttons["manageShelf"].tap()
+        app.buttons["read-changfeng"].tap()
+        acknowledgeFirstGuide(in: app)
+        XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 山雨欲来")
     }
 
     @MainActor

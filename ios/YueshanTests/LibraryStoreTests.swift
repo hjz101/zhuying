@@ -28,6 +28,38 @@ final class LibraryStoreTests: XCTestCase {
         }
     }
 
+    func testShelfLayoutsPersistWithoutChangingReadingData() {
+        let store = LibraryStore(books: books, defaults: defaults)
+        XCTAssertEqual(store.shelfLayout, .standard)
+        let favorites = store.favorites
+        let progress = store.progress
+        store.sort = .title
+        for layout in ShelfLayout.allCases {
+            store.shelfLayout = layout
+            let restored = LibraryStore(books: books, defaults: defaults)
+            XCTAssertEqual(restored.shelfLayout, layout)
+            XCTAssertEqual(restored.favorites, favorites)
+            XCTAssertEqual(restored.progress, progress)
+            XCTAssertEqual(restored.sort, .title)
+            XCTAssertNil(restored.storageMessage)
+        }
+        store.settings = .init()
+        XCTAssertEqual(LibraryStore(books: books, defaults: defaults).shelfLayout, .list)
+    }
+
+    func testUnknownShelfLayoutFallsBackWithoutLosingSavedData() throws {
+        let store = LibraryStore(books: books, defaults: defaults)
+        store.record(books[0], chapter: 3, paragraph: 4)
+        var object = try JSONSerialization.jsonObject(with: defaults.data(forKey: LibraryStore.storageKey)!) as! [String: Any]
+        object["shelfLayout"] = "future-layout"
+        defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: LibraryStore.storageKey)
+        let restored = LibraryStore(books: books, defaults: defaults)
+        XCTAssertEqual(restored.shelfLayout, .standard)
+        XCTAssertEqual(restored.favorites, store.favorites)
+        XCTAssertEqual(restored.progress, store.progress)
+        XCTAssertNil(restored.storageMessage)
+    }
+
     func testTitleAuthorAndCategorySearch() {
         let store = LibraryStore(books: books, defaults: defaults)
         XCTAssertEqual(store.search(" 长风 ").map(\.id), ["changfeng"])
@@ -102,6 +134,7 @@ final class LibraryStoreTests: XCTestCase {
         var object = try JSONSerialization.jsonObject(with: defaults.data(forKey: LibraryStore.storageKey)!) as! [String: Any]
         object.removeValue(forKey: "sort"); object.removeValue(forKey: "updates")
         object.removeValue(forKey: "hasSeenReadingGuide")
+        object.removeValue(forKey: "shelfLayout")
         var settings = object["settings"] as! [String: Any]
         for key in ["mode", "hand", "tapToTurn", "haptics"] { settings.removeValue(forKey: key) }
         object["settings"] = settings
@@ -115,6 +148,7 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(migrated.progress[books[0].id]?.paragraph, 4)
         XCTAssertEqual(migrated.settings.mode, .scroll)
         XCTAssertFalse(migrated.hasSeenReadingGuide)
+        XCTAssertEqual(migrated.shelfLayout, .standard)
     }
 
     func testHistoryIncludesUnfavoritedBooksAndIgnoresShelfSort() {

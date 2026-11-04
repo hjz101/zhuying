@@ -101,7 +101,7 @@ struct BookCover: View {
                     MountainShape().fill(Color(hex: colors.2).opacity(0.4)).frame(height: geo.size.height * 0.37).scaleEffect(x: -1).offset(y: geo.size.height * 0.63)
                     MountainShape().fill(Color(hex: colors.2)).frame(height: geo.size.height * 0.31).offset(y: geo.size.height * 0.69)
                 }
-            }
+            }.accessibilityHidden(true).allowsHitTesting(false)
             VStack(spacing: 0) {
                 Text("阅 山 · 故 事 典 藏").font(.system(size: width * 0.042)).tracking(1.2).opacity(0.5).padding(.top, width * 0.13)
                 Spacer().frame(height: width * 0.2)
@@ -118,6 +118,7 @@ struct BookCover: View {
         .foregroundStyle(Color(hex: colors.1))
         .frame(width: width, height: width * 1.38)
         .clipShape(.rect(cornerRadius: 5))
+        .contentShape(Rectangle())
         .overlay(RoundedRectangle(cornerRadius: 5).stroke(.black.opacity(0.04), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.09), radius: 5, x: 1, y: 4)
         .accessibilityLabel("\(book.title)封面")

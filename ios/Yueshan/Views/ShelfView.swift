@@ -16,7 +16,6 @@ struct ShelfView: View {
     let onDiscover: () -> Void
     @State private var category: ShelfCategory = .novel
     @State private var filter = 0
-    @State private var listLayout = false
     @State private var removal: ShelfRemoval?
     @State private var managing = false
     @State private var selection = Set<String>()
@@ -31,7 +30,9 @@ struct ShelfView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let coverWidth = max(95, (geo.size.width - 65) / 2)
+            let columns = store.shelfLayout.columns
+            let gap: CGFloat = store.shelfLayout == .spacious ? 21 : 12
+            let coverWidth = max(1, (geo.size.width - 44 - gap * CGFloat(columns - 1)) / CGFloat(columns))
             ScrollView {
                 VStack(alignment: .leading, spacing: 27) {
                     HStack(alignment: .top) {
@@ -119,9 +120,17 @@ struct ShelfView: View {
                                 filterButton("未读", value: 2, count: categoryBooks.count - categoryReadingCount)
                             }
                             Spacer(minLength: 8)
-                            Button { withAnimation(.easeInOut(duration: 0.2)) { listLayout.toggle() } } label: {
-                                Image(systemName: listLayout ? "square.grid.2x2" : "list.bullet").font(.system(size: 15)).frame(width: 37, height: 44).foregroundStyle(Palette.muted)
-                            }.accessibilityLabel(listLayout ? "网格布局" : "列表布局")
+                            Menu {
+                                Picker("书架布局", selection: $store.shelfLayout) {
+                                    ForEach(ShelfLayout.allCases, id: \.self) { layout in
+                                        Text(layout.title).tag(layout)
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: store.shelfLayout == .list ? "list.bullet" : "square.grid.3x3")
+                                    .font(.system(size: 15)).frame(width: 44, height: 46).foregroundStyle(Palette.muted)
+                            }.accessibilityLabel("书架布局").accessibilityValue(store.shelfLayout.title)
+                                .accessibilityIdentifier("shelfLayout")
                         }.overlay(alignment: .bottom) { Rectangle().fill(Palette.line).frame(height: 0.5) }
 
                         if filteredBooks.isEmpty {
@@ -134,7 +143,7 @@ struct ShelfView: View {
                                     Button("去发现好书", action: onDiscover).buttonStyle(.borderedProminent)
                                 }
                             }.padding(.vertical, 25).accessibilityIdentifier("shelfEmptyState")
-                        } else if listLayout {
+                        } else if store.shelfLayout == .list {
                             LazyVStack(spacing: 21) {
                                 ForEach(filteredBooks) { book in
                                     HStack {
@@ -145,7 +154,7 @@ struct ShelfView: View {
                                 }
                             }
                         } else {
-                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 21), GridItem(.flexible())], alignment: .leading, spacing: 26) {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: gap), count: columns), alignment: .leading, spacing: store.shelfLayout == .spacious ? 26 : 20) {
                                 ForEach(filteredBooks) { book in bookCell(book, width: coverWidth) }
                             }
                         }
@@ -237,38 +246,72 @@ struct ShelfView: View {
     }
 
     private func bookCell(_ book: Book, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button { if managing { toggleSelection(book) } else { store.read(book) } } label: { BookCover(book: book, width: width) }
+        let spacious = store.shelfLayout == .spacious
+        let compact = store.shelfLayout == .compact
+        return VStack(alignment: .leading, spacing: 0) {
+            Button { if managing { toggleSelection(book) } else { store.read(book) } } label: {
+                BookCover(book: book, width: width)
+                    .frame(width: width, height: width * 1.38)
+                    .contentShape(Rectangle())
+            }
                 .buttonStyle(.plain).accessibilityLabel(managing ? "选择\(book.title)" : "阅读\(book.title)")
+                .accessibilityValue(store.updateCount(book) > 0 ? "更新 \(store.updateCount(book)) 章" : "")
                 .accessibilityIdentifier(managing ? "select-\(book.id)" : "read-\(book.id)")
-                .highPriorityGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in beginManaging(book) })
+                .contextMenu { if !managing { bookActions(book) } }
                 .overlay(alignment: .topLeading) {
                     if !managing && store.updateCount(book) > 0 {
-                        Button { store.read(book) } label: { Text("更新 \(store.updateCount(book)) 章").font(.system(size: 9, weight: .medium)).padding(.horizontal, 8).padding(.vertical, 7).foregroundStyle(.white).background(Palette.accent, in: .rect(cornerRadius: 5)) }.padding(7).accessibilityLabel("\(book.title)更新\(store.updateCount(book))章，继续阅读")
+                        if spacious {
+                            Text("更新 \(store.updateCount(book)) 章").font(.system(size: 9, weight: .medium))
+                                .padding(.horizontal, 8).padding(.vertical, 7).foregroundStyle(.white)
+                                .background(Palette.accent, in: .rect(cornerRadius: 5)).padding(7).allowsHitTesting(false)
+                        } else {
+                            Circle().fill(Palette.accent).frame(width: 8, height: 8)
+                                .overlay(Circle().stroke(Palette.background, lineWidth: 2)).padding(6)
+                                .accessibilityHidden(true).allowsHitTesting(false)
+                        }
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if managing { selectionIcon(book).padding(7) }
-                    else { Menu {
-                        Button("选择多本", systemImage: "checkmark.circle") { beginManaging(book) }
-                        Button("开始或继续阅读", systemImage: "book") { store.read(book) }
-                        Button("移出书架", systemImage: "bookmark.slash", role: .destructive) { removal = store.removeFavorites([book.id]) }
-                    } label: {
-                        Image(systemName: "ellipsis").font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.green).frame(width: 28, height: 28).background(.regularMaterial, in: Circle()).frame(width: 44, height: 44)
-                    }.accessibilityLabel("\(book.title)的更多操作") }
+                    if managing { selectionIcon(book).padding(compact ? 2 : 7) }
+                    else if spacious {
+                        Menu { bookActions(book) } label: {
+                            Image(systemName: "ellipsis").font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.green)
+                                .frame(width: 28, height: 28).background(.regularMaterial, in: Circle()).frame(width: 44, height: 44)
+                        }.accessibilityLabel("\(book.title)的更多操作")
+                    }
                 }
-            NavigationLink(value: book) { Text(book.title).font(.system(size: 15, weight: .semibold, design: .serif)).foregroundStyle(Palette.green).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 13).padding(.bottom, 6) }.buttonStyle(.plain).disabled(managing).accessibilityLabel("\(book.title)详情")
-            Text("\(book.author) · \(book.genre)").font(.system(size: 9)).foregroundStyle(Palette.muted).lineLimit(1)
-            HStack {
-                Text(store.progress[book.id] == nil ? "故事在等你翻开" : "已读 \(store.percent(book))%")
-                Spacer(minLength: 2)
-                if let progress = store.progress[book.id] { Text("第\(progress.chapter + 1)章") }
-            }.font(.system(size: 8)).foregroundStyle(Palette.muted).padding(.top, 13)
-            GeometryReader { geometry in
-                Capsule().fill(Palette.line)
-                Capsule().fill(Color(hex: 0x92A17B)).frame(width: geometry.size.width * Double(store.percent(book)) / 100)
-            }.frame(height: 2).padding(.top, 7)
-        }
+            NavigationLink(value: book) {
+                Text(book.title).font(.system(size: spacious ? 15 : compact ? 11 : 13, weight: .semibold, design: .serif))
+                    .foregroundStyle(Palette.green).lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.top, spacious ? 13 : 9).padding(.bottom, 6)
+            }.buttonStyle(.plain).disabled(managing).accessibilityLabel("\(book.title)详情")
+            if spacious {
+                Text("\(book.author) · \(book.genre)").font(.system(size: 9)).foregroundStyle(Palette.muted).lineLimit(1)
+                    .accessibilityIdentifier("shelf-author-\(book.id)")
+            }
+            if !compact {
+                HStack {
+                    Text(store.progress[book.id] == nil ? "尚未开始" : "已读 \(store.percent(book))%")
+                    if spacious {
+                        Spacer(minLength: 2)
+                        if let progress = store.progress[book.id] { Text("第\(progress.chapter + 1)章") }
+                    }
+                }.font(.system(size: spacious ? 8 : 9)).foregroundStyle(Palette.muted).padding(.top, spacious ? 13 : 0)
+                    .accessibilityIdentifier("shelf-progress-\(book.id)")
+            }
+            if spacious {
+                GeometryReader { geometry in
+                    Capsule().fill(Palette.line)
+                    Capsule().fill(Color(hex: 0x92A17B)).frame(width: geometry.size.width * Double(store.percent(book)) / 100)
+                }.frame(height: 2).padding(.top, 7)
+            }
+        }.frame(width: width, alignment: .leading)
+    }
+
+    @ViewBuilder private func bookActions(_ book: Book) -> some View {
+        Button("选择多本", systemImage: "checkmark.circle") { beginManaging(book) }
+        Button("开始或继续阅读", systemImage: "book") { store.read(book) }
+        Button("移出书架", systemImage: "bookmark.slash", role: .destructive) { removal = store.removeFavorites([book.id]) }
     }
     private func toggleSelection(_ book: Book) {
         if selection.contains(book.id) { selection.remove(book.id) } else { selection.insert(book.id) }
@@ -278,7 +321,7 @@ struct ShelfView: View {
     }
     private func selectionIcon(_ book: Book) -> some View {
         Image(systemName: selection.contains(book.id) ? "checkmark.circle.fill" : "circle")
-            .font(.system(size: 24)).foregroundStyle(selection.contains(book.id) ? Palette.green : Palette.muted)
+            .font(.system(size: store.shelfLayout == .compact ? 20 : 24)).foregroundStyle(selection.contains(book.id) ? Palette.green : Palette.muted)
             .padding(3).background(Palette.background, in: Circle()).accessibilityHidden(true)
     }
 

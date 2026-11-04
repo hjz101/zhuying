@@ -39,55 +39,64 @@ struct ReaderView: View {
     private var document: ReaderDocument { ReaderDocument(book: book, chapter: chapter, settings: store.settings) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header.opacity(controlsVisible ? 1 : 0).allowsHitTesting(controlsVisible).accessibilityHidden(!controlsVisible)
-            GeometryReader { geo in
-                let key = layoutKey(geo.size)
-                ZStack(alignment: .bottom) {
-                    if store.settings.mode == .scroll {
-                        ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) })
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else if !ranges.isEmpty {
-                        if ranges.indices.contains(page) {
-                            ZStack {
-                                PagedReaderText(text: document.pageText(in: ranges[page]), onTap: handleTap, onSwipe: { flip(forward: $0) })
-                                    .frame(width: max(40, geo.size.width - 50), height: max(40, geo.size.height - 44))
-                                    .padding(.horizontal, 25).padding(.top, 24).padding(.bottom, 20)
-                                    .allowsHitTesting(false)
-                                HStack(spacing: 0) {
-                                    tapArea(0.1, label: "轻触左侧", id: "readerTapLeft").frame(width: geo.size.width * 0.3)
-                                    tapArea(0.5, label: "显示或隐藏阅读工具栏", id: "readerTapCenter")
-                                    tapArea(0.9, label: "轻触右侧", id: "readerTapRight").frame(width: geo.size.width * 0.3)
-                                }.frame(width: geo.size.width, height: geo.size.height)
-                                    .simultaneousGesture(DragGesture(minimumDistance: 25).onEnded { value in
-                                        if abs(value.translation.width) > 45 && abs(value.translation.width) > abs(value.translation.height) { flip(forward: value.translation.width < 0) }
-                                    })
-                            }.frame(width: geo.size.width, height: geo.size.height).clipped()
-                        }
+        GeometryReader { geo in
+            let key = layoutKey(geo.size)
+            ZStack(alignment: .bottom) {
+                if store.settings.mode == .scroll {
+                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) })
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } else if !ranges.isEmpty {
+                    if ranges.indices.contains(page) {
+                        ZStack {
+                            PagedReaderText(text: document.pageText(in: ranges[page]), onTap: handleTap, onSwipe: { flip(forward: $0) })
+                                .frame(width: max(40, geo.size.width - 50), height: max(40, geo.size.height - 44))
+                                .padding(.horizontal, 25).padding(.top, 24).padding(.bottom, 20)
+                                .allowsHitTesting(false)
+                            HStack(spacing: 0) {
+                                tapArea(0.1, label: "轻触左侧", id: "readerTapLeft").frame(width: geo.size.width * 0.3)
+                                tapArea(0.5, label: "显示或隐藏阅读工具栏", id: "readerTapCenter")
+                                tapArea(0.9, label: "轻触右侧", id: "readerTapRight").frame(width: geo.size.width * 0.3)
+                            }.frame(width: geo.size.width, height: geo.size.height)
+                                // A recognized swipe cancels the buttons' tap actions.
+                                .highPriorityGesture(DragGesture(minimumDistance: 25).onEnded { value in
+                                    if abs(value.translation.width) > 45 && abs(value.translation.width) > abs(value.translation.height) { flip(forward: value.translation.width < 0) }
+                                })
+                        }.frame(width: geo.size.width, height: geo.size.height).clipped()
                     }
-                    if !controlsVisible {
-                        Button { controlsVisible = true; haptic() } label: {
-                            Label("显示工具栏", systemImage: "ellipsis").font(.system(size: 10)).padding(.horizontal, 14).frame(height: 36).foregroundStyle(theme.secondary).background(theme.background.opacity(0.92), in: Capsule())
-                        }.padding(.bottom, 5).accessibilityIdentifier("showReaderControls")
-                    }
-                    if let message {
-                        Text(message).font(.system(size: 11)).padding(13).foregroundStyle(theme.ink).background(.regularMaterial, in: Capsule()).padding(.bottom, 9)
-                    }
-                }
-                .task(id: key) {
-                    guard initialized else { return }
-                    reflowing = true
-                    if store.settings.mode == .paged {
-                        let newRanges = ReaderPaginator.ranges(document: document, size: CGSize(width: max(40, geo.size.width - 50), height: max(40, geo.size.height - 44)))
-                        let newPage = ReaderPaginator.page(containing: anchor, document: document, ranges: newRanges)
-                        ranges = newRanges
-                        page = min(newPage, max(0, newRanges.count - 1))
-                    }
-                    await Task.yield()
-                    reflowing = false
                 }
             }
-            footer.opacity(controlsVisible ? 1 : 0).allowsHitTesting(controlsVisible).accessibilityHidden(!controlsVisible)
+            .task(id: key) {
+                guard initialized else { return }
+                reflowing = true
+                if store.settings.mode == .paged {
+                    let newRanges = ReaderPaginator.ranges(document: document, size: CGSize(width: max(40, geo.size.width - 50), height: max(40, geo.size.height - 44)))
+                    let newPage = ReaderPaginator.page(containing: anchor, document: document, ranges: newRanges)
+                    ranges = newRanges
+                    page = min(newPage, max(0, newRanges.count - 1))
+                }
+                await Task.yield()
+                reflowing = false
+            }
+        }
+        // Controls never participate in text layout, so hiding them reveals the
+        // full page without repagination or changing the current scroll position.
+        .overlay(alignment: .top) {
+            if controlsVisible { header.background(theme.background) }
+        }
+        .overlay(alignment: .bottom) {
+            VStack(spacing: 0) {
+                if let message {
+                    Text(message).font(.system(size: 11)).padding(13).foregroundStyle(theme.ink).background(.regularMaterial, in: Capsule()).padding(.bottom, 9)
+                }
+                if controlsVisible {
+                    footer.background(theme.background)
+                } else {
+                    Button { controlsVisible = true; haptic() } label: {
+                        Label("显示工具栏", systemImage: "ellipsis").font(.system(size: 10)).padding(.horizontal, 14).frame(height: 20).foregroundStyle(theme.secondary).background(theme.background.opacity(0.92), in: Capsule())
+                            .frame(height: 44, alignment: .bottom)
+                    }.accessibilityIdentifier("showReaderControls")
+                }
+            }
         }
         .background(theme.background.ignoresSafeArea())
         .foregroundStyle(theme.ink)

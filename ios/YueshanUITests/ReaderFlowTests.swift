@@ -94,12 +94,16 @@ final class ReaderFlowTests: XCTestCase {
         // Both edges advance; only the center controls the toolbar.
         app.buttons["readerTapLeft"].tap()
         XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 3 /"), app.staticTexts["readerPageStatus"].label)
+        // Do not assume a fixed page count: full-height text fits more per page.
+        app.buttons["previousChapter"].tap()
+        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 2 /"))
         app.buttons["readerTapRight"].tap()
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 4 /"), app.staticTexts["readerPageStatus"].label)
+        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 3 /"), app.staticTexts["readerPageStatus"].label)
         app.buttons["readerTapCenter"].swipeRight()
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 3 /"))
+        XCTAssertTrue(app.buttons["readerSettings"].isHittable, "A swipe must not also trigger the center tap and hide controls")
+        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 2 /"))
         app.buttons["readerTapCenter"].swipeLeft()
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 4 /"))
+        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 3 /"))
         app.buttons["readerTapCenter"].tap()
         XCTAssertTrue(app.buttons["showReaderControls"].waitForExistence(timeout: 5))
         app.buttons["showReaderControls"].tap()
@@ -112,6 +116,75 @@ final class ReaderFlowTests: XCTestCase {
         app.buttons["完成"].tap()
         XCTAssertTrue(app.textViews["continuousText"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["readerContents"].isHittable)
+    }
+
+    @MainActor
+    func testScrollingReaderFillsScreenWithoutMovingWhenControlsToggle() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        app.buttons["continueReading"].tap()
+        acknowledgeFirstGuide(in: app)
+        let text = app.textViews["continuousText"]
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        text.swipeUp()
+        let frame = text.frame
+        let progress = app.staticTexts["readerPageStatus"].label
+        // UITextView.tap() can choose its top-left accessibility hit point,
+        // which now sits under the overlaid back button. Tap the actual center.
+        text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["showReaderControls"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["readerSettings"].exists)
+        XCTAssertGreaterThan(text.frame.height, app.frame.height * 0.82, "Hidden controls must not reserve space above or below the text")
+        XCTAssertGreaterThan(text.frame.maxY, app.frame.maxY - 65, "The text viewport must reach the bottom safe area")
+        XCTAssertEqual(text.frame, frame, "Toggling the overlay must not resize or reflow the text")
+        let preview = XCTAttachment(screenshot: app.screenshot())
+        preview.name = "ImmersiveScrollingReader"
+        preview.lifetime = .keepAlways
+        add(preview)
+        app.buttons["showReaderControls"].tap()
+        XCTAssertEqual(text.frame, frame)
+        XCTAssertEqual(app.staticTexts["readerPageStatus"].label, progress)
+
+        // Safe-area layout also fills the shorter viewport after rotation.
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["showReaderControls"].waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(text.frame.height, app.frame.height * 0.82)
+        XCTAssertGreaterThan(text.frame.maxY, app.frame.maxY - 65)
+    }
+
+    @MainActor
+    func testPagedReaderFillsScreenAndKeepsPageWhenControlsToggle() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        app.buttons["continueReading"].tap()
+        acknowledgeFirstGuide(in: app)
+        app.buttons["readerSettings"].tap()
+        app.segmentedControls.buttons["左右翻页"].tap()
+        app.buttons["完成"].tap()
+        app.buttons["nextChapter"].tap()
+        let page = app.staticTexts["readerPageStatus"].label
+        let text = app.otherElements["readerTouchSurface"]
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        let frame = text.frame
+        app.buttons["readerTapCenter"].tap()
+        XCTAssertTrue(app.buttons["showReaderControls"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["readerContents"].exists)
+        XCTAssertGreaterThan(text.frame.height, app.frame.height * 0.78, "Pagination must use the full reading height")
+        XCTAssertGreaterThan(text.frame.maxY, app.frame.maxY - 85)
+        XCTAssertEqual(text.frame, frame)
+        let preview = XCTAttachment(screenshot: app.screenshot())
+        preview.name = "ImmersivePagedReader"
+        preview.lifetime = .keepAlways
+        add(preview)
+        app.buttons["showReaderControls"].tap()
+        XCTAssertEqual(app.staticTexts["readerPageStatus"].label, page, "Showing controls must preserve the current page and page count")
+        XCTAssertEqual(text.frame, frame)
+        XCTAssertTrue(app.buttons["readerSettings"].isHittable)
     }
 
     @MainActor

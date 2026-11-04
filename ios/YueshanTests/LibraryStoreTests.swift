@@ -21,6 +21,7 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(store.favorites.count, 6)
         XCTAssertEqual(store.readingCount, 3)
         XCTAssertEqual(store.recent?.id, "changfeng")
+        XCTAssertFalse(store.hasSeenReadingGuide, "Seeded reading history must not suppress the first-use guide")
         for book in books {
             XCTAssertEqual(book.chapters.count, book.content.count)
             XCTAssertTrue(book.content.allSatisfy { $0.count == 14 && $0.allSatisfy { !$0.isEmpty } })
@@ -100,6 +101,7 @@ final class LibraryStoreTests: XCTestCase {
         store.record(books[0], chapter: 3, paragraph: 4)
         var object = try JSONSerialization.jsonObject(with: defaults.data(forKey: LibraryStore.storageKey)!) as! [String: Any]
         object.removeValue(forKey: "sort"); object.removeValue(forKey: "updates")
+        object.removeValue(forKey: "hasSeenReadingGuide")
         var settings = object["settings"] as! [String: Any]
         for key in ["mode", "hand", "tapToTurn", "haptics"] { settings.removeValue(forKey: key) }
         object["settings"] = settings
@@ -112,6 +114,7 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(migrated.favorites, store.favorites)
         XCTAssertEqual(migrated.progress[books[0].id]?.paragraph, 4)
         XCTAssertEqual(migrated.settings.mode, .scroll)
+        XCTAssertFalse(migrated.hasSeenReadingGuide)
     }
 
     func testHistoryIncludesUnfavoritedBooksAndIgnoresShelfSort() {
@@ -167,6 +170,34 @@ final class LibraryStoreTests: XCTestCase {
         let store = LibraryStore(books: books, defaults: defaults)
         store.settings = .init(fontSize: 22, lineSpacing: 18, theme: .dark, mode: .paged, tapToTurn: true, haptics: false)
         XCTAssertEqual(LibraryStore(books: books, defaults: defaults).settings, store.settings)
+    }
+
+    func testGuideCompletionSurvivesRelaunchAndPreferenceReset() {
+        let store = LibraryStore(books: books, defaults: defaults)
+        store.settings = .init(fontSize: 22, theme: .dark, mode: .paged, tapToTurn: true)
+        let favorites = store.favorites
+        let progress = store.progress
+        let settings = store.settings
+        store.completeReadingGuide()
+        store.completeReadingGuide()
+        let restored = LibraryStore(books: books, defaults: defaults)
+        XCTAssertTrue(restored.hasSeenReadingGuide)
+        XCTAssertEqual(restored.favorites, favorites)
+        XCTAssertEqual(restored.progress, progress)
+        XCTAssertEqual(restored.settings, settings)
+        restored.settings = .init()
+        XCTAssertTrue(LibraryStore(books: books, defaults: defaults).hasSeenReadingGuide)
+    }
+
+    func testOpeningAnotherBookDoesNotConsumeFirstUseGuide() {
+        let store = LibraryStore(books: books, defaults: defaults)
+        store.read(books[0])
+        store.read(books[1])
+        XCTAssertFalse(store.hasSeenReadingGuide)
+        XCTAssertFalse(LibraryStore(books: books, defaults: defaults).hasSeenReadingGuide)
+        store.completeReadingGuide()
+        store.read(books[2])
+        XCTAssertTrue(store.hasSeenReadingGuide)
     }
 
 }

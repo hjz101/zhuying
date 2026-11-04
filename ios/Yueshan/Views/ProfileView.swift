@@ -46,6 +46,7 @@ struct ProfileView: View {
 struct ReadingSettingsView: View {
     @EnvironmentObject private var store: LibraryStore
     @Environment(\.dismiss) private var dismiss
+    @State private var showGestureGuide = false
     private var theme: ReadingTheme { store.settings.theme }
     var body: some View {
         NavigationStack {
@@ -55,6 +56,9 @@ struct ReadingSettingsView: View {
                         ForEach(ReadingMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
                     }.pickerStyle(.segmented).accessibilityIdentifier("readingModePicker")
                     Text("左右翻页按屏幕、字号与行距分页；两种模式共用阅读位置。").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Button { showGestureGuide = true } label: {
+                        Label("查看阅读手势", systemImage: "hand.tap")
+                    }.accessibilityIdentifier("readingGestureHelp")
                 }
                 Section("单手操作") {
                     Toggle("轻触翻页", isOn: $store.settings.tapToTurn).accessibilityIdentifier("tapToTurnToggle")
@@ -100,6 +104,7 @@ struct ReadingSettingsView: View {
             .navigationTitle("阅读偏好").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
         }.tint(Palette.green).presentationDetents([.large]).presentationDragIndicator(.visible)
+            .sheet(isPresented: $showGestureGuide) { ReadingGestureGuideView(isFirstUse: false) }
     }
     private func tapZone(_ title: String) -> some View {
         Text(title).font(.system(size: 9)).multilineTextAlignment(.center).frame(maxWidth: .infinity, minHeight: 44).background(Palette.green.opacity(0.07), in: .rect(cornerRadius: 7)).foregroundStyle(Palette.green)

@@ -107,6 +107,7 @@ struct LibrarySnapshot: Codable {
     var settings: ReadingSettings = .init()
     var sort: ShelfSort = .recent
     var updates: [String: UpdateNotice]? = nil
+    var hasSeenReadingGuide: Bool? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -124,6 +125,7 @@ final class LibraryStore: ObservableObject {
     @Published var settings: ReadingSettings { didSet { persist() } }
     @Published var sort: ShelfSort = .recent { didSet { persist() } }
     @Published private(set) var updates: [String: UpdateNotice] = [:]
+    @Published private(set) var hasSeenReadingGuide = false
     @Published var reader: ReaderSession?
     @Published var storageMessage: String?
     private let defaults: UserDefaults
@@ -147,6 +149,7 @@ final class LibraryStore: ObservableObject {
             if object["sort"] == nil { object["sort"] = ShelfSort.recent.rawValue }
             let snapshot = try JSONDecoder().decode(LibrarySnapshot.self, from: JSONSerialization.data(withJSONObject: object))
             guard snapshot.version == 1 else { throw CocoaError(.coderReadCorrupt) }
+            hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
             var seen = Set<String>()
             let ids = Set(books.map(\.id))
             favorites = snapshot.favorites.filter { ids.contains($0) && seen.insert($0).inserted }
@@ -261,9 +264,15 @@ final class LibraryStore: ObservableObject {
         reader = ReaderSession(book: book, chapter: target)
     }
 
+    func completeReadingGuide() {
+        guard !hasSeenReadingGuide else { return }
+        hasSeenReadingGuide = true
+        persist()
+    }
+
     func persist() {
         do {
-            let snapshot = LibrarySnapshot(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates)
+            let snapshot = LibrarySnapshot(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates, hasSeenReadingGuide: hasSeenReadingGuide)
             defaults.set(try JSONEncoder().encode(snapshot), forKey: Self.storageKey)
         } catch {
             storageMessage = "阅读记录保存失败，请稍后重试。"

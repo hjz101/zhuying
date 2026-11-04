@@ -9,7 +9,9 @@ struct YueshanApp: App {
         let defaults: UserDefaults
         if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
             defaults = UserDefaults(suiteName: "com.yueshan.ui-tests")!
-            defaults.removePersistentDomain(forName: "com.yueshan.ui-tests")
+            if !ProcessInfo.processInfo.arguments.contains("--preserve-ui-test-state") {
+                defaults.removePersistentDomain(forName: "com.yueshan.ui-tests")
+            }
         } else { defaults = .standard }
         do {
             let books = try Book.load()

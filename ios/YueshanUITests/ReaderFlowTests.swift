@@ -9,6 +9,7 @@ final class ReaderFlowTests: XCTestCase {
         let resume = app.buttons["continueReading"]
         XCTAssertTrue(resume.waitForExistence(timeout: 10))
         resume.tap()
+        acknowledgeFirstGuide(in: app)
         XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 山雨欲来")
         app.buttons["readerContents"].tap()
@@ -53,11 +54,20 @@ final class ReaderFlowTests: XCTestCase {
         add.tap()
         XCTAssertTrue(app.buttons["已在书架"].waitForExistence(timeout: 5))
         app.buttons["detailRead"].tap()
+        acknowledgeFirstGuide(in: app)
         XCTAssertTrue(app.staticTexts["第一章 山脚少年"].waitForExistence(timeout: 5))
         app.buttons["返回书架"].tap()
         app.tabBars.buttons["书架"].tap()
         XCTAssertTrue(app.buttons["阅读云海问道"].waitForExistence(timeout: 5))
     }
+    @MainActor
+    private func acknowledgeFirstGuide(in app: XCUIApplication) {
+        let start = app.buttons["dismissGestureGuide"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        XCTAssertFalse(app.staticTexts["gestureGuideTitle"].exists)
+    }
+
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<5 { if element.isHittable { return }; app.swipeUp() }
@@ -69,6 +79,7 @@ final class ReaderFlowTests: XCTestCase {
         app.launchArguments = ["--ui-testing"]
         app.launch()
         app.buttons["continueReading"].tap()
+        acknowledgeFirstGuide(in: app)
         app.buttons["readerSettings"].tap()
         app.segmentedControls.buttons["左右翻页"].tap()
         let tapToggle = app.switches["tapToTurnToggle"]
@@ -137,6 +148,7 @@ final class ReaderFlowTests: XCTestCase {
         search.tap(); search.typeText("明日")
         app.buttons["result-echo"].tap()
         app.buttons["detailRead"].tap()
+        acknowledgeFirstGuide(in: app)
         XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
         app.buttons["返回书架"].tap()
         app.tabBars.buttons["我的"].tap()
@@ -156,6 +168,7 @@ final class ReaderFlowTests: XCTestCase {
         app.buttons["shelfUpdates"].tap()
         XCTAssertTrue(app.buttons["update-read-changfeng"].waitForExistence(timeout: 5))
         app.buttons["update-read-changfeng"].tap()
+        acknowledgeFirstGuide(in: app)
         XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第十章 长夜将明")
         app.buttons["返回书架"].tap()
@@ -166,6 +179,75 @@ final class ReaderFlowTests: XCTestCase {
         simulate.tap()
         app.swipeDown()
         XCTAssertTrue(app.staticTexts["更新 3 章"].firstMatch.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testFirstReadingGuideOnlyAppearsOnceAcrossBooksAndRelaunch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        app.buttons["continueReading"].tap()
+        XCTAssertTrue(app.staticTexts["gestureGuideTitle"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["gestureGuideMode"].label, "当前模式 · 上下滚动")
+        XCTAssertTrue(app.staticTexts["gestureGuideTapStatus"].label.contains("需在阅读设置中开启"))
+        XCTAssertEqual(app.staticTexts["gestureGuideSwipe"].label, "上下滑动阅读 · 底部箭头切换章节")
+        let preview = XCTAttachment(screenshot: app.screenshot())
+        preview.name = "FirstReadingGestureGuide"
+        preview.lifetime = .keepAlways
+        add(preview)
+        acknowledgeFirstGuide(in: app)
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 山雨欲来")
+        app.buttons["返回书架"].tap()
+        app.tabBars.buttons["发现"].tap()
+        let search = app.searchFields.firstMatch
+        search.tap(); search.typeText("群星")
+        app.buttons["result-stars"].tap()
+        app.buttons["detailRead"].tap()
+        XCTAssertTrue(app.staticTexts["第二章 未来来信"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["gestureGuideTitle"].exists)
+        app.buttons["返回书架"].tap()
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "--preserve-ui-test-state"]
+        app.launch()
+        app.buttons["continueReading"].tap()
+        XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["gestureGuideTitle"].exists)
+    }
+
+    @MainActor
+    func testGuideCanBeReviewedFromSettingsWithoutChangingReadingPosition() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        app.tabBars.buttons["我的"].tap()
+        app.buttons["阅读偏好"].tap()
+        app.segmentedControls.buttons["左右翻页"].tap()
+        let tapToggle = app.switches["tapToTurnToggle"]
+        tapToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
+        app.buttons["readingGestureHelp"].tap()
+        XCTAssertTrue(app.staticTexts["gestureGuideTitle"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["gestureGuideMode"].label, "当前模式 · 左右翻页")
+        XCTAssertEqual(app.staticTexts["gestureGuideSwipe"].label, "左滑下一页 · 右滑上一页")
+        XCTAssertTrue(app.staticTexts["gestureGuideTapStatus"].label.contains("已开启轻触翻页"))
+        XCTAssertEqual(app.buttons["dismissGestureGuide"].label, "知道了")
+        app.buttons["dismissGestureGuide"].tap()
+        app.buttons["完成"].tap()
+        app.tabBars.buttons["书架"].tap()
+        app.buttons["continueReading"].tap()
+        // Reviewing help before the first read does not consume the first-use presentation.
+        XCTAssertTrue(app.buttons["dismissGestureGuide"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["dismissGestureGuide"].label, "开始阅读")
+        acknowledgeFirstGuide(in: app)
+        app.buttons["nextChapter"].tap()
+        let before = app.staticTexts["readerPageStatus"].label
+        app.buttons["readerSettings"].tap()
+        app.buttons["readingGestureHelp"].tap()
+        XCTAssertTrue(app.staticTexts["gestureGuideTitle"].waitForExistence(timeout: 5))
+        app.buttons["dismissGestureGuide"].tap()
+        app.buttons["完成"].tap()
+        XCTAssertTrue(app.staticTexts["readerPageStatus"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["readerPageStatus"].label, before)
+        XCTAssertFalse(app.staticTexts["gestureGuideTitle"].exists)
     }
 
 }

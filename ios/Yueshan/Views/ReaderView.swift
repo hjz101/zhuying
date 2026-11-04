@@ -18,6 +18,7 @@ struct ReaderView: View {
     @State private var restoreID = 0
     @State private var showContents = false
     @State private var showSettings = false
+    @State private var showGestureGuide = false
     @State private var controlsVisible = true
     @State private var sliderValue: Double
     @State private var sliderEditing = false
@@ -96,6 +97,7 @@ struct ReaderView: View {
             }
             initialized = true
             restoreID += 1
+            showGestureGuide = !store.hasSeenReadingGuide
         }
         .onChange(of: page) { _, target in
             guard !reflowing, ranges.indices.contains(target) else { return }
@@ -108,6 +110,9 @@ struct ReaderView: View {
             ContentsView(book: book, currentChapter: chapter) { target in goChapter(target); showContents = false }
         }
         .sheet(isPresented: $showSettings, onDismiss: { restoreID += 1 }) { ReadingSettingsView() }
+        .sheet(isPresented: $showGestureGuide, onDismiss: { store.completeReadingGuide() }) {
+            ReadingGestureGuideView(isFirstUse: true)
+        }
     }
 
     private var header: some View {

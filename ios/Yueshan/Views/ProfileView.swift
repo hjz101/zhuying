@@ -18,6 +18,11 @@ struct ProfileView: View {
                     Rectangle().fill(Palette.line).frame(width: 1, height: 40)
                     number(store.progress.count, label: "读过的故事")
                 }.padding(.vertical, 22).background(Color(hex: 0xEDF0E4), in: .rect(cornerRadius: 17))
+                NavigationLink {
+                    ReadingHistoryView()
+                } label: {
+                    HStack { Label("阅读历史", systemImage: "clock.arrow.circlepath"); Spacer(); Text("\(store.history.count) 本").font(.system(size: 11)); Image(systemName: "chevron.right").font(.system(size: 12)) }.font(.system(size: 14)).foregroundStyle(Palette.green).padding(20).background(.white.opacity(0.6), in: .rect(cornerRadius: 15))
+                }.accessibilityIdentifier("readingHistory")
                 Button { showSettings = true } label: {
                     HStack { Label("阅读偏好", systemImage: "textformat.size"); Spacer(); Image(systemName: "chevron.right").font(.system(size: 12)) }.font(.system(size: 14)).foregroundStyle(Palette.green).padding(20).background(.white.opacity(0.6), in: .rect(cornerRadius: 15))
                 }
@@ -26,7 +31,7 @@ struct ProfileView: View {
                     Text("阅山，一个安静的私人阅读角落。").font(.system(size: 20, design: .serif)).lineSpacing(7).foregroundStyle(Palette.green)
                     Text("这是 iOS 原生界面预览。8 本原创模拟小说，可体验搜索、收藏、选章、阅读和进度恢复。").font(.system(size: 12)).lineSpacing(7).foregroundStyle(Palette.muted)
                     Text("阅读数据保存在当前设备，不连接真实书源。演示章节包含复用段落，书籍字数与状态仅用于界面展示。").font(.system(size: 11)).lineSpacing(7).foregroundStyle(Palette.muted)
-                    Text("YUESHAN FOR iOS · DESIGN PREVIEW 0.1").font(.system(size: 8)).tracking(1.3).foregroundStyle(Palette.muted).padding(.top, 5)
+                    Text("YUESHAN FOR iOS · DESIGN PREVIEW 0.2").font(.system(size: 8)).tracking(1.3).foregroundStyle(Palette.muted).padding(.top, 5)
                 }.padding(23).frame(maxWidth: .infinity, alignment: .leading).background(Color(hex: 0xEEEFE4), in: .rect(cornerRadius: 17))
             }.padding(23)
         }.background(Palette.background).navigationTitle("我的").navigationBarTitleDisplayMode(.inline)
@@ -45,6 +50,22 @@ struct ReadingSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("阅读方式") {
+                    Picker("翻页模式", selection: $store.settings.mode) {
+                        ForEach(ReadingMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
+                    }.pickerStyle(.segmented).accessibilityIdentifier("readingModePicker")
+                    Text("左右翻页按屏幕、字号与行距分页；两种模式共用阅读位置。").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Section("单手操作") {
+                    Toggle("轻触翻页", isOn: $store.settings.tapToTurn).accessibilityIdentifier("tapToTurnToggle")
+                    HStack(spacing: 5) {
+                        tapZone("下一页")
+                        tapZone("显示／隐藏菜单")
+                        tapZone("下一页")
+                    }
+                    Text("启用后，轻点左侧或右侧都前进一页，中间显示／隐藏菜单。滚动模式前进约一屏；上一页使用右滑或底部按钮。").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Toggle("轻微触觉反馈", isOn: $store.settings.haptics).accessibilityIdentifier("hapticsToggle")
+                }
                 Section("阅读主题") {
                     HStack(spacing: 12) {
                         ForEach(ReadingTheme.allCases, id: \.self) { item in
@@ -80,4 +101,8 @@ struct ReadingSettingsView: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
         }.tint(Palette.green).presentationDetents([.large]).presentationDragIndicator(.visible)
     }
+    private func tapZone(_ title: String) -> some View {
+        Text(title).font(.system(size: 9)).multilineTextAlignment(.center).frame(maxWidth: .infinity, minHeight: 44).background(Palette.green.opacity(0.07), in: .rect(cornerRadius: 7)).foregroundStyle(Palette.green)
+    }
+
 }

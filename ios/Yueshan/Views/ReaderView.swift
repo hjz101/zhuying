@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension ReadingTheme {
     var background: Color { switch self { case .paper: Color(hex: 0xF4EEDF); case .light: Color(hex: 0xFCFCF8); case .dark: Color(hex: 0x222E28) } }
@@ -10,159 +11,197 @@ struct ReaderView: View {
     @EnvironmentObject private var store: LibraryStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let book: Book
     @State private var chapter: Int
-    @State private var position: String?
+    @State private var anchor = ReaderAnchor()
+    @State private var restoreID = 0
     @State private var showContents = false
     @State private var showSettings = false
     @State private var controlsVisible = true
-    @State private var isRestoring = true
+    @State private var sliderValue: Double
+    @State private var sliderEditing = false
+    @State private var ranges: [NSRange] = []
+    @State private var page = 0
+    @State private var reflowing = false
+    @State private var turn = 0
+    @State private var message: String?
+    @State private var initialized = false
 
     init(book: Book, initialChapter: Int) {
         self.book = book
         _chapter = State(initialValue: initialChapter)
+        _sliderValue = State(initialValue: Double(initialChapter))
     }
-
     private var theme: ReadingTheme { store.settings.theme }
+    private var document: ReaderDocument { ReaderDocument(book: book, chapter: chapter, settings: store.settings) }
+
     var body: some View {
         VStack(spacing: 0) {
-            if controlsVisible {
-                HStack(spacing: 13) {
-                    Button { save(); dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }.accessibilityLabel("返回书架")
-                    Spacer(minLength: 0)
-                    VStack(spacing: 4) {
-                        Text(book.title).font(.system(size: 13, weight: .medium, design: .serif)).tracking(2)
-                        Text("\(book.author) 著").font(.system(size: 9)).foregroundStyle(theme.secondary)
-                    }
-                    Spacer(minLength: 0)
-                    Button { store.toggleFavorite(book) } label: { Image(systemName: store.isFavorite(book) ? "bookmark.fill" : "bookmark").font(.system(size: 16)).frame(width: 44, height: 44) }.accessibilityLabel(store.isFavorite(book) ? "已收藏" : "加入书架")
-                }.padding(.horizontal, 9).foregroundStyle(theme.ink).padding(.bottom, 8)
-                Rectangle().fill(theme.secondary.opacity(0.2)).frame(height: 0.5)
-            }
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        VStack(alignment: .leading, spacing: 18) {
-                            Text("\(book.genre)  /  \(String(format: "%02d", chapter + 1)) OF \(String(format: "%02d", book.chapters.count))").font(.system(size: 9)).tracking(1.5).foregroundStyle(theme.secondary)
-                            Text(book.chapterTitle(chapter)).font(.system(size: 27, weight: .medium, design: .serif)).tracking(1.5).lineSpacing(6).accessibilityIdentifier("chapterTitle")
-                            HStack(spacing: 15) { Text("\(book.author) 著"); Text("原创示例章节") }.font(.system(size: 9)).foregroundStyle(theme.secondary)
-                        }.padding(.top, 29).padding(.bottom, 35).id("heading")
-
-                        ForEach(Array(book.content[chapter].enumerated()), id: \.offset) { index, text in
-                            Text("　　" + text)
-                                .font(.system(size: store.settings.fontSize, design: .serif))
-                                .lineSpacing(store.settings.lineSpacing)
-                                .tracking(0.6)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.bottom, 22)
-                                .id("\(chapter):\(index)")
-                                .accessibilityIdentifier("paragraph-\(index)")
-                                .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { controlsVisible.toggle() } }
+            header.opacity(controlsVisible ? 1 : 0).allowsHitTesting(controlsVisible).accessibilityHidden(!controlsVisible)
+            GeometryReader { geo in
+                let key = layoutKey(geo.size)
+                ZStack(alignment: .bottom) {
+                    if store.settings.mode == .scroll {
+                        ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) })
+                            .frame(width: geo.size.width, height: geo.size.height)
+                    } else if !ranges.isEmpty {
+                        if ranges.indices.contains(page) {
+                            ZStack {
+                                PagedReaderText(text: document.pageText(in: ranges[page]), onTap: handleTap, onSwipe: { flip(forward: $0) })
+                                    .frame(width: max(40, geo.size.width - 50), height: max(40, geo.size.height - 44))
+                                    .padding(.horizontal, 25).padding(.top, 24).padding(.bottom, 20)
+                                    .allowsHitTesting(false)
+                                HStack(spacing: 0) {
+                                    tapArea(0.1, label: "轻触左侧", id: "readerTapLeft").frame(width: geo.size.width * 0.3)
+                                    tapArea(0.5, label: "显示或隐藏阅读工具栏", id: "readerTapCenter")
+                                    tapArea(0.9, label: "轻触右侧", id: "readerTapRight").frame(width: geo.size.width * 0.3)
+                                }.frame(width: geo.size.width, height: geo.size.height)
+                                    .simultaneousGesture(DragGesture(minimumDistance: 25).onEnded { value in
+                                        if abs(value.translation.width) > 45 && abs(value.translation.width) > abs(value.translation.height) { flip(forward: value.translation.width < 0) }
+                                    })
+                            }.frame(width: geo.size.width, height: geo.size.height).clipped()
                         }
-
-                        VStack(spacing: 23) {
-                            HStack(spacing: 17) { Rectangle().frame(width: 35, height: 0.5); Image(systemName: "leaf"); Rectangle().frame(width: 35, height: 0.5) }.foregroundStyle(theme.secondary).font(.system(size: 14)).frame(maxWidth: .infinity).padding(.top, 25)
-                            Text(chapter == book.chapters.count - 1 ? "你已读完全部示例章节，感谢同行。" : "故事还在继续，不妨再读一章。").font(.system(size: 11)).foregroundStyle(theme.secondary).frame(maxWidth: .infinity)
-                            HStack(spacing: 15) {
-                                Button { changeChapter(chapter - 1, proxy: proxy) } label: { Label("上一章", systemImage: "chevron.left") }.disabled(chapter == 0).accessibilityIdentifier("previousChapter")
-                                Button { changeChapter(chapter + 1, proxy: proxy) } label: { HStack { Text(chapter == book.chapters.count - 1 ? "已是最后一章" : "下一章"); Image(systemName: "chevron.right") } }.disabled(chapter == book.chapters.count - 1).accessibilityIdentifier("nextChapter")
-                            }.buttonStyle(ReaderChapterButtonStyle(theme: theme))
-                            Text("阅山 · 在字里行间，遇见山海").font(.system(size: 9)).tracking(2).foregroundStyle(theme.secondary).frame(maxWidth: .infinity).padding(.top, 8)
-                        }.padding(.bottom, 40)
                     }
-                    .scrollTargetLayout()
-                    .padding(.horizontal, 25)
-                    .frame(maxWidth: 700)
-                    .frame(maxWidth: .infinity)
-                }
-                .scrollPosition(id: $position, anchor: .top)
-                .task {
-                    let paragraph = store.progress[book.id]?.chapter == chapter ? store.progress[book.id]?.paragraph ?? 0 : 0
-                    try? await Task.sleep(for: .milliseconds(150))
-                    if paragraph > 0 { proxy.scrollTo("\(chapter):\(paragraph)", anchor: .top) }
-                    isRestoring = false
-                }
-                .onChange(of: chapter) { _, _ in
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(100))
-                        proxy.scrollTo("heading", anchor: .top)
+                    if !controlsVisible {
+                        Button { controlsVisible = true; haptic() } label: {
+                            Label("显示工具栏", systemImage: "ellipsis").font(.system(size: 10)).padding(.horizontal, 14).frame(height: 36).foregroundStyle(theme.secondary).background(theme.background.opacity(0.92), in: Capsule())
+                        }.padding(.bottom, 5).accessibilityIdentifier("showReaderControls")
+                    }
+                    if let message {
+                        Text(message).font(.system(size: 11)).padding(13).foregroundStyle(theme.ink).background(.regularMaterial, in: Capsule()).padding(.bottom, 9)
                     }
                 }
+                .task(id: key) {
+                    guard initialized else { return }
+                    reflowing = true
+                    if store.settings.mode == .paged {
+                        let newRanges = ReaderPaginator.ranges(document: document, size: CGSize(width: max(40, geo.size.width - 50), height: max(40, geo.size.height - 44)))
+                        let newPage = ReaderPaginator.page(containing: anchor, document: document, ranges: newRanges)
+                        ranges = newRanges
+                        page = min(newPage, max(0, newRanges.count - 1))
+                    }
+                    await Task.yield()
+                    reflowing = false
+                }
             }
-            if controlsVisible {
-                VStack(spacing: 13) {
-                    HStack {
-                        Text("第 \(chapter + 1) / \(book.chapters.count) 章")
-                        Spacer()
-                        Text("已读 \(store.percent(book))% · 自动保存进度")
-                    }.font(.system(size: 8)).foregroundStyle(theme.secondary).padding(.horizontal, 25)
-                    HStack {
-                        tool("目录", icon: "list.bullet") { save(); showContents = true }.accessibilityIdentifier("readerContents")
-                        Spacer()
-                        tool("设置", icon: "textformat.size") { save(); showSettings = true }.accessibilityIdentifier("readerSettings")
-                        Spacer()
-                        tool(store.isFavorite(book) ? "已收藏" : "收藏", icon: store.isFavorite(book) ? "bookmark.fill" : "bookmark") { store.toggleFavorite(book) }
-                    }.padding(.horizontal, 32)
-                }.padding(.top, 14).padding(.bottom, 5).background(theme.background)
-                    .overlay(alignment: .top) { Rectangle().fill(theme.secondary.opacity(0.2)).frame(height: 0.5) }
-            }
+            footer.opacity(controlsVisible ? 1 : 0).allowsHitTesting(controlsVisible).accessibilityHidden(!controlsVisible)
         }
         .background(theme.background.ignoresSafeArea())
         .foregroundStyle(theme.ink)
         .preferredColorScheme(theme == .dark ? .dark : .light)
-        .statusBarHidden(!controlsVisible)
-        .onChange(of: position) { _, _ in if !isRestoring { save() } }
+        .onAppear {
+            if let saved = store.progress[book.id], saved.chapter == chapter {
+                anchor = .init(paragraph: saved.paragraph, offset: saved.characterOffset)
+            }
+            initialized = true
+            restoreID += 1
+        }
+        .onChange(of: page) { _, target in
+            guard !reflowing, ranges.indices.contains(target) else { return }
+            updateAnchor(document.anchor(at: ranges[target].location))
+            haptic()
+        }
         .onChange(of: scenePhase) { _, phase in if phase != .active { save() } }
         .onDisappear { save() }
         .sheet(isPresented: $showContents) {
-            ContentsView(book: book, currentChapter: chapter) { target in
-                isRestoring = true
-                chapter = target
-                position = nil
-                store.record(book, chapter: target)
-                showContents = false
-                Task { @MainActor in try? await Task.sleep(for: .milliseconds(250)); isRestoring = false }
-            }
+            ContentsView(book: book, currentChapter: chapter) { target in goChapter(target); showContents = false }
         }
-        .sheet(isPresented: $showSettings) { ReadingSettingsView() }
+        .sheet(isPresented: $showSettings, onDismiss: { restoreID += 1 }) { ReadingSettingsView() }
     }
 
+    private var header: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Button { save(); dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }.accessibilityLabel("返回书架")
+                Spacer(minLength: 0)
+                VStack(spacing: 5) {
+                    Text(book.title).font(.system(size: 13, weight: .medium, design: .serif)).tracking(2)
+                    Text(book.chapterTitle(chapter)).font(.system(size: 9)).foregroundStyle(theme.secondary).accessibilityIdentifier("chapterTitle")
+                }
+                Spacer(minLength: 0)
+                Button { store.toggleFavorite(book); haptic() } label: { Image(systemName: store.isFavorite(book) ? "bookmark.fill" : "bookmark").frame(width: 44, height: 44) }.accessibilityLabel(store.isFavorite(book) ? "已收藏" : "加入书架")
+            }.padding(.horizontal, 9).padding(.bottom, 8)
+            Rectangle().fill(theme.secondary.opacity(0.2)).frame(height: 0.5)
+        }
+    }
+
+    private var footer: some View {
+        VStack(spacing: 5) {
+            HStack {
+                Button { flip(forward: false) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 34) }.disabled(chapter == 0 && (store.settings.mode == .scroll || page == 0)).accessibilityLabel(store.settings.mode == .paged ? "上一页" : "上一章").accessibilityIdentifier("previousChapter")
+                Spacer(minLength: 0)
+                VStack(spacing: 3) {
+                    Text(sliderEditing ? "跳至 · \(book.chapterTitle(Int(sliderValue)))" : "第 \(chapter + 1) / \(book.chapters.count) 章").font(.system(size: 10)).lineLimit(1)
+                    Text(store.settings.mode == .paged ? "本章 \(page + 1) / \(max(1, ranges.count)) 页" : "上下滚动 · 已读 \(store.percent(book))%").font(.system(size: 8)).foregroundStyle(theme.secondary).accessibilityIdentifier("readerPageStatus")
+                }
+                Spacer(minLength: 0)
+                Button { flip(forward: true) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 34) }.disabled(chapter == book.chapters.count - 1 && (store.settings.mode == .scroll || page == ranges.count - 1)).accessibilityLabel(store.settings.mode == .paged ? "下一页" : "下一章").accessibilityIdentifier("nextChapter")
+            }
+            Slider(value: $sliderValue, in: 0...Double(max(1, book.chapters.count - 1)), step: 1) { editing in
+                sliderEditing = editing
+                if !editing { goChapter(min(book.chapters.count - 1, Int(sliderValue))) }
+            }.tint(theme.secondary).padding(.horizontal, 24).accessibilityLabel("章节进度").accessibilityValue(book.chapterTitle(Int(sliderValue))).accessibilityIdentifier("chapterSlider")
+            HStack {
+                tool("目录", icon: "list.bullet") { save(); showContents = true }.accessibilityIdentifier("readerContents")
+                Spacer()
+                tool("设置", icon: "textformat.size") { save(); showSettings = true }.accessibilityIdentifier("readerSettings")
+                Spacer()
+                tool(store.isFavorite(book) ? "已收藏" : "收藏", icon: store.isFavorite(book) ? "bookmark.fill" : "bookmark") { store.toggleFavorite(book); haptic() }
+            }
+            .padding(.horizontal, 32)
+        }.padding(.top, 8).padding(.bottom, 4).overlay(alignment: .top) { Rectangle().fill(theme.secondary.opacity(0.2)).frame(height: 0.5) }
+    }
+
+    private func tapArea(_ fraction: Double, label: String, id: String) -> some View {
+        Button { handleTap(fraction) } label: {
+            Color.white.opacity(0.02).frame(maxWidth: .infinity, maxHeight: .infinity).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityLabel(label).accessibilityIdentifier(id)
+    }
     private func tool(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 6) { Image(systemName: icon).font(.system(size: 18)); Text(title).font(.system(size: 10)) }.frame(width: 55, height: 48)
-        }.foregroundStyle(theme.ink.opacity(0.8))
+        Button(action: action) { VStack(spacing: 5) { Image(systemName: icon).font(.system(size: 17)); Text(title).font(.system(size: 9)) }.frame(width: 55, height: 45) }.foregroundStyle(theme.ink.opacity(0.8))
     }
-
-    private func changeChapter(_ target: Int, proxy: ScrollViewProxy) {
-        guard book.chapters.indices.contains(target) else { return }
-        isRestoring = true
-        chapter = target
-        position = nil
-        store.record(book, chapter: target)
-        proxy.scrollTo("heading", anchor: .top)
-        Task { @MainActor in try? await Task.sleep(for: .milliseconds(150)); isRestoring = false }
+    private func layoutKey(_ size: CGSize) -> String {
+        "\(chapter)-\(Int(size.width))-\(Int(size.height))-\(store.settings.fontSize)-\(store.settings.lineSpacing)-\(theme.rawValue)-\(store.settings.mode.rawValue)-\(restoreID)-\(initialized)"
     }
-
+    private func updateAnchor(_ value: ReaderAnchor) {
+        guard initialized else { return }
+        anchor = value; save()
+    }
     private func save() {
-        guard !isRestoring else { return }
-        let parts = position?.split(separator: ":") ?? []
-        let paragraph = parts.count == 2 && Int(parts[0]) == chapter ? Int(parts[1]) ?? 0 : store.progress[book.id]?.paragraph ?? 0
-        store.record(book, chapter: chapter, paragraph: paragraph)
+        guard initialized else { return }
+        store.record(book, chapter: chapter, paragraph: anchor.paragraph, characterOffset: anchor.offset)
+    }
+    private func goChapter(_ target: Int, atEnd: Bool = false) {
+        guard book.chapters.indices.contains(target) else { showMessage(target < 0 ? "已经是第一章" : "已读完全部示例章节"); return }
+        chapter = target
+        anchor = atEnd ? ReaderAnchor(paragraph: max(0, book.content[target].count - 1)) : .init()
+        sliderValue = Double(target)
+        reflowing = true; ranges = []; page = 0
+        restoreID += 1; save(); haptic()
+    }
+    private func flip(forward: Bool) {
+        if store.settings.mode == .scroll { goChapter(chapter + (forward ? 1 : -1)); return }
+        let target = page + (forward ? 1 : -1)
+        if ranges.indices.contains(target) {
+            if reduceMotion { page = target } else { withAnimation(.easeInOut(duration: 0.2)) { page = target } }
+        } else { goChapter(chapter + (forward ? 1 : -1), atEnd: !forward) }
+    }
+    private func handleTap(_ fraction: Double) {
+        switch ReaderInteraction.action(at: fraction, settings: store.settings) {
+        case .controls: controlsVisible.toggle(); haptic()
+        case .next, .previous:
+            let forward = ReaderInteraction.action(at: fraction, settings: store.settings) == .next
+            if store.settings.mode == .paged { flip(forward: forward) }
+            else { turn += forward ? 1 : -1; haptic() }
+        }
+    }
+    private func haptic() { if store.settings.haptics { UISelectionFeedbackGenerator().selectionChanged() } }
+    private func showMessage(_ value: String) {
+        message = value
+        Task { @MainActor in try? await Task.sleep(for: .seconds(2)); if message == value { message = nil } }
     }
 }
-
-struct ReaderChapterButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var enabled
-    let theme: ReadingTheme
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.font(.system(size: 13)).frame(maxWidth: .infinity, minHeight: 48)
-            .foregroundStyle(theme.ink).background(theme.secondary.opacity(0.1), in: .rect(cornerRadius: 10))
-            .opacity(enabled ? (configuration.isPressed ? 0.6 : 1) : 0.3)
-    }
-}
-
 struct ContentsView: View {
     @Environment(\.dismiss) private var dismiss
     let book: Book

@@ -34,6 +34,20 @@ struct ReadingProgress: Codable, Equatable {
     var chapter: Int
     var paragraph: Int
     var updatedAt: Date
+    var characterOffset: Int = 0
+
+    init(chapter: Int, paragraph: Int, updatedAt: Date, characterOffset: Int = 0) {
+        self.chapter = chapter; self.paragraph = paragraph
+        self.updatedAt = updatedAt; self.characterOffset = characterOffset
+    }
+    private enum CodingKeys: String, CodingKey { case chapter, paragraph, updatedAt, characterOffset }
+    init(from decoder: Decoder) throws {
+        let box = try decoder.container(keyedBy: CodingKeys.self)
+        chapter = try box.decode(Int.self, forKey: .chapter)
+        paragraph = try box.decode(Int.self, forKey: .paragraph)
+        updatedAt = try box.decode(Date.self, forKey: .updatedAt)
+        characterOffset = try box.decodeIfPresent(Int.self, forKey: .characterOffset) ?? 0
+    }
 }
 
 enum ReadingTheme: String, Codable, CaseIterable {
@@ -41,10 +55,49 @@ enum ReadingTheme: String, Codable, CaseIterable {
     var title: String { switch self { case .paper: "暖纸"; case .light: "明亮"; case .dark: "夜读" } }
 }
 
+enum ReadingMode: String, Codable, CaseIterable {
+    case scroll, paged
+    var title: String { self == .scroll ? "上下滚动" : "左右翻页" }
+}
+
+enum ShelfSort: String, Codable, CaseIterable {
+    case recent, added, title
+    var title: String { switch self { case .recent: "最近阅读"; case .added: "加入时间"; case .title: "书名排序" } }
+}
+
 struct ReadingSettings: Codable, Equatable {
     var fontSize: Double = 20
     var lineSpacing: Double = 12
     var theme: ReadingTheme = .paper
+    var mode: ReadingMode = .scroll
+    var tapToTurn = false
+    var haptics = true
+
+    private enum CodingKeys: String, CodingKey { case fontSize, lineSpacing, theme, mode, tapToTurn, haptics }
+    init(fontSize: Double = 20, lineSpacing: Double = 12, theme: ReadingTheme = .paper,
+         mode: ReadingMode = .scroll, tapToTurn: Bool = false, haptics: Bool = true) {
+        self.fontSize = fontSize; self.lineSpacing = lineSpacing; self.theme = theme
+        self.mode = mode; self.tapToTurn = tapToTurn; self.haptics = haptics
+    }
+    init(from decoder: Decoder) throws {
+        let box = try decoder.container(keyedBy: CodingKeys.self)
+        fontSize = try box.decodeIfPresent(Double.self, forKey: .fontSize) ?? 20
+        lineSpacing = try box.decodeIfPresent(Double.self, forKey: .lineSpacing) ?? 12
+        theme = try box.decodeIfPresent(ReadingTheme.self, forKey: .theme) ?? .paper
+        mode = try box.decodeIfPresent(ReadingMode.self, forKey: .mode) ?? .scroll
+        tapToTurn = try box.decodeIfPresent(Bool.self, forKey: .tapToTurn) ?? false
+        haptics = try box.decodeIfPresent(Bool.self, forKey: .haptics) ?? true
+    }
+}
+
+struct UpdateNotice: Codable, Equatable {
+    var firstChapter: Int
+    var readThrough: Int = -1
+}
+
+struct ShelfRemoval {
+    let entries: [(id: String, index: Int)]
+    var count: Int { entries.count }
 }
 
 struct LibrarySnapshot: Codable {
@@ -52,6 +105,8 @@ struct LibrarySnapshot: Codable {
     var favorites: [String]
     var progress: [String: ReadingProgress]
     var settings: ReadingSettings = .init()
+    var sort: ShelfSort = .recent
+    var updates: [String: UpdateNotice]? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -67,6 +122,8 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var favorites: [String]
     @Published private(set) var progress: [String: ReadingProgress]
     @Published var settings: ReadingSettings { didSet { persist() } }
+    @Published var sort: ShelfSort = .recent { didSet { persist() } }
+    @Published private(set) var updates: [String: UpdateNotice] = [:]
     @Published var reader: ReaderSession?
     @Published var storageMessage: String?
     private let defaults: UserDefaults
@@ -82,9 +139,13 @@ final class LibraryStore: ObservableObject {
             return (id, ReadingProgress(chapter: chapter, paragraph: 0, updatedAt: now.addingTimeInterval(-seconds)))
         })
         settings = .init()
+        updates = Dictionary(uniqueKeysWithValues: books.filter { $0.status == "连载中" }.map { ($0.id, UpdateNotice(firstChapter: max(0, $0.chapters.count - 3))) })
         guard let data = defaults.data(forKey: Self.storageKey) else { return }
         do {
-            let snapshot = try JSONDecoder().decode(LibrarySnapshot.self, from: data)
+            // Add defaults to old v1 snapshots before decoding the expanded schema.
+            var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            if object["sort"] == nil { object["sort"] = ShelfSort.recent.rawValue }
+            let snapshot = try JSONDecoder().decode(LibrarySnapshot.self, from: JSONSerialization.data(withJSONObject: object))
             guard snapshot.version == 1 else { throw CocoaError(.coderReadCorrupt) }
             var seen = Set<String>()
             let ids = Set(books.map(\.id))
@@ -93,7 +154,13 @@ final class LibraryStore: ObservableObject {
                 guard let book = books.first(where: { $0.id == entry.key }), !book.chapters.isEmpty else { return }
                 let chapter = min(max(0, entry.value.chapter), book.chapters.count - 1)
                 let count = book.content.indices.contains(chapter) ? book.content[chapter].count : 0
-                result[entry.key] = ReadingProgress(chapter: chapter, paragraph: min(max(0, entry.value.paragraph), max(0, count - 1)), updatedAt: entry.value.updatedAt)
+                let paragraph = min(max(0, entry.value.paragraph), max(0, count - 1))
+                let length = count > 0 ? (book.content[chapter][paragraph] as NSString).length : 0
+                result[entry.key] = ReadingProgress(chapter: chapter, paragraph: paragraph, updatedAt: entry.value.updatedAt, characterOffset: min(max(0, entry.value.characterOffset), max(0, length - 1)))
+            }
+            sort = snapshot.sort
+            if let savedUpdates = snapshot.updates {
+                updates = savedUpdates.filter { ids.contains($0.key) }.mapValues { UpdateNotice(firstChapter: max(0, $0.firstChapter), readThrough: max(-1, $0.readThrough)) }
             }
             settings = snapshot.settings
             settings.fontSize = [16, 18, 20, 22, 24].contains(settings.fontSize) ? settings.fontSize : 20
@@ -105,6 +172,8 @@ final class LibraryStore: ObservableObject {
 
     var shelf: [Book] {
         favorites.compactMap { id in books.first { $0.id == id } }.sorted { a, b in
+            if sort == .added { return (favorites.firstIndex(of: a.id) ?? 0) < (favorites.firstIndex(of: b.id) ?? 0) }
+            if sort == .title { return a.title.localizedStandardCompare(b.title) == .orderedAscending }
             switch (progress[a.id], progress[b.id]) {
             case let (a?, b?): return a.updatedAt > b.updatedAt
             case (_?, nil): return true
@@ -114,7 +183,36 @@ final class LibraryStore: ObservableObject {
         }
     }
 
-    var recent: Book? { shelf.first { progress[$0.id] != nil } }
+    var history: [Book] {
+        books.filter { progress[$0.id] != nil }.sorted {
+            let a = progress[$0.id]!.updatedAt, b = progress[$1.id]!.updatedAt
+            return a == b ? $0.id < $1.id : a > b
+        }
+    }
+    var recent: Book? { history.first { favorites.contains($0.id) } }
+    var updatedBooks: [Book] { shelf.filter { updateCount($0) > 0 } }
+    func updateCount(_ book: Book) -> Int {
+        guard let notice = updates[book.id] else { return 0 }
+        return max(0, book.chapters.count - max(notice.firstChapter, notice.readThrough + 1))
+    }
+    func simulateUpdates() {
+        for book in books where book.status == "连载中" {
+            updates[book.id] = UpdateNotice(firstChapter: max(0, book.chapters.count - 3))
+        }
+        persist()
+    }
+    func removeFavorites(_ ids: Set<String>) -> ShelfRemoval {
+        let receipt = ShelfRemoval(entries: favorites.enumerated().filter { ids.contains($0.element) }.map { ($0.element, $0.offset) })
+        favorites.removeAll { ids.contains($0) }
+        persist()
+        return receipt
+    }
+    func undoRemoval(_ receipt: ShelfRemoval) {
+        for entry in receipt.entries.sorted(by: { $0.index < $1.index }) where !favorites.contains(entry.id) {
+            favorites.insert(entry.id, at: min(entry.index, favorites.count))
+        }
+        persist()
+    }
     var readingCount: Int { shelf.filter { progress[$0.id] != nil }.count }
     func isFavorite(_ book: Book) -> Bool { favorites.contains(book.id) }
 
@@ -142,9 +240,15 @@ final class LibraryStore: ObservableObject {
     }
 
     @discardableResult
-    func record(_ book: Book, chapter: Int, paragraph: Int = 0, now: Date = Date()) -> Bool {
+    func record(_ book: Book, chapter: Int, paragraph: Int = 0, characterOffset: Int = 0, now: Date = Date()) -> Bool {
         guard books.contains(where: { $0.id == book.id }), book.chapters.indices.contains(chapter), book.content.indices.contains(chapter) else { return false }
-        progress[book.id] = .init(chapter: chapter, paragraph: min(max(0, paragraph), max(0, book.content[chapter].count - 1)), updatedAt: now)
+        let paragraph = min(max(0, paragraph), max(0, book.content[chapter].count - 1))
+        let length = (book.content[chapter][paragraph] as NSString).length
+        progress[book.id] = .init(chapter: chapter, paragraph: paragraph, updatedAt: now, characterOffset: min(max(0, characterOffset), max(0, length - 1)))
+        if var notice = updates[book.id], chapter >= notice.firstChapter {
+            notice.readThrough = max(notice.readThrough, chapter)
+            updates[book.id] = notice
+        }
         persist()
         return true
     }
@@ -153,13 +257,13 @@ final class LibraryStore: ObservableObject {
         let target = chapter ?? progress[book.id]?.chapter ?? 0
         guard book.chapters.indices.contains(target) else { return }
         let paragraph = progress[book.id]?.chapter == target ? progress[book.id]?.paragraph ?? 0 : 0
-        record(book, chapter: target, paragraph: paragraph)
+        record(book, chapter: target, paragraph: paragraph, characterOffset: progress[book.id]?.chapter == target ? progress[book.id]?.characterOffset ?? 0 : 0)
         reader = ReaderSession(book: book, chapter: target)
     }
 
     func persist() {
         do {
-            let snapshot = LibrarySnapshot(favorites: favorites, progress: progress, settings: settings)
+            let snapshot = LibrarySnapshot(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates)
             defaults.set(try JSONEncoder().encode(snapshot), forKey: Self.storageKey)
         } catch {
             storageMessage = "阅读记录保存失败，请稍后重试。"

@@ -95,4 +95,78 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(store.settings.fontSize, 20)
         XCTAssertEqual(store.settings.lineSpacing, 12)
     }
+    func testOldSnapshotMigratesWithoutLosingData() throws {
+        let store = LibraryStore(books: books, defaults: defaults)
+        store.record(books[0], chapter: 3, paragraph: 4)
+        var object = try JSONSerialization.jsonObject(with: defaults.data(forKey: LibraryStore.storageKey)!) as! [String: Any]
+        object.removeValue(forKey: "sort"); object.removeValue(forKey: "updates")
+        var settings = object["settings"] as! [String: Any]
+        for key in ["mode", "hand", "tapToTurn", "haptics"] { settings.removeValue(forKey: key) }
+        object["settings"] = settings
+        var progress = object["progress"] as! [String: [String: Any]]
+        for key in progress.keys { progress[key]?.removeValue(forKey: "characterOffset") }
+        object["progress"] = progress
+        defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: LibraryStore.storageKey)
+        let migrated = LibraryStore(books: books, defaults: defaults)
+        XCTAssertNil(migrated.storageMessage)
+        XCTAssertEqual(migrated.favorites, store.favorites)
+        XCTAssertEqual(migrated.progress[books[0].id]?.paragraph, 4)
+        XCTAssertEqual(migrated.settings.mode, .scroll)
+    }
+
+    func testHistoryIncludesUnfavoritedBooksAndIgnoresShelfSort() {
+        let store = LibraryStore(books: books, defaults: defaults)
+        let book = books.first { $0.id == "echo" }!
+        store.record(book, chapter: 1, paragraph: 5, characterOffset: 9)
+        store.sort = .title
+        XCTAssertEqual(store.history.first?.id, book.id)
+        XCTAssertFalse(store.isFavorite(book))
+        let restored = LibraryStore(books: books, defaults: defaults)
+        XCTAssertEqual(restored.history.first?.id, book.id)
+        XCTAssertEqual(restored.progress[book.id]?.characterOffset, 9)
+        XCTAssertEqual(restored.sort, .title)
+    }
+
+    func testSortingAndBulkRemovalUndoPreserveReadingData() {
+        let store = LibraryStore(books: books, defaults: defaults)
+        let initial = store.favorites
+        let progress = store.progress
+        let receipt = store.removeFavorites(Set(initial.prefix(3)))
+        XCTAssertEqual(receipt.count, 3)
+        XCTAssertEqual(store.favorites.count, 3)
+        XCTAssertEqual(store.progress, progress)
+        store.undoRemoval(receipt)
+        store.undoRemoval(receipt)
+        XCTAssertEqual(store.favorites, initial)
+        store.toggleFavorite(books.last!)
+        store.sort = .added
+        XCTAssertEqual(store.shelf.first?.id, books.last?.id)
+        store.sort = .title
+        XCTAssertEqual(store.shelf.map(\.title), store.shelf.map(\.title).sorted { $0.localizedStandardCompare($1) == .orderedAscending })
+    }
+
+    func testUpdateBadgesDecreaseOnlyAfterReadingUpdatedChapters() {
+        let store = LibraryStore(books: books, defaults: defaults)
+        let book = books[0]
+        XCTAssertEqual(store.updateCount(book), 3)
+        store.record(book, chapter: 2)
+        XCTAssertEqual(store.updateCount(book), 3)
+        store.record(book, chapter: 10)
+        XCTAssertEqual(store.updateCount(book), 1)
+        store.record(book, chapter: 1)
+        XCTAssertEqual(store.updateCount(book), 1)
+        store.record(book, chapter: 11)
+        XCTAssertEqual(store.updateCount(book), 0)
+        XCTAssertEqual(LibraryStore(books: books, defaults: defaults).updateCount(book), 0)
+        store.simulateUpdates()
+        XCTAssertEqual(store.updateCount(book), 3)
+        XCTAssertEqual(store.updateCount(books[1]), 0)
+    }
+
+    func testExpandedSettingsSurviveRelaunch() {
+        let store = LibraryStore(books: books, defaults: defaults)
+        store.settings = .init(fontSize: 22, lineSpacing: 18, theme: .dark, mode: .paged, tapToTurn: true, haptics: false)
+        XCTAssertEqual(LibraryStore(books: books, defaults: defaults).settings, store.settings)
+    }
+
 }

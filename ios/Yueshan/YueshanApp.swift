@@ -52,12 +52,9 @@ struct RootView: View {
             NavigationStack { FeatureHubView(sourceOnly: true) }
                 .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
                 .tabItem { Label("书源", systemImage: "externaldrive") }.tag(2)
-            NavigationStack { FeatureHubView() }
+            NavigationStack { ProfileView(onShelf: { selectedTab = 0 }) }
                 .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
-                .tabItem { Label("工具", systemImage: "square.grid.2x2") }.tag(3)
-            NavigationStack { ProfileView() }
-                .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
-                .tabItem { Label("我的", systemImage: "person.crop.circle") }.tag(4)
+                .tabItem { Label("我的", systemImage: "person.crop.circle") }.tag(3)
         }
         .tint(Palette.green)
         .preferredColorScheme(.light)

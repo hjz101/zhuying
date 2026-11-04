@@ -31,9 +31,9 @@ struct FeatureHubView: View {
                     toolsHome
                 }
             }.padding(22)
-        }.background(Palette.background).navigationTitle(sourceOnly ? "书源" : "工具")
+        }.background(Palette.background).navigationTitle(sourceOnly ? "书源" : "全部工具")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: sourceOnly ? "搜索书源功能" : "搜索模块或功能")
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: sourceOnly ? "搜索书源功能" : "搜索模块或功能")
     }
 
     private var toolsHome: some View {

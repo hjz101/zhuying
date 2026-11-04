@@ -4,8 +4,16 @@ final class FeatureFlowTests: XCTestCase {
     @MainActor private func launch() -> XCUIApplication {
         let app = XCUIApplication(); app.launchArguments = ["--ui-testing"]; app.launch(); return app
     }
+    @MainActor private func openTools(in app: XCUIApplication) {
+        app.tabBars.buttons["我的"].tap()
+        if !app.navigationBars["全部工具"].exists {
+            let tools = app.buttons["allTools"]
+            reveal(tools, app: app); tools.tap()
+        }
+        XCTAssertTrue(app.navigationBars["全部工具"].waitForExistence(timeout: 5))
+    }
     @MainActor private func open(_ id: String, title: String, app: XCUIApplication) {
-        app.tabBars.buttons["工具"].tap()
+        openTools(in: app)
         let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
@@ -24,9 +32,68 @@ final class FeatureFlowTests: XCTestCase {
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
     }
 
+    @MainActor func testMergedProfileHomeAndCommonTools() {
+        let app = launch()
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
+        XCTAssertFalse(app.tabBars.buttons["工具"].exists)
+        app.tabBars.buttons["我的"].tap()
+        XCTAssertTrue(app.buttons["readingHistory"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["关于这个 Demo"].exists)
+        XCTAssertFalse(app.buttons["tool-category-reading"].exists)
+        capture(app, name: "Profile-MergedHome")
+
+        app.buttons["profileFavorites"].tap()
+        XCTAssertTrue(app.tabBars.buttons["书架"].isSelected)
+        app.tabBars.buttons["我的"].tap()
+        app.buttons["profileReadBooks"].tap()
+        XCTAssertTrue(app.navigationBars["阅读历史"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["history-changfeng"].exists)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["readingHistory"].tap()
+        XCTAssertTrue(app.navigationBars["阅读历史"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["profileReadingSettings"].tap()
+        XCTAssertTrue(app.segmentedControls["readingModePicker"].waitForExistence(timeout: 5))
+        app.buttons["完成"].tap()
+        for (id, title) in [("import", "智能导入"), ("fulltext", "全文搜索"), ("cache", "缓存管理"), ("backup", "本地备份")] {
+            let shortcut = app.buttons["profile-tool-\(id)"]
+            reveal(shortcut, app: app); shortcut.tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        openTools(in: app)
+        XCTAssertTrue(app.buttons["tool-category-reading"].exists)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["allTools"].exists)
+        XCTAssertTrue(app.tabBars.buttons["我的"].isSelected)
+    }
+
+    @MainActor func testProfileSettingsHelpAndAbout() {
+        let app = launch()
+        app.tabBars.buttons["我的"].tap()
+        app.buttons["profileSettings"].tap()
+        XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 5))
+        app.buttons["阅读偏好"].tap()
+        XCTAssertTrue(app.segmentedControls["readingModePicker"].waitForExistence(timeout: 5))
+        app.buttons["完成"].tap()
+        app.buttons["profileGestureHelp"].tap()
+        XCTAssertTrue(app.staticTexts["gestureGuideTitle"].waitForExistence(timeout: 5))
+        app.buttons["dismissGestureGuide"].tap()
+        app.buttons["profileAbout"].tap()
+        XCTAssertTrue(app.navigationBars["关于阅山"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["关于这个 Demo"].exists)
+        capture(app, name: "Profile-About")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["阅读统计"].tap()
+        XCTAssertTrue(app.navigationBars["阅读统计"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["iCloud 同步"].tap()
+        XCTAssertTrue(app.navigationBars["iCloud"].waitForExistence(timeout: 5))
+    }
+
     @MainActor func testToolsHomeShortcutsAndCategoryNavigation() {
         let app = launch()
-        app.tabBars.buttons["工具"].tap()
+        openTools(in: app)
         XCTAssertTrue(app.staticTexts["常用工具"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["feature-shelf"].exists, "Home should not expand the full feature catalogue")
         capture(app, name: "Tools-CompactHome")
@@ -53,7 +120,7 @@ final class FeatureFlowTests: XCTestCase {
 
     @MainActor func testToolsSearchEmptyResultsAndCategoryScope() {
         let app = launch()
-        app.tabBars.buttons["工具"].tap()
+        openTools(in: app)
         let search = app.searchFields.firstMatch
         search.tap(); search.typeText("不存在的模块")
         XCTAssertTrue(app.staticTexts["没有找到相关功能"].waitForExistence(timeout: 5))
@@ -144,13 +211,13 @@ final class FeatureFlowTests: XCTestCase {
         capture(app, name: "Catalog-Player")
         app.tabBars.buttons["书架"].tap()
         XCTAssertTrue(app.buttons["切换演示朗读"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.tabBars.buttons["工具"].isHittable)
+        XCTAssertTrue(app.tabBars.buttons["我的"].isHittable)
         capture(app, name: "Catalog-MiniPlayer")
     }
 
     @MainActor func testToolsHomeAndSampleFilePreview() {
         let app = launch()
-        app.tabBars.buttons["工具"].tap()
+        openTools(in: app)
         XCTAssertTrue(app.staticTexts["把阅读，调成你的样子。"].waitForExistence(timeout: 5))
         capture(app, name: "Catalog-ToolsHome")
         open("pdf", title: "PDF 阅读", app: app)

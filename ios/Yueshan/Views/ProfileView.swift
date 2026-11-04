@@ -2,50 +2,137 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject private var store: LibraryStore
+    let onShelf: () -> Void
     @State private var showSettings = false
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 27) {
-                HStack(spacing: 18) {
-                    Text("山").font(.system(size: 31, design: .serif)).foregroundStyle(Palette.green).frame(width: 70, height: 70).background(Color(hex: 0xE4EAD9), in: .rect(cornerRadius: 24))
-                    VStack(alignment: .leading, spacing: 9) {
-                        Text("山间读者").font(.system(size: 24, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(spacing: 14) {
+                    Text("山").font(.system(size: 26, design: .serif)).foregroundStyle(Palette.green)
+                        .frame(width: 56, height: 56).background(Palette.soft, in: .rect(cornerRadius: 19))
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("山间读者").font(.system(size: 23, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
                         Text("你的阅读，只属于你。").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     }
-                }.padding(.vertical, 13)
-                HStack {
-                    number(store.favorites.count, label: "书架收藏")
-                    Rectangle().fill(Palette.line).frame(width: 1, height: 40)
-                    number(store.progress.count, label: "读过的故事")
-                }.padding(.vertical, 22).background(Color(hex: 0xEDF0E4), in: .rect(cornerRadius: 17))
-                NavigationLink {
-                    ReadingHistoryView()
-                } label: {
-                    HStack { Label("阅读历史", systemImage: "clock.arrow.circlepath"); Spacer(); Text("\(store.history.count) 本").font(.system(size: 11)); Image(systemName: "chevron.right").font(.system(size: 12)) }.font(.system(size: 14)).foregroundStyle(Palette.green).padding(20).background(.white.opacity(0.6), in: .rect(cornerRadius: 15))
-                }.accessibilityIdentifier("readingHistory")
-                Button { showSettings = true } label: {
-                    HStack { Label("阅读偏好", systemImage: "textformat.size"); Spacer(); Image(systemName: "chevron.right").font(.system(size: 12)) }.font(.system(size: 14)).foregroundStyle(Palette.green).padding(20).background(.white.opacity(0.6), in: .rect(cornerRadius: 15))
+                }.padding(.vertical, 5)
+
+                HStack(spacing: 0) {
+                    Button(action: onShelf) { number(store.favorites.count, label: "书架收藏") }
+                        .buttonStyle(.plain).accessibilityIdentifier("profileFavorites")
+                    Rectangle().fill(Palette.line).frame(width: 1, height: 35)
+                    NavigationLink { ReadingHistoryView() } label: { number(store.history.count, label: "读过的故事") }
+                        .buttonStyle(.plain).accessibilityIdentifier("profileReadBooks")
+                }.padding(.vertical, 18).background(Palette.soft, in: .rect(cornerRadius: 17))
+
+                HStack(spacing: 12) {
+                    NavigationLink { ReadingHistoryView() } label: {
+                        quickEntry("阅读历史", icon: "clock.arrow.circlepath")
+                    }.buttonStyle(.plain).accessibilityIdentifier("readingHistory")
+                    Button { showSettings = true } label: {
+                        quickEntry("阅读偏好", icon: "textformat.size")
+                    }.buttonStyle(.plain).accessibilityIdentifier("profileReadingSettings").accessibilityLabel("阅读偏好")
                 }
-                VStack(spacing: 0) {
-                    ForEach(["statistics", "backup", "icloud", "themes", "files", "cache"], id: \.self) { id in
-                        NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id)) } label: { FeatureRow(feature: FeatureCatalog.feature(id)) }.buttonStyle(.plain)
-                        if id != "cache" { Divider() }
+
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionHeading(title: "常用工具")
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
+                        ForEach(Array(FeatureCatalog.commonTools.prefix(4))) { feature in
+                            NavigationLink { FeatureDemoView(feature: feature) } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: feature.icon).font(.system(size: 21, weight: .light)).frame(width: 27)
+                                    Text(feature.title).font(.system(size: 13, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
+                                }.foregroundStyle(Palette.green).frame(maxWidth: .infinity, minHeight: 76)
+                                    .background(Palette.card, in: .rect(cornerRadius: 15))
+                            }.buttonStyle(.plain).accessibilityIdentifier("profile-tool-\(feature.id)")
+                        }
                     }
-                }.padding(.horizontal, 15).background(.white.opacity(0.6), in: .rect(cornerRadius: 15))
-                VStack(alignment: .leading, spacing: 16) {
-                    Label("关于这个 Demo", systemImage: "leaf").font(.system(size: 14, weight: .medium)).foregroundStyle(Palette.green)
-                    Text("阅山，一个安静的私人阅读角落。").font(.system(size: 20, design: .serif)).lineSpacing(7).foregroundStyle(Palette.green)
-                    Text("这是 iOS 原生界面预览。8 本原创模拟小说，可体验搜索、收藏、选章、阅读和进度恢复。").font(.system(size: 12)).lineSpacing(7).foregroundStyle(Palette.muted)
-                    Text("阅读数据保存在当前设备，不连接真实书源。演示章节包含复用段落，书籍字数与状态仅用于界面展示。").font(.system(size: 11)).lineSpacing(7).foregroundStyle(Palette.muted)
-                    Text("YUESHAN FOR iOS · DESIGN PREVIEW 0.3").font(.system(size: 8)).tracking(1.3).foregroundStyle(Palette.muted).padding(.top, 5)
-                }.padding(23).frame(maxWidth: .infinity, alignment: .leading).background(Color(hex: 0xEEEFE4), in: .rect(cornerRadius: 17))
-            }.padding(23)
-        }.background(Palette.background).navigationTitle("我的").navigationBarTitleDisplayMode(.inline)
+                }
+                NavigationLink { FeatureHubView() } label: {
+                    HStack(spacing: 13) {
+                        Image(systemName: "square.grid.2x2").font(.system(size: 19))
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("全部工具").font(.system(size: 14, weight: .medium))
+                            Text("阅读、导入、朗读等 6 个分类").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    }.foregroundStyle(Palette.green).padding(17).background(Palette.card, in: .rect(cornerRadius: 15))
+                }.buttonStyle(.plain).accessibilityIdentifier("allTools")
+            }.padding(22)
+        }.appPageStyle().navigationTitle("我的").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink { ProfileSettingsView() } label: {
+                        Image(systemName: "gearshape").frame(width: 44, height: 44)
+                    }.accessibilityLabel("设置").accessibilityIdentifier("profileSettings")
+                }
+            }
             .sheet(isPresented: $showSettings) { ReadingSettingsView() }
     }
 
     private func number(_ value: Int, label: String) -> some View {
-        VStack(spacing: 8) { Text("\(value)").font(.system(size: 29, weight: .regular, design: .serif)).foregroundStyle(Palette.green); Text(label).font(.system(size: 10)).foregroundStyle(Palette.muted) }.frame(maxWidth: .infinity)
+        VStack(spacing: 7) {
+            Text("\(value)").font(.system(size: 27, design: .serif)).foregroundStyle(Palette.green)
+            Text(label).font(.system(size: 10)).foregroundStyle(Palette.muted)
+        }.frame(maxWidth: .infinity, minHeight: 52).contentShape(Rectangle())
+    }
+    private func quickEntry(_ title: String, icon: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon).font(.system(size: 18, weight: .light))
+            Text(title).font(.system(size: 13, weight: .medium))
+        }.foregroundStyle(Palette.green).frame(maxWidth: .infinity, minHeight: 66)
+            .background(Palette.card, in: .rect(cornerRadius: 15))
+    }
+}
+
+private struct ProfileSettingsView: View {
+    @State private var showReadingSettings = false
+    @State private var showGuide = false
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                AppSettingsCard("阅读与数据", icon: "slider.horizontal.3") {
+                    Button { showReadingSettings = true } label: { settingsRow("阅读偏好", icon: "textformat.size") }
+                    Divider()
+                    NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("icloud")) } label: { settingsRow("iCloud 同步", icon: "icloud") }
+                    Divider()
+                    NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("statistics")) } label: { settingsRow("阅读统计", icon: "chart.bar") }
+                }
+                AppSettingsCard("关于与帮助", icon: "questionmark.circle") {
+                    Button { showGuide = true } label: { settingsRow("阅读手势帮助", icon: "hand.tap") }
+                        .accessibilityIdentifier("profileGestureHelp")
+                    Divider()
+                    NavigationLink { DemoAboutView() } label: { settingsRow("关于阅山", icon: "leaf") }
+                        .accessibilityIdentifier("profileAbout")
+                }
+            }.padding(22)
+        }.appPageStyle().navigationTitle("设置").navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showReadingSettings) { ReadingSettingsView() }
+            .sheet(isPresented: $showGuide) { ReadingGestureGuideView(isFirstUse: false) }
+    }
+    private func settingsRow(_ title: String, icon: String) -> some View {
+        HStack {
+            Label(title, systemImage: icon)
+            Spacer()
+            Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted)
+        }.font(.system(size: 13)).frame(minHeight: 44).contentShape(Rectangle())
+    }
+}
+
+private struct DemoAboutView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                AppPageHeader(title: "阅山", subtitle: "一个安静的私人阅读角落。", icon: "leaf")
+                AppSettingsCard("关于这个 Demo", icon: "info.circle") {
+                    Text("这是 iOS 原生界面预览。8 本原创模拟小说，可体验搜索、收藏、选章、阅读和进度恢复。")
+                    Text("阅读数据保存在当前设备，不连接真实书源。演示章节包含复用段落，书籍字数与状态仅用于界面展示。")
+                        .foregroundStyle(Palette.muted)
+                    Text("YUESHAN FOR iOS · DESIGN PREVIEW 0.3").font(.system(size: 9)).foregroundStyle(Palette.muted)
+                }.font(.system(size: 12)).lineSpacing(6)
+            }.padding(22)
+        }.appPageStyle().navigationTitle("关于阅山").navigationBarTitleDisplayMode(.inline)
     }
 }
 

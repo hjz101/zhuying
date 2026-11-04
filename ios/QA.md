@@ -113,3 +113,13 @@ v0.2 验证结果：19 项单元测试通过，8 条界面流程全部通过，0
 本轮 27 项单元测试与 18 条界面流程均已通过，其中 47 个功能页逐项打开检查单独通过。新增目录回归按照系统搜索交互先切换排序，再搜索并跳转章节。已检查偏好首页、夜读选择、阅读预览、进阶排版和目录的实际截图；新版已安装至 iPhone 17 Pro 模拟器。
 
 预览：`screenshots/unified-reading-preferences.png`、`screenshots/unified-preferences-night-selection.png`、`screenshots/unified-reading-style-preview.png`、`screenshots/unified-advanced-typography.png`、`screenshots/unified-chapter-contents.png`。
+
+
+## 2026-11-04 · 我的与工具合并
+
+- 底部精简为书架／发现／书源／我的四个标签。
+- 我的首页：紧凑读者信息、可点击的收藏／阅读数量、历史与偏好双入口、四个常用工具和全部工具入口。
+- 设置收纳统计、同步、手势帮助与 Demo 说明。工具箱保留六分类、全部 47 项功能和全局搜索。
+- 验证：29 项 iOS 单元测试、10 项相关界面测试与 12 项网页测试通过；界面检查覆盖入口返回、搜索范围、播放器、书源、阅读历史和偏好。
+- 使用独立的 Yueshan Tools QA 模拟器运行界面测试，避免其他任务覆盖正在测试的应用；初轮发现并修复二级工具箱搜索栏默认收起的问题。
+- 截图：[合并后的我的首页](screenshots/profile-merged.png)。

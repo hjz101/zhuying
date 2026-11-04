@@ -4,6 +4,7 @@ import SwiftUI
 struct YueshanApp: App {
     @StateObject private var library: LibraryStore
     @StateObject private var featureDemo = FeatureDemoStore()
+    @StateObject private var navigation: NavigationStore
     private let launchError: String?
 
     init() {
@@ -14,6 +15,7 @@ struct YueshanApp: App {
                 defaults.removePersistentDomain(forName: "com.yueshan.ui-tests")
             }
         } else { defaults = .standard }
+        _navigation = StateObject(wrappedValue: NavigationStore(defaults: defaults))
         do {
             let books = try Book.load()
             _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults))
@@ -29,7 +31,7 @@ struct YueshanApp: App {
             if let launchError {
                 ContentUnavailableView("暂时无法打开书库", systemImage: "books.vertical", description: Text(launchError))
             } else {
-                RootView().environmentObject(library).environmentObject(featureDemo)
+                RootView().environmentObject(library).environmentObject(featureDemo).environmentObject(navigation)
             }
         }
     }
@@ -38,26 +40,15 @@ struct YueshanApp: App {
 struct RootView: View {
     @EnvironmentObject private var store: LibraryStore
     @EnvironmentObject private var demo: FeatureDemoStore
-    @State private var selectedTab = 0
+    @EnvironmentObject private var navigation: NavigationStore
+    @State private var selectedTab = AppTab.shelf
     @State private var showPlayer = false
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack { ShelfView(onDiscover: { selectedTab = 1 }) }
-                .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
-                .tabItem { Label("书架", systemImage: "books.vertical") }.tag(0)
-            NavigationStack { DiscoverView() }
-                .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
-                .tabItem { Label("发现", systemImage: "safari") }.tag(1)
-            NavigationStack { FeatureHubView(sourceOnly: true) }
-                .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
-                .tabItem { Label("书源", systemImage: "externaldrive") }.tag(2)
-            NavigationStack { ProfileView(onShelf: { selectedTab = 0 }) }
-                .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
-                .tabItem { Label("我的", systemImage: "person.crop.circle") }.tag(3)
-        }
+        navigationTabs
         .tint(Palette.green)
         .preferredColorScheme(.light)
+        .onChange(of: navigation.visibleTabs) { _, _ in selectedTab = navigation.validSelection(selectedTab) }
         .sheet(isPresented: $showPlayer) {
             NavigationStack { FeatureDemoView(feature: FeatureCatalog.feature("backgroundAudio"))
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showPlayer = false } } } }
@@ -68,6 +59,41 @@ struct RootView: View {
         .alert("本地记录提示", isPresented: Binding(get: { store.storageMessage != nil }, set: { if !$0 { store.storageMessage = nil } })) {
             Button("知道了") { store.storageMessage = nil }
         } message: { Text(store.storageMessage ?? "") }
+    }
+    @ViewBuilder private var navigationTabs: some View {
+        if #available(iOS 26.0, *) {
+            modernTabs.tabBarMinimizeBehavior(navigation.autoCollapse ? .onScrollDown : .never)
+        } else if #available(iOS 18.0, *) {
+            modernTabs
+        } else {
+            TabView(selection: $selectedTab) {
+                ForEach(navigation.visibleTabs + [.search]) { tab in
+                    tabPage(tab).tabItem { Label(tab.title, systemImage: tab.icon) }.tag(tab)
+                }
+            }
+        }
+    }
+    @available(iOS 18.0, *)
+    private var modernTabs: some View {
+        TabView(selection: $selectedTab) {
+            ForEach(navigation.visibleTabs) { tab in
+                Tab(tab.title, systemImage: tab.icon, value: tab) { tabPage(tab) }
+            }
+            Tab("搜索", systemImage: "magnifyingglass", value: AppTab.search, role: .search) { tabPage(.search) }
+        }
+    }
+    private func tabPage(_ tab: AppTab) -> some View {
+        NavigationStack {
+            switch tab {
+            case .shelf: ShelfView(onDiscover: { selectedTab = .search })
+            case .footprints: FootprintsView()
+            case .discover: DiscoverView()
+            case .sources: FeatureHubView(sourceOnly: true)
+            case .tools: FeatureHubView()
+            case .profile: ProfileView(onShelf: { selectedTab = .shelf })
+            case .search: DiscoverView(searchEntry: true)
+            }
+        }.safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
     }
     @ViewBuilder private var miniPlayer: some View {
             if demo.playerVisible {

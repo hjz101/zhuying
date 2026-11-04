@@ -34,6 +34,21 @@ struct ProfileView: View {
                     }.buttonStyle(.plain).accessibilityIdentifier("profileReadingSettings").accessibilityLabel("阅读偏好")
                 }
 
+                VStack(spacing: 0) {
+                    NavigationLink { NavigationSettingsView() } label: {
+                        HStack {
+                            Label("界面设置", systemImage: "rectangle.bottomthird.inset.filled")
+                            Spacer(); Text("底部导航").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                            Image(systemName: "chevron.right").font(.system(size: 10))
+                        }.font(.system(size: 13)).padding(17).contentShape(Rectangle())
+                    }.accessibilityIdentifier("interfaceSettings")
+                    Divider().overlay(Palette.line).padding(.horizontal, 17)
+                    NavigationLink { FeatureHubView(sourceOnly: true) } label: {
+                        HStack { Label("书源管理", systemImage: "externaldrive"); Spacer(); Image(systemName: "chevron.right").font(.system(size: 10)) }
+                            .font(.system(size: 13)).padding(17).contentShape(Rectangle())
+                    }.accessibilityIdentifier("profileSources")
+                }.buttonStyle(.plain).foregroundStyle(Palette.green).background(Palette.card, in: .rect(cornerRadius: 15))
+
                 VStack(alignment: .leading, spacing: 14) {
                     SectionHeading(title: "常用工具")
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
@@ -92,6 +107,10 @@ private struct ProfileSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                AppSettingsCard("界面与导航", icon: "rectangle.bottomthird.inset.filled") {
+                    NavigationLink { NavigationSettingsView() } label: { settingsRow("界面设置", icon: "slider.horizontal.3") }
+                        .accessibilityIdentifier("interfaceSettings")
+                }
                 AppSettingsCard("阅读与数据", icon: "slider.horizontal.3") {
                     Button { showReadingSettings = true } label: { settingsRow("阅读偏好", icon: "textformat.size") }
                     Divider()

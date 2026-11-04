@@ -2,8 +2,10 @@ import SwiftUI
 
 struct DiscoverView: View {
     @EnvironmentObject private var store: LibraryStore
+    var searchEntry = false
     @State private var query = ""
     @State private var category = "全部"
+    @State private var searchPresented = false
     private let categories = ["全部", "奇幻", "都市", "科幻", "古风", "悬疑", "仙侠"]
 
     var body: some View {
@@ -45,9 +47,10 @@ struct DiscoverView: View {
             }.padding(.horizontal, 22).padding(.top, 19).padding(.bottom, 25)
         }
         .background(Palette.background)
-        .navigationTitle("发现")
+        .navigationTitle(searchEntry ? "搜索" : "发现")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书名或作者")
+        .searchable(text: $query, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书名或作者")
+        .onAppear { if searchEntry { searchPresented = true } }
         .autocorrectionDisabled()
         .navigationDestination(for: Book.self) { BookDetailView(book: $0) }
     }

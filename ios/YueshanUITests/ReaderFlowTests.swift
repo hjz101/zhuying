@@ -153,7 +153,7 @@ final class ReaderFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
         app.launch()
-        app.tabBars.buttons["发现"].tap()
+        app.tabBars.buttons["搜索"].tap()
         let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
@@ -438,7 +438,7 @@ final class ReaderFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
         app.launch()
-        app.tabBars.buttons["发现"].tap()
+        app.tabBars.buttons["搜索"].tap()
         let search = app.searchFields.firstMatch
         search.tap(); search.typeText("明日")
         app.buttons["result-echo"].tap()
@@ -493,7 +493,7 @@ final class ReaderFlowTests: XCTestCase {
         acknowledgeFirstGuide(in: app)
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 山雨欲来")
         app.buttons["返回书架"].tap()
-        app.tabBars.buttons["发现"].tap()
+        app.tabBars.buttons["搜索"].tap()
         let search = app.searchFields.firstMatch
         search.tap(); search.typeText("群星")
         app.buttons["result-stars"].tap()

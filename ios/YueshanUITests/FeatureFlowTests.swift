@@ -36,6 +36,8 @@ final class FeatureFlowTests: XCTestCase {
         let app = launch()
         XCTAssertEqual(app.tabBars.buttons.count, 4)
         XCTAssertFalse(app.tabBars.buttons["工具"].exists)
+        XCTAssertTrue(app.tabBars.buttons["足迹"].exists)
+        XCTAssertTrue(app.tabBars.buttons["搜索"].exists)
         app.tabBars.buttons["我的"].tap()
         XCTAssertTrue(app.buttons["readingHistory"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["关于这个 Demo"].exists)
@@ -180,7 +182,9 @@ final class FeatureFlowTests: XCTestCase {
 
     @MainActor func testSourceEditingAndBatchReport() {
         let app = launch()
-        app.tabBars.buttons["书源"].tap()
+        app.tabBars.buttons["我的"].tap()
+        let sources = app.buttons["profileSources"]
+        reveal(sources, app: app); sources.tap()
         capture(app, name: "Catalog-Sources")
         let edit = app.buttons["编辑"].firstMatch
         XCTAssertTrue(edit.waitForExistence(timeout: 5)); edit.tap()

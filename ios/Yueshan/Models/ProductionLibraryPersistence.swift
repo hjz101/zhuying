@@ -290,10 +290,7 @@ actor ProductionLibraryPersistence {
             case let .exact(paragraph, offset), let .recovered(paragraph, offset):
                 snapshot.progress[id] = .init(chapter: chapter, paragraph: paragraph, updatedAt: anchor.updatedAt, characterOffset: offset)
                 unresolved.remove(id)
-            case .chapterStart:
-                snapshot.progress[id] = .init(chapter: chapter, paragraph: 0, updatedAt: anchor.updatedAt)
-                unresolved.remove(id)
-            case .missingChapter: unresolved.insert(id)
+            case .unresolved, .missingChapter: unresolved.insert(id)
             }
         }
         var state = ProductionLibraryState(books: books, snapshot: snapshot, unresolvedBookIDs: unresolved)

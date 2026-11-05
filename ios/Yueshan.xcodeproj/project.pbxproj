@@ -11,6 +11,7 @@
 		0C294654163573BBB0F751AC /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E028908BB149ACE0D9068E09 /* ReaderView.swift */; };
 		0EE68EF77FEA079933E56768 /* FileChapterRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5299955E038EA74F1773521 /* FileChapterRepository.swift */; };
 		147C7FC815E626A5AF1604C0 /* ShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157DB7F47871493B1C150FCE /* ShelfView.swift */; };
+		1810A94653F798E5C8A5F6E4 /* ReadingSessionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C923CC9A26F366E7E5C197F5 /* ReadingSessionControllerTests.swift */; };
 		19C3968A46509CF2B996D29D /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9289365055BAF46AB29BE23 /* Library.swift */; };
 		1D60CC9F95F5863AF5EC292D /* FileChapterRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B86CE19E7DC0E86FFE45396 /* FileChapterRepositoryTests.swift */; };
 		1E59EF66222F73F749FC6506 /* ManagedFontLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81479D734D080C32091F047C /* ManagedFontLibraryTests.swift */; };
@@ -33,6 +34,7 @@
 		3BC56F7C124C9CD7B77CCA72 /* ThemeLibraryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9270A87A73835CAA6A93E260 /* ThemeLibraryRepository.swift */; };
 		43D4380E1111C45966AE5B3B /* PerformanceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701A9EEBDC3E68AA1D9F5536 /* PerformanceFixtures.swift */; };
 		46FDFEE0283EEDCCE9915546 /* ProductionLibraryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B095C4655905A7745628F3 /* ProductionLibraryStoreTests.swift */; };
+		484DCF51C47DAAC411F8EBCF /* ReadingSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F73D373855F0C8AFAD6103 /* ReadingSessionController.swift */; };
 		48672C1B90E4CA45F5191947 /* ReaderPageFurniture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FA9DA18323FF6E8072A1FC /* ReaderPageFurniture.swift */; };
 		4A880317FC18D716B1034032 /* ThemeAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614D39F671D2FE7E3156C66A /* ThemeAssets.swift */; };
 		4B3ECA92C04C8D4912E2A1B9 /* performance-budget.json in Resources */ = {isa = PBXBuildFile; fileRef = 634B86415520603BBC9770FA /* performance-budget.json */; };
@@ -131,6 +133,7 @@
 
 /* Begin PBXFileReference section */
 		027556BC0A07BD3D56FDC99D /* ReaderEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderEngine.swift; sourceTree = "<group>"; };
+		03F73D373855F0C8AFAD6103 /* ReadingSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingSessionController.swift; sourceTree = "<group>"; };
 		0943680C44CFFFCDFA095654 /* BookImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookImportTests.swift; sourceTree = "<group>"; };
 		096FEB33678F7EF17D5A6BDB /* ReadingPageEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPageEditors.swift; sourceTree = "<group>"; };
 		098509FC532C9CCE9FB4BF40 /* ThemeStylePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStylePreview.swift; sourceTree = "<group>"; };
@@ -198,6 +201,7 @@
 		BD17F5A745418D5B16C735E4 /* LibrarySaveLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySaveLifecycle.swift; sourceTree = "<group>"; };
 		C401D3B8BABD9D2346932CBA /* LibraryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStoreTests.swift; sourceTree = "<group>"; };
 		C5952415F036408B24AB3331 /* ContentContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentContracts.swift; sourceTree = "<group>"; };
+		C923CC9A26F366E7E5C197F5 /* ReadingSessionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingSessionControllerTests.swift; sourceTree = "<group>"; };
 		C9289365055BAF46AB29BE23 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
 		D5CDC4D351907709DC44CF9A /* SQLiteLibraryRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteLibraryRepositoryTests.swift; sourceTree = "<group>"; };
 		D6B1F580D8AF2898ADF5BB64 /* ReaderRenderingPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderRenderingPreferencesTests.swift; sourceTree = "<group>"; };
@@ -307,6 +311,7 @@
 				027556BC0A07BD3D56FDC99D /* ReaderEngine.swift */,
 				A70047BBE5AD3E2E404A0980 /* ReaderPreferences.swift */,
 				4A026FA567ED309787593681 /* ReadingFontLibrary.swift */,
+				03F73D373855F0C8AFAD6103 /* ReadingSessionController.swift */,
 				7B73961E31FCEB70F08C21D6 /* ReadingStyleResolver.swift */,
 				6B641452C1C28186DE2ECB09 /* ShushanAccount.swift */,
 				AB190B3FBCAE05A66EE8F695 /* ShushanBookSource.swift */,
@@ -413,6 +418,7 @@
 				B1F85F266A45583C22C6B451 /* ReadingAppearanceTests.swift */,
 				F5E553DD44A21BF9EF597B7F /* ReadingFontLibraryTests.swift */,
 				A8999BE2109E84463B30E668 /* ReadingPreferencePresentationTests.swift */,
+				C923CC9A26F366E7E5C197F5 /* ReadingSessionControllerTests.swift */,
 				F1AEC098A00809288FBBADEA /* ShushanAccountTests.swift */,
 				6561D8C4B99EAC563745EC1C /* ShushanBookSourceTests.swift */,
 				DA6DB2B8C0684EB07BA9753D /* SourceFeasibilityValidationTests.swift */,
@@ -657,6 +663,7 @@
 				3B91DAFABDCC408961816DBE /* ReadingHistoryView.swift in Sources */,
 				E4E01002AD200DCAE8C12A50 /* ReadingPageEditors.swift in Sources */,
 				930F0651C491D367C3B6FEFA /* ReadingPreferencesView.swift in Sources */,
+				484DCF51C47DAAC411F8EBCF /* ReadingSessionController.swift in Sources */,
 				567B38722AB6C3D9E14F3EE0 /* ReadingStyleResolver.swift in Sources */,
 				3A25CFEBEB800C2D925A1E75 /* SQLiteLibraryRepository.swift in Sources */,
 				147C7FC815E626A5AF1604C0 /* ShelfView.swift in Sources */,
@@ -731,6 +738,7 @@
 				F703B1A000F0FD94B018FBE7 /* ReadingAppearanceTests.swift in Sources */,
 				2579CF40EA93AE19E42597FF /* ReadingFontLibraryTests.swift in Sources */,
 				23BEEC121CAA7A0922A2DD25 /* ReadingPreferencePresentationTests.swift in Sources */,
+				1810A94653F798E5C8A5F6E4 /* ReadingSessionControllerTests.swift in Sources */,
 				293A23D605E0D4F27FBA321D /* SQLiteLibraryRepositoryTests.swift in Sources */,
 				CC5B8A377026FACA17288562 /* ShushanAccountTests.swift in Sources */,
 				E25CF97C907D15D49E4AF8FD /* ShushanBookSourceTests.swift in Sources */,

@@ -24,18 +24,25 @@ final class ContentContractsTests: XCTestCase {
         let restored = try JSONDecoder().decode(ReadingAnchor.self, from: JSONEncoder().encode(anchor))
         XCTAssertEqual(restored, anchor)
     }
-    func testChangedParagraphUsesUniqueQuoteAndAmbiguousMatchFallsBackToStart() throws {
+    func testChangedParagraphUsesUniqueQuoteAndAmbiguousMatchPreservesHistory() throws {
         let text = "这是原来的阅读段落，其中包含需要恢复的文字位置。"
         let document = ChapterDocument(chapterID: "c", paragraphs: [text])
         let anchor = try ReadingAnchor(bookID: "b", document: document, paragraph: 0, offset: 8)
         let updated = ChapterDocument(chapterID: "c", paragraphs: ["前文", "新增前缀：" + text + "，新增后缀。"])
         XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: updated), .recovered(paragraph: 1, offset: 8 + ("新增前缀：" as NSString).length))
         let ambiguous = ChapterDocument(chapterID: "c", paragraphs: ["前缀：" + text, "另一个前缀：" + text])
-        XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: ambiguous), .chapterStart)
+        XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: ambiguous), .unresolved)
         XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: .init(chapterID: "deleted", paragraphs: [text])), .missingChapter)
-        XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: .init(chapterID: "c", paragraphs: [])), .chapterStart)
+        XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: .init(chapterID: "c", paragraphs: [])), .unresolved)
     }
     func testInvalidParagraphDoesNotCreateProgress() {
         XCTAssertThrowsError(try ReadingAnchor(bookID: "b", document: .init(chapterID: "c", paragraphs: []), paragraph: 0, offset: 0))
+    }
+    func testInsertedIdenticalParagraphDoesNotGuessWhichOccurrenceWasRead() throws {
+        let old = ChapterDocument(chapterID: "c", paragraphs: ["重复内容", "重复内容"])
+        let anchor = try ReadingAnchor(bookID: "b", document: old, paragraph: 1, offset: 2)
+        XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: old), .exact(paragraph: 1, offset: 2))
+        let changed = ChapterDocument(chapterID: "c", paragraphs: ["重复内容", "重复内容", "重复内容"])
+        XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: changed), .unresolved)
     }
 }

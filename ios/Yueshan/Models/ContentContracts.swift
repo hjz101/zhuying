@@ -114,7 +114,7 @@ struct ReadingAnchor: Codable, Equatable, Sendable {
     var updatedAt: Date
 
     init(bookID: String, document: ChapterDocument, paragraph: Int, offset: Int, now: Date = Date()) throws {
-        guard document.paragraphs.indices.contains(paragraph) else { throw ContentFailure.missingChapter }
+        guard document.paragraphs.indices.contains(paragraph), !document.paragraphs[paragraph].text.isEmpty else { throw ContentFailure.missingChapter }
         self.bookID = bookID; chapterID = document.chapterID; contentVersion = document.version
         let content = document.paragraphs[paragraph]
         paragraphID = content.id; paragraphIndex = paragraph
@@ -137,7 +137,7 @@ struct ReadingAnchor: Codable, Equatable, Sendable {
 enum AnchorResolution: Equatable {
     case exact(paragraph: Int, offset: Int)
     case recovered(paragraph: Int, offset: Int)
-    case chapterStart
+    case unresolved
     case missingChapter
 }
 
@@ -145,10 +145,12 @@ enum ReadingAnchorResolver {
     static func resolve(_ anchor: ReadingAnchor, in document: ChapterDocument) -> AnchorResolution {
         guard anchor.chapterID == document.chapterID else { return .missingChapter }
         if let index = document.paragraphs.firstIndex(where: { $0.id == anchor.paragraphID }) {
+            if anchor.contentVersion != document.version,
+               document.paragraphs.filter({ $0.text == document.paragraphs[index].text }).count > 1 { return .unresolved }
             let offset = ReadingAnchor.safeOffset(anchor.utf16Offset, in: document.paragraphs[index].text as NSString)
             return anchor.contentVersion == document.version ? .exact(paragraph: index, offset: offset) : .recovered(paragraph: index, offset: offset)
         }
-        guard !anchor.quote.isEmpty else { return .chapterStart }
+        guard !anchor.quote.isEmpty else { return .unresolved }
         var matches: [(Int, Int)] = []
         for (index, paragraph) in document.paragraphs.enumerated() {
             let text = paragraph.text as NSString
@@ -157,11 +159,11 @@ enum ReadingAnchorResolver {
                 let range = text.range(of: anchor.quote, range: NSRange(location: start, length: text.length - start))
                 guard range.location != NSNotFound else { break }
                 matches.append((index, ReadingAnchor.safeOffset(range.location + anchor.offsetInQuote, in: text)))
-                if matches.count > 1 { return .chapterStart }
+                if matches.count > 1 { return .unresolved }
                 start = range.location + max(1, range.length)
             }
         }
-        guard let match = matches.first else { return .chapterStart }
+        guard let match = matches.first else { return .unresolved }
         return .recovered(paragraph: match.0, offset: match.1)
     }
 }

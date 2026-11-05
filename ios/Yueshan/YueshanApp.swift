@@ -5,6 +5,7 @@ struct YueshanApp: App {
     @StateObject private var library: LibraryStore
     @StateObject private var featureDemo = FeatureDemoStore()
     @StateObject private var navigation: NavigationStore
+    @StateObject private var toolbox: ToolboxStore
     private let launchError: String?
 
     init() {
@@ -16,6 +17,7 @@ struct YueshanApp: App {
             }
         } else { defaults = .standard }
         _navigation = StateObject(wrappedValue: NavigationStore(defaults: defaults))
+        _toolbox = StateObject(wrappedValue: ToolboxStore(defaults: defaults))
         do {
             let books = try Book.load()
             let manager = FileManager.default
@@ -43,7 +45,7 @@ struct YueshanApp: App {
             if let launchError {
                 ContentUnavailableView("暂时无法打开书库", systemImage: "books.vertical", description: Text(launchError))
             } else {
-                RootView().environmentObject(library).environmentObject(featureDemo).environmentObject(navigation)
+                RootView().environmentObject(library).environmentObject(featureDemo).environmentObject(navigation).environmentObject(toolbox)
             }
         }
     }

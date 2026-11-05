@@ -31,7 +31,7 @@ final class FeatureDemoTests: XCTestCase {
 
     func testToolCategoriesCoverEveryFeatureExactlyOnce() {
         let ids = ToolCategory.allCases.flatMap { $0.features.map(\.id) }
-        XCTAssertEqual(ToolCategory.allCases.count, 6)
+        XCTAssertEqual(ToolCategory.allCases.count, 7)
         XCTAssertEqual(ids.count, FeatureCatalog.all.count)
         XCTAssertEqual(Set(ids), Set(FeatureCatalog.all.map(\.id)))
         for category in ToolCategory.allCases {
@@ -40,14 +40,22 @@ final class FeatureDemoTests: XCTestCase {
         }
         XCTAssertEqual(ToolCategory.data.search("备份").map(\.id), ["backup", "icloud"])
         XCTAssertTrue(ToolCategory.reading.search("书源编辑").isEmpty)
-        XCTAssertEqual(ToolCategory.advanced.search("书源编辑").map(\.id), ["sourceEdit"])
+        XCTAssertEqual(ToolCategory.sources.search("书源编辑").map(\.id), ["sourceEdit"])
+        XCTAssertTrue(ToolCategory.advanced.search("书源编辑").isEmpty)
+        for category in ToolCategory.allCases {
+            XCTAssertEqual(Set((category.primaryFeatures + category.secondaryFeatures).map(\.id)), Set(category.features.map(\.id)))
+        }
+        XCTAssertFalse(ToolCategory.files.primaryFeatures.contains { ["txt", "epub", "pdf"].contains($0.id) })
+        XCTAssertEqual(ToolCategory.files.secondaryFeatures.count, 5)
+        XCTAssertTrue(ToolCategory.advanced.features.contains { $0.id == "engine" })
+        XCTAssertTrue(ToolCategory.reading.primaryFeatures.contains { $0.id == "purify" })
     }
 
     func testCommonToolsAreUniqueAndSearchStillCoversAllCategories() {
         let common = FeatureCatalog.commonTools
-        XCTAssertEqual(common.count, 6)
+        XCTAssertEqual(common.count, 4)
         XCTAssertEqual(Set(common.map(\.id)).count, common.count)
-        XCTAssertEqual(common.map(\.id), ["import", "fulltext", "cache", "backup", "systemTTS", "themes"])
+        XCTAssertEqual(common.map(\.id), ["import", "fulltext", "themes", "sources"])
         for feature in FeatureCatalog.all {
             XCTAssertTrue(FeatureCatalog.search(feature.title).contains { $0.id == feature.id })
         }

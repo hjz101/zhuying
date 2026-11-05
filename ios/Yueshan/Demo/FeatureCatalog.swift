@@ -15,43 +15,64 @@ enum DemoGroup: String, CaseIterable {
 
 /// Home categories are independent of the detailed catalogue groups.
 enum ToolCategory: String, CaseIterable, Identifiable {
-    case reading, files, audio, style, data, advanced
+    case reading, files, sources, audio, style, data, advanced
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .reading: "阅读"; case .files: "导入"; case .audio: "朗读"
-        case .style: "外观"; case .data: "数据"; case .advanced: "高级"
+        case .reading: "阅读辅助"; case .files: "导入与文件"; case .sources: "书源管理"; case .audio: "朗读与声音"
+        case .style: "主题与外观"; case .data: "数据管理"; case .advanced: "高级设置"
         }
     }
     var icon: String {
         switch self {
-        case .reading: "book"; case .files: "square.and.arrow.down"; case .audio: "headphones"
+        case .reading: "book"; case .files: "square.and.arrow.down"; case .sources: "externaldrive"; case .audio: "headphones"
         case .style: "paintpalette"; case .data: "externaldrive"; case .advanced: "slider.horizontal.3"
         }
     }
     var summary: String {
         switch self {
-        case .reading: "书架 · 搜索 · 排版"; case .files: "文件 · 漫画 · 导入"
+        case .reading: "检索 · 书签 · 排版"; case .files: "本地文件 · 导入 · 格式支持"; case .sources: "书源 · 登录 · 检测"
         case .audio: "声音 · 角色 · 播放"; case .style: "主题 · 字体 · 规则"
-        case .data: "备份 · 缓存 · 统计"; case .advanced: "书源 · 调试 · 网络"
+        case .data: "备份 · 缓存 · 足迹"; case .advanced: "规则引擎 · 网络 · 服务"
         }
     }
     var features: [DemoFeature] {
-        let dataIDs: Set<String> = ["backup", "icloud", "statistics", "files", "cache"]
+        let dataIDs: Set<String> = ["backup", "icloud", "statistics", "cache"]
         return FeatureCatalog.all.filter { feature in
             switch self {
-            case .reading: return feature.group == .library || feature.group == .reading
-            case .files: return feature.group == .files
+            case .reading: return feature.group == .library || feature.group == .reading || ["purify", "highlight"].contains(feature.id)
+            case .files: return feature.group == .files || feature.id == "files"
+            case .sources: return feature.group == .sources && feature.id != "engine"
             case .audio: return feature.group == .audio
-            case .style: return feature.group == .style || feature.id == "covers"
+            case .style: return (feature.group == .style && !["purify", "highlight"].contains(feature.id)) || feature.id == "covers"
             case .data: return dataIDs.contains(feature.id)
-            case .advanced: return feature.group == .sources || (feature.group == .system && !dataIDs.contains(feature.id) && feature.id != "covers")
+            case .advanced: return feature.id == "engine" || (feature.group == .system && !dataIDs.contains(feature.id) && !["covers", "files"].contains(feature.id))
             }
         }
     }
     func search(_ query: String) -> [DemoFeature] {
         let ids = Set(features.map(\.id))
         return FeatureCatalog.search(query).filter { ids.contains($0.id) }
+    }
+    var primaryFeatures: [DemoFeature] {
+        let ids: [String]
+        switch self {
+        case .reading: ids = ["fulltext", "bookmarks", "typography", "purify", "highlight"]
+        case .files: ids = ["import", "files"]
+        case .sources: ids = ["sources", "sourceImport", "sourceBatch"]
+        case .audio: ids = ["systemTTS", "onlineTTS", "backgroundAudio", "aiRoles", "aiConfig"]
+        case .style: ids = ["themes", "fonts", "covers", "titleDesign", "comments"]
+        case .data: ids = ["backup", "icloud", "cache", "statistics"]
+        case .advanced: ids = ["engine", "network", "backend", "browser", "links"]
+        }
+        return ids.map { FeatureCatalog.feature($0) }
+    }
+    var secondaryFeatures: [DemoFeature] {
+        let primaryIDs = Set(primaryFeatures.map(\.id))
+        return features.filter { !primaryIDs.contains($0.id) }
+    }
+    var shortTitle: String {
+        switch self { case .reading: "阅读"; case .files: "导入"; case .sources: "书源"; case .audio: "朗读"; case .style: "外观"; case .data: "数据"; case .advanced: "高级" }
     }
 }
 
@@ -81,10 +102,15 @@ struct DemoFeature: Identifiable {
     var fields: [DemoField] = []
     var actions: [String] = []
     var related: [String] = []
+    var capabilityBadge: String? {
+        if ["import", "fulltext", "contents", "progress", "details", "reading"].contains(id) { return nil }
+        if ["shelf", "sources", "sourceImport", "sourceEdit", "bookmarks", "themes"].contains(id) { return "部分演示" }
+        return "演示"
+    }
 }
 
 enum FeatureCatalog {
-    static let commonToolIDs = ["import", "fulltext", "cache", "backup", "systemTTS", "themes"]
+    static let commonToolIDs = ["import", "fulltext", "themes", "sources"]
     static var commonTools: [DemoFeature] { commonToolIDs.map { feature($0) } }
 
     static let sampleJSON = """

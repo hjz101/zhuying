@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 
 struct FootprintsView: View {
+    var title = "足迹"
     @EnvironmentObject private var store: LibraryStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var now = Date()
@@ -39,7 +40,7 @@ struct FootprintsView: View {
                 NavigationLink { ReadingHistoryView() } label: { Label("查看全部阅读历史", systemImage: "clock.arrow.circlepath") }
                     .font(.system(size: 13)).frame(minHeight: 44)
             }.padding(22)
-        }.appPageStyle().navigationTitle("足迹").navigationBarTitleDisplayMode(.inline)
+        }.appPageStyle().navigationTitle(title).navigationBarTitleDisplayMode(.inline)
             .onChange(of: period) { _, _ in selectedDate = calendar.startOfDay(for: now); showAll = false }
             .onChange(of: scenePhase) { _, phase in if phase == .active { refresh() } }
             .onAppear { refresh() }

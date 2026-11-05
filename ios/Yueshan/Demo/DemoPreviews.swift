@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SourceManagementView: View {
+    var title = "书源"
     @EnvironmentObject private var demo: FeatureDemoStore
     @State private var query = ""
     @State private var kind: DemoSourceKind?
@@ -29,7 +30,7 @@ struct SourceManagementView: View {
                     .listRowBackground(Color.clear)
             }.listStyle(.plain).scrollContentBackground(.hidden)
         }.background(Palette.background)
-            .navigationTitle("书源").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索名称、网址或分组")
             .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { toolbarActions } }
             .safeAreaInset(edge: .bottom, spacing: 0) { if managing { batchActions } }

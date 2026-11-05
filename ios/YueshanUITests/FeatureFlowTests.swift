@@ -109,36 +109,69 @@ final class FeatureFlowTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["iCloud"].waitForExistence(timeout: 5))
     }
 
+    @MainActor private func chooseToolCategory(_ id: String, app: XCUIApplication) {
+        let button = app.buttons["tool-category-\(id)"]
+        for _ in 0..<5 {
+            if button.isHittable { button.tap(); return }
+            if ["all", "reading", "files"].contains(id) { app.scrollViews["toolsCategories"].swipeRight() }
+            else { app.scrollViews["toolsCategories"].swipeLeft() }
+        }
+        XCTFail("Category is not visible: \(id)")
+    }
+
     @MainActor func testToolsHomeShortcutsAndCategoryNavigation() {
-        let app = launch()
-        openTools(in: app)
+        let app = launch(); openTools(in: app)
         XCTAssertTrue(app.staticTexts["常用工具"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["feature-shelf"].exists, "Home should not expand the full feature catalogue")
-        capture(app, name: "Tools-CompactHome")
-        for id in ["import", "fulltext", "cache", "backup", "systemTTS", "themes"] {
-            let shortcut = app.buttons["tool-shortcut-\(id)"]
-            reveal(shortcut, app: app); shortcut.tap()
-            XCTAssertTrue(app.navigationBars.buttons.element(boundBy: 0).waitForExistence(timeout: 5))
-            app.navigationBars.buttons.element(boundBy: 0).tap()
-        }
-        let routes = [("reading", "阅读", "contents"), ("files", "导入", "txt"),
-                      ("audio", "朗读", "systemTTS"), ("style", "外观", "themes"),
-                      ("data", "数据", "backup"), ("advanced", "高级", "sources")]
-        for (id, title, featureID) in routes {
-            let category = app.buttons["tool-category-\(id)"]
-            reveal(category, app: app); category.tap()
-            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
-            let feature = app.buttons["feature-\(featureID)"]
-            reveal(feature, app: app)
-            XCTAssertTrue(feature.isHittable)
-            if id == "reading" { capture(app, name: "Tools-ReadingCategory") }
-            app.navigationBars.buttons.element(boundBy: 0).tap()
-        }
+        XCTAssertFalse(app.buttons["feature-shelf"].exists)
+        XCTAssertFalse(app.staticTexts["把阅读，调成你的样子。"].exists)
+        let shortcuts = ["import", "fulltext", "themes", "sources"].map { app.buttons["tool-shortcut-\($0)"] }
+        for shortcut in shortcuts { XCTAssertTrue(shortcut.isHittable) }
+        XCTAssertLessThan(abs(shortcuts[0].frame.minY - shortcuts[3].frame.minY), 2)
+        XCTAssertLessThanOrEqual(shortcuts[3].frame.maxX, app.frame.maxX - 20)
+        capture(app, name: "Tools-Directory")
+        chooseToolCategory("reading", app: app)
+        XCTAssertTrue(app.navigationBars["全部工具"].exists)
+        XCTAssertTrue(app.buttons["feature-fulltext"].exists)
+        XCTAssertFalse(app.buttons["feature-contents"].exists)
+        app.descendants(matching: .any)["tools-details-reading"].tap()
+        let contents = app.buttons["feature-contents"]
+        reveal(contents, app: app); contents.tap()
+        XCTAssertTrue(app.navigationBars["章节目录"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.swipeDown()
+        chooseToolCategory("sources", app: app)
+        app.buttons["feature-sources"].tap()
+        XCTAssertTrue(app.navigationBars["书源管理"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["source-kind-全部"].exists)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        chooseToolCategory("files", app: app)
+        XCTAssertTrue(app.buttons["feature-import"].exists)
+        XCTAssertFalse(app.buttons["feature-epub"].exists)
+        app.descendants(matching: .any)["tools-details-files"].tap()
+        let epub = app.buttons["feature-epub"]
+        reveal(epub, app: app)
+        XCTAssertTrue(app.staticTexts["tool-status-epub"].exists)
+        capture(app, name: "Tools-Formats")
+    }
+
+    @MainActor func testToolsFoldedGroupsAndActivityDestination() {
+        let app = launch(); openTools(in: app)
+        let reading = app.buttons["tools-group-reading"]
+        XCTAssertEqual(reading.value as? String, "已收起")
+        reading.tap()
+        XCTAssertTrue(app.buttons["feature-fulltext"].exists)
+        XCTAssertEqual(reading.value as? String, "已展开")
+        reading.tap()
+        XCTAssertFalse(app.buttons["feature-fulltext"].exists)
+        chooseToolCategory("data", app: app)
+        let statistics = app.buttons["feature-statistics"]
+        reveal(statistics, app: app); statistics.tap()
+        XCTAssertTrue(app.navigationBars["阅读统计"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.segmentedControls["activityPeriod"].exists)
     }
 
     @MainActor func testToolsSearchEmptyResultsAndCategoryScope() {
-        let app = launch()
-        openTools(in: app)
+        let app = launch(); openTools(in: app)
         let search = app.searchFields.firstMatch
         search.tap(); search.typeText("不存在的模块")
         XCTAssertTrue(app.staticTexts["没有找到相关功能"].waitForExistence(timeout: 5))
@@ -147,18 +180,51 @@ final class FeatureFlowTests: XCTestCase {
         search.typeText("书源编辑")
         XCTAssertTrue(app.buttons["feature-sourceEdit"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["tool-shortcut-import"].exists)
-        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4))
-        let reading = app.buttons["tool-category-reading"]
-        reveal(reading, app: app); reading.tap()
-        let categorySearch = app.textFields["toolCategorySearch"]
-        categorySearch.tap(); categorySearch.typeText("书源编辑")
+        chooseToolCategory("reading", app: app)
         XCTAssertTrue(app.staticTexts["没有找到相关功能"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["feature-sourceEdit"].exists)
-        categorySearch.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4))
-        categorySearch.typeText("章节目录")
+        search.tap(); search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4)); search.typeText("章节目录")
         XCTAssertTrue(app.buttons["feature-contents"].waitForExistence(timeout: 5))
         app.buttons["feature-contents"].tap()
         XCTAssertTrue(app.navigationBars["章节目录"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        search.tap(); search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4)); search.typeText("EPUB")
+        chooseToolCategory("all", app: app)
+        XCTAssertTrue(app.buttons["feature-epub"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["tool-status-epub"].exists)
+    }
+
+    @MainActor func testToolShortcutReplaceRemoveAddOrderAndPersistence() {
+        let app = launch(); openTools(in: app)
+        app.buttons["tool-shortcut-import"].press(forDuration: 1)
+        app.buttons["替换工具"].tap()
+        let pickerSearch = app.searchFields.firstMatch
+        XCTAssertTrue(pickerSearch.waitForExistence(timeout: 5)); pickerSearch.tap(); pickerSearch.typeText("缓存管理")
+        app.buttons["shortcut-pick-cache"].tap()
+        let cache = app.buttons["tool-shortcut-cache"]
+        XCTAssertTrue(cache.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["tool-shortcut-import"].exists)
+        cache.press(forDuration: 1); app.buttons["向后移动"].tap()
+        XCTAssertGreaterThan(cache.frame.minX, app.buttons["tool-shortcut-fulltext"].frame.minX)
+        cache.press(forDuration: 1); app.buttons["移出常用"].tap()
+        XCTAssertTrue(app.buttons["toolsAddShortcut"].exists)
+        chooseToolCategory("reading", app: app)
+        app.buttons["feature-bookmarks"].press(forDuration: 1); app.buttons["加入常用"].tap()
+        let bookmark = app.buttons["tool-shortcut-bookmarks"]
+        XCTAssertTrue(bookmark.exists)
+        bookmark.press(forDuration: 1); app.buttons["向前移动"].tap()
+        XCTAssertLessThan(bookmark.frame.minX, app.buttons["tool-shortcut-sources"].frame.minX)
+        app.buttons["toolsEditShortcuts"].tap()
+        XCTAssertTrue(app.navigationBars["编辑常用"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["shortcutEditorAdd"].isEnabled)
+        capture(app, name: "Tools-ShortcutEditor")
+        app.buttons["完成"].tap()
+        app.terminate(); app.launchArguments = ["--ui-testing", "--preserve-ui-test-state"]; app.launch()
+        openTools(in: app)
+        let ids = ["fulltext", "themes", "bookmarks", "sources"]
+        for index in 0..<ids.count - 1 {
+            XCTAssertLessThan(app.buttons["tool-shortcut-\(ids[index])"].frame.minX, app.buttons["tool-shortcut-\(ids[index + 1])"].frame.minX)
+        }
     }
 
     @MainActor func testThemeLibraryImportPreviewFiltersAndDetails() {
@@ -452,7 +518,7 @@ final class FeatureFlowTests: XCTestCase {
     @MainActor func testToolsHomeAndSampleFilePreview() {
         let app = launch()
         openTools(in: app)
-        XCTAssertTrue(app.staticTexts["把阅读，调成你的样子。"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["常用工具"].waitForExistence(timeout: 5))
         capture(app, name: "Catalog-ToolsHome")
         open("pdf", title: "PDF 阅读", app: app)
         let preview = app.buttons["demo-action-pdf-打开示例 PDF"]

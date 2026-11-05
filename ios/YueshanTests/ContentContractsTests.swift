@@ -27,6 +27,11 @@ final class ContentContractsTests: XCTestCase {
         XCTAssertEqual(ReadingAnchorResolver.resolve(anchor, in: updated), .recovered(paragraph: 2, offset: 1))
         let restored = try JSONDecoder().decode(ReadingAnchor.self, from: JSONEncoder().encode(anchor))
         XCTAssertEqual(restored, anchor)
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(anchor)) as? [String: Any])
+        legacy.removeValue(forKey: "paragraphCount")
+        let old = try JSONDecoder().decode(ReadingAnchor.self, from: JSONSerialization.data(withJSONObject: legacy))
+        XCTAssertNil(old.paragraphCount)
+        XCTAssertEqual(ReadingAnchorResolver.resolve(old, in: document), .exact(paragraph: 1, offset: 1))
     }
     func testChangedParagraphUsesUniqueQuoteAndAmbiguousMatchPreservesHistory() throws {
         let text = "这是原来的阅读段落，其中包含需要恢复的文字位置。"

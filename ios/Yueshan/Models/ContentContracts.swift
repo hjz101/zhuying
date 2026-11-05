@@ -118,6 +118,7 @@ struct ReadingAnchor: Codable, Equatable, Sendable {
     let utf16Offset: Int
     let quote: String
     let offsetInQuote: Int
+    let paragraphCount: Int?
     var updatedAt: Date
 
     init(bookID: String, document: ChapterDocument, paragraph: Int, offset: Int, now: Date = Date()) throws {
@@ -125,6 +126,7 @@ struct ReadingAnchor: Codable, Equatable, Sendable {
         self.bookID = bookID; chapterID = document.chapterID; contentVersion = document.version
         let content = document.paragraphs[paragraph]
         paragraphID = content.id; paragraphIndex = paragraph
+        paragraphCount = document.paragraphs.count
         let text = content.text as NSString
         utf16Offset = Self.safeOffset(offset, in: text)
         let start = Self.safeOffset(max(0, utf16Offset - 24), in: text)

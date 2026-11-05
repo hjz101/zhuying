@@ -359,8 +359,11 @@ final class LibraryStore: ObservableObject {
 
     func percent(_ book: Book) -> Int {
         guard let value = progress[book.id], book.chapters.indices.contains(value.chapter), book.content.indices.contains(value.chapter) else { return 0 }
-        let count = max(1, prose(book, chapter: value.chapter).count)
-        return min(99, Int((Double(value.chapter) + Double(value.paragraph) / Double(count)) / Double(book.chapters.count) * 100))
+        let loadedCount = prose(book, chapter: value.chapter).count
+        let savedCount = stableProgress[book.id]?.paragraphCount ?? 0
+        let count = loadedCount > 0 ? loadedCount : savedCount
+        let fraction = count > 0 ? Double(min(max(0, value.paragraph), count - 1)) / Double(count) : 0
+        return min(99, Int((Double(value.chapter) + fraction) / Double(book.chapters.count) * 100))
     }
 
     @discardableResult

@@ -222,6 +222,22 @@ final class ProductionLibraryStoreTests: XCTestCase {
         await restored.bootstrapProductionIfNeeded()
         XCTAssertEqual(restored.settings, library.settings)
     }
+    func testChapterCacheEvictionAndRestartDoNotInflateShelfProgressPercent() async throws {
+        let library = try store(); await library.bootstrapProductionIfNeeded()
+        var imported: [Book] = []
+        for index in 0..<5 {
+            let text = "第一章 来信\n作品 \(index) 第一段。\n第二段。\n第三段。\n第四段。\n第五段。\n第二章 山林\n最后一章正文。"
+            let book = try BookImporter.prepare(data: Data(text.utf8), name: "作品\(index).txt").book
+            _ = try await library.importBookDurably(book)
+            library.record(book, chapter: 0, paragraph: 2)
+            imported.append(book)
+        }
+        let first = try XCTUnwrap(library.books.first { $0.id == imported[0].id })
+        XCTAssertEqual(library.percent(first), 20, "Evicted prose must not imply a one-paragraph chapter")
+        _ = await library.flushPendingWrites()
+        let reopened = try store(); await reopened.bootstrapProductionIfNeeded()
+        XCTAssertEqual(reopened.percent(try XCTUnwrap(reopened.books.first { $0.id == first.id })), 20)
+    }
 
     func testGroupsBookmarksAndPermanentDeletionHaveSeparateDurableBoundaries() async throws {
         let library = try store(); await library.bootstrapProductionIfNeeded()

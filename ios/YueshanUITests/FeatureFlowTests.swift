@@ -32,42 +32,58 @@ final class FeatureFlowTests: XCTestCase {
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
     }
 
-    @MainActor func testMergedProfileHomeAndCommonTools() {
+    @MainActor func testMagazineProfileLayoutAndDestinations() {
         let app = launch()
-        XCTAssertEqual(app.tabBars.buttons.count, 4)
-        XCTAssertFalse(app.tabBars.buttons["工具"].exists)
-        XCTAssertTrue(app.tabBars.buttons["足迹"].exists)
-        XCTAssertTrue(app.tabBars.buttons["搜索"].exists)
         app.tabBars.buttons["我的"].tap()
-        XCTAssertTrue(app.buttons["readingHistory"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["关于这个 Demo"].exists)
-        XCTAssertFalse(app.buttons["tool-category-reading"].exists)
-        capture(app, name: "Profile-MergedHome")
-
-        app.buttons["profileFavorites"].tap()
+        XCTAssertTrue(app.staticTexts["profileEditorialTitle"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["profileCurrentBook"].label, "长风渡山海")
+        XCTAssertTrue(app.staticTexts["profileCurrentProgress"].label.contains("第3章"))
+        XCTAssertFalse(app.staticTexts["常用工具"].exists)
+        capture(app, name: "Profile-Magazine")
+        let favorites = app.buttons["profileFavorites"]
+        reveal(favorites, app: app); favorites.tap()
         XCTAssertTrue(app.tabBars.buttons["书架"].isSelected)
         app.tabBars.buttons["我的"].tap()
-        app.buttons["profileReadBooks"].tap()
-        XCTAssertTrue(app.navigationBars["阅读历史"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["history-changfeng"].exists)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        app.buttons["readingHistory"].tap()
+        let history = app.buttons["profileReadBooks"]
+        reveal(history, app: app); history.tap()
         XCTAssertTrue(app.navigationBars["阅读历史"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        app.buttons["profileReadingSettings"].tap()
+        let activity = app.buttons["profileActivity"]
+        reveal(activity, app: app); activity.tap()
+        XCTAssertTrue(app.segmentedControls["activityPeriod"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let settings = app.buttons["profileReadingSettings"]
+        reveal(settings, app: app); settings.tap()
         XCTAssertTrue(app.segmentedControls["readingModePicker"].waitForExistence(timeout: 5))
         app.buttons["完成"].tap()
-        for (id, title) in [("import", "智能导入"), ("fulltext", "全文搜索"), ("cache", "缓存管理"), ("backup", "本地备份")] {
-            let shortcut = app.buttons["profile-tool-\(id)"]
+        for (id, title) in [("readingHistory", "阅读历史"), ("profile-tool-import", "智能导入"), ("profileThemes", "主题管理"), ("profileSources", "书源")] {
+            let shortcut = app.buttons[id]
             reveal(shortcut, app: app); shortcut.tap()
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
             app.navigationBars.buttons.element(boundBy: 0).tap()
         }
         openTools(in: app)
         XCTAssertTrue(app.buttons["tool-category-reading"].exists)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.buttons["allTools"].exists)
-        XCTAssertTrue(app.tabBars.buttons["我的"].isSelected)
+    }
+
+    @MainActor func testMagazineProfileResumesActualReadingAndUpdatesChapter() {
+        let app = launch()
+        app.tabBars.buttons["我的"].tap()
+        app.buttons["profileContinueReading"].tap()
+        XCTAssertTrue(app.buttons["dismissGestureGuide"].waitForExistence(timeout: 5))
+        app.buttons["dismissGestureGuide"].tap()
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 山雨欲来")
+        app.buttons["nextChapter"].tap()
+        XCTAssertTrue(app.staticTexts["chapterTitle"].label.contains("第四章"))
+        app.buttons["返回书架"].tap()
+        XCTAssertTrue(app.staticTexts["profileCurrentProgress"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["profileCurrentProgress"].label.contains("第4章"))
+        let history = app.buttons["readingHistory"]
+        reveal(history, app: app)
+        XCTAssertTrue(history.isHittable)
+        XCTAssertGreaterThanOrEqual(history.frame.minX, app.frame.minX + 20)
+        XCTAssertLessThanOrEqual(app.buttons["profileReadingSettings"].frame.maxX, app.frame.maxX - 20)
+        capture(app, name: "Profile-MagazineEntries")
     }
 
     @MainActor func testProfileSettingsHelpAndAbout() {

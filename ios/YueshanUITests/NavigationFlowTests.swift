@@ -12,6 +12,7 @@ final class NavigationFlowTests: XCTestCase {
         app.tabBars.buttons["我的"].tap()
         if app.navigationBars["底部导航"].exists { return }
         let entry = app.buttons["interfaceSettings"]
+        if !entry.exists { app.buttons["profileSettings"].tap() }
         reveal(entry, in: app); entry.tap()
         XCTAssertTrue(app.navigationBars["底部导航"].waitForExistence(timeout: 5))
     }

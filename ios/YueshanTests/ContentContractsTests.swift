@@ -2,6 +2,10 @@ import XCTest
 @testable import Yueshan
 
 final class ContentContractsTests: XCTestCase {
+    func testHexEncodingKeepsExistingSHA256IdentifiersByteForByte() {
+        XCTAssertEqual(StableContentID.hex([UInt8(0), 1, 15, 16, 255]), "00010f10ff")
+        XCTAssertEqual(StableContentID.version("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    }
     func testStableIDsDoNotCollideForDelimitedComponentsOrAcrossSources() {
         XCTAssertNotEqual(StableContentID.make("a:b", "c"), StableContentID.make("a", "b:c"))
         XCTAssertNotEqual(StableContentID.make("source-a", "book"), StableContentID.make("source-b", "book"))

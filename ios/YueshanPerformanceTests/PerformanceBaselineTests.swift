@@ -25,6 +25,10 @@ import Darwin
         let measurements: [Measurement]
     }
     private var timings: [String: [Double]] = [:]
+    private func traceMemory(_ stage: String) {
+        var usage = rusage(); _ = getrusage(RUSAGE_SELF, &usage)
+        print("PERFORMANCE_MEMORY", stage, Double(usage.ru_maxrss) / 1_048_576)
+    }
     private func record(_ id: String, started: Double) {
         timings[id, default: []].append((ProcessInfo.processInfo.systemUptime - started) * 1000)
     }
@@ -51,6 +55,7 @@ import Darwin
     }
 
     func testRecordStorageAndReaderBaselineWithoutChangingFrozenTargets() async throws {
+        traceMemory("before-import")
         let (budget, raw) = try PerformanceBudget.load(bundle: Bundle(for: Self.self))
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("performance-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -75,6 +80,7 @@ import Darwin
             XCTAssertEqual(restored.snapshot.favorites, [longBook.id])
         }
         let records = try SQLiteLibraryRepository(url: root.appendingPathComponent("catalog.sqlite"))
+        traceMemory("after-import")
         for index in 0..<scale.shelfBooks { try await records.save(book: PerformanceFixtures.metadata(index), chapters: []) }
         let book = PerformanceFixtures.metadata(0)
         let catalog = PerformanceFixtures.catalog(bookID: book.id, count: scale.catalogChapters)
@@ -86,6 +92,7 @@ import Darwin
             XCTAssertEqual(loaded, catalog)
         }
         let files = try FileChapterRepository(directory: root.appendingPathComponent("import-0/chapters"))
+        traceMemory("after-catalog")
         for index in 0..<budget.samples {
             let id = StableContentID.make(longBook.id, "local-v1", String(index * 100))
             let started = ProcessInfo.processInfo.systemUptime
@@ -108,6 +115,7 @@ import Darwin
             }
         }
         let longChapter = PerformanceFixtures.book(id: "long-chapter", chapters: 1, paragraphs: scale.longChapterParagraphs, paragraphUTF16: scale.longChapterParagraphUTF16)
+        traceMemory("after-shelf")
         var settings = ReadingSettings()
         settings.preferences.showCommentBubbles = false; settings.preferences.showGodComments = false
         measureValue("reader.compose.ms", count: budget.samples, { ReaderDocument(book: longChapter, chapter: 0, settings: settings) }) { document in
@@ -119,9 +127,11 @@ import Darwin
         let document = ReaderDocument(book: longChapter, chapter: 0, settings: settings)
         measureValue("reader.paginate.ms", count: budget.samples, { ReaderPaginator.ranges(document: document, size: CGSize(width: 393, height: 770)) }) { validatePages($0, document: document) }
         settings.fontSize = 30
+        traceMemory("after-pagination")
         let large = ReaderDocument(book: longChapter, chapter: 0, settings: settings)
         measureValue("reader.reflow.ms", count: budget.samples, { ReaderPaginator.ranges(document: large, size: CGSize(width: 770, height: 393)) }) { validatePages($0, document: large) }
         var usage = rusage()
+        traceMemory("after-reflow")
         XCTAssertEqual(getrusage(RUSAGE_SELF, &usage), 0)
         timings["process.peak-rss.mib"] = [Double(usage.ru_maxrss) / 1_048_576]
         let expected = Set(budget.limits.keys).subtracting(["app.empty-launch.ms"])
@@ -140,6 +150,7 @@ import Darwin
     }
 
     func testCompatibilityCorpusUsesActualFontFileThemeColorsAndMissingFontFallback() async throws {
+        traceMemory("before-compatibility")
         let bundle = Bundle(for: Self.self)
         let url = try XCTUnwrap(bundle.url(forResource: "ReaderTestFont", withExtension: "ttf"))
         _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)

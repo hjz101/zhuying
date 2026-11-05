@@ -298,24 +298,38 @@ enum ReaderCommentArtwork {
 enum ReaderPaginator {
     static func ranges(document: ReaderDocument, size: CGSize) -> [NSRange] {
         guard size.width >= 40, size.height >= 40, document.text.length > 0 else { return [] }
-        let storage = NSTextStorage(attributedString: document.text)
-        let manager = NSLayoutManager()
-        storage.addLayoutManager(manager)
         var result: [NSRange] = []
-        var previousEnd = 0
-        // Each container represents an actual screen, including the active font and spacing.
-        while previousEnd < document.text.length {
-            let container = NSTextContainer(size: size)
-            container.lineFragmentPadding = 0
-            manager.addTextContainer(container)
-            manager.ensureLayout(for: container)
-            let glyphs = manager.glyphRange(for: container)
-            guard glyphs.length > 0 else { break }
-            let characters = manager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
-            let end = NSMaxRange(characters)
-            guard end > previousEnd else { break }
-            result.append(NSRange(location: previousEnd, length: end - previousEnd))
-            previousEnd = end
+        var start = 0
+        let source = document.text.string as NSString
+        let body = document.paragraphRanges.first?.location ?? 0
+        let fontSize = (document.text.attribute(.font, at: min(body, document.text.length - 1), effectiveRange: nil) as? UIFont)?.pointSize ?? 20
+        let spacing = (document.text.attribute(.paragraphStyle, at: min(body, document.text.length - 1), effectiveRange: nil) as? NSParagraphStyle)?.lineSpacing ?? 0
+        let initialWindow = max(512, min(4096, Int(size.width / fontSize * size.height / max(1, fontSize + spacing) * 3)))
+        // A bounded text window avoids retaining a text container and glyph
+        // graph for every page of a very long chapter. Every page is measured
+        // by the same TextKit renderer that displays it, including continuation
+        // indentation. Grow the window if the first candidate fits in full.
+        while start < document.text.length {
+            let range: NSRange = autoreleasepool {
+                var window = min(initialWindow, document.text.length - start)
+                while true {
+                    var end = min(document.text.length, start + window)
+                    if end < source.length { end = source.rangeOfComposedCharacterSequence(at: end).location }
+                    let candidate = document.pageText(in: NSRange(location: start, length: end - start))
+                    let storage = NSTextStorage(attributedString: candidate)
+                    let manager = NSLayoutManager(); storage.addLayoutManager(manager)
+                    let container = NSTextContainer(size: size); container.lineFragmentPadding = 0
+                    manager.addTextContainer(container); manager.ensureLayout(for: container)
+                    let glyphs = manager.glyphRange(for: container)
+                    let characters = manager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+                    if NSMaxRange(characters) < candidate.length || end == document.text.length {
+                        return NSRange(location: start, length: NSMaxRange(characters))
+                    }
+                    window = min(document.text.length - start, window * 2)
+                }
+            }
+            guard range.length > 0 else { break }
+            result.append(range); start = NSMaxRange(range)
         }
         return result
     }

@@ -76,4 +76,17 @@ final class ReaderEngineTests: XCTestCase {
         let index = document.index(for: .init(paragraph: 0, offset: 4))
         XCTAssertEqual(document.anchor(at: index), .init(paragraph: 0, offset: 1))
     }
+    func testLongUnicodeParagraphsCrossWindowAndPageBoundariesWithoutTruncation() {
+        let text = String(repeating: "甲👩🏽‍🚀乙e\u{301}丙，文字连续。", count: 450)
+        let document = ReaderDocument(book: book, chapter: 0, settings: .init(), paragraphs: [text], isDemo: false)
+        for size in [CGSize(width: 230, height: 240), CGSize(width: 700, height: 200)] {
+            let ranges = ReaderPaginator.ranges(document: document, size: size)
+            XCTAssertGreaterThan(ranges.count, 3)
+            XCTAssertEqual(ranges.map { document.pageText(in: $0).string }.joined(), document.text.string)
+            for range in ranges.dropLast() {
+                let end = NSMaxRange(range)
+                XCTAssertEqual((document.text.string as NSString).rangeOfComposedCharacterSequence(at: end).location, end)
+            }
+        }
+    }
 }

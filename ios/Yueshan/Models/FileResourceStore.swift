@@ -25,7 +25,7 @@ final class FileResourceStore: @unchecked Sendable {
     init(directory: URL, writer: any AtomicFileWriting = AtomicFileWriter()) {
         self.directory = directory; self.writer = writer
     }
-    static func digest(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+    static func digest(_ data: Data) -> String { StableContentID.hex(SHA256.hash(data: data)) }
     func url(for reference: ResourceFileReference) throws -> URL {
         guard reference.isValid else { throw ContentFailure.storageFailure }
         let root = directory.standardizedFileURL.resolvingSymlinksInPath()

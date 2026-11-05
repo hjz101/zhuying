@@ -84,7 +84,7 @@ enum ThemePackageParser {
         guard text.count == 6 else { return nil }
         return UInt32(text, radix: 16)
     }
-    private static func digest(_ text: String) -> String { SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined() }
+    private static func digest(_ text: String) -> String { StableContentID.hex(SHA256.hash(data: Data(text.utf8))) }
 }
 
 enum ThemeAssetValidator {

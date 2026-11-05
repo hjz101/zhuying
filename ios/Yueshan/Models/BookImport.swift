@@ -1,7 +1,5 @@
 import Foundation
 import CryptoKit
-import PDFKit
-import CoreFoundation
 
 enum ImportEncoding: String, CaseIterable {
     case automatic = "自动识别", utf8 = "UTF-8", gb18030 = "GB18030", utf16 = "UTF-16"
@@ -69,31 +67,24 @@ enum BookImporter {
     }
 
     static func prepare(data: Data, name: String, encoding: ImportEncoding = .automatic) throws -> PreparedBookImport {
+        try Task.checkCancellation()
         try validateSize(data.count)
         let format = (name as NSString).pathExtension.lowercased()
-        let text: String
-        let encodingName: String
-        switch format {
-        case "txt": (text, encodingName) = try decode(data, encoding: encoding)
-        case "pdf":
-            guard let pdf = PDFDocument(data: data), !pdf.isLocked else { throw BookImportError.message("PDF 无法读取或需要密码。") }
-            guard pdf.pageCount <= 2000 else { throw BookImportError.message("PDF 页数过多，暂支持 2000 页以内。") }
-            text = (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.string }.joined(separator: "\n\n")
-            encodingName = "PDF 文字提取"
-        default: throw BookImportError.message("暂不支持 \(format.isEmpty ? "此格式" : format.uppercased())，请选择 TXT 或有文字层的 PDF。")
-        }
+        let parsed = try BookFormatParsers.parse(data: data, extension: format, encoding: encoding)
+        let text = parsed.text, encodingName = parsed.encoding
         let normalized = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.isEmpty else { throw BookImportError.message("没有可读取的正文；扫描版 PDF 暂不支持文字识别。") }
         guard !normalized.unicodeScalars.contains(where: { $0.value == 0 || ($0.value < 32 && ![9, 10, 13].contains($0.value)) }) else {
             throw BookImportError.message("内容不是可读文本，请检查文件或尝试其他编码。")
         }
-        let digest = SHA256.hash(data: Data(normalized.utf8)).map { String(format: "%02x", $0) }.joined()
+        let digest = StableContentID.hex(SHA256.hash(data: Data(normalized.utf8)))
         let title = (name as NSString).deletingPathExtension
         var titles: [String] = [], chapters: [[String]] = [], paragraphs: [String] = []
         var currentTitle = "正文"
         let heading = try NSRegularExpression(pattern: "^(第[零〇一二三四五六七八九十百千万两0-9]+[章回卷节部篇].{0,60}|chapter\\s+[0-9ivxlcdm]+.{0,60})$", options: .caseInsensitive)
         for raw in normalized.components(separatedBy: "\n") {
+            try Task.checkCancellation()
             let line = raw.trimmingCharacters(in: .whitespaces)
             guard !line.isEmpty else { continue }
             if heading.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil {
@@ -115,20 +106,7 @@ enum BookImporter {
         return .init(book: book, bytes: data.count, encoding: encodingName)
     }
 
-    private static func decode(_ data: Data, encoding: ImportEncoding) throws -> (String, String) {
-        let gb = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
-        let choices: [(String.Encoding, String)]
-        switch encoding {
-        case .utf8: choices = [(.utf8, "UTF-8")]
-        case .gb18030: choices = [(gb, "GB18030")]
-        case .utf16: choices = [(.utf16, "UTF-16")]
-        case .automatic:
-            if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) { choices = [(.utf16, "UTF-16")] }
-            else { choices = [(.utf8, "UTF-8"), (gb, "GB18030")] }
-        }
-        for (encoding, title) in choices { if let text = String(data: data, encoding: encoding) { return (text.replacingOccurrences(of: "\u{FEFF}", with: ""), title) } }
-        throw BookImportError.message("无法识别文本编码，请在更多选项中更换编码后重试。")
-    }
+
 }
 
 enum ImportItemStatus: Equatable { case ready, duplicate, imported, failed(String) }

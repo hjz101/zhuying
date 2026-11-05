@@ -160,7 +160,7 @@ final class ReadingFontLibrary: ObservableObject {
         return usable
     }
     static func filename(for data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() + ".font"
+        StableContentID.hex(SHA256.hash(data: data)) + ".font"
     }
     private static func canonical(_ url: URL) -> URL { url.standardizedFileURL.resolvingSymlinksInPath() }
     static func usesFile(_ postScriptName: String, url: URL) -> Bool {

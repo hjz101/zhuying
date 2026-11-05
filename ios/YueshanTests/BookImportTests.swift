@@ -1,10 +1,26 @@
 import XCTest
 import UIKit
 import CoreFoundation
+import PDFKit
 @testable import Yueshan
 
 @MainActor
 final class BookImportTests: XCTestCase {
+    func testParserRegistryPreservesTextContractAndRejectsEncryptedPDF() throws {
+        XCTAssertEqual(Set(BookFormatParsers.parsers.flatMap(\.extensions)), ["txt", "pdf"])
+        let parsed = try BookFormatParsers.parse(data: Data("Unicode 👩🏽‍🚀正文".utf8), extension: "TXT", encoding: .automatic)
+        XCTAssertEqual(parsed.text, "Unicode 👩🏽‍🚀正文"); XCTAssertEqual(parsed.encoding, "UTF-8")
+        XCTAssertThrowsError(try BookFormatParsers.parse(data: Data("unrelated".utf8), extension: "epub", encoding: .automatic))
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 400, height: 500))
+        let bytes = renderer.pdfData { context in
+            context.beginPage()
+            ("Encrypted original text." as NSString).draw(at: CGPoint(x: 20, y: 30), withAttributes: [.font: UIFont.systemFont(ofSize: 16)])
+        }
+        let pdf = try XCTUnwrap(PDFDocument(data: bytes))
+        let encrypted = try XCTUnwrap(pdf.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "test-user", PDFDocumentWriteOption.ownerPasswordOption: "test-owner"]))
+        XCTAssertTrue(try XCTUnwrap(PDFDocument(data: encrypted)).isLocked)
+        XCTAssertThrowsError(try BookImporter.prepare(data: encrypted, name: "locked.pdf"))
+    }
     private var directory: URL!
     private var defaults: UserDefaults!
     private var domain: String!

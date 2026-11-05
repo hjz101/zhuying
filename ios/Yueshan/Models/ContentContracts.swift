@@ -16,6 +16,13 @@ enum ContentFailure: Error, LocalizedError, Equatable, Sendable {
 }
 
 enum StableContentID {
+    static func hex<Bytes: Sequence>(_ bytes: Bytes) -> String where Bytes.Element == UInt8 {
+        let digits = Array("0123456789abcdef".utf8)
+        var result: [UInt8] = []
+        result.reserveCapacity(bytes.underestimatedCount * 2)
+        for byte in bytes { result.append(digits[Int(byte >> 4)]); result.append(digits[Int(byte & 15)]) }
+        return String(decoding: result, as: UTF8.self)
+    }
     /// Encode components, rather than concatenate delimiters which may occur in IDs.
     static func make(_ components: String...) -> String {
         list(components)
@@ -28,10 +35,10 @@ enum StableContentID {
             withUnsafeBytes(of: &length) { bytes.append(contentsOf: $0) }
             bytes.append(value)
         }
-        return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        return hex(SHA256.hash(data: bytes))
     }
     static func version(_ text: String) -> String {
-        SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+        hex(SHA256.hash(data: Data(text.utf8)))
     }
 }
 

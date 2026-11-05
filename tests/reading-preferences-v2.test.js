@@ -8,7 +8,7 @@ const html = readFileSync(repositorySource, 'utf8');
 const originalScript = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const script = originalScript.replace(/\}\)\(\);\s*$/, `
  globalThis.testAPI = { cssDeclarations, effectiveMargins, styledText, regexFor,
-   themes, fonts, defaults, theme, bubble, god, css, paper, rulePreview, getState: () => s };
+   themes, fonts, defaults, theme, bubble, god, css, paper, rulePreview, readingBehavior, getState: () => s };
 })();`);
 
 function fixture(options = {}) {
@@ -204,6 +204,10 @@ test('page progress switches between scrolling and pagination without reloading 
   assert.equal(api.getState().mode, '左右分页');
   assert.match(api.paper(), /12 \/ 180/);
   assert.doesNotMatch(api.paper(), /章进度 36%/);
+  api.input({ bind: 'mode' }, '上下分页', 'select-one');
+  assert.equal(api.getState().mode, '上下分页');
+  assert.match(api.paper(), /12 \/ 180/);
+  assert.doesNotMatch(api.paper(), /章进度 36%/);
   api.input({ bind: 'mode' }, '上下滚动', 'select-one');
   assert.match(api.paper(), /章进度 36%/);
   assert.doesNotMatch(api.paper(), /12 \/ 180/);
@@ -366,4 +370,74 @@ test('opening paragraph comments through a styled bubble does not create appeara
   assert.equal(state.css, null);
   assert.deepEqual({ bubble: api.bubble(), god: api.god(), css: api.css() }, inherited);
   assert.equal(api.saves.length, 0);
+});
+
+
+test('reading behavior separates continuous scrolling from horizontal and vertical pagination', () => {
+  const api = fixture();
+  let behavior = api.readingBehavior();
+  assert.equal(behavior.axis, 'vertical');
+  assert.equal(behavior.paged, false);
+  assert.equal(behavior.gesture, '上滑继续阅读，下滑回看');
+  api.input({ bind: 'mode' }, '左右分页', 'select-one');
+  behavior = api.readingBehavior();
+  assert.equal(behavior.axis, 'horizontal');
+  assert.equal(behavior.paged, true);
+  assert.equal(behavior.effect, '仿真');
+  assert.equal(behavior.gesture, '左滑下一页，右滑上一页');
+  api.input({ bind: 'mode' }, '上下分页', 'select-one');
+  behavior = api.readingBehavior();
+  assert.equal(behavior.axis, 'vertical');
+  assert.equal(behavior.paged, true);
+  assert.equal(behavior.effect, '平移');
+  assert.equal(behavior.gesture, '上滑下一页，下滑上一页');
+});
+
+test('horizontal and vertical paging effects remain independent when switching modes', () => {
+  const api = fixture();
+  api.click({ readingMode: '左右分页' });
+  api.click({ readingEffect: '覆盖' });
+  assert.equal(api.readingBehavior().effect, '覆盖');
+  api.click({ readingMode: '上下分页' });
+  assert.equal(api.readingBehavior().effect, '平移');
+  api.click({ readingEffect: '无动画' });
+  assert.equal(api.readingBehavior().effect, '无动画');
+  api.click({ readingMode: '上下滚动' });
+  assert.equal(api.readingBehavior().paged, false);
+  assert.equal(api.readingBehavior().effect, '连续滚动（跟手）');
+  assert.equal(api.getState().horizontalEffect, '覆盖');
+  assert.equal(api.getState().verticalEffect, '无动画');
+  api.click({ readingMode: '左右分页' });
+  assert.equal(api.readingBehavior().effect, '覆盖');
+  api.click({ readingMode: '上下分页' });
+  assert.equal(api.readingBehavior().effect, '无动画');
+  assert.equal(api.saves.at(-1).privateContent.preferencesV2.horizontalEffect, '覆盖');
+  assert.equal(api.saves.at(-1).privateContent.preferencesV2.verticalEffect, '无动画');
+});
+
+test('operation screen rerenders direction-specific animation controls and hides them for scrolling', () => {
+  const api = fixture();
+  api.click({ open: 'operation' });
+  const content = () => api.nodes.get('[data-content]').innerHTML;
+  const effects = () => [...content().matchAll(/data-reading-effect="([^"]+)"/g)].map(match => match[1]);
+  assert.match(content(), /连续滚动（跟手）/);
+  assert.deepEqual(effects(), []);
+  api.click({ readingMode: '左右分页' });
+  assert.deepEqual(effects(), ['平移', '覆盖', '仿真', '无动画']);
+  assert.match(content(), /data-reading-mode="左右分页" aria-pressed="true"/);
+  api.click({ readingMode: '上下分页' });
+  assert.deepEqual(effects(), ['平移', '覆盖', '无动画']);
+  assert.match(content(), /data-reading-mode="上下分页" aria-pressed="true"/);
+  api.click({ readingMode: '上下滚动' });
+  assert.match(content(), /连续滚动（跟手）/);
+  assert.deepEqual(effects(), []);
+  assert.match(content(), /data-reading-mode="上下滚动" aria-pressed="true"/);
+});
+
+test('unsupported per-direction effects fall back to a supported default', () => {
+  const api = fixture();
+  Object.assign(api.getState(), { mode: '左右分页', horizontalEffect: '不存在的动画' });
+  assert.equal(api.readingBehavior().effect, '仿真');
+  Object.assign(api.getState(), { mode: '上下分页', verticalEffect: '仿真' });
+  assert.equal(api.readingBehavior().effect, '平移');
 });

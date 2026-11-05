@@ -1,0 +1,315 @@
+<style>
+#reading-layout-options { --ys-bg:light-dark(#f7f5ef,#222823); --ys-card:light-dark(#fffefa,#2b332d); --ys-ink:light-dark(#344f40,#dce7dc); --ys-sub:light-dark(#767e70,#a7b3a7); --ys-line:light-dark(#e4e5db,#414b42); --ys-soft:light-dark(#e9ece3,#354338); --ys-accent:light-dark(#8d634c,#d1a38a); --ys-selected:light-dark(#344f40,#c5d8c3); --ys-on-selected:light-dark(#fffefa,#1b2b20); font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif; color:var(--ys-ink); }
+#reading-layout-options * { box-sizing:border-box; }
+#reading-layout-options .ys-stage { min-height:1040px; padding:20px 10px 28px; display:flex; justify-content:center; align-items:flex-start; }
+#reading-layout-options .ys-phone { width:100%; max-width:390px; min-height:970px; background:var(--ys-bg); border:1px solid var(--ys-line); border-radius:30px; box-shadow:0 12px 28px #18251a12; overflow:hidden; position:relative; font-size:14px; line-height:1.5; }
+#reading-layout-options :where(.ys-phone) button,#reading-layout-options :where(.ys-phone) input,#reading-layout-options :where(.ys-phone) select { font:inherit; color:inherit; }
+#reading-layout-options :where(.ys-phone) button { border:0; background:none; padding:0; }
+#reading-layout-options :where(.ys-phone) button { cursor:inherit; }
+#reading-layout-options .ys-status { display:flex; justify-content:space-between; align-items:center; padding:17px 24px 6px; font-size:12px; font-weight:500; }
+#reading-layout-options .ys-status span:last-child { display:flex; align-items:center; gap:5px; }
+#reading-layout-options .ys-status svg { width:14px; height:14px; }
+#reading-layout-options .ys-nav { height:52px; display:grid; grid-template-columns:58px 1fr 58px; align-items:center; margin:0 18px; }
+#reading-layout-options .ys-nav strong { text-align:center; font-size:16px; font-weight:500; }
+#reading-layout-options .ys-nav button { min-height:44px; display:flex; align-items:center; justify-content:center; }
+#reading-layout-options .ys-nav button:first-child { justify-content:flex-start; }
+#reading-layout-options .ys-nav svg { width:19px; height:19px; }
+#reading-layout-options .ys-nav button:last-child { justify-content:flex-end; font-size:13px; }
+#reading-layout-options .ys-body { padding:10px 18px 28px; }
+#reading-layout-options .ys-intro { margin:0 0 14px; color:var(--ys-sub); font-size:12px; }
+#reading-layout-options .ys-section { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:19px 2px 8px; }
+#reading-layout-options .ys-section h3 { margin:0; font-size:12px; letter-spacing:.06em; font-weight:500; }
+#reading-layout-options .ys-section button { font-size:11px; min-height:28px; color:var(--ys-sub); }
+#reading-layout-options .ys-list { border-radius:15px; background:var(--ys-card); padding:0 14px; }
+#reading-layout-options .ys-row { min-height:45px; display:flex; width:100%; align-items:center; justify-content:space-between; gap:12px; text-align:left; }
+#reading-layout-options .ys-row + .ys-row, #reading-layout-options .ys-list > .ys-divider { border-top:1px solid var(--ys-line); }
+#reading-layout-options .ys-row .ys-row-title { display:flex; align-items:center; gap:9px; }
+#reading-layout-options .ys-row .ys-row-title svg { width:17px; height:17px; }
+#reading-layout-options .ys-row-end { display:flex; gap:5px; align-items:center; color:var(--ys-sub); font-size:12px; flex-shrink:0; }
+#reading-layout-options .ys-row-end svg { width:13px; height:13px; }
+#reading-layout-options .ys-value { font-size:12px; color:var(--ys-sub); }
+#reading-layout-options .ys-preview { --paper:#f2efdf; --paper-ink:#4d5546; background:var(--paper); color:var(--paper-ink); padding:18px; border-radius:15px; position:relative; }
+#reading-layout-options .ys-preview[data-theme='明亮'] { --paper:#fffefa; --paper-ink:#3f493d; }
+#reading-layout-options .ys-preview[data-theme='夜读'] { --paper:#28332e; --paper-ink:#c5cabb; }
+#reading-layout-options .ys-preview-title { font-family:'Songti SC','STSong',serif; font-size:13px; letter-spacing:.03em; font-weight:500; }
+#reading-layout-options .ys-prose { font-family:'Songti SC','STSong',serif; margin:10px 0 0; font-size:18px; line-height:1.85; text-align:justify; }
+#reading-layout-options .ys-prose p { margin:0; }
+#reading-layout-options .ys-prose p + p { margin-top:var(--ys-paragraph,18px); }
+#reading-layout-options .ys-preview.ys-compact { padding:14px 16px; }
+#reading-layout-options .ys-compact .ys-prose { margin-top:6px; font-size:17px; line-height:1.65; }
+#reading-layout-options .ys-preview-meta { display:flex; justify-content:space-between; align-items:center; margin-top:13px; font-size:10px; opacity:.78; }
+#reading-layout-options .ys-stepper { display:flex; align-items:center; gap:4px; }
+#reading-layout-options .ys-stepper button { width:34px; height:34px; border-radius:7px; background:var(--ys-soft); font-size:17px; }
+#reading-layout-options .ys-stepper output { text-align:center; min-width:46px; font-size:13px; font-variant-numeric:tabular-nums; }
+#reading-layout-options .ys-themes { display:flex; gap:10px; }
+#reading-layout-options .ys-themes button { display:flex; align-items:center; gap:5px; min-height:42px; font-size:11px; }
+#reading-layout-options .ys-dot { height:19px; width:19px; display:inline-flex; justify-content:center; align-items:center; border:1px solid #a5ac9c; border-radius:50%; background:#f2efdf; color:#364a39; }
+#reading-layout-options [data-theme-choice='明亮'] .ys-dot { background:#fffefa; }
+#reading-layout-options [data-theme-choice='夜读'] .ys-dot { background:#28332e; color:#eff4e9; }
+#reading-layout-options [data-theme-choice][aria-pressed='true'] .ys-dot:after { content:'✓'; font-size:12px; }
+#reading-layout-options .ys-toggle { appearance:none; -webkit-appearance:none; border:0; width:36px; height:22px; border-radius:30px; background:var(--ys-line); position:relative; flex-shrink:0; margin:0; }
+#reading-layout-options .ys-toggle:before { content:''; position:absolute; background:var(--ys-card); width:18px; height:18px; border-radius:50%; left:2px; top:2px; box-shadow:0 1px 3px #0002; }
+#reading-layout-options .ys-toggle:checked { background:var(--ys-selected); }
+#reading-layout-options .ys-toggle:checked:before { left:16px; background:var(--ys-on-selected); }
+#reading-layout-options .ys-footer { display:flex; justify-content:space-between; color:var(--ys-sub); align-items:center; gap:12px; font-size:11px; margin-top:20px; }
+#reading-layout-options .ys-footer button { min-height:36px; font-size:11px; }
+#reading-layout-options .ys-handle { height:4px; width:100px; border-radius:4px; background:var(--ys-ink); margin:0 auto 10px; opacity:.8; }
+#reading-layout-options .ys-tabs { display:flex; padding:4px; border-radius:10px; background:var(--ys-soft); gap:4px; margin:18px 0 6px; }
+#reading-layout-options .ys-tabs button { flex:1; min-height:36px; font-size:13px; border-radius:7px; }
+#reading-layout-options .ys-tabs button[aria-selected='true'] { background:var(--ys-card); box-shadow:0 1px 3px #00000009; font-weight:500; }
+#reading-layout-options .ys-panel { min-height:350px; }
+#reading-layout-options .ys-panel-title { display:flex; align-items:baseline; justify-content:space-between; padding:15px 0 9px; font-size:13px; }
+#reading-layout-options .ys-panel-title span { font-size:11px; color:var(--ys-sub); }
+#reading-layout-options .ys-slider { padding:14px 0; border-bottom:1px solid var(--ys-line); }
+#reading-layout-options .ys-slider:last-child { border:0; }
+#reading-layout-options .ys-slider label { display:flex; align-items:center; justify-content:space-between; font-size:13px; margin-bottom:9px; }
+#reading-layout-options .ys-slider output { color:var(--ys-sub); font-size:12px; font-variant-numeric:tabular-nums; }
+#reading-layout-options .ys-slider input { width:100%; accent-color:var(--ys-ink); height:20px; margin:2px 0 0; }
+#reading-layout-options .ys-note { font-size:11px; color:var(--ys-sub); margin:9px 1px; }
+#reading-layout-options .ys-segments { display:flex; border-radius:9px; padding:4px; background:var(--ys-soft); gap:4px; margin:5px 0 14px; }
+#reading-layout-options .ys-segments button { flex:1; min-height:36px; border-radius:6px; font-size:12px; }
+#reading-layout-options .ys-segments button[aria-pressed='true'] { background:var(--ys-card); }
+#reading-layout-options .ys-subheading { margin:18px 0 9px; font-size:12px; font-weight:500; }
+#reading-layout-options .ys-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+#reading-layout-options .ys-category { text-align:left; background:var(--ys-card); padding:17px 14px; min-height:133px; border-radius:16px; display:flex; align-items:flex-start; flex-direction:column; }
+#reading-layout-options .ys-category svg { height:21px; width:21px; margin-bottom:14px; }
+#reading-layout-options .ys-category strong { font-size:14px; font-weight:500; }
+#reading-layout-options .ys-category span { font-size:11px; color:var(--ys-sub); margin-top:5px; }
+#reading-layout-options .ys-current { padding:18px 0 22px; border-bottom:1px solid var(--ys-line); margin-bottom:20px; }
+#reading-layout-options .ys-eyebrow { font-size:10px; color:var(--ys-sub); letter-spacing:.14em; }
+#reading-layout-options .ys-current h2 { font-family:'Songti SC','STSong',serif; font-size:28px; font-weight:500; margin:8px 0 7px; line-height:1.35; }
+#reading-layout-options .ys-current p { font-size:12px; color:var(--ys-sub); margin:0; }
+#reading-layout-options .ys-current .ys-inline-swatches { display:flex; gap:7px; align-items:center; margin-top:16px; font-size:11px; color:var(--ys-sub); }
+#reading-layout-options .ys-current .ys-inline-swatches b { height:16px; width:16px; border-radius:50%; border:1px solid #9da797; background:#f2efdf; }
+#reading-layout-options .ys-current .ys-inline-swatches b:nth-child(2) { background:#fffefa; }
+#reading-layout-options .ys-current .ys-inline-swatches b:nth-child(3) { background:#28332e; margin-right:5px; }
+#reading-layout-options .ys-details { min-height:740px; }
+#reading-layout-options .ys-detail-head { display:flex; gap:12px; align-items:center; padding:4px 0 16px; }
+#reading-layout-options .ys-detail-head button { min-width:34px; min-height:40px; display:flex; align-items:center; justify-content:center; background:var(--ys-soft); border-radius:9px; }
+#reading-layout-options .ys-detail-head strong { font-size:19px; font-weight:500; font-family:'Songti SC','STSong',serif; }
+#reading-layout-options .ys-detail-head svg { height:17px; width:17px; }
+#reading-layout-options .ys-detail-preview { margin-bottom:15px; }
+#reading-layout-options .ys-option-list { display:flex; flex-wrap:wrap; gap:7px; padding:4px 0 10px; }
+#reading-layout-options .ys-option-list button { border-radius:8px; padding:9px 13px; background:var(--ys-soft); font-size:12px; min-height:36px; }
+#reading-layout-options .ys-option-list button[aria-pressed='true'] { background:var(--ys-selected); color:var(--ys-on-selected); }
+#reading-layout-options .ys-scope { font-size:11px; color:var(--ys-sub); padding:12px 0; }
+#reading-layout-options .ys-choose-theme { padding:14px 0; display:flex; gap:10px; flex-wrap:wrap; }
+#reading-layout-options .ys-theme-card { padding:14px 10px; border-radius:10px; min-height:95px; flex:1; min-width:75px; background:#f2efdf; color:#4d5546; text-align:center; border:1px solid #a5ac9c55; }
+#reading-layout-options .ys-theme-card[data-theme-choice='明亮'] { background:#fffefa; color:#3f493d; }
+#reading-layout-options .ys-theme-card[data-theme-choice='夜读'] { background:#28332e; color:#c5cabb; }
+#reading-layout-options .ys-theme-card[aria-pressed='true'] { outline:2px solid var(--ys-ink); outline-offset:2px; }
+#reading-layout-options .ys-theme-card strong { display:block; font:22px 'Songti SC','STSong',serif; margin-bottom:10px; }
+#reading-layout-options .ys-theme-card span { font-size:12px; }
+#reading-layout-options .ys-phone [hidden] { display:none !important; }
+#reading-layout-options .ys-message { font-size:11px; color:var(--ys-sub); min-height:20px; margin-top:12px; }
+@media (max-width:380px) {
+ #reading-layout-options .ys-stage { min-height:1130px; padding:15px 2px 25px; }
+ #reading-layout-options .ys-phone { min-height:1040px; border-radius:24px; }
+ #reading-layout-options .ys-body { padding:8px 14px 23px; }
+ #reading-layout-options .ys-themes { gap:7px; }
+ #reading-layout-options .ys-row { gap:8px; }
+ #reading-layout-options .ys-row-end { font-size:11px; }
+}
+@media (pointer:coarse) {
+ #reading-layout-options .ys-row { min-height:48px; }
+ #reading-layout-options .ys-stepper button { width:40px; height:44px; }
+ #reading-layout-options .ys-tabs button,#reading-layout-options .ys-segments button { min-height:44px; }
+}
+</style>
+<div id="reading-layout-options" class="viz-carousel viz-dotted-background" aria-label="阅读偏好布局方案" data-previous-label="上一个方案" data-next-label="下一个方案">
+  <section data-variant="分区设置" aria-label="分区设置布局">
+    <div class="ys-stage"><div class="ys-phone" data-reader="grouped" aria-label="分区设置阅读偏好">
+      <div class="ys-status"><span>9:41</span><span><i data-lucide="signal" aria-hidden="true"></i><i data-lucide="wifi" aria-hidden="true"></i><i data-lucide="battery-full" aria-hidden="true"></i></span></div>
+      <div class="ys-nav"><button type="button" data-back aria-label="返回偏好首页" class="cursor-interaction"><i data-lucide="chevron-left" aria-hidden="true"></i></button><strong>阅读偏好</strong><button type="button" data-done class="cursor-interaction">完成</button></div>
+      <div class="ys-body" data-home>
+        <p class="ys-intro">调整阅读的样子，也调整阅读的习惯。</p>
+        <div class="ys-preview ys-compact" data-theme="暖纸"><div class="ys-preview-title">第三章 · 山海有相逢</div><div class="ys-prose"><p>雨是在午后停的。山路尽头，一盏茶正冒着温热的白气。</p></div></div>
+        <div class="ys-section"><h3>外观与排版</h3><button type="button" data-detail="appearance" class="cursor-interaction">主题与字体 ›</button></div>
+        <div class="ys-list">
+          <div class="ys-row"><span>字号</span><div class="ys-stepper"><button type="button" data-step="-1" aria-label="减小字号" class="cursor-interaction">−</button><output data-font-value>20 pt</output><button type="button" data-step="1" aria-label="增大字号" class="cursor-interaction">＋</button></div></div>
+          <div class="ys-row"><span>纸色</span><div class="ys-themes"><button type="button" data-theme-choice="暖纸" aria-pressed="true" class="cursor-interaction"><span class="ys-dot"></span>暖纸</button><button type="button" data-theme-choice="明亮" aria-pressed="false" class="cursor-interaction"><span class="ys-dot"></span>明亮</button><button type="button" data-theme-choice="夜读" aria-pressed="false" class="cursor-interaction"><span class="ys-dot"></span>夜读</button></div></div>
+          <button type="button" class="ys-row cursor-interaction" data-detail="typography"><span>行距与高级排版</span><span class="ys-row-end"><span data-line-summary>适中</span><i data-lucide="chevron-right" aria-hidden="true"></i></span></button>
+          <button type="button" class="ys-row cursor-interaction" data-detail="title"><span>章节标题</span><span class="ys-row-end"><span data-title-value>简约居中</span><i data-lucide="chevron-right" aria-hidden="true"></i></span></button>
+        </div>
+        <div class="ys-section"><h3>翻页与手势</h3><button type="button" data-detail="operation" class="cursor-interaction">全部操作 ›</button></div>
+        <div class="ys-list">
+          <button type="button" class="ys-row cursor-interaction" data-detail="operation"><span>阅读方式</span><span class="ys-row-end"><span data-mode-value>上下滚动</span><i data-lucide="chevron-right" aria-hidden="true"></i></span></button>
+          <label class="ys-row cursor-interaction"><span>轻触翻页</span><input class="ys-toggle" type="checkbox" data-setting="tap" aria-label="轻触翻页" checked></label>
+          <label class="ys-row cursor-interaction"><span>触觉反馈</span><input class="ys-toggle" type="checkbox" data-setting="haptics" aria-label="触觉反馈" checked></label>
+        </div>
+        <div class="ys-section"><h3>内容呈现</h3></div>
+        <div class="ys-list">
+          <button type="button" class="ys-row cursor-interaction" data-detail="purify"><span>正文净化</span><span class="ys-row-end">规则管理<i data-lucide="chevron-right" aria-hidden="true"></i></span></button>
+          <button type="button" class="ys-row cursor-interaction" data-detail="highlight"><span>高亮规则</span><span class="ys-row-end">关键词与样式<i data-lucide="chevron-right" aria-hidden="true"></i></span></button>
+          <button type="button" class="ys-row cursor-interaction" data-detail="comments"><span>段评与皮肤</span><span class="ys-row-end">显示与外观<i data-lucide="chevron-right" aria-hidden="true"></i></span></button>
+        </div>
+        <div class="ys-footer"><span>自动保存 · 全局阅读偏好</span><button type="button" data-reset class="cursor-interaction">恢复默认</button></div>
+      </div>
+      <div class="ys-body ys-details" data-details hidden></div><div class="ys-handle"></div>
+    </div></div>
+  </section>
+  <section data-variant="预览工作台" aria-label="预览工作台布局" hidden>
+    <div class="ys-stage"><div class="ys-phone" data-reader="workbench" aria-label="预览工作台阅读偏好">
+      <div class="ys-status"><span>9:41</span><span><i data-lucide="signal" aria-hidden="true"></i><i data-lucide="wifi" aria-hidden="true"></i><i data-lucide="battery-full" aria-hidden="true"></i></span></div>
+      <div class="ys-nav"><button type="button" data-back aria-label="返回偏好首页" class="cursor-interaction"><i data-lucide="chevron-left" aria-hidden="true"></i></button><strong>阅读偏好</strong><button type="button" data-done class="cursor-interaction">完成</button></div>
+      <div class="ys-body" data-home>
+        <div class="ys-preview" data-theme="暖纸"><div class="ys-preview-title">第三章 · 山海有相逢</div><div class="ys-prose"><p>雨是在午后停的。山路尽头，一盏茶正冒着温热的白气。</p><p>风经过窗边，故事才刚刚开始。</p></div><div class="ys-preview-meta"><span>长风渡山海</span><span data-preview-info>暖纸 · 20 pt</span></div></div>
+        <div class="ys-tabs" role="tablist" aria-label="阅读偏好分类"><button type="button" role="tab" data-tab="appearance" aria-selected="false" class="cursor-interaction">样式</button><button type="button" role="tab" data-tab="typography" aria-selected="true" class="cursor-interaction">排版</button><button type="button" role="tab" data-tab="operation" aria-selected="false" class="cursor-interaction">操作</button><button type="button" role="tab" data-tab="content" aria-selected="false" class="cursor-interaction">内容</button></div>
+        <div class="ys-panel" data-tab-panel role="tabpanel" aria-label="排版设置">
+          <div class="ys-panel-title">文字排版<span>调整即预览</span></div>
+          <div class="ys-list">
+            <div class="ys-slider"><label>文字大小<output data-font-value>20 pt</output></label><input type="range" min="16" max="26" value="20" data-range="font" aria-label="文字大小"></div>
+            <div class="ys-slider"><label>行间距<output data-line-value>12 pt</output></label><input type="range" min="4" max="20" value="12" data-range="line" aria-label="行间距"></div>
+            <div class="ys-slider"><label>左右边距<output data-margin-value>20 pt</output></label><input type="range" min="12" max="32" value="20" data-range="margin" aria-label="左右边距"></div>
+          </div>
+          <div class="ys-list" style="margin-top:12px"><button type="button" class="ys-row cursor-interaction" data-detail="typography"><span>段距、字重与对齐</span><span class="ys-row-end">进阶排版<i data-lucide="chevron-right" aria-hidden="true"></i></span></button></div>
+        </div>
+        <div class="ys-footer"><span>自动保存 · 全局阅读偏好</span><button type="button" data-reset class="cursor-interaction">恢复默认</button></div>
+      </div>
+      <div class="ys-body ys-details" data-details hidden></div><div class="ys-handle"></div>
+    </div></div>
+  </section>
+  <section data-variant="偏好总览" aria-label="偏好总览布局" hidden>
+    <div class="ys-stage"><div class="ys-phone" data-reader="overview" aria-label="偏好总览阅读偏好">
+      <div class="ys-status"><span>9:41</span><span><i data-lucide="signal" aria-hidden="true"></i><i data-lucide="wifi" aria-hidden="true"></i><i data-lucide="battery-full" aria-hidden="true"></i></span></div>
+      <div class="ys-nav"><button type="button" data-back aria-label="返回偏好首页" class="cursor-interaction"><i data-lucide="chevron-left" aria-hidden="true"></i></button><strong>阅读偏好</strong><button type="button" data-done class="cursor-interaction">完成</button></div>
+      <div class="ys-body" data-home>
+        <div class="ys-current"><div class="ys-eyebrow">YOUR READING SPACE</div><h2>读得舒服，<br>就是好风格。</h2><p data-overview-summary>暖纸 · 系统宋体 · 20 pt · 上下滚动</p><div class="ys-inline-swatches"><b></b><b></b><b></b><span>当前阅读样式</span></div></div>
+        <div class="ys-grid">
+          <button type="button" class="ys-category cursor-interaction" data-detail="appearance"><i data-lucide="palette" aria-hidden="true"></i><strong>主题与字体</strong><span>纸色 · 主题库 · 字体管理</span></button>
+          <button type="button" class="ys-category cursor-interaction" data-detail="typography"><i data-lucide="type" aria-hidden="true"></i><strong>文字排版</strong><span>字号 · 行段距 · 章节标题</span></button>
+          <button type="button" class="ys-category cursor-interaction" data-detail="operation"><i data-lucide="hand" aria-hidden="true"></i><strong>翻页与手势</strong><span>阅读方式 · 翻页效果 · 操作</span></button>
+          <button type="button" class="ys-category cursor-interaction" data-detail="content"><i data-lucide="text-cursor-input" aria-hidden="true"></i><strong>正文与段评</strong><span>净化 · 高亮规则 · 段评皮肤</span></button>
+        </div>
+        <div class="ys-section"><h3>当前效果</h3><button type="button" data-detail="typography" class="cursor-interaction">调整排版 ›</button></div>
+        <div class="ys-preview" data-theme="暖纸"><div class="ys-preview-title">第三章 · 山海有相逢</div><div class="ys-prose"><p>雨是在午后停的。山路尽头，一盏茶正冒着温热的白气。</p></div></div>
+        <div class="ys-footer"><span>自动保存 · 全局阅读偏好</span><button type="button" data-reset class="cursor-interaction">恢复默认</button></div>
+      </div>
+      <div class="ys-body ys-details" data-details hidden></div><div class="ys-handle"></div>
+    </div></div>
+  </section>
+</div>
+<script>
+(function () {
+  const root = document.getElementById('reading-layout-options');
+  const defaults = () => ({font:20,line:12,margin:20,paragraph:18,theme:'暖纸',mode:'上下滚动',tap:true,haptics:true,fontName:'系统宋体',effect:'平移',weight:'常规',align:'两端对齐',indent:true,purify:true,highlight:false,comments:true,title:'简约居中',skin:'纸边批注',scope:'全部书籍'});
+  const labels={appearance:'主题与字体',typography:'文字排版',operation:'翻页与手势',content:'正文与段评',fonts:'字体管理',themes:'主题库',title:'章节标题',purify:'正文净化规则',highlight:'高亮规则',comments:'段评与皮肤',guide:'阅读手势'};
+  const saved = globalThis.openai?.widgetState;
+  const states = {};
+  const renderers = {};
+  const chevron = '<i data-lucide="chevron-right" aria-hidden="true"></i>';
+  const row = (name,value,target) => `<button type="button" class="ys-row cursor-interaction" data-detail="${target}"><span>${name}</span><span class="ys-row-end"><span data-summary="${({fonts:'fontName',title:'title',comments:'skin'})[target]||''}">${value}</span>${chevron}</span></button>`;
+  const toggle = (name,key,state) => `<label class="ys-row cursor-interaction"><span>${name}</span><input class="ys-toggle" type="checkbox" data-setting="${key}" aria-label="${name}" ${state[key]?'checked':''}></label>`;
+  const slider = (name,key,min,max,state,unit='pt') => `<div class="ys-slider"><label>${name}<output data-${key}-value>${state[key]} ${unit}</output></label><input type="range" min="${min}" max="${max}" value="${state[key]}" data-range="${key}" aria-label="${name}"></div>`;
+  const choices = (key,values,state) => `<div class="ys-option-list">${values.map(v=>`<button type="button" data-choice="${key}" data-value="${v}" aria-pressed="${state[key]===v}" class="cursor-interaction">${v}</button>`).join('')}</div>`;
+  function previewMarkup(state) { return `<div class="ys-preview ys-compact ys-detail-preview" data-theme="${state.theme}"><div class="ys-preview-title">第三章 · 山海有相逢</div><div class="ys-prose"><p>雨是在午后停的。</p><p>风经过窗边，故事才刚刚开始。</p></div></div>`; }
+  function panelContent(type,s,expanded=false) {
+    if(type==='appearance') return `<div class="ys-panel-title">纸色与主题<span>与正文同步预览</span></div><div class="ys-choose-theme">${['暖纸','明亮','夜读'].map(t=>`<button type="button" class="ys-theme-card cursor-interaction" data-theme-choice="${t}" aria-pressed="${s.theme===t}"><strong>阅</strong><span>${t}</span></button>`).join('')}</div><div class="ys-list">${row('主题库','更多阅读风格','themes')}${row('字体',s.fontName,'fonts')}${row('章节标题',s.title,'title')}</div>`;
+    if(type==='typography') {
+      const base=`<div class="ys-panel-title">文字排版<span>调整即预览</span></div><div class="ys-list">${slider('文字大小','font',16,26,s)}${slider('行间距','line',4,20,s)}${slider('左右边距','margin',12,32,s)}${expanded?slider('段落间距','paragraph',0,32,s):''}</div>`;
+      return base+(expanded?`<h4 class="ys-subheading">字重</h4>${choices('weight',['细体','常规','中等'],s)}<div class="ys-list">${toggle('首行缩进','indent',s)}${row('章节标题',s.title,'title')}</div><h4 class="ys-subheading">文本对齐</h4>${choices('align',['左对齐','两端对齐','居中'],s)}`:`<div class="ys-list" style="margin-top:12px">${row('段距、字重与对齐','进阶排版','typography')}</div>`);
+    }
+    if(type==='operation') return `<div class="ys-panel-title">阅读方式<span>共用阅读位置</span></div><div class="ys-segments">${['上下滚动','左右分页'].map(v=>`<button type="button" class="cursor-interaction" data-choice="mode" data-value="${v}" aria-pressed="${s.mode===v}">${v}</button>`).join('')}</div><div data-paging-effects ${s.mode==='左右分页'?'':'hidden'}><h4 class="ys-subheading">分页效果</h4>${choices('effect',['平移','覆盖','无动画','仿真'],s)}</div><div class="ys-list">${toggle('轻触翻页','tap',s)}${toggle('触觉反馈','haptics',s)}${row('阅读手势','查看操作示意','guide')}</div><p class="ys-note">轻触左右两侧前进，中间唤出菜单。</p>`;
+    if(type==='content') return `<div class="ys-panel-title">正文与段评<span>按内容关联设置</span></div><div class="ys-list">${toggle('正文净化','purify',s)}${row('净化规则','替换 · 作用范围','purify')}${toggle('关键词高亮','highlight',s)}${row('高亮规则','关键词 · 显示样式','highlight')}</div><div class="ys-list" style="margin-top:14px">${toggle('显示段评','comments',s)}${row('段评皮肤',s.skin,'comments')}</div>`;
+    if(type==='fonts') return `<div class="ys-panel-title">阅读字体<span>当前使用同一套字体设置</span></div>${choices('fontName',['系统宋体','系统黑体','系统楷体'],s)}<p class="ys-note">字体切换与字号、行距共用正文预览。</p>`;
+    if(type==='themes') return `<div class="ys-panel-title">阅读主题<span>纸色、文字与强调色</span></div><div class="ys-choose-theme">${['暖纸','明亮','夜读'].map(t=>`<button type="button" class="ys-theme-card cursor-interaction" data-theme-choice="${t}" aria-pressed="${s.theme===t}"><strong>阅</strong><span>${t}</span></button>`).join('')}</div><div class="ys-list">${row('字体',s.fontName,'fonts')}${row('文字排版',s.font+' pt','typography')}</div>`;
+    if(type==='title') return `<div class="ys-panel-title">标题样式<span>跟随当前主题</span></div>${choices('title',['简约居中','左对齐','细线分隔'],s)}<div class="ys-list">${row('正文字体',s.fontName,'fonts')}${row('正文排版',s.font+' pt','typography')}</div>`;
+    if(type==='purify') return `<div class="ys-panel-title">正文净化<span>规则与作用范围一起设置</span></div><div class="ys-list">${toggle('启用正文净化','purify',s)}<div class="ys-row"><span>广告文本</span><span class="ys-value">替换为空</span></div><div class="ys-row"><span>多余空行</span><span class="ys-value">合并空行</span></div></div><h4 class="ys-subheading">作用范围</h4>${choices('scope',['全部书籍','当前书籍','当前书源'],s)}`;
+    if(type==='highlight') return `<div class="ys-panel-title">高亮规则<span>关键词与样式</span></div><div class="ys-list">${toggle('启用关键词高亮','highlight',s)}<div class="ys-row"><span>关键词</span><span class="ys-value">山海 · 长风</span></div></div><p class="ys-note">高亮规则与主题共用文字和强调色。</p>`;
+    if(type==='comments') return `<div class="ys-panel-title">段评与皮肤<span>先决定显示，再调整样式</span></div><div class="ys-list">${toggle('显示段评','comments',s)}</div><h4 class="ys-subheading">段评皮肤</h4>${choices('skin',['纸边批注','轻量气泡','纯文字'],s)}`;
+    return `<div class="ys-panel-title">轻触操作<span>左右两侧前进，中间唤出菜单</span></div><div class="ys-segments"><button type="button" data-zone="下一页" class="cursor-interaction">下一页</button><button type="button" data-zone="显示／隐藏菜单" class="cursor-interaction">菜单</button><button type="button" data-zone="下一页" class="cursor-interaction">下一页</button></div><div class="ys-list">${toggle('轻触翻页','tap',s)}${toggle('触觉反馈','haptics',s)}</div><p class="ys-message" role="status" data-gesture-message>点按上方区域查看操作。</p>`;
+  }
+  function refreshIcons() { if(globalThis.lucide) lucide.createIcons({attrs:{width:16,height:16}}); }
+  function save() { if(globalThis.openai?.setWidgetState) globalThis.openai.setWidgetState({modelContent:null,privateContent:{readingLayoutPreviews:states}}).catch(()=>{}); }
+  root.querySelectorAll('[data-reader]').forEach(phone=>{
+    const id=phone.dataset.reader;
+    const savedState=saved?.privateContent?.readingLayoutPreviews?.[id] || saved?.readingLayoutPreviews?.[id];
+    const s=states[id]=Object.assign(defaults(),savedState||{});
+    const history=[];
+    let currentDetail=null;
+    let tab='typography';
+    function sync() {
+      phone.querySelectorAll('.ys-preview').forEach(p=>{
+        p.dataset.theme=s.theme;
+        const prose=p.querySelector('.ys-prose');
+        prose.style.fontSize=s.font+'px';
+        prose.style.lineHeight=(1.35+s.line/28).toFixed(2);
+        prose.style.fontFamily=s.fontName==='系统黑体'?'-apple-system,BlinkMacSystemFont,sans-serif':s.fontName==='系统楷体'?"'Kaiti SC',STKaiti,serif":"'Songti SC',STSong,serif";
+        prose.style.fontWeight=s.weight==='中等'?'500':'400';
+        prose.style.setProperty('--ys-paragraph',s.paragraph+'px');
+        prose.style.textIndent=s.indent?'2em':'0';
+        prose.style.textAlign=s.align==='居中'?'center':s.align==='左对齐'?'left':'justify';
+        p.style.paddingLeft=s.margin+'px';p.style.paddingRight=s.margin+'px';
+        const title=p.querySelector('.ys-preview-title');
+        title.style.textAlign=s.title==='左对齐'?'left':'center';
+        title.style.borderBottom=s.title==='细线分隔'?'1px solid currentColor':'none';
+        title.style.paddingBottom=s.title==='细线分隔'?'8px':'0';
+      });
+      ['font','line','margin','paragraph'].forEach(k=>{
+        phone.querySelectorAll('[data-'+k+'-value]').forEach(o=>o.textContent=s[k]+' pt');
+        phone.querySelectorAll('[data-range="'+k+'"]').forEach(i=>i.value=s[k]);
+      });
+      phone.querySelectorAll('[data-theme-choice]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.themeChoice===s.theme)));
+      phone.querySelectorAll('[data-choice]').forEach(b=>b.setAttribute('aria-pressed',String(s[b.dataset.choice]===b.dataset.value)));
+      phone.querySelectorAll('[data-setting]').forEach(i=>i.checked=!!s[i.dataset.setting]);
+      phone.querySelectorAll('[data-paging-effects]').forEach(el=>el.hidden=s.mode!=='左右分页');
+      phone.querySelectorAll('[data-summary]').forEach(el=>{if(el.dataset.summary)el.textContent=s[el.dataset.summary];});
+      phone.querySelectorAll('[data-line-summary]').forEach(el=>el.textContent=s.line<=8?'紧凑':s.line<=14?'适中':'宽松');
+      phone.querySelectorAll('[data-title-value]').forEach(el=>el.textContent=s.title);
+      phone.querySelectorAll('[data-mode-value]').forEach(el=>el.textContent=s.mode);
+      phone.querySelectorAll('[data-preview-info]').forEach(el=>el.textContent=s.theme+' · '+s.font+' pt');
+      phone.querySelectorAll('[data-overview-summary]').forEach(el=>el.textContent=[s.theme,s.fontName,s.font+' pt',s.mode].join(' · '));
+    }
+    function detail(type,push=true) {
+      if(push) history.push(currentDetail);
+      currentDetail=type;
+      phone.querySelector('[data-home]').hidden=true;
+      const target=phone.querySelector('[data-details]');
+      target.hidden=false;
+      target.innerHTML=`<div class="ys-detail-head"><button type="button" data-detail-back aria-label="返回上一级" class="cursor-interaction"><i data-lucide="chevron-left" aria-hidden="true"></i></button><strong>${labels[type]||'阅读手势'}</strong></div>${previewMarkup(s)}${panelContent(type,s,true)}<p class="ys-scope">自动保存 · 与阅读偏好共用设置</p>`;
+      sync();refreshIcons();
+    }
+    function back() {
+      const last=history.pop();
+      if(last) detail(last,false);
+      else {currentDetail=null;phone.querySelector('[data-details]').hidden=true;phone.querySelector('[data-home]').hidden=false;sync();}
+    }
+    function setTab(type) {
+      tab=type;
+      phone.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
+      const p=phone.querySelector('[data-tab-panel]');
+      p.innerHTML=panelContent(type,s);p.setAttribute('aria-label',labels[type]+'设置');
+      sync();refreshIcons();
+    }
+    phone.addEventListener('input',e=>{
+      const el=e.target;
+      if(el.dataset.range) {s[el.dataset.range]=Number(el.value);sync();save();}
+      if(el.dataset.setting) {s[el.dataset.setting]=el.checked;sync();save();}
+    });
+    phone.addEventListener('click',e=>{
+      const b=e.target.closest('button');if(!b||!phone.contains(b)) return;
+      if(b.hasAttribute('data-step')) {s.font=Math.max(16,Math.min(26,s.font+Number(b.dataset.step)));sync();save();}
+      if(b.dataset.themeChoice) {s.theme=b.dataset.themeChoice;sync();save();}
+      if(b.dataset.detail) detail(b.dataset.detail);
+      if(b.hasAttribute('data-back')||b.hasAttribute('data-detail-back')) back();
+      if(b.dataset.tab) setTab(b.dataset.tab);
+      if(b.dataset.choice) {s[b.dataset.choice]=b.dataset.value;sync();save();}
+      if(b.hasAttribute('data-reset')) {Object.assign(s,defaults());if(id==='workbench') setTab(tab);sync();save();}
+      if(b.hasAttribute('data-done')) {b.textContent='已保存';setTimeout(()=>b.textContent='完成',1400);save();}
+      if(b.dataset.zone) {const msg=phone.querySelector('[data-gesture-message]');if(msg)msg.textContent='操作：'+b.dataset.zone;}
+    });
+    renderers[id] = sync;
+    sync();
+    if(globalThis.Tweak) {
+      const tweakState={radius:15};
+      const tweak = new Tweak({container:phone,onChange:()=>phone.querySelectorAll('.ys-list,.ys-preview,.ys-category').forEach(el=>el.style.borderRadius=tweakState.radius+'px')});
+      tweak.addSlider(tweakState,'radius',{label:'卡片圆角',min:6,max:22,step:1,unit:'px'});
+    }
+  });
+  window.addEventListener('openai:set_globals',event=>{
+    const saved=event.detail?.globals?.widgetState;
+    const next=saved?.privateContent?.readingLayoutPreviews||saved?.readingLayoutPreviews;
+    if(next) Object.keys(states).forEach(key=>{if(next[key]) { Object.assign(states[key],next[key]); renderers[key](); }});
+  });
+})();
+</script>

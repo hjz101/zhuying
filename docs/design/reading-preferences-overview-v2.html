@@ -42,7 +42,7 @@
 #pref-overview-v2 .page-header span:nth-child(2),#pref-overview-v2 .page-footer span:nth-child(2) {text-align:center}
 #pref-overview-v2 .page-header span:last-child,#pref-overview-v2 .page-footer span:last-child {text-align:right}
 #pref-overview-v2 .body-text {font-size:18px;line-height:1.9;overflow-wrap:anywhere}
-#pref-overview-v2 .body-text p {margin:0 0 12px}
+#pref-overview-v2 .body-text > p {margin:0 0 var(--paragraph-gap,14px)}
 #pref-overview-v2 .paragraph-end {display:inline-flex;align-items:center;gap:3px;vertical-align:baseline;font:10px/1.2 -apple-system,sans-serif;border-radius:12px;padding:3px 6px;margin-left:5px;background:color-mix(in srgb,var(--reader-ink) 11%,transparent);color:var(--reader-ink);border:1px solid transparent;white-space:nowrap}
 #pref-overview-v2 .paragraph-end svg {width:10px;height:10px;display:inline-block}
 #pref-overview-v2 .paragraph-end[data-skin='描边'] {background:transparent;border-color:currentColor}
@@ -54,7 +54,7 @@
 #pref-overview-v2 .sample-system {font-size:.88em;opacity:.8}
 #pref-overview-v2 .dropcap:first-letter {float:left;font-size:2.6em;line-height:1.1;margin:3px 5px 0 0;color:var(--reader-accent)}
 #pref-overview-v2 .preview-wrap .paper {margin-top:0}
-#pref-overview-v2 .preview-wrap .body-text > p:not(:first-child) {display:none}
+#pref-overview-v2 .preview-wrap .body-text > p {display:block}
 #pref-overview-v2 .preview-wrap .body-text .god-comment {margin-bottom:0}
 #pref-overview-v2 .theme-card {display:block;width:100%;border-radius:12px;margin:12px 0;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
 #pref-overview-v2 .theme-card .mini {padding:15px 16px;font-family:'Songti SC',serif}
@@ -104,6 +104,19 @@
 #pref-overview-v2 .motion-toolbar {display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:9px}
 #pref-overview-v2 .motion-toolbar button {min-height:38px;background:var(--soft);border-radius:8px;padding:8px 11px;font-size:12px}
 #pref-overview-v2 .motion-status {font-size:11px;color:var(--muted);margin-top:8px;min-height:18px}
+#pref-overview-v2 .page-region {position:relative;width:100%;font-family:-apple-system,sans-serif}
+#pref-overview-v2 .page-item {position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;min-height:28px;line-height:1.3;overflow-wrap:anywhere;text-align:center;max-height:100%;overflow:hidden}
+#pref-overview-v2 .editor-zone {border:1px dashed color-mix(in srgb,var(--reader-ink) 35%,transparent);border-radius:5px;touch-action:none;background:color-mix(in srgb,var(--reader-ink) 3%,transparent)}
+#pref-overview-v2 .page-item[aria-pressed='true'] {outline:1px solid var(--reader-accent);border-radius:4px;background:color-mix(in srgb,var(--reader-accent) 12%,transparent)}
+#pref-overview-v2 .editor-zone .page-item {touch-action:none;user-select:none}
+#pref-overview-v2 .element-chips {display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
+#pref-overview-v2 .element-chips button {border-radius:7px;padding:8px 11px;min-height:36px;background:var(--soft);font-size:12px}
+#pref-overview-v2 .element-chips button[aria-pressed='true'] {background:var(--selected);color:var(--on)}
+#pref-overview-v2 .source-options {display:flex;gap:7px;margin:12px 0}
+#pref-overview-v2 .source-options button {flex:1;min-height:40px;padding:10px;background:var(--soft);border-radius:8px;text-align:center;font-size:13px}
+#pref-overview-v2 .source-options button[aria-pressed='true'] {background:var(--selected);color:var(--on)}
+#pref-overview-v2 .compact-details {border-top:1px solid var(--line);margin:14px 0;padding-top:12px}
+#pref-overview-v2 .compact-details summary {font-size:13px;min-height:36px}
 #pref-overview-v2 [hidden] {display:none!important}
 @media(max-width:380px){#pref-overview-v2 .content{padding:8px 13px 20px}#pref-overview-v2 .category{padding:13px 10px}#pref-overview-v2 .phone{border-radius:22px}#pref-overview-v2 .two{gap:8px}}
 @media(pointer:coarse){#pref-overview-v2 .action,#pref-overview-v2 .filters button,#pref-overview-v2 .row{min-height:44px}#pref-overview-v2 .field input,#pref-overview-v2 .field select,#pref-overview-v2 .field textarea{font-size:16px}}
@@ -129,8 +142,9 @@
   {id:'frame',name:'旧书画廊',source:'导入示例',paper:'#f2e5d2',ink:'#594735',accent:'#9a6a42',bubble:'圆角方形',god:'画框',css:'.chapter-title { text-align: center; border-bottom: 1px solid var(--reader-accent); padding-bottom: 10px; }'}
  ];
  const fonts=[{id:'serif',name:'系统宋体',source:'内置',family:"'Songti SC','STSong',serif"},{id:'sans',name:'系统黑体',source:'内置',family:'-apple-system,BlinkMacSystemFont,sans-serif'},{id:'kai',name:'系统楷体',source:'内置',family:"'Kaiti SC','STKaiti',serif"}];
- const defaults=()=>({theme:'warm',font:'serif',fontSize:19,left:28,right:16,linked:false,header:true,footer:true,hLeft:'书名',hCenter:'无',hRight:'时间',fLeft:'章节',fCenter:'进度',fRight:'无',headerGap:16,footerGap:16,css:null,bubble:null,god:null,showBubble:true,showGod:true,bubbleRadius:12,godRadius:9,bubbleName:'我的段尾气泡',godName:'我的神评卡片',bubbleColor:'#637c69',godColor:'#e8ebe3',godAccent:'#8b6449',mode:'上下滚动',horizontalEffect:'仿真',verticalEffect:'平移',tap:true,haptics:true,filter:'全部',testText:'山海有相逢，长风自有归处。Aa 0123，。！？',rules:[{id:'dialog',name:'人物对话',match:'对话引号',kind:'文字高亮',color:'#8f5442',enabled:true},{id:'system',name:'系统消息',match:'系统提示',kind:'段落底色',color:'#667e67',enabled:false},{id:'poem',name:'诗词',match:'诗词段落',kind:'居中斜体',color:'#876846',enabled:false},{id:'drop',name:'章节首字下沉',match:'章节首段',kind:'首字下沉',color:'#8b6449',enabled:false}]});
- let s=defaults(),view='operation',history=[],selectedTheme='warm',ruleIndex=0,skinType='bubble',fontSerial=0;
+ const defaults=()=>({theme:'warm',font:'serif',fontSize:19,lineSpacing:10,paragraphSpacing:14,top:16,bottom:16,left:28,right:16,linked:false,header:true,footer:true,hLeft:'书名',hCenter:'无',hRight:'时间',fLeft:'章节',fCenter:'进度',fRight:'无',headerGap:16,footerGap:16,headerHeight:64,footerHeight:64,pageElements:[{id:'book',zone:'header',type:'书名',text:'',x:28,y:45,width:46,size:11,color:'#737c70'},{id:'time',zone:'header',type:'时间',text:'',x:82,y:45,width:26,size:11,color:'#737c70'},{id:'chapter',zone:'footer',type:'章节',text:'',x:23,y:50,width:36,size:11,color:'#737c70'},{id:'progress',zone:'footer',type:'进度',text:'',x:68,y:50,width:54,size:11,color:'#737c70'}],css:null,bubble:null,god:null,showBubble:true,showGod:true,bubbleRadius:12,godRadius:9,bubbleName:'我的段尾气泡',godName:'我的神评卡片',bubbleColor:'#637c69',godColor:'#e8ebe3',godAccent:'#8b6449',mode:'上下滚动',horizontalEffect:'仿真',verticalEffect:'平移',tap:true,haptics:true,filter:'全部',testText:'山海有相逢，长风自有归处。Aa 0123，。！？',rules:[{id:'dialog',name:'人物对话',match:'对话引号',kind:'文字高亮',color:'#8f5442',enabled:true},{id:'system',name:'系统消息',match:'系统提示',kind:'段落底色',color:'#667e67',enabled:false},{id:'poem',name:'诗词',match:'诗词段落',kind:'居中斜体',color:'#876846',enabled:false},{id:'drop',name:'章节首字下沉',match:'章节首段',kind:'首字下沉',color:'#8b6449',enabled:false}]});
+ let s=defaults(),view='layout',history=[],selectedTheme='warm',ruleIndex=0,skinType='bubble',fontSerial=0;
+ let selectedElement='book',elementSerial=0,pageDrag=null;
  let motionPage=12,motionBusy=false,demoVersion=0,pointerStart=null;
  let draft={name:'我的对话样式',match:'对话引号',kind:'文字高亮',color:'#8f5442',pattern:'「[^」]+」',scope:'全部书籍'};
  const saved=globalThis.openai?.widgetState;
@@ -168,7 +182,7 @@
   const t=theme();const has=k=>s.rules.some(r=>r.enabled&&r.kind===k);
   const bubbleHTML=s.showBubble?`<button type="button" class="paragraph-end cursor-interaction" data-open="comments" data-skin="${bubble()}" style="${s.bubble==='自定义'?'background:'+s.bubbleColor+';color:'+t.paper+';border-radius:'+s.bubbleRadius+'px':''}" aria-label="查看本段 12 条评论">${icon('message-circle')}12</button>`:'';
   const godHTML=s.showGod?`<div class="god-comment" data-skin="${god()}" style="${god()==='自定义'?'border-radius:'+s.godRadius+'px;background:'+s.godColor+';border:1px solid '+s.godAccent:''}"><b>神人评论 · 山间客</b><p>这盏茶，怕不是等了整整一章。</p></div>`:'';
-  return `<div class="paper" data-paper style="--reader-paper:${t.paper};--reader-ink:${t.ink};--reader-accent:${t.accent};padding-left:${s.left}px;padding-right:${s.right}px;font-family:${esc(font().family)}">${s.header?`<div class="page-header" style="margin-bottom:${s.headerGap}px"><span>${texts()[s.hLeft]}</span><span>${texts()[s.hCenter]}</span><span>${texts()[s.hRight]}</span></div>`:''}<div class="chapter-title" data-title>第三章 · 山海有相逢</div><div class="body-text" style="font-size:${s.fontSize}px"><p class="${has('首字下沉')?'dropcap':''}">${styledText('雨是在午后停的。她说：「山路尽头，总有人为你留一盏茶。」')}${bubbleHTML}</p>${godHTML}${full?`<p class="sample-system" style="${has('段落底色')?'background:'+s.rules.find(r=>r.enabled&&r.kind==='段落底色').color+'22;padding:7px;border-radius:6px':''}">【系统提示：已解锁山海图鉴】</p><p style="${has('居中斜体')?'text-align:center;font-style:italic;color:'+s.rules.find(r=>r.enabled&&r.kind==='居中斜体').color:''}">长风破浪会有时，直挂云帆济沧海。</p>`:''}</div>${s.footer?`<div class="page-footer" style="margin-top:${s.footerGap}px"><span>${texts()[s.fLeft]}</span><span>${texts()[s.fCenter]}</span><span>${texts()[s.fRight]}</span></div>`:''}</div>`;
+  return `<div class="paper" data-paper style="--reader-paper:${t.paper};--reader-ink:${t.ink};--reader-accent:${t.accent};padding:${s.top}px ${s.right}px ${s.bottom}px ${s.left}px;font-family:${esc(font().family)}">${s.header?pageRegion('header'):''}<div class="chapter-title" data-title>第三章 · 山海有相逢</div><div class="body-text" style="font-size:${s.fontSize}px;line-height:${s.fontSize+s.lineSpacing}px;--paragraph-gap:${s.paragraphSpacing}px"><p class="${has('首字下沉')?'dropcap':''}">${styledText('雨是在午后停的。她说：「山路尽头，总有人为你留一盏茶。」')}${bubbleHTML}</p>${godHTML}<p>她推开木窗，让远山的风翻过书页。窗外的故事，还在慢慢继续。</p>${full?`<p class="sample-system" style="${has('段落底色')?'background:'+s.rules.find(r=>r.enabled&&r.kind==='段落底色').color+'22;padding:7px;border-radius:6px':''}">【系统提示：已解锁山海图鉴】</p><p style="${has('居中斜体')?'text-align:center;font-style:italic;color:'+s.rules.find(r=>r.enabled&&r.kind==='居中斜体').color:''}">长风破浪会有时，直挂云帆济沧海。</p>`:''}</div>${s.footer?pageRegion('footer'):''}</div>`;
  }
  function rulePreview(){const current=s.rules;s.rules=current.map(r=>({...r}));const entry={...draft,enabled:true};if(ruleIndex<0)s.rules.push(entry);else s.rules[ruleIndex]=entry;const html=paper(true);s.rules=current;return html;}
  function preview(){return `<div class="preview-wrap" data-preview>${paper()}</div>`;}
@@ -178,11 +192,10 @@
   if(view==='themes')return `<div class="filters">${['全部','内置','我的导入'].map(x=>`<button type="button" class="cursor-interaction" data-filter="${x}" aria-pressed="${s.filter===x}">${x}</button>`).join('')}</div><div class="actions">${action('导入主题包','data-import="theme"',true)}</div>${themes.filter(t=>s.filter==='全部'||(s.filter==='内置'?t.source==='内置':t.source!=='内置')).map(t=>`<button type="button" class="theme-card cursor-interaction" data-theme-detail="${t.id}"><div class="mini" style="background:${t.paper};color:${t.ink}"><div class="mini-title">${esc(t.name)}</div><p class="mini-text">山海有相逢，长风自有归处。 <span style="color:${t.accent}">▱ 12</span></p><p style="font:11px/1.6 -apple-system,sans-serif;margin-top:6px">神评皮肤：${t.god} · 气泡：${t.bubble}</p></div><div class="meta"><span>${esc(t.source)}</span><span>${t.id===s.theme?'使用中':'查看整页效果 ›'}</span></div></button>`).join('')}<p class="note">“我的导入”中包含两套示例，实际导入内容会以文件中的名称显示。</p>`;
   if(view==='themeDetail'){const t=themes.find(t=>t.id===selectedTheme)||theme();return `<h2>${esc(t.name)}</h2><p class="sub">${esc(t.source)} · 完整阅读主题</p><div class="theme-card"><div class="mini" style="background:${t.paper};color:${t.ink}"><div class="mini-title">第三章 · 山海有相逢</div><p class="mini-text">山路尽头，总有人为你留一盏茶。</p><p class="mini-text">段尾气泡：${t.bubble}</p><p class="mini-text">神评皮肤：${t.god}</p></div></div><div class="list"><div class="row"><span>主题配色</span><span class="end">纸色 · 正文 · 强调色</span></div><div class="row"><span>章节样式</span><span class="end">${s.css?'保留个人自定义':'跟随主题'}</span></div><div class="row"><span>段尾气泡 / 神评</span><span class="end">${s.bubble||s.god?'保留个人自定义':'跟随主题'}</span></div></div><div class="actions">${action('应用主题 · 保留自定义',`data-apply-theme="${t.id}"`,true)}${action('仅应用配色',`data-colors-theme="${t.id}"`)}</div><p class="note">章节标题只在“排版与页面”编辑；本页仅展示主题包内的组件。</p>`;}
   if(view==='fonts')return `${preview()}<label class="field"><span>自定义试字</span><input type="text" data-bind="testText" value="${esc(s.testText)}" aria-label="自定义试字"></label>${range('试读字号','fontSize',14,30)}<div class="actions">${action('导入 TTF / OTF 字体','data-import="font"',true)}</div><div data-font-list>${fontList()}</div><p class="note">导入后每行直接用字体文件排字；正文、中文标点、数字可一起对比。预览中的字体文件仅在当前会话加载。</p>`;
-  if(view==='layout')return `${preview()}<div class="list">${row('正文排版',s.fontSize+' pt · 行段距与字重','body')}${row('页面边距','左 '+s.left+' / 右 '+s.right+' pt','margins')}${row('章节标题',s.css?'自定义 CSS':'跟随主题','title')}${row('页眉与页脚','内容 · 位置 · 留白','headers')}</div><p class="note">章节样式的唯一编辑入口在这里。主题导入的标题 CSS 也在同一处预览、复制与编辑。</p>`;
-  if(view==='body')return `${preview()}${range('文字大小','fontSize',14,30)}<div class="list">${row('正文样式规则','对话 · 系统消息 · 诗词 · 首字下沉','rules')}${row('字体管理',font().name,'fonts')}</div>`;
-  if(view==='margins')return `${preview()}<div class="list">${toggle('左右边距联动','linked')}</div><div class="two">${range('左边距','left',8,56)}${range('右边距','right',8,56)}</div><p class="note">关闭联动后独立调节；例如左侧 32 pt、右侧 12 pt。预览同步显示正文偏移。</p><div class="actions">${action('左 32 / 右 12','data-asymmetric',true)}</div>`;
-  if(view==='headers')return `${preview()}<div class="list">${toggle('显示页眉','header')}${toggle('显示页脚','footer')}</div><h3>页眉</h3><div class="two">${select('页眉左侧','hLeft',['无','书名','章节','时间','进度'])}${select('页眉中间','hCenter',['无','书名','章节','时间','进度'])}${select('页眉右侧','hRight',['无','书名','章节','时间','进度'])}</div><h3>页脚</h3><div class="two">${select('页脚左侧','fLeft',['无','书名','章节','时间','进度'])}${select('页脚中间','fCenter',['无','书名','章节','时间','进度'])}${select('页脚右侧','fRight',['无','书名','章节','时间','进度'])}</div><div class="two">${range('页眉留白','headerGap',8,36)}${range('页脚留白','footerGap',8,36)}</div><p class="note">分页显示页码；滚动显示章节进度。页眉页脚留白计入页面排版，正文不会被覆盖。</p>`;
-  if(view==='title')return `${preview()}<p class="sub">${s.css?'个人自定义 · 优先于主题':'跟随主题 · '+esc(theme().name)}</p><div class="actions">${action('新建 CSS','data-new-css',true)}${action('导入 CSS','data-import="css"')}${action('恢复跟随主题','data-follow="css"')}</div><label class="field"><span>章节标题 CSS</span><textarea data-css spellcheck="false" aria-label="章节标题 CSS">${esc(css())}</textarea></label><div class="error" role="alert" data-css-error></div><p class="note">当前提案预览支持 .chapter-title 的颜色、字体、边框、圆角与间距。编辑即预览；不支持的 CSS 会显示提示。</p><div class="actions">${action('细线分隔','data-title-preset="line"')}${action('左侧题签','data-title-preset="tag"')}</div>`;
+  if(view==='layout')return `${preview()}<div class="list">${row('正文排版与边距',s.fontSize+' pt · 行距 '+s.lineSpacing+' · 段距 '+s.paragraphSpacing,'body')}${row('章节标题',s.css?'自定义 · 可编辑预览':'跟随主题 / 自定义','title')}${row('页眉与页脚','自由拖动 · 添加元素','headers')}</div><p class="note">正文大小、行段距和四边留白在同一页调整，预览同步变化。</p>`;
+  if(view==='body'||view==='margins')return typographyScreen();
+  if(view==='headers')return headerEditorScreen();
+  if(view==='title')return titleEditorScreen();
   if(view==='operation')return operationScreen();
   if(view==='content')return `${preview()}<div class="list">${row('正文样式规则',s.rules.length+' 条 · 可新增与编辑','rules')}${row('段评与神人评论','段尾气泡 · 段下精选评论','comments')}</div><p class="note">规则决定正文怎样呈现；评论皮肤分别控制段尾入口与段下评论卡片。</p>`;
   if(view==='rules')return `<div data-preview>${paper(true)}</div><div class="actions">${action('＋ 新建规则','data-new-rule',true)}</div><div class="list">${s.rules.map((r,i)=>`<div class="rule"><button type="button" data-rule="${i}" class="cursor-interaction">${esc(r.name)} ›</button><input type="checkbox" class="toggle" data-rule-toggle="${i}" aria-label="启用${esc(r.name)}" ${r.enabled?'checked':''}><div class="sub">${esc(r.match)} → ${esc(r.kind)} · ${esc(r.scope||'全部书籍')}</div></div>`).join('')}</div><p class="note">从上到下决定同类样式的匹配优先级。首字下沉属于段落装饰，可以与对话高亮同时使用。</p>`;
@@ -190,6 +203,54 @@
   if(view==='comments')return `<div data-preview>${paper(true)}</div><h3>段尾气泡 · 紧接段落末尾</h3><div class="list">${toggle('显示段评气泡','showBubble')}${row('气泡皮肤',bubble()+(s.bubble?' · 自定义':' · 跟随主题'),'bubble')}</div><h3>神人评论 · 显示在该段下方</h3><div class="list">${toggle('显示神人评论','showGod')}${row('神评卡片皮肤',god()+(s.god?' · 自定义':' · 跟随主题'),'god')}</div><p class="note">主题包可以携带两种皮肤；也可在这里分别新建、单独导入。正式阅读器建议每段默认展示一条神评，更多评论点击段尾气泡展开。</p>`;
   if(view==='bubble'||view==='god'){skinType=view;const isBubble=view==='bubble';return `<div data-preview>${paper(true)}</div><p class="sub">${s[view]?'个人自定义':'跟随主题 · '+esc(theme().name)}</p><div class="actions">${(isBubble?['轻量胶囊','描边','圆角方形']:['纯色','液态玻璃','画框']).map(x=>action(x,`data-select-skin="${x}" aria-pressed="${(isBubble?bubble():god())===x}"`)).join('')}</div><div class="actions">${action('新建皮肤','data-create-skin',true)}${action('导入皮肤','data-import="skin"')}${action('恢复跟随主题',`data-follow="${view}"`)}</div>${s[view]==='自定义'?`<label class="field"><span>皮肤名称</span><input type="text" data-bind="${isBubble?'bubbleName':'godName'}" value="${esc(s[isBubble?'bubbleName':'godName'])}" aria-label="皮肤名称"></label><label class="field"><span>底色</span><input type="color" data-bind="${isBubble?'bubbleColor':'godColor'}" value="${s[isBubble?'bubbleColor':'godColor']}" aria-label="皮肤底色"></label>${range('自定义圆角',isBubble?'bubbleRadius':'godRadius',0,24)}`:''}<p class="note">${isBubble?'气泡控制轮廓、颜色、计数和圆角，位置始终紧接段落末尾。':'神评卡片可用纯色、玻璃与画框；液态玻璃在正文背景上预览可读性。'}</p>`;}
   return '';
+ }
+ function constrainPageElement(element,x,y){
+  const width=Math.max(15,Math.min(90,Number(element.width)||30));
+  const zoneHeight=element.zone==='footer'?s.footerHeight:s.headerHeight;
+  const halfHeight=Math.min(50,Math.max(28,(Number(element.size)||11)+12)/Math.max(48,zoneHeight)*50);
+  return {x:Math.max(width/2,Math.min(100-width/2,Number(x)||0)),y:Math.max(halfHeight,Math.min(100-halfHeight,Number(y)||0))};
+ }
+ function currentPageElement(){return s.pageElements.find(el=>el.id===selectedElement)||null;}
+ function pageRegion(zone){
+  const editing=view==='headers',height=zone==='header'?s.headerHeight:s.footerHeight;
+  return `<div class="page-region ${editing?'editor-zone':''}" data-page-region="${zone}" aria-label="${zone==='header'?'页眉':'页脚'}自由布局区域" style="height:${height}px;margin-${zone==='header'?'bottom':'top'}:${zone==='header'?s.headerGap:s.footerGap}px">${s.pageElements.filter(el=>el.zone===zone).map(el=>{
+   const pos=constrainPageElement(el,el.x,el.y),text=el.type==='自定义文字'?el.text:texts()[el.type]||'';
+   const style=`left:${pos.x}%;top:${pos.y}%;width:${el.width}%;font-size:${el.size}px;color:${el.color}`;
+   return editing?`<button type="button" class="page-item cursor-interaction" data-page-element="${esc(el.id)}" aria-label="选择${esc(el.type)}元素" aria-pressed="${el.id===selectedElement}" style="${style}">${esc(text)}</button>`:`<span class="page-item" style="${style}">${esc(text)}</span>`;
+  }).join('')}</div>`;
+ }
+ function typographyScreen(){return `${preview()}<h3>文字与段落</h3><div class="two">${range('文字大小','fontSize',14,30)}${range('行间距','lineSpacing',0,24)}${range('段落间距','paragraphSpacing',0,36)}</div><h3>页面留白</h3><div class="list">${toggle('左右边距联动','linked')}</div><div class="two">${range('左边距','left',8,56)}${range('右边距','right',8,56)}${range('上边距','top',0,56)}${range('下边距','bottom',0,56)}</div><div class="actions">${action('左 32 / 右 12','data-asymmetric')}</div><div class="list">${row('字体管理',font().name,'fonts')}${row('章节标题',s.css?'个人自定义':'跟随主题 / 自定义','title')}</div><p class="note">行间距是同一段内相邻行的额外留白；段落间距是两段之间的距离，均独立于页面四边留白。</p>`;}
+ function elementRange(label,key,min,max,unit='%',value=currentPageElement()?.[key]){return `<label class="field"><span>${label}<output data-element-value="${key}">${value} ${unit}</output></span><input type="range" min="${min}" max="${max}" value="${value}" data-element-field="${key}" aria-label="${label}"></label>`;}
+ function elementSelect(label,key,options,element){return `<label class="field"><span>${label}</span><select data-element-field="${key}" aria-label="${label}">${options.map(([value,name])=>`<option value="${value}" ${element[key]===value?'selected':''}>${name}</option>`).join('')}</select></label>`;}
+ function elementControls(){
+  const el=currentPageElement();if(!el)return '<p class="note">添加元素或点选预览中的文字，开始调整。</p>';
+  return `<h3>选中元素 · ${esc(el.type)}</h3><div class="two">${elementSelect('所在区域','zone',[['header','页眉'],['footer','页脚']],el)}${elementSelect('元素内容','type',['书名','章节','时间','进度','自定义文字'].map(v=>[v,v]),el)}</div>${el.type==='自定义文字'?`<label class="field"><span>显示文字</span><input type="text" data-element-field="text" value="${esc(el.text)}" aria-label="显示文字"></label>`:''}<div class="two">${elementRange('横向位置 X','x',0,100)}${elementRange('纵向位置 Y','y',0,100)}${elementRange('元素宽度','width',15,90)}${elementRange('元素字号','size',9,22,'pt')}</div><label class="field"><span>元素颜色</span><input type="color" data-element-field="color" value="${el.color}" aria-label="元素颜色"></label><div class="actions">${action('删除选中元素','data-remove-page-element')}</div>`;
+ }
+ function headerEditorScreen(){return `${preview()}<p class="note">点选页眉或页脚中的元素并拖动，也可用下方 X / Y 精确微调。每个区域都可添加多个元素。</p><div class="list">${toggle('显示页眉','header')}${toggle('显示页脚','footer')}</div><div class="actions">${action('＋ 页眉元素','data-add-page-element="header"',true)}${action('＋ 页脚元素','data-add-page-element="footer"')}</div><div class="element-chips">${s.pageElements.map(el=>`<button type="button" class="cursor-interaction" data-page-element="${esc(el.id)}" aria-pressed="${el.id===selectedElement}">${el.zone==='header'?'页眉':'页脚'} · ${esc(el.type)}</button>`).join('')}</div><div data-element-controls>${elementControls()}</div><details class="compact-details"><summary>区域高度与正文间距</summary><div class="two">${range('页眉区域高度','headerHeight',48,120)}${range('页脚区域高度','footerHeight',48,120)}${range('页眉与正文间距','headerGap',0,40)}${range('页脚与正文间距','footerGap',0,40)}</div></details><p class="note">坐标相对于各自区域，可自由放置，且预留区域高度以避免覆盖正文。重叠元素可点下方名称切换选择。</p>`;}
+ function titleControlsFromCSS(){const declarations=cssDeclarations(css());return {'font-size':parseFloat(declarations['font-size'])||17,'text-align':declarations['text-align']||'center',color:/^#[0-9a-f]{6}$/i.test(declarations.color||'')?declarations.color:declarations.color?.includes('--reader-accent')?theme().accent:theme().ink,'letter-spacing':parseFloat(declarations['letter-spacing'])||0,'padding-bottom':parseFloat(declarations['padding-bottom'])||0};}
+ function titleRange(label,key,min,max){const value=titleControlsFromCSS()[key];return `<label class="field"><span>${label}<output data-title-value="${key}">${value} pt</output></span><input type="range" min="${min}" max="${max}" value="${value}" data-title-field="${key}" aria-label="${label}"></label>`;}
+ function updateTitleField(key,value){
+  const declarations=cssDeclarations(css());
+  if(['font-size','letter-spacing','padding-bottom'].includes(key)){const limits={'font-size':[14,40],'letter-spacing':[0,12],'padding-bottom':[0,30]};const [min,max]=limits[key];declarations[key]=Math.max(min,Math.min(max,Number(value)))+'px';}
+  else if(key==='text-align'&&['left','center','right'].includes(value))declarations[key]=value;
+  else if(key==='color'&&/^#[0-9a-f]{6}$/i.test(value))declarations.color=value;
+  else return;
+  s.css='.chapter-title {\n'+Object.entries(declarations).map(([name,v])=>'  '+name+': '+v+';').join('\n')+'\n}';
+ }
+ function syncTitleEditor(){
+  const values=titleControlsFromCSS();
+  root.querySelectorAll('[data-title-source]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.titleSource===(s.css===null?'theme':'custom'))));
+  root.querySelectorAll('[data-title-field]').forEach(el=>el.value=values[el.dataset.titleField]);
+  root.querySelectorAll('[data-title-value]').forEach(el=>el.textContent=values[el.dataset.titleValue]+' pt');
+  const editor=root.querySelector('[data-css]');if(editor)editor.value=css();
+  const status=root.querySelector('[data-title-status]');if(status)status.textContent=s.css===null?'使用主题标题样式 · 可直接修改下方控件':'个人自定义 · 切换主题时保留';
+ }
+ function titleEditorScreen(){const values=titleControlsFromCSS();return `${preview()}<div class="source-options" aria-label="章节标题样式来源">${action('跟随主题',`data-title-source="theme" aria-pressed="${s.css===null}"`)}${action('自定义',`data-title-source="custom" aria-pressed="${s.css!==null}"`)}</div><p class="sub" data-title-status>${s.css===null?'使用主题标题样式 · 可直接修改下方控件':'个人自定义 · 切换主题时保留'}</p><div class="two">${titleRange('标题字号','font-size',14,40)}${titleRange('标题字距','letter-spacing',0,12)}${titleRange('标题下方留白','padding-bottom',0,30)}<label class="field"><span>标题对齐</span><select data-title-field="text-align" aria-label="标题对齐">${[['left','居左'],['center','居中'],['right','居右']].map(([value,name])=>`<option value="${value}" ${values['text-align']===value?'selected':''}>${name}</option>`).join('')}</select></label></div><label class="field"><span>标题颜色</span><input type="color" data-title-field="color" value="${values.color}" aria-label="标题颜色"></label><div class="actions">${action('细线分隔','data-title-preset="line"')}${action('左侧题签','data-title-preset="tag"')}</div><details class="compact-details"><summary>高级 CSS · 新建、导入与编辑</summary><div class="actions">${action('新建 CSS','data-new-css',true)}${action('导入 CSS','data-import="css"')}</div><label class="field"><span>章节标题 CSS</span><textarea data-css spellcheck="false" aria-label="章节标题 CSS">${esc(css())}</textarea></label><div class="error" role="alert" data-css-error></div><p class="note">可视化控件与 CSS 共用一个标题样式，编辑即预览；只影响标题区域。</p></details>`;}
+ function updateElementEditor(){
+  const current=currentPageElement();
+  const controls=root.querySelector('[data-element-controls]');if(controls)controls.innerHTML=elementControls();
+  root.querySelectorAll('[data-page-element]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.pageElement===selectedElement)));
+  if(current)root.querySelectorAll('[data-element-value]').forEach(el=>el.textContent=current[el.dataset.elementValue]+(el.dataset.elementValue==='size'?' pt':' %'));
  }
  function readingBehavior(){
   if(s.mode==='左右分页')return {axis:'horizontal',paged:true,effect:['平移','覆盖','仿真','无动画'].includes(s.horizontalEffect)?s.horizontalEffect:'仿真',gesture:'左滑下一页，右滑上一页'};
@@ -223,7 +284,7 @@
  }
  function fontList(){return fonts.map(f=>`<button type="button" class="font-item cursor-interaction" data-font="${f.id}"><div class="meta"><span>${esc(f.name)} · ${esc(f.source)}</span><span>${s.font===f.id?'使用中':'使用字体'}</span></div><div class="sample" style="font-family:${esc(f.family)};font-size:${s.fontSize}px">${esc(s.testText)}</div></button>`).join('');}
  function draftSelect(label,key,values){return `<label class="field"><span>${label}</span><select data-draft="${key}" aria-label="${label}">${values.map(v=>`<option ${draft[key]===v?'selected':''}>${v}</option>`).join('')}</select></label>`;}
- const names={overview:'阅读偏好',appearance:'主题与字体',themes:'我的主题库',themeDetail:'主题详情',fonts:'字体管理',layout:'排版与页面',body:'正文排版',margins:'页面边距',headers:'页眉与页脚',title:'章节标题样式',operation:'翻页与手势',content:'正文与段评',rules:'正文样式规则',ruleEdit:'编辑样式规则',comments:'段评与神人评论',bubble:'段尾气泡皮肤',god:'神人评论皮肤'};
+ const names={overview:'阅读偏好',appearance:'主题与字体',themes:'我的主题库',themeDetail:'主题详情',fonts:'字体管理',layout:'排版与页面',body:'正文排版与边距',margins:'正文排版与边距',headers:'页眉与页脚',title:'章节标题样式',operation:'翻页与手势',content:'正文与段评',rules:'正文样式规则',ruleEdit:'编辑样式规则',comments:'段评与神人评论',bubble:'段尾气泡皮肤',god:'神人评论皮肤'};
  function render(){demoVersion++;motionBusy=false;root.querySelector('[data-nav-title]').textContent=names[view];content.innerHTML=screen()+'<div class="message" role="status" data-message></div>';applyTitle();if(globalThis.lucide)lucide.createIcons({attrs:{width:16,height:16}});}
  function applyTitle(){let declarations;try{declarations=cssDeclarations(css());}catch{return;}root.querySelectorAll('[data-title]').forEach(el=>{for(const [key,value]of Object.entries(declarations))el.style.setProperty(key,value);});if(s.bubble==='自定义')root.querySelectorAll('.paragraph-end').forEach(el=>el.style.borderRadius=s.bubbleRadius+'px');}
  function updatePreview(){root.querySelectorAll('[data-preview]').forEach(el=>el.innerHTML=view==='ruleEdit'?rulePreview():el.classList.contains('preview-wrap')?paper():paper(true));applyTitle();if(globalThis.lucide)lucide.createIcons({attrs:{width:16,height:16}});}
@@ -233,6 +294,10 @@
  root.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||!root.contains(b))return;
   if(b.hasAttribute('data-back')){view=history.pop()||'overview';render();}
+  if(b.hasAttribute('data-add-page-element')){const zone=b.dataset.addPageElement==='footer'?'footer':'header';let id;do{id='page-'+(++elementSerial);}while(s.pageElements.some(item=>item.id===id));s.pageElements.push({id,zone,type:'自定义文字',text:'我的文字',x:50,y:50,width:40,size:12,color:theme().ink});s[zone]=true;selectedElement=id;render();edited();}
+  if(b.dataset.pageElement){selectedElement=b.dataset.pageElement;updateElementEditor();}
+  if(b.hasAttribute('data-remove-page-element')){s.pageElements=s.pageElements.filter(el=>el.id!==selectedElement);selectedElement=s.pageElements[0]?.id||null;render();edited();}
+  if(b.dataset.titleSource){if(b.dataset.titleSource==='custom')s.css=css();else s.css=null;render();edited();}
   if(b.dataset.readingMode){s.mode=b.dataset.readingMode;render();edited();}
   if(b.dataset.readingEffect){const key=readingBehavior().axis==='horizontal'?'horizontalEffect':'verticalEffect';s[key]=b.dataset.readingEffect;render();edited();}
   if(b.hasAttribute('data-trial-turn'))demonstrateTurn(Number(b.dataset.trialTurn));
@@ -257,7 +322,9 @@
  });
  root.addEventListener('input',e=>{
   const el=e.target;
-  if(el.hasAttribute('data-css')){try{cssDeclarations(el.value);s.css=el.value;root.querySelector('[data-css-error]').textContent='';updatePreview();edited();}catch(err){root.querySelector('[data-css-error]').textContent=err.message;}return;}
+  if(el.dataset.elementField){const item=currentPageElement();if(!item)return;const key=el.dataset.elementField;let value=el.type==='range'?Number(el.value):el.value;if(key==='width')value=Math.max(15,Math.min(90,Number(value)));if(key==='size')value=Math.max(9,Math.min(22,Number(value)));if(key==='zone'&&!['header','footer'].includes(value))return;if(key==='color'&&!/^#[0-9a-f]{6}$/i.test(value))return;item[key]=value;Object.assign(item,constrainPageElement(item,item.x,item.y));root.querySelectorAll('[data-element-field]').forEach(input=>{if(input.type==='range')input.value=item[input.dataset.elementField];});root.querySelectorAll('[data-element-value]').forEach(output=>output.textContent=item[output.dataset.elementValue]+(output.dataset.elementValue==='size'?' pt':' %'));if(key==='zone'||key==='type')render();else updatePreview();edited();return;}
+  if(el.dataset.titleField){updateTitleField(el.dataset.titleField,el.value);updatePreview();syncTitleEditor();edited();return;}
+  if(el.hasAttribute('data-css')){try{cssDeclarations(el.value);s.css=el.value;root.querySelector('[data-css-error]').textContent='';updatePreview();syncTitleEditor();edited();}catch(err){root.querySelector('[data-css-error]').textContent=err.message;}return;}
   if(el.dataset.draft){draft[el.dataset.draft]=el.value;if(el.dataset.draft==='match')render();else updatePreview();return;}
   if(el.hasAttribute('data-rule-toggle')){s.rules[Number(el.dataset.ruleToggle)].enabled=el.checked;updatePreview();edited();return;}
   if(!el.dataset.bind)return;
@@ -265,14 +332,32 @@
   if(key==='left'||key==='right'){Object.assign(s,effectiveMargins(key,value));root.querySelectorAll('input[data-bind="left"],input[data-bind="right"]').forEach(input=>input.value=s[input.dataset.bind]);}
   else if(key==='linked'){s.linked=value;if(value)s.right=s.left;root.querySelectorAll('input[data-bind="left"],input[data-bind="right"]').forEach(input=>input.value=s[input.dataset.bind]);}
   else s[key]=value;
+  if(key==='headerHeight'||key==='footerHeight')s.pageElements.forEach(item=>Object.assign(item,constrainPageElement(item,item.x,item.y)));
   if(['mode','horizontalEffect','verticalEffect','tap'].includes(key)){render();edited();return;}
   root.querySelectorAll('[data-value]').forEach(o=>o.textContent=s[o.dataset.value]+' pt');
   if(key==='testText'||key==='fontSize'){const list=root.querySelector('[data-font-list]');if(list)list.innerHTML=fontList();}
   updatePreview();edited();
  });
- root.addEventListener('pointerdown',e=>{if(e.target.closest('[data-motion]'))pointerStart={x:e.clientX,y:e.clientY};});
- root.addEventListener('pointerup',e=>{if(!pointerStart)return;const dx=e.clientX-pointerStart.x,dy=e.clientY-pointerStart.y;pointerStart=null;const b=readingBehavior(),delta=b.axis==='horizontal'?dx:dy;if(Math.abs(delta)>28)demonstrateTurn(delta<0?1:-1);});
- root.addEventListener('pointercancel',()=>{pointerStart=null;});
+ function beginPagePointer(e){
+  const item=e.target.closest('[data-page-element]'),region=item?.closest?.('[data-page-region]');
+  if(view==='headers'&&region){selectedElement=item.dataset.pageElement;const value=currentPageElement();const rect=region.getBoundingClientRect();pageDrag={id:value.id,startX:e.clientX,startY:e.clientY,x:value.x,y:value.y,rect};if(e.pointerId!==undefined)item.setPointerCapture?.(e.pointerId);updateElementEditor();e.preventDefault();return;}
+  if(e.target.closest('[data-motion]'))pointerStart={x:e.clientX,y:e.clientY};
+ }
+ root.addEventListener('pointerdown',beginPagePointer);
+ root.addEventListener('mousedown',e=>{if(!pageDrag)beginPagePointer(e);});
+ function movePagePointer(e){
+  if(!pageDrag)return;const item=currentPageElement();if(!item)return;
+  Object.assign(item,constrainPageElement(item,pageDrag.x+(e.clientX-pageDrag.startX)/pageDrag.rect.width*100,pageDrag.y+(e.clientY-pageDrag.startY)/pageDrag.rect.height*100));
+  root.querySelectorAll('.page-item[data-page-element]').forEach(node=>{if(node.dataset.pageElement===item.id){node.style.left=item.x+'%';node.style.top=item.y+'%';}});
+  root.querySelectorAll('[data-element-field]').forEach(input=>{if(['x','y'].includes(input.dataset.elementField))input.value=item[input.dataset.elementField];});
+  root.querySelectorAll('[data-element-value]').forEach(output=>output.textContent=item[output.dataset.elementValue]+(output.dataset.elementValue==='size'?' pt':' %'));
+ }
+ root.addEventListener('pointermove',movePagePointer);
+ root.addEventListener('mousemove',movePagePointer);
+ function endPagePointer(e){if(pageDrag){pageDrag=null;edited();return;}if(!pointerStart)return;const dx=e.clientX-pointerStart.x,dy=e.clientY-pointerStart.y;pointerStart=null;const b=readingBehavior(),delta=b.axis==='horizontal'?dx:dy;if(Math.abs(delta)>28)demonstrateTurn(delta<0?1:-1);}
+ root.addEventListener('pointerup',endPagePointer);
+ root.addEventListener('mouseup',endPagePointer);
+ root.addEventListener('pointercancel',()=>{if(pageDrag)edited();pageDrag=null;pointerStart=null;});
  file.addEventListener('change',async()=>{
   const f=file.files[0];if(!f)return;
   try{

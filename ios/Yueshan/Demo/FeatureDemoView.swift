@@ -163,6 +163,13 @@ struct FeatureDemoView: View {
     private var outcomeKey: String { "\(feature.id):\(scope)" }
 
     var body: some View {
+        Group {
+            if feature.id == "import" { SmartImportView() }
+            else { demoBody }
+        }
+    }
+
+    @ViewBuilder private var demoBody: some View {
         if feature.id == "sourceImport" {
             SourceImportView()
         } else {
@@ -239,7 +246,7 @@ struct FeatureDemoView: View {
         case .toggle:
             Toggle(field.title, isOn: Binding(get: { value.wrappedValue == "true" }, set: { value.wrappedValue = String($0) })).font(.system(size: 13)).tint(Palette.green)
         case .choice(let options):
-            let choices = feature.id == "shelf" && field.id == "group" ? ["全部"] + demo.groups : options
+            let choices = feature.id == "shelf" && field.id == "group" ? ["全部"] + Array(Set(demo.groups + Array(library.importedGroups.values))).sorted() : options
             HStack {
                 Text(field.title).font(.system(size: 12))
                 Spacer(minLength: 8)
@@ -273,15 +280,18 @@ struct FeatureDemoView: View {
         case .books:
             let selected = feature.id == "shelf" ? library.shelf : library.books.filter { text("category").isEmpty || text("category") == "全部" || $0.category == text("category") }
             VStack(spacing: 18) {
-                ForEach(selected.filter { feature.id != "shelf" || text("group") == "全部" || demo.bookGroups[$0.id] == text("group") }) { item in
+                ForEach(selected.filter { feature.id != "shelf" || text("group") == "全部" || (library.importedGroups[$0.id] ?? demo.bookGroups[$0.id]) == text("group") }) { item in
                     HStack {
                         NavigationLink { BookDetailView(book: item) } label: { BookRow(book: item) }.buttonStyle(.plain)
                         if feature.id == "shelf" {
-                            Menu { ForEach(demo.groups, id: \.self) { group in Button(group) { demo.bookGroups[item.id] = group } } } label: { Image(systemName: "folder.badge.plus").frame(width: 44, height: 44) }.accessibilityLabel("移动\(item.title)分组")
+                            Menu { ForEach(demo.groups, id: \.self) { group in Button(group) {
+                                if item.id.hasPrefix("local-") { library.moveImportedBook(item.id, group: group) }
+                                else { demo.bookGroups[item.id] = group }
+                            } } } label: { Image(systemName: "folder.badge.plus").frame(width: 44, height: 44) }.accessibilityLabel("移动\(item.title)分组")
                         }
                     }
                 }
-                if selected.filter({ feature.id != "shelf" || text("group") == "全部" || demo.bookGroups[$0.id] == text("group") }).isEmpty { Text("当前分组暂无作品").font(.system(size: 12)).foregroundStyle(Palette.muted) }
+                if selected.filter({ feature.id != "shelf" || text("group") == "全部" || (library.importedGroups[$0.id] ?? demo.bookGroups[$0.id]) == text("group") }).isEmpty { Text("当前分组暂无作品").font(.system(size: 12)).foregroundStyle(Palette.muted) }
             }
         case .search:
             VStack(alignment: .leading, spacing: 16) {

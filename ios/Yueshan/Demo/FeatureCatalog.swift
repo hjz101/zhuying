@@ -127,7 +127,7 @@ enum FeatureCatalog {
               fields: [.choice("mode", "阅读方式", ["页漫", "条漫"]), .choice("direction", "阅读方向", ["从左到右", "从右到左"]), .toggle("cache", "缓存图片")], actions: ["打开示例漫画"]),
         .init(id: "archive", title: "压缩包支持", icon: "doc.zipper", group: .files, summary: "ZIP · RAR · 7z · 内容导入", preview: .files,
               fields: [.choice("format", "文件格式", ["ZIP", "RAR", "7z"]), .toggle("nested", "扫描子文件夹")], actions: ["预览解压内容", "导入选中内容"]),
-        .init(id: "import", title: "智能导入", icon: "square.and.arrow.down", group: .files, summary: "文件 · URL · 剪贴板内容 · 兼容链接", preview: .files,
+        .init(id: "import", title: "智能导入", icon: "square.and.arrow.down", group: .files, summary: "本地文件 · 链接 · 剪贴板 · 预览确认", preview: .files,
               fields: [.choice("method", "内容来源", ["文件", "URL", "剪贴板示例"]), .text("input", "待识别内容", "https://books.example/library.epub")], actions: ["识别内容", "确认模拟导入"], related: ["txt", "epub", "archive", "links"]),
         .init(id: "sources", title: "书源管理", icon: "externaldrive", group: .sources, summary: "新建编辑删除 · 分组 · 启停 · 批量管理", preview: .sources,
               fields: [.choice("group", "书源分组", ["全部", "小说", "漫画", "个人收藏"])], actions: ["新建示例书源", "全部启用", "全部停用"], related: ["sourceImport", "sourceEdit", "sourceBatch"]),

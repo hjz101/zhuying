@@ -18,6 +18,7 @@ struct Book: Codable, Identifiable, Hashable {
 
     func chapterTitle(_ index: Int) -> String {
         guard chapters.indices.contains(index) else { return "章节不可用" }
+        if id.hasPrefix("local-") { return chapters[index] }
         let numerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"]
         return "第\(index < numerals.count ? numerals[index] : String(index + 1))章 \(chapters[index])"
     }
@@ -122,6 +123,7 @@ struct LibrarySnapshot: Codable {
     var updates: [String: UpdateNotice]? = nil
     var hasSeenReadingGuide: Bool? = nil
     var shelfLayout: String? = nil
+    var importedGroups: [String: String]? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -133,7 +135,8 @@ struct ReaderSession: Identifiable {
 @MainActor
 final class LibraryStore: ObservableObject {
     static let storageKey = "yueshan.ios.demo.v1"
-    let books: [Book]
+    @Published private(set) var books: [Book]
+    @Published private(set) var importedGroups: [String: String] = [:]
     @Published private(set) var favorites: [String]
     @Published private(set) var progress: [String: ReadingProgress]
     @Published var settings: ReadingSettings { didSet { persist() } }
@@ -144,10 +147,13 @@ final class LibraryStore: ObservableObject {
     @Published var reader: ReaderSession?
     @Published var storageMessage: String?
     private let defaults: UserDefaults
+    private let importsURL: URL?
+    private var importedBooks: [Book] = []
 
-    init(books: [Book], defaults: UserDefaults = .standard) {
+    init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil) {
         self.books = books
         self.defaults = defaults
+        self.importsURL = importsURL
         favorites = Array(books.prefix(6)).map(\.id)
         let now = Date()
         let initial: [(String, Int, Double)] = [("changfeng", 2, 3600), ("stars", 1, 86400), ("sunset", 3, 172800)]
@@ -157,6 +163,18 @@ final class LibraryStore: ObservableObject {
         })
         settings = .init()
         updates = Dictionary(uniqueKeysWithValues: books.filter { $0.status == "连载中" }.map { ($0.id, UpdateNotice(firstChapter: max(0, $0.chapters.count - 3))) })
+        if let importsURL, FileManager.default.fileExists(atPath: importsURL.path) {
+            do {
+                let saved = try JSONDecoder().decode([Book].self, from: Data(contentsOf: importsURL))
+                var ids = Set(books.map(\.id))
+                importedBooks = saved.filter { book in
+                    book.id.hasPrefix("local-") && !book.chapters.isEmpty && book.chapters.count == book.content.count &&
+                    book.content.allSatisfy { !$0.isEmpty && $0.allSatisfy { !$0.isEmpty } } && ids.insert(book.id).inserted
+                }
+                self.books.append(contentsOf: importedBooks)
+            } catch { storageMessage = "本地导入书库读取失败，请保留原文件后重试。" }
+        }
+        let books = self.books
         guard let data = defaults.data(forKey: Self.storageKey) else { return }
         do {
             // Add defaults to old v1 snapshots before decoding the expanded schema.
@@ -167,6 +185,7 @@ final class LibraryStore: ObservableObject {
             hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
             var seen = Set<String>()
             let ids = Set(books.map(\.id))
+            importedGroups = (snapshot.importedGroups ?? [:]).filter { ids.contains($0.key) }
             favorites = snapshot.favorites.filter { ids.contains($0) && seen.insert($0).inserted }
             progress = snapshot.progress.reduce(into: [:]) { result, entry in
                 guard let book = books.first(where: { $0.id == entry.key }), !book.chapters.isEmpty else { return }
@@ -286,9 +305,30 @@ final class LibraryStore: ObservableObject {
         persist()
     }
 
+    func moveImportedBook(_ id: String, group: String) {
+        guard importedBooks.contains(where: { $0.id == id }) else { return }
+        importedGroups[id] = group; persist()
+    }
+
+    @discardableResult
+    func importBook(_ book: Book, group: String = "未分组") throws -> Bool {
+        guard !books.contains(where: { $0.id == book.id }) else { return false }
+        guard book.id.hasPrefix("local-"), !book.chapters.isEmpty, book.chapters.count == book.content.count,
+              book.content.allSatisfy({ !$0.isEmpty && $0.allSatisfy { !$0.isEmpty } }) else { throw CocoaError(.fileReadCorruptFile) }
+        let additions = importedBooks + [book]
+        if let importsURL {
+            try FileManager.default.createDirectory(at: importsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(additions).write(to: importsURL, options: .atomic)
+        }
+        importedBooks = additions; books.append(book); favorites.insert(book.id, at: 0)
+        importedGroups[book.id] = group
+        persist()
+        return true
+    }
+
     func persist() {
         do {
-            let snapshot = LibrarySnapshot(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates, hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue)
+            let snapshot = LibrarySnapshot(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates, hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups)
             defaults.set(try JSONEncoder().encode(snapshot), forKey: Self.storageKey)
         } catch {
             storageMessage = "阅读记录保存失败，请稍后重试。"

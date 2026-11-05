@@ -436,15 +436,8 @@ final class FeatureFlowTests: XCTestCase {
         capture(app, name: "Catalog-TestReport")
     }
 
-    @MainActor func testMockImportAndPlayerFlow() {
+    @MainActor func testPlayerFlow() {
         let app = launch()
-        open("import", title: "智能导入", app: app)
-        let recognize = app.buttons["demo-action-import-识别内容"]
-        reveal(recognize, app: app); recognize.tap()
-        let confirm = app.buttons["demo-action-import-确认模拟导入"]
-        reveal(confirm, app: app); confirm.tap()
-        XCTAssertTrue(app.staticTexts["新导入的故事.epub"].waitForExistence(timeout: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
         open("systemTTS", title: "系统朗读", app: app)
         let play = app.buttons["demoPlayerToggle"]
         reveal(play, app: app); play.tap()

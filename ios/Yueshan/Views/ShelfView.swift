@@ -23,6 +23,7 @@ struct ShelfView: View {
     @State private var selection = Set<String>()
     @State private var confirmRemoval = false
     @State private var showUpdates = false
+    @State private var showLocalImport = false
     // The bundled library currently contains novels only.
     private var categoryBooks: [Book] { category == .novel ? store.shelf : [] }
     private var categoryReadingCount: Int { categoryBooks.filter { store.progress[$0.id] != nil }.count }
@@ -41,6 +42,13 @@ struct ShelfView: View {
                         HStack {
                             Text("YOUR LITTLE READING CORNER").font(.system(size: 8, weight: .medium)).tracking(1.6).foregroundStyle(Palette.muted)
                             Spacer(minLength: 8)
+                            Menu {
+                                Button("本地导入", systemImage: "folder.badge.plus") { showLocalImport = true }
+                                NavigationLink { SmartImportView() } label: { Label("智能导入", systemImage: "square.and.arrow.down") }
+                            } label: {
+                                Image(systemName: "plus").font(.system(size: 18)).foregroundStyle(Palette.green)
+                                    .frame(width: 44, height: 44).background(.white.opacity(0.7), in: Circle())
+                            }.accessibilityLabel("添加书籍").accessibilityIdentifier("shelfAddBook")
                             Button(action: onDiscover) {
                                 Image(systemName: "magnifyingglass").font(.system(size: 18)).foregroundStyle(Palette.green)
                                     .frame(width: 44, height: 44).background(.white.opacity(0.7), in: Circle())
@@ -157,6 +165,12 @@ struct ShelfView: View {
             }
         } message: { Text("仍可在阅读历史里找到，或使用撤销恢复收藏。") }
         .sheet(isPresented: $showUpdates) { UpdatesView() }
+        .sheet(isPresented: $showLocalImport) {
+            NavigationStack {
+                SmartImportView(openPickerOnAppear: true)
+                    .toolbar { ToolbarItem(placement: .topBarLeading) { Button("关闭") { showLocalImport = false } } }
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Palette.background, for: .navigationBar)
         .navigationDestination(for: Book.self) { BookDetailView(book: $0) }

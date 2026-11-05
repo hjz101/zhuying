@@ -18,7 +18,19 @@ struct YueshanApp: App {
         _navigation = StateObject(wrappedValue: NavigationStore(defaults: defaults))
         do {
             let books = try Book.load()
-            _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults))
+            let manager = FileManager.default
+            let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+            let archive = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent(testing ? "UITestImports/books.json" : "ImportedBooks/books.json")
+            if testing && !ProcessInfo.processInfo.arguments.contains("--preserve-ui-test-state") { try? manager.removeItem(at: archive) }
+            if testing && ProcessInfo.processInfo.arguments.contains("--import-fixtures") {
+                let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                try manager.createDirectory(at: documents, withIntermediateDirectories: true)
+                try Data("第一章 来信\n这是从系统文件选择器导入的真实正文。\n第二章 回声\n山谷里的回声来自远方。".utf8)
+                    .write(to: documents.appendingPathComponent("导入测试.txt"))
+                try Data("unsupported".utf8).write(to: documents.appendingPathComponent("不支持的格式.epub"))
+            }
+            _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive))
             launchError = nil
         } catch {
             _library = StateObject(wrappedValue: LibraryStore(books: [], defaults: defaults))
@@ -48,6 +60,7 @@ struct RootView: View {
         navigationTabs
         .tint(Palette.green)
         .preferredColorScheme(.light)
+        .onReceive(NotificationCenter.default.publisher(for: .showImportedShelf)) { _ in selectedTab = .shelf }
         .onChange(of: navigation.visibleTabs) { _, _ in selectedTab = navigation.validSelection(selectedTab) }
         .sheet(isPresented: $showPlayer) {
             NavigationStack { FeatureDemoView(feature: FeatureCatalog.feature("backgroundAudio"))

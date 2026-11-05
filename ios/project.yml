@@ -13,6 +13,11 @@ targets:
   Yueshan:
     type: application
     platform: iOS
+    info:
+      path: Yueshan/Info.plist
+      properties:
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
     sources:
       - path: Yueshan
     settings:

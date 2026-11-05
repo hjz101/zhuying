@@ -3,7 +3,7 @@ import SwiftUI
 import WebKit
 import UIKit
 
-struct ThemeLibrarySnapshot: Codable {
+struct ThemeLibrarySnapshot: Codable, Equatable {
     let themes: [DemoTheme]
     let assets: [ThemeAsset]
     let themeID: String
@@ -44,8 +44,8 @@ enum ThemeReaderBridge {
         if !colorsOnly {
             if resetMissingComponents && title == nil { result.preferences.themeTitleCSS = nil }
             if resetMissingComponents && bubble == nil { result.preferences.bubbleSVG = nil; result.preferences.bubbleImageData = nil }
-            if let title { result.preferences.themeTitleCSS = nativeTitle(title.content, accent: theme.accent).css }
-            if let bubble, result.preferences.bubbleSVG != bubble.content { result.preferences.bubbleSVG = bubble.content; result.preferences.bubbleImageData = nil }
+            if let title, ThemeAssetValidator.isValid(title.content, kind: .title) { result.preferences.themeTitleCSS = nativeTitle(title.content, accent: theme.accent).css }
+            if let bubble, ThemeAssetValidator.isValid(bubble.content, kind: .bubble), result.preferences.bubbleSVG != bubble.content { result.preferences.bubbleSVG = bubble.content; result.preferences.bubbleImageData = nil }
             if let style = theme.godStyle { result.preferences.themeGodStyle = style }
         }
         return result
@@ -55,10 +55,18 @@ enum ThemeReaderBridge {
 @MainActor extension FeatureDemoStore {
     func connectReader(_ library: LibraryStore) {
         readingLibrary = library
+        if !library.isDemo, library.loadState == .ready, let snapshot = library.themeLibrary {
+            restoringThemeLibrary = true
+            themes = snapshot.themes; themeAssets = snapshot.assets
+            activeThemeID = snapshot.themeID; activeTitleStyleID = snapshot.titleID; activeBubbleStyleID = snapshot.bubbleID
+            restoringThemeLibrary = false
+            themePersistence = { [weak library] in library?.updateThemeLibrary($0) }
+        }
         if let colors = library.settings.preferences.colors {
             let matches: (DemoTheme) -> Bool = { $0.name == colors.name && $0.background == colors.background && $0.ink == colors.ink && $0.accent == colors.accent }
             if !themes.contains(where: { $0.id == activeThemeID && matches($0) }), let theme = themes.first(where: matches) { activeThemeID = theme.id }
         }
+        if library.loadState == .ready { refreshReaderBubbles() }
     }
     func readerPreview(theme: DemoTheme, titleID: String?, bubbleID: String?) -> ReadingSettings {
         ThemeReaderBridge.apply(theme: theme, title: themeAssets.first { $0.id == titleID }, bubble: themeAssets.first { $0.id == bubbleID }, to: readingLibrary?.settings ?? .init())
@@ -75,6 +83,7 @@ enum ThemeReaderBridge {
     }
     func updateReaderAsset(_ asset: ThemeAsset) {
         guard let library = readingLibrary, let theme = themes.first(where: { $0.id == activeThemeID }) else { return }
+        guard ThemeAssetValidator.isValid(asset.content, kind: asset.kind) else { readerThemeMessage = "该资源暂时不可用，已保留当前阅读样式，请重新导入或重试加载。"; return }
         if asset.kind == .title {
             let parsed = ThemeReaderBridge.nativeTitle(asset.content, accent: theme.accent)
             library.settings.preferences.titleCSS = parsed.css
@@ -118,9 +127,13 @@ enum ThemeReaderBridge {
         }
     }
     func persistThemeLibrary() {
-        guard !restoringThemeLibrary, let defaults = themeLibraryDefaults,
-              let data = try? JSONEncoder().encode(ThemeLibrarySnapshot(themes: themes, assets: themeAssets, themeID: activeThemeID, titleID: activeTitleStyleID, bubbleID: activeBubbleStyleID)) else { return }
+        guard !restoringThemeLibrary else { return }
+        if let themePersistence { themePersistence(themeSnapshot); return }
+        guard isDemo, let defaults = themeLibraryDefaults, let data = try? JSONEncoder().encode(themeSnapshot) else { return }
         defaults.set(data, forKey: "yueshan.reader.theme-library.v1")
+    }
+    var themeSnapshot: ThemeLibrarySnapshot {
+        .init(themes: themes, assets: themeAssets, themeID: activeThemeID, titleID: activeTitleStyleID, bubbleID: activeBubbleStyleID)
     }
     func restoreThemeLibrary() {
         guard let defaults = themeLibraryDefaults, let data = defaults.data(forKey: "yueshan.reader.theme-library.v1"),

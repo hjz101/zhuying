@@ -152,7 +152,16 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var importedGroups: [String: String] = [:]
     @Published private(set) var favorites: [String]
     @Published private(set) var progress: [String: ReadingProgress]
-    @Published var settings: ReadingSettings { didSet { persist() } }
+    @Published var settings: ReadingSettings {
+        didSet {
+            if productionPersistence != nil {
+                let resolved = ReadingStyleResolver.resolve(settings, previous: oldValue)
+                if resolved != settings { settings = resolved; return }
+            }
+            persist()
+        }
+    }
+    @Published private(set) var themeLibrary: ThemeLibrarySnapshot?
     @Published var sort: ShelfSort = .recent { didSet { persist() } }
     @Published var shelfLayout: ShelfLayout = .standard { didSet { persist() } }
     @Published private(set) var updates: [String: UpdateNotice] = [:]
@@ -175,6 +184,7 @@ final class LibraryStore: ObservableObject {
     private var queueRevision = 0
     private var lastWriteFailed = false
     private var lastWriteMessage: String?
+    private var appearancePreparation: (() throws -> AppearanceMigrationInput)?
 
     init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil, seedDemoData: Bool = true,
          productionPersistence: ProductionLibraryPersistence? = nil) {
@@ -416,11 +426,17 @@ final class LibraryStore: ObservableObject {
               hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups)
     }
 
-    func bootstrapProductionIfNeeded() async {
-        guard let backend = productionPersistence, !bootstrapStarted || loadState == .failed else { return }
+    func bootstrapProductionIfNeeded(prepareAppearance: (() throws -> AppearanceMigrationInput)? = nil, forceReload: Bool = false) async {
+        if let prepareAppearance { appearancePreparation = prepareAppearance }
+        guard let backend = productionPersistence, !bootstrapStarted || loadState == .failed || forceReload else { return }
+        if forceReload && loadState == .ready {
+            guard await flushPendingWrites() else { return }
+        }
         bootstrapStarted = true; loadState = .loading
         do {
-            let restored = try await backend.bootstrap(legacySnapshot: defaults.data(forKey: Self.storageKey), archiveURL: importsURL)
+            let appearance = try appearancePreparation?()
+            let restored = try await backend.bootstrap(legacySnapshot: defaults.data(forKey: Self.storageKey), archiveURL: importsURL,
+                                                       legacyThemeData: defaults.data(forKey: "yueshan.reader.theme-library.v1"), appearance: appearance)
             suppressPersistence = true
             books = restored.books; importedBooks = restored.books
             favorites = restored.snapshot.favorites; progress = restored.snapshot.progress
@@ -432,13 +448,20 @@ final class LibraryStore: ObservableObject {
             sort = restored.snapshot.sort
             shelfLayout = ShelfLayout(rawValue: restored.snapshot.shelfLayout ?? "") ?? .standard
             hasSeenReadingGuide = restored.snapshot.hasSeenReadingGuide ?? false
+            themeLibrary = restored.themeLibrary
             unresolvedBookIDs = restored.unresolvedBookIDs
             suppressPersistence = false; loadState = .ready
-            storageMessage = unresolvedBookIDs.intersection(Set(books.map(\.id))).isEmpty ? nil : "部分旧阅读位置无法定位，历史记录已保留，请从章节目录重新选章。"
+            var messages = restored.warnings
+            if !unresolvedBookIDs.intersection(Set(books.map(\.id))).isEmpty { messages.append("部分旧阅读位置无法定位，历史记录已保留，请从章节目录重新选章。") }
+            storageMessage = messages.isEmpty ? nil : messages.joined(separator: "\n")
         } catch {
             suppressPersistence = false; loadState = .failed
             storageMessage = "书库读取或升级失败，原有文件和记录已保留，请重试。"
         }
+    }
+    func updateThemeLibrary(_ value: ThemeLibrarySnapshot) {
+        guard loadState == .ready, themeLibrary != value else { return }
+        themeLibrary = value; persist()
     }
 
     @discardableResult
@@ -485,8 +508,9 @@ final class LibraryStore: ObservableObject {
             // Read state after earlier imports commit and publish their new shelf entries.
             let revision = self.changeRevision
             let current = self.snapshot
+            let themes = self.themeLibrary
             do {
-                try await backend.saveState(current)
+                try await backend.saveState(current, themeLibrary: themes)
                 if self.changeRevision == revision { self.hasPendingChanges = false }
                 self.lastWriteFailed = false
                 if self.storageMessage == self.lastWriteMessage { self.storageMessage = nil }

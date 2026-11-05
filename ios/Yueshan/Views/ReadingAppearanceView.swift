@@ -67,7 +67,10 @@ struct ReadingFontManagerView: View {
                 Button("导入本地字体", systemImage: "square.and.arrow.down") { showingFiles = true }
                     .buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("readingFontImport")
                 ForEach(Array(samples.enumerated()), id: \.offset) { _, entry in
-                    Button { store.settings.preferences.fontName = entry.1 } label: {
+                    Button {
+                        store.settings.preferences.fontName = entry.1
+                        store.settings.preferences.fontResourceHash = entry.1.flatMap { fonts.recordedHashes[$0] }
+                    } label: {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Text(entry.0).font(.system(size: 12)); Spacer()
@@ -92,6 +95,7 @@ struct ReadingFontManagerView: View {
                     defer { if access { url.stopAccessingSecurityScopedResource() } }
                     let added = try fonts.importFont(at: url)
                     store.settings.preferences.fontName = added.first?.postScriptName
+                    store.settings.preferences.fontResourceHash = added.first?.resource?.digest
                 } catch { self.error = error.localizedDescription }
             }
             .alert("字体导入", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("知道了") { error = nil } } message: { Text(error ?? "") }

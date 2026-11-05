@@ -4,6 +4,15 @@ struct ProductionLibraryState {
     var books: [Book]
     var snapshot: LibrarySnapshot
     var unresolvedBookIDs: Set<String>
+    var themeLibrary: ThemeLibrarySnapshot? = nil
+    var warnings: [String] = []
+}
+
+struct AppearanceMigrationInput {
+    let fallbackThemeLibrary: ThemeLibrarySnapshot
+    let originalFontManifest: Data?
+    let fontHashes: [String: String]
+    var warnings: [String] = []
 }
 
 private struct LibraryViewPreferences: Codable {
@@ -13,6 +22,8 @@ private struct LibraryViewPreferences: Codable {
     var hasSeenReadingGuide: Bool
     init(_ snapshot: LibrarySnapshot) {
         settings = snapshot.settings; sort = snapshot.sort
+        if settings.preferences.bubbleSVG != nil { settings.preferences.bubbleImageData = nil }
+        if settings.preferences.customBubbleSVG != nil { settings.preferences.customBubbleImageData = nil }
         shelfLayout = snapshot.shelfLayout; hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
     }
 }
@@ -22,10 +33,13 @@ private struct LibraryViewPreferences: Codable {
 actor ProductionLibraryPersistence {
     static let migrationKey = "migration.legacy-library.v1"
     static let legacySnapshotKey = "migration.legacy-library.original-snapshot"
+    static let appearanceMigrationKey = "migration.appearance.v1"
+    static let themeLibraryKey = "appearance.theme-library.v1"
     private static let viewKey = "library.view-preferences.v1"
     private static let unresolvedKey = "library.unresolved-history.v1"
     private let records: SQLiteLibraryRepository
     private let files: FileChapterRepository
+    private let themes: ThemeLibraryRepository?
     private var tail: Task<Void, Never>?
     private var documents: [String: ChapterDocument] = [:]
     private var catalogs: [String: [ChapterRecord]] = [:]
@@ -33,11 +47,12 @@ actor ProductionLibraryPersistence {
     init(directory: URL, writer: any AtomicFileWriting = AtomicFileWriter()) throws {
         records = try SQLiteLibraryRepository(url: directory.appendingPathComponent("library.sqlite"))
         files = try FileChapterRepository(directory: directory.appendingPathComponent("chapters"), writer: writer)
+        themes = ThemeLibraryRepository(directory: directory.appendingPathComponent("resources/themes"), writer: writer)
     }
 
     // Dependency injection also permits testing a failed metadata commit after files stage.
     init(records: SQLiteLibraryRepository, files: FileChapterRepository) {
-        self.records = records; self.files = files
+        self.records = records; self.files = files; themes = nil
     }
 
     private func serialized<T>(_ body: @escaping (ProductionLibraryPersistence) async throws -> T) async throws -> T {
@@ -51,19 +66,47 @@ actor ProductionLibraryPersistence {
         return try await withTaskCancellationHandler(operation: { try await operation.value }, onCancel: { operation.cancel() })
     }
 
-    func bootstrap(legacySnapshot: Data?, archiveURL: URL?) async throws -> ProductionLibraryState {
-        try await serialized { try await $0.performBootstrap(legacySnapshot: legacySnapshot, archiveURL: archiveURL) }
+    func bootstrap(legacySnapshot: Data?, archiveURL: URL?, legacyThemeData: Data? = nil, appearance: AppearanceMigrationInput? = nil) async throws -> ProductionLibraryState {
+        try await serialized {
+            try await $0.performBootstrap(legacySnapshot: legacySnapshot, archiveURL: archiveURL)
+            if let appearance { try await $0.migrateAppearance(legacyThemeData: legacyThemeData, input: appearance) }
+            var state = try await $0.loadState()
+            state.warnings.append(contentsOf: appearance?.warnings ?? [])
+            return state
+        }
     }
 
     func importBook(_ book: Book, group: String) async throws -> Bool {
         try await serialized { try await $0.performImport(book, group: group) }
     }
 
-    func saveState(_ snapshot: LibrarySnapshot) async throws {
-        try await serialized { try await $0.performSave(snapshot) }
+    func saveState(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot? = nil) async throws {
+        try await serialized { try await $0.performSave(snapshot, themeLibrary: themeLibrary) }
     }
 
-    private func performBootstrap(legacySnapshot: Data?, archiveURL: URL?) async throws -> ProductionLibraryState {
+    private func migrateAppearance(legacyThemeData: Data?, input: AppearanceMigrationInput) async throws {
+        guard try await records.preference(key: Self.appearanceMigrationKey) == nil else { return }
+        guard let themes else { throw ContentFailure.storageFailure }
+        let snapshot = try legacyThemeData.map { try JSONDecoder().decode(ThemeLibrarySnapshot.self, from: $0) } ?? input.fallbackThemeLibrary
+        let staged = try themes.stage(snapshot)
+        do {
+            var preferences: [String: Data] = [Self.themeLibraryKey: staged.data, Self.appearanceMigrationKey: Data("1".utf8)]
+            if let legacyThemeData { preferences["migration.appearance.original-theme-library"] = legacyThemeData }
+            if let original = input.originalFontManifest { preferences["migration.appearance.original-font-manifest"] = original }
+            if let data = try await records.preference(key: Self.viewKey) {
+                var view = try JSONDecoder().decode(LibraryViewPreferences.self, from: data)
+                view.settings = ReadingStyleResolver.resolve(view.settings)
+                if let name = view.settings.preferences.fontName { view.settings.preferences.fontResourceHash = input.fontHashes[name] }
+                if view.settings.preferences.bubbleSVG != nil { view.settings.preferences.bubbleImageData = nil }
+                if view.settings.preferences.customBubbleSVG != nil { view.settings.preferences.customBubbleImageData = nil }
+                preferences[Self.viewKey] = try JSONEncoder().encode(view)
+            }
+            try await records.savePreferences(preferences)
+            themes.commit(staged)
+        } catch { themes.rollback(staged); throw error }
+    }
+
+    private func performBootstrap(legacySnapshot: Data?, archiveURL: URL?) async throws {
         // A failed or unsupported legacy decode must not create a completion marker.
         if try await records.preference(key: Self.migrationKey) == nil {
             let snapshot = try Self.decodeLegacy(legacySnapshot)
@@ -91,7 +134,6 @@ actor ProductionLibraryPersistence {
             if let legacySnapshot { preferences[Self.legacySnapshotKey] = legacySnapshot }
             try await records.commitState(favorites: normalized.favorites, groups: normalized.importedGroups ?? [:], progress: anchors, preferences: preferences)
         } else { try await recoverUncommittedFiles() }
-        return try await loadState()
     }
 
     private static func decodeLegacy(_ data: Data?) throws -> LibrarySnapshot {
@@ -167,13 +209,21 @@ actor ProductionLibraryPersistence {
         return result
     }
 
-    private func performSave(_ snapshot: LibrarySnapshot) async throws {
+    private func performSave(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot?) async throws {
         var unresolved = Set<String>()
         let progress = try await anchors(from: snapshot.progress, unresolved: &unresolved)
         // A UI bug must not replace valid locations with guessed chapter indices.
         guard unresolved.isEmpty else { throw ContentFailure.missingChapter }
-        try await records.commitState(favorites: snapshot.favorites, groups: snapshot.importedGroups ?? [:], progress: progress,
-                                      preferences: [Self.viewKey: try JSONEncoder().encode(LibraryViewPreferences(snapshot))])
+        var preferences = [Self.viewKey: try JSONEncoder().encode(LibraryViewPreferences(snapshot))]
+        let staged = try themeLibrary.map { value -> ThemeLibraryRepository.Staged in
+            guard let themes else { throw ContentFailure.storageFailure }
+            return try themes.stage(value)
+        }
+        if let staged { preferences[Self.themeLibraryKey] = staged.data }
+        do {
+            try await records.commitState(favorites: snapshot.favorites, groups: snapshot.importedGroups ?? [:], progress: progress, preferences: preferences)
+            if let staged { themes?.commit(staged) }
+        } catch { if let staged { themes?.rollback(staged) }; throw error }
     }
 
     private func loadState() async throws -> ProductionLibraryState {
@@ -213,6 +263,13 @@ actor ProductionLibraryPersistence {
             case .missingChapter: unresolved.insert(id)
             }
         }
-        return .init(books: books, snapshot: snapshot, unresolvedBookIDs: unresolved)
+        var state = ProductionLibraryState(books: books, snapshot: snapshot, unresolvedBookIDs: unresolved)
+        if let data = try await records.preference(key: Self.themeLibraryKey) {
+            guard let themes else { throw ContentFailure.storageFailure }
+            let loaded = try themes.load(data)
+            state.themeLibrary = loaded.snapshot
+            if !loaded.warnings.isEmpty { state.warnings.append("部分主题资源缺失或校验失败，已保留记录并暂用有效样式。") }
+        }
+        return state
     }
 }

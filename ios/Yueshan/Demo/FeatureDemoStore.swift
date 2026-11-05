@@ -149,6 +149,7 @@ final class FeatureDemoStore: ObservableObject {
     @Published var downloadPaused = true
     var themeLibraryDefaults: UserDefaults?
     var restoringThemeLibrary = false
+    var themePersistence: ((ThemeLibrarySnapshot) -> Void)?
     weak var readingLibrary: LibraryStore?
     @Published var readerThemeMessage: String?
     @Published var themes: [DemoTheme] = [
@@ -188,7 +189,7 @@ final class FeatureDemoStore: ObservableObject {
             themes[index].bubbleStyleIDs = themeAssets.filter { $0.sourceThemeID == id && $0.kind == .bubble }.map(\.id)
         }
         restoringThemeLibrary = false
-        restoreThemeLibrary()
+        if seedDemoData { restoreThemeLibrary() }
     }
 
     private func persistProductionSources() {

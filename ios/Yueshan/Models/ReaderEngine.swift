@@ -1,4 +1,5 @@
 import UIKit
+import CoreText
 
 struct ReaderAnchor: Equatable {
     var paragraph: Int = 0
@@ -210,7 +211,12 @@ enum ReaderTypography {
         if settings.preferences.fontName == "__serif__", let descriptor = UIFont.systemFont(ofSize: settings.fontSize, weight: weight).fontDescriptor.withDesign(.serif) {
             return UIFont(descriptor: descriptor, size: settings.fontSize)
         }
-        if let name = settings.preferences.fontName, let font = UIFont(name: name, size: settings.fontSize) { return font }
+        if let name = settings.preferences.fontName, let font = UIFont(name: name, size: settings.fontSize) {
+            if let digest = settings.preferences.fontResourceHash {
+                if let url = CTFontCopyAttribute(CTFontCreateWithName(name as CFString, settings.fontSize, nil), kCTFontURLAttribute) as? URL,
+                   url.lastPathComponent == digest + ".font", let data = try? Data(contentsOf: url), FileResourceStore.digest(data) == digest { return font }
+            } else { return font }
+        }
         return UIFont.systemFont(ofSize: settings.fontSize, weight: weight)
     }
     static func applyRules(_ rules: [ReaderStyleRule], to text: NSMutableAttributedString, paragraph: Int, settings: ReadingSettings) {

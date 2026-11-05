@@ -198,6 +198,21 @@ final class ProductionLibraryStoreTests: XCTestCase {
         _ = await library.flushPendingWrites()
     }
 
+    func testInvalidAppearanceUpdateKeepsValidOverridesAndSavesNormalizedSettings() async throws {
+        let library = try store()
+        await library.bootstrapProductionIfNeeded()
+        library.settings.preferences.titleCSS = ".chapter-title {font-size: 24px;}"
+        library.settings.preferences.titleCSS = "not a supported title style"
+        library.settings.fontSize = 100
+        XCTAssertEqual(library.settings.fontSize, 30)
+        XCTAssertEqual(library.settings.preferences.titleCSS, ".chapter-title {font-size: 24px;}")
+        let saved = await library.flushPendingWrites()
+        XCTAssertTrue(saved)
+        let restored = try store()
+        await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.settings, library.settings)
+    }
+
     func testAlternatingBooksKeepIndependentPositionsAndRemovalPreservesUnfavoritedHistory() async throws {
         let library = try store()
         await library.bootstrapProductionIfNeeded()

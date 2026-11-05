@@ -10,6 +10,7 @@ struct ReaderPreferences: Codable, Equatable {
     var marginsLinked = true
     var firstLineIndent = true
     var fontName: String? = nil
+    var fontResourceHash: String? = nil
     var fontWeight = "常规"
     var colors: ReaderColors? = nil
     var titleCSS: String? = nil
@@ -75,6 +76,7 @@ struct ReaderPreferences: Codable, Equatable {
         if let svg = customBubbleSVG, svg.utf8.count > 60_000 { customBubbleSVG = nil }
         if let image = customBubbleImageData, image.count > 512_000 { customBubbleImageData = nil }
         if let fontName, fontName.count > 200 { self.fontName = nil }
+        if let hash = fontResourceHash, hash.count != 64 || !hash.allSatisfy({ "0123456789abcdef".contains($0) }) { fontResourceHash = nil; fontName = nil }
         var elementIDs = Set<String>()
         pageElements = Array(pageElements.prefix(32)).map { element in
             var value = element.constrained(headerHeight: headerHeight, footerHeight: footerHeight)
@@ -102,7 +104,7 @@ struct ReaderPreferences: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case paragraphSpacing, leftMargin, rightMargin, topMargin, bottomMargin, marginsLinked, firstLineIndent
-        case fontName, fontWeight, colors, titleCSS, themeTitleCSS, headerEnabled, footerEnabled
+        case fontName, fontResourceHash, fontWeight, colors, titleCSS, themeTitleCSS, headerEnabled, footerEnabled
         case headerHeight, footerHeight, headerGap, footerGap, pageElements, horizontalEffect, verticalEffect
         case rules, showCommentBubbles, showGodComments, bubbleStyle, godStyle, bubbleSVG, bubbleImageData
         case bubbleRadius, bubbleColor, godRadius, godBackground, godBorder, bubbleFollowsTheme, godFollowsTheme, themeGodStyle
@@ -122,6 +124,7 @@ extension ReaderPreferences {
         marginsLinked = try box.decodeIfPresent(Bool.self, forKey: .marginsLinked) ?? marginsLinked
         firstLineIndent = try box.decodeIfPresent(Bool.self, forKey: .firstLineIndent) ?? firstLineIndent
         fontName = try box.decodeIfPresent(String.self, forKey: .fontName)
+        fontResourceHash = try box.decodeIfPresent(String.self, forKey: .fontResourceHash)
         fontWeight = try box.decodeIfPresent(String.self, forKey: .fontWeight) ?? fontWeight
         colors = try box.decodeIfPresent(ReaderColors.self, forKey: .colors)
         titleCSS = try box.decodeIfPresent(String.self, forKey: .titleCSS)

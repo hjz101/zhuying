@@ -31,6 +31,13 @@ final class ReadingFontLibrary: ObservableObject {
         reload()
     }
     func useManagedStorage(_ enabled: Bool) { managed = enabled }
+    var recordedHashes: [String: String] {
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent("fonts.json")), let saved = try? decodeManifest(data) else { return [:] }
+        return saved.reduce(into: [:]) { result, entry in
+            let digest = entry.resource?.digest ?? String(entry.filename.prefix(64))
+            if digest.count == 64 && digest.allSatisfy({ "0123456789abcdef".contains($0) }) { result[entry.postScriptName] = digest }
+        }
+    }
     private var resources: FileResourceStore { .init(directory: directory, writer: writer) }
     private func decodeManifest(_ data: Data) throws -> [ReadingFontEntry] {
         if let legacy = try? JSONDecoder().decode([ReadingFontEntry].self, from: data) { return legacy }

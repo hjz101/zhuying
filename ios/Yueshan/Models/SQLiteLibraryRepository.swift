@@ -177,6 +177,13 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
     func preference(key: String) throws -> Data? {
         try database.read { try Data.fetchOne($0, sql: "SELECT payload FROM preferences WHERE key = ?", arguments: [key]) }
     }
+    func savePreferences(_ values: [String: Data]) throws {
+        try database.write { db in
+            for (key, data) in values {
+                try db.execute(sql: "INSERT INTO preferences(key, payload) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload", arguments: [key, data])
+            }
+        }
+    }
 
     func allChapterIDs() throws -> Set<String> {
         try database.read { Set(try String.fetchAll($0, sql: "SELECT id FROM chapter_records")) }

@@ -15,6 +15,7 @@ struct YueshanApp: App {
         let credentialService = environment.isUITesting ? "com.yueshan.shushan.ui-tests" : "com.yueshan.shushan.\(environment.mode.rawValue)"
         _shushan = StateObject(wrappedValue: ShushanAccountStore(defaults: defaults, vault: ShushanKeychain(service: credentialService)))
         _featureDemo = StateObject(wrappedValue: FeatureDemoStore(defaults: defaults, seedDemoData: environment.isDemo))
+        ReadingFontLibrary.shared.useManagedStorage(!environment.isDemo)
         ReadingFontLibrary.shared.reload(reset: environment.resetsTestState)
         _navigation = StateObject(wrappedValue: NavigationStore(defaults: defaults))
         _toolbox = StateObject(wrappedValue: ToolboxStore(defaults: defaults))
@@ -100,7 +101,12 @@ struct RootView: View {
             }
         }
         .task {
-            await store.bootstrapProductionIfNeeded()
+            await store.bootstrapProductionIfNeeded(prepareAppearance: {
+                let fonts = ReadingFontLibrary.shared
+                let original = try fonts.prepareManagedStorage()
+                return .init(fallbackThemeLibrary: demo.themeSnapshot, originalFontManifest: original,
+                             fontHashes: fonts.recordedHashes, warnings: fonts.message.map { [$0] } ?? [])
+            })
             #if DEBUG
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-step-zero-source") {
                 try? await SourceFeasibilityValidation.runDevelopmentProbe(credential: shushan.credentialForRequests)

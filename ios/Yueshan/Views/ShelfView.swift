@@ -13,6 +13,8 @@ private enum ShelfCategory: String, CaseIterable {
 
 struct ShelfView: View {
     @EnvironmentObject private var store: LibraryStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .title) private var titleSize = 28
     let onDiscover: () -> Void
     @State private var category: ShelfCategory = .novel
     @State private var filter = 0
@@ -35,20 +37,24 @@ struct ShelfView: View {
             let coverWidth = max(1, (geo.size.width - 44 - gap * CGFloat(columns - 1)) / CGFloat(columns))
             ScrollView {
                 VStack(alignment: .leading, spacing: 27) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 9) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
                             Text("YOUR LITTLE READING CORNER").font(.system(size: 8, weight: .medium)).tracking(1.6).foregroundStyle(Palette.muted)
-                            HStack(spacing: 0) {
-                                Text("我的书架").font(.system(size: 31, weight: .semibold, design: .serif)).tracking(2)
-                                Text(".").font(.system(size: 35, weight: .medium, design: .serif)).foregroundStyle(Palette.accent)
-                            }.foregroundStyle(Palette.green)
-                            Text("生活很忙，记得给自己留一页时间。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                            Spacer(minLength: 8)
+                            Button(action: onDiscover) {
+                                Image(systemName: "magnifyingglass").font(.system(size: 18)).foregroundStyle(Palette.green)
+                                    .frame(width: 44, height: 44).background(.white.opacity(0.7), in: Circle())
+                            }.accessibilityLabel("搜索好书")
                         }
-                        Spacer()
-                        Button(action: onDiscover) {
-                            Image(systemName: "magnifyingglass").font(.system(size: 18)).foregroundStyle(Palette.green)
-                                .frame(width: 44, height: 44).background(.white.opacity(0.7), in: Circle())
-                        }.accessibilityLabel("搜索好书")
+                        if dynamicTypeSize.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: 14) { shelfTitle; categoryPicker }
+                        } else {
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 12) { shelfTitle; Spacer(minLength: 0); categoryPicker }
+                                VStack(alignment: .leading, spacing: 14) { shelfTitle; categoryPicker }
+                            }
+                        }
+                        Text("生活很忙，记得给自己留一页时间。").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     }
 
                     HStack(spacing: 17) {
@@ -56,7 +62,7 @@ struct ShelfView: View {
                             NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id)) } label: { Label(id == "shelf" ? "书架分组" : FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon).font(.system(size: 11)).frame(minHeight: 36) }.accessibilityIdentifier("shelf-feature-\(id)")
                         }
                     }
-                    if !managing {
+                    if !managing && category == .novel {
                         if let recent = store.recent { continueCard(recent) }
                         else { welcomeCard }
                         Button { showUpdates = true } label: {
@@ -68,7 +74,7 @@ struct ShelfView: View {
                                 Text("查看").font(.system(size: 10)); Image(systemName: "chevron.right").font(.system(size: 10))
                             }.font(.system(size: 12)).foregroundStyle(Palette.green).padding(15).background(Color(hex: 0xEEF0E6), in: .rect(cornerRadius: 12))
                         }.accessibilityIdentifier("shelfUpdates")
-                    } else {
+                    } else if managing {
                         HStack {
                             Text("已选择 \(selection.count) 本").font(.system(size: 15, weight: .medium)).foregroundStyle(Palette.green)
                             Spacer()
@@ -78,60 +84,14 @@ struct ShelfView: View {
                             }.font(.system(size: 12)).accessibilityIdentifier("selectAllBooks")
                         }
                     }
-                    HStack {
-                        Text(managing ? "选择要移出书架的作品" : "按\(store.sort.title)排列").font(.system(size: 10)).foregroundStyle(Palette.muted)
-                        Spacer()
-                        Menu {
-                            Picker("书架排序", selection: $store.sort) {
-                                ForEach(ShelfSort.allCases, id: \.self) { sort in Text(sort.title).tag(sort) }
-                            }
-                        } label: { Label("排序", systemImage: "arrow.up.arrow.down").font(.system(size: 11)).frame(minHeight: 35) }.accessibilityIdentifier("shelfSort")
-                        Button(managing ? "完成" : "管理") { managing.toggle(); selection = [] }.font(.system(size: 11, weight: .medium)).frame(minWidth: 44, minHeight: 35).accessibilityIdentifier("manageShelf")
-                    }
-
                     VStack(spacing: 20) {
-                        HStack(spacing: 8) {
-                            ForEach(ShelfCategory.allCases, id: \.self) { item in
-                                Button {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        category = item
-                                        filter = 0
-                                        selection = []
-                                    }
-                                } label: {
-                                    Text(item.title)
-                                        .font(.system(size: 17, weight: category == item ? .semibold : .regular))
-                                        .frame(maxWidth: .infinity, minHeight: 46)
-                                        .foregroundStyle(category == item ? Palette.green : Palette.muted)
-                                        .background(category == item ? Palette.green.opacity(0.08) : .clear, in: .rect(cornerRadius: 10))
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("shelf-category-\(item.rawValue)")
-                                .accessibilityAddTraits(category == item ? .isSelected : [])
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 8) { statusFilters; Spacer(minLength: 0); shelfControls }
+                            VStack(alignment: .leading, spacing: 4) {
+                                statusFilters
+                                HStack { Spacer(); shelfControls }
                             }
                         }
-                        .accessibilityElement(children: .contain)
-                        .accessibilityLabel("书架栏目")
-
-                        HStack(spacing: 0) {
-                            HStack(spacing: 20) {
-                                filterButton("全部收藏", value: 0, count: categoryBooks.count)
-                                filterButton("正在阅读", value: 1, count: categoryReadingCount)
-                                filterButton("未读", value: 2, count: categoryBooks.count - categoryReadingCount)
-                            }
-                            Spacer(minLength: 8)
-                            Menu {
-                                Picker("书架布局", selection: $store.shelfLayout) {
-                                    ForEach(ShelfLayout.allCases, id: \.self) { layout in
-                                        Text(layout.title).tag(layout)
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: store.shelfLayout == .list ? "list.bullet" : "square.grid.3x3")
-                                    .font(.system(size: 15)).frame(width: 44, height: 46).foregroundStyle(Palette.muted)
-                            }.accessibilityLabel("书架布局").accessibilityValue(store.shelfLayout.title)
-                                .accessibilityIdentifier("shelfLayout")
-                        }.overlay(alignment: .bottom) { Rectangle().fill(Palette.line).frame(height: 0.5) }
 
                         if filteredBooks.isEmpty {
                             ContentUnavailableView {
@@ -202,14 +162,83 @@ struct ShelfView: View {
         .navigationDestination(for: Book.self) { BookDetailView(book: $0) }
     }
 
+    private var shelfTitle: some View {
+        HStack(spacing: 0) {
+            Text("我的书架").font(.system(size: titleSize, weight: .semibold, design: .serif)).tracking(1)
+                .lineLimit(1).minimumScaleFactor(0.75)
+                .accessibilityIdentifier("shelfTitle")
+            Text(".").font(.system(size: titleSize + 4, weight: .medium, design: .serif)).foregroundStyle(Palette.accent)
+                .accessibilityHidden(true)
+        }.foregroundStyle(Palette.green).fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: true)
+    }
+
+    private var categoryPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(ShelfCategory.allCases, id: \.self) { item in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        category = item
+                        filter = 0
+                        selection = []
+                    }
+                } label: {
+                    Text(item.title)
+                        .font(.system(size: 12, weight: category == item ? .semibold : .regular))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .foregroundStyle(category == item ? Palette.background : Palette.green.opacity(0.72))
+                        .background(category == item ? Palette.green : .clear, in: .rect(cornerRadius: 8))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("shelf-category-\(item.rawValue)")
+                .accessibilityAddTraits(category == item ? .isSelected : [])
+            }
+        }
+        .padding(3).background(Palette.soft, in: .rect(cornerRadius: 11))
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .contain).accessibilityLabel("书架栏目")
+        .accessibilityIdentifier("shelfCategories")
+    }
+
+    private var statusFilters: some View {
+        HStack(spacing: 8) {
+            filterButton("全部", value: 0, count: categoryBooks.count)
+            filterButton("在读", value: 1, count: categoryReadingCount)
+            filterButton("未读", value: 2, count: categoryBooks.count - categoryReadingCount)
+        }.fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var shelfControls: some View {
+        HStack(spacing: 0) {
+            Menu {
+                Picker("书架排序", selection: $store.sort) {
+                    ForEach(ShelfSort.allCases, id: \.self) { sort in Text(sort.title).tag(sort) }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down").font(.system(size: 13)).frame(width: 44, height: 44)
+            }.accessibilityLabel("书架排序").accessibilityValue(store.sort.title).accessibilityIdentifier("shelfSort")
+            Menu {
+                Picker("书架布局", selection: $store.shelfLayout) {
+                    ForEach(ShelfLayout.allCases, id: \.self) { layout in Text(layout.title).tag(layout) }
+                }
+            } label: {
+                Image(systemName: store.shelfLayout == .list ? "list.bullet" : "square.grid.3x3")
+                    .font(.system(size: 15)).frame(width: 44, height: 44)
+            }.accessibilityLabel("书架布局").accessibilityValue(store.shelfLayout.title).accessibilityIdentifier("shelfLayout")
+            Button(managing ? "完成" : "管理") { managing.toggle(); selection = [] }
+                .font(.system(size: 11, weight: .medium)).frame(minWidth: 44, minHeight: 44)
+                .foregroundStyle(Palette.green).accessibilityIdentifier("manageShelf")
+        }.foregroundStyle(Palette.muted).fixedSize(horizontal: true, vertical: false)
+    }
+
     private func filterButton(_ title: String, value: Int, count: Int) -> some View {
         Button { withAnimation(.easeInOut(duration: 0.2)) { filter = value } } label: {
             HStack(spacing: 5) {
                 Text(title).font(.system(size: 12, weight: filter == value ? .semibold : .regular))
                 Text("\(count)").font(.system(size: 9))
             }.foregroundStyle(filter == value ? Palette.green : Palette.muted)
-                .frame(minHeight: 46)
-                .overlay(alignment: .bottom) { if filter == value { Rectangle().fill(Palette.green).frame(height: 2) } }
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("shelf-filter-\(value)").accessibilityAddTraits(filter == value ? .isSelected : [])
     }
 

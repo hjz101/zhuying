@@ -7,16 +7,38 @@ final class ReaderFlowTests: XCTestCase {
         app.launchArguments = ["--ui-testing"]
         app.launch()
         let novel = app.buttons["shelf-category-novel"]
-        reveal(novel, in: app)
+        XCTAssertTrue(novel.waitForExistence(timeout: 10))
+        let title = app.descendants(matching: .any)["shelfTitle"].firstMatch
+        XCTAssertTrue(title.exists)
+        XCTAssertLessThanOrEqual(title.frame.maxX + 8, novel.frame.minX, "The compact category switch belongs beside the shelf title")
+        XCTAssertEqual(title.frame.midY, novel.frame.midY, accuracy: 5)
+        var previous: XCUIElement?
+        for id in ["novel", "comic", "audio"] {
+            let tab = app.buttons["shelf-category-\(id)"]
+            XCTAssertTrue(tab.isHittable)
+            XCTAssertGreaterThanOrEqual(tab.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(tab.frame.height, 44)
+            XCTAssertLessThanOrEqual(tab.frame.maxX, app.frame.maxX - 21)
+            if let previous {
+                XCTAssertLessThanOrEqual(previous.frame.maxX, tab.frame.minX)
+                XCTAssertEqual(previous.frame.midY, tab.frame.midY, accuracy: 1)
+            }
+            previous = tab
+        }
         XCTAssertTrue(novel.isSelected)
         let all = app.buttons["shelf-filter-0"]
         XCTAssertLessThan(novel.frame.maxY, all.frame.minY)
+        XCTAssertTrue(app.buttons["continueReading"].exists)
+        XCTAssertTrue(app.buttons["shelfUpdates"].exists)
+        capture(app, name: "ShelfCompactSegments")
+        reveal(all, in: app)
         XCTAssertTrue(all.label.contains("6"))
         app.buttons["shelf-filter-1"].tap()
         XCTAssertTrue(app.buttons["shelf-filter-1"].isSelected)
 
         for (id, title) in [("comic", "漫画"), ("audio", "听书")] {
             let tab = app.buttons["shelf-category-\(id)"]
+            revealShelfCategories(in: app)
             tab.tap()
             XCTAssertTrue(tab.isSelected)
             XCTAssertFalse(novel.isSelected)
@@ -24,15 +46,21 @@ final class ReaderFlowTests: XCTestCase {
             XCTAssertTrue(all.label.contains("0"))
             XCTAssertTrue(app.staticTexts["还没有收藏的\(title)"].exists)
             XCTAssertFalse(app.buttons["read-changfeng"].exists)
+            XCTAssertFalse(app.buttons["continueReading"].exists, "Novel progress must not appear in another content category")
+            XCTAssertFalse(app.buttons["shelfUpdates"].exists, "Novel updates must not appear in another content category")
             app.buttons["shelf-filter-1"].tap()
             XCTAssertTrue(app.staticTexts["还没有收藏的\(title)"].exists)
         }
 
+        revealShelfCategories(in: app)
         novel.tap()
         XCTAssertTrue(novel.isSelected)
         XCTAssertTrue(all.isSelected)
         XCTAssertTrue(all.label.contains("6"))
         XCTAssertFalse(app.otherElements["shelfEmptyState"].exists)
+        XCTAssertTrue(app.buttons["continueReading"].exists)
+        XCTAssertTrue(app.buttons["shelfUpdates"].exists)
+        reveal(app.buttons["shelfLayout"], in: app)
         app.buttons["shelfLayout"].tap()
         app.buttons["列表"].tap()
         XCTAssertTrue(app.buttons["list-read-changfeng"].exists)
@@ -40,6 +68,62 @@ final class ReaderFlowTests: XCTestCase {
         screenshot.name = "ShelfPrimaryCategories"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+    }
+
+    @MainActor
+    func testShelfCategoryChangeClearsManagedSelection() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        let manage = app.buttons["manageShelf"]
+        reveal(manage, in: app)
+        manage.tap()
+        let book = app.buttons["select-changfeng"]
+        reveal(book, in: app)
+        book.tap()
+        let remove = app.buttons["removeSelected"]
+        XCTAssertTrue(remove.isEnabled)
+        XCTAssertTrue(remove.label.contains("1"))
+
+        revealShelfCategories(in: app)
+        app.buttons["shelf-category-comic"].tap()
+        XCTAssertTrue(app.buttons["shelf-category-comic"].isSelected)
+        XCTAssertTrue(app.staticTexts["已选择 0 本"].exists)
+        XCTAssertFalse(remove.isEnabled)
+        XCTAssertTrue(app.staticTexts["还没有收藏的漫画"].exists)
+        app.buttons["shelf-category-novel"].tap()
+        XCTAssertTrue(app.staticTexts["已选择 0 本"].exists)
+        XCTAssertFalse(remove.isEnabled, "Returning to novels must not restore a hidden selection")
+        reveal(book, in: app)
+        XCTAssertTrue(book.exists, "Changing categories must preserve saved novels")
+        XCTAssertTrue(app.buttons["shelf-filter-0"].label.contains("6"))
+    }
+
+    @MainActor
+    func testShelfCategoriesReflowBelowTitleAtAccessibilityTextSize() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        let title = app.descendants(matching: .any)["shelfTitle"].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        let novel = app.buttons["shelf-category-novel"]
+        XCTAssertGreaterThanOrEqual(novel.frame.minY, title.frame.maxY + 8, "Accessibility text sizes move the category switch onto its own row")
+        var previous: XCUIElement?
+        for (id, label) in [("novel", "小说"), ("comic", "漫画"), ("audio", "听书")] {
+            let tab = app.buttons["shelf-category-\(id)"]
+            XCTAssertTrue(tab.isHittable)
+            XCTAssertEqual(tab.label, label)
+            XCTAssertGreaterThanOrEqual(tab.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(tab.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(tab.frame.minX, app.frame.minX + 21)
+            XCTAssertLessThanOrEqual(tab.frame.maxX, app.frame.maxX - 21)
+            if let previous { XCTAssertLessThanOrEqual(previous.frame.maxX, tab.frame.minX) }
+            previous = tab
+        }
+        app.buttons["shelf-category-audio"].tap()
+        XCTAssertTrue(app.buttons["shelf-category-audio"].isSelected)
+        XCTAssertTrue(app.staticTexts["还没有收藏的听书"].exists)
+        capture(app, name: "ShelfCompactSegmentsAccessibilitySize")
     }
 
     @MainActor
@@ -81,9 +165,11 @@ final class ReaderFlowTests: XCTestCase {
         app.launch()
         reveal(layout, in: app)
         XCTAssertEqual(layout.value as? String, "四列 · 紧凑")
+        revealShelfCategories(in: app)
         app.buttons["shelf-category-comic"].tap()
         XCTAssertEqual(layout.value as? String, "四列 · 紧凑")
         app.buttons["shelf-category-novel"].tap()
+        reveal(app.buttons["shelf-filter-2"], in: app)
         app.buttons["shelf-filter-2"].tap()
         XCTAssertEqual(layout.value as? String, "四列 · 紧凑")
     }
@@ -183,6 +269,13 @@ final class ReaderFlowTests: XCTestCase {
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<5 { if element.isHittable { return }; app.swipeUp() }
+    }
+
+    @MainActor
+    private func revealShelfCategories(in app: XCUIApplication) {
+        let novel = app.buttons["shelf-category-novel"]
+        for _ in 0..<5 { if novel.isHittable { return }; app.swipeDown() }
+        XCTAssertTrue(novel.isHittable)
     }
 
     @MainActor
@@ -427,7 +520,7 @@ final class ReaderFlowTests: XCTestCase {
         reveal(sorting, in: app)
         sorting.tap()
         app.buttons["加入时间"].tap()
-        XCTAssertTrue(app.staticTexts["按加入时间排列"].waitForExistence(timeout: 5))
+        XCTAssertEqual(sorting.value as? String, "加入时间")
         app.buttons["manageShelf"].tap()
         XCTAssertTrue(app.buttons["select-changfeng"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["select-stars"].exists)

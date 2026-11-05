@@ -180,14 +180,63 @@ final class FeatureFlowTests: XCTestCase {
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第一章 旧巷听风")
     }
 
+    @MainActor func testSourceSwipeLoginAndDetailFallback() {
+        let app = launch()
+        app.tabBars.buttons["我的"].tap()
+        let entry = app.buttons["profileSources"]
+        reveal(entry, app: app); entry.tap()
+        let row = app.buttons["source-row-shanhai"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.swipeLeft()
+        XCTAssertFalse(app.buttons["删除书源"].exists)
+        capture(app, name: "Source-SwipeActions")
+        app.buttons["source-login-shanhai"].tap()
+        XCTAssertEqual(app.staticTexts["currentSourceName"].label, "当前书源：山海书库")
+        let login = app.buttons["demo-action-sourceLogin-模拟登录"]
+        reveal(login, app: app); login.tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(row.label.contains("已登录"))
+        row.tap()
+        XCTAssertTrue(app.navigationBars["书源详情"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["sourceLoginStatus"].label.contains("已登录"))
+        app.buttons["sourceDetailLogin"].tap()
+        XCTAssertEqual(app.staticTexts["currentSourceName"].label, "当前书源：山海书库")
+        let clear = app.buttons["demo-action-sourceLogin-清除演示 Cookie"]
+        reveal(clear, app: app); clear.tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["sourceLoginStatus"].label.contains("未登录"))
+    }
+
+    @MainActor func testSourceLongPressScopeToggleAndConfirmedRemoval() {
+        let app = launch()
+        app.tabBars.buttons["我的"].tap()
+        let entry = app.buttons["profileSources"]
+        reveal(entry, app: app); entry.tap()
+        let row = app.buttons["source-row-yunjian"]
+        reveal(row, app: app); row.press(forDuration: 1)
+        app.buttons["重新登录"].tap()
+        XCTAssertEqual(app.staticTexts["currentSourceName"].label, "当前书源：云间小说")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        row.press(forDuration: 1); app.buttons["停用书源"].tap()
+        XCTAssertTrue(row.label.contains("已停用"))
+        row.press(forDuration: 1); app.buttons["删除书源"].tap()
+        app.buttons["取消"].tap()
+        XCTAssertTrue(row.exists)
+        row.press(forDuration: 1); app.buttons["删除书源"].tap()
+        app.buttons["确认删除书源"].tap()
+        XCTAssertFalse(row.exists)
+        XCTAssertTrue(app.buttons["source-row-shanhai"].exists)
+    }
+
     @MainActor func testSourceEditingAndBatchReport() {
         let app = launch()
         app.tabBars.buttons["我的"].tap()
         let sources = app.buttons["profileSources"]
         reveal(sources, app: app); sources.tap()
         capture(app, name: "Catalog-Sources")
-        let edit = app.buttons["编辑"].firstMatch
-        XCTAssertTrue(edit.waitForExistence(timeout: 5)); edit.tap()
+        let row = app.buttons["source-row-shanhai"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.swipeLeft()
+        app.buttons["source-edit-shanhai"].tap()
         let validate = app.buttons["demo-action-sourceEdit-校验 JSON"]
         reveal(validate, app: app); validate.tap()
         XCTAssertTrue(app.staticTexts["JSON 格式正确。这里只校验语法，不执行书源规则。"].waitForExistence(timeout: 5))

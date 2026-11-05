@@ -54,6 +54,44 @@ final class FeatureDemoTests: XCTestCase {
         XCTAssertTrue(FeatureCatalog.search("不存在的模块").isEmpty)
     }
 
+    func testSourceLoginStatusAndEditorStayScopedToSelectedSource() {
+        let login = FeatureCatalog.feature("sourceLogin")
+        let edit = FeatureCatalog.feature("sourceEdit")
+        demo.prepareSource(edit, scope: "yunjian")
+        XCTAssertEqual(demo.text(edit, "name", scope: "yunjian"), "云间小说")
+        XCTAssertEqual(demo.text(edit, "url", scope: "yunjian"), "https://yunjian.example")
+        demo.set("自定义名称", feature: edit, field: edit.fields.first { $0.id == "name" }!, scope: "yunjian")
+        demo.prepareSource(edit, scope: "yunjian")
+        XCTAssertEqual(demo.text(edit, "name", scope: "yunjian"), "自定义名称")
+        demo.execute("模拟登录", feature: login, scope: "shanhai", book: nil, library: library)
+        XCTAssertEqual(demo.sources[0].loginStatus, .signedIn)
+        XCTAssertEqual(demo.sources[1].loginStatus, .expired)
+        demo.execute("清除演示 Cookie", feature: login, scope: "shanhai", book: nil, library: library)
+        XCTAssertEqual(demo.sources[0].loginStatus, .signedOut)
+        demo.execute("保存演示配置", feature: edit, scope: "yunjian", book: nil, library: library)
+        XCTAssertEqual(demo.sources[1].name, "自定义名称")
+        XCTAssertEqual(demo.sources[0].name, "山海书库")
+        demo.setSourceLogin("unknown", status: .signedIn)
+        XCTAssertEqual(demo.sources.count, 3)
+    }
+
+    func testRemovingSourceClearsOnlyItsDemoStateAndKeepsReadingData() {
+        let before = library.progress
+        let favorites = library.favorites
+        let edit = FeatureCatalog.feature("sourceEdit")
+        demo.prepareSource(edit, scope: "shanhai")
+        demo.prepareSource(edit, scope: "yunjian")
+        demo.bookSources = ["changfeng": "shanhai", "stars": "yunjian"]
+        demo.removeSource("shanhai")
+        XCTAssertFalse(demo.sources.contains { $0.id == "shanhai" })
+        XCTAssertNil(demo.bookSources["changfeng"])
+        XCTAssertEqual(demo.bookSources["stars"], "yunjian")
+        XCTAssertFalse(demo.values.keys.contains { $0.contains(":shanhai:") })
+        XCTAssertEqual(demo.text(edit, "name", scope: "yunjian"), "云间小说")
+        XCTAssertEqual(library.progress, before)
+        XCTAssertEqual(library.favorites, favorites)
+    }
+
     func testFieldsAreScopedToFeatureAndSource() {
         let feature = FeatureCatalog.feature("sourceEdit")
         let field = feature.fields.first { $0.id == "name" }!

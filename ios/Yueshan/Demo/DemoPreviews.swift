@@ -1,33 +1,101 @@
 import SwiftUI
 
 struct DemoSourceList: View {
-    @EnvironmentObject private var demo: FeatureDemoStore
     var scope: String
     var group = "全部"
+    @State private var route: SourceActionRoute?
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            ForEach(demo.sources.filter { group == "全部" || $0.group == group }) { source in
-                VStack(spacing: 13) {
-                    HStack {
-                        Image(systemName: "externaldrive").foregroundStyle(Palette.green)
-                        VStack(alignment: .leading, spacing: 6) { Text(source.name).font(.system(size: 14, weight: .medium)); Text(source.detail).font(.system(size: 10)).foregroundStyle(Palette.muted) }
-                        Spacer()
-                        Toggle("启用\(source.name)", isOn: Binding(get: { demo.sources.first { $0.id == source.id }?.enabled ?? false }, set: { enabled in if let index = demo.sources.firstIndex(where: { $0.id == source.id }) { demo.sources[index].enabled = enabled } })).labelsHidden().tint(Palette.green)
-                    }
-                    HStack(spacing: 19) {
-                        sourceLink("编辑", id: "sourceEdit", source: source)
-                        sourceLink("登录", id: "sourceLogin", source: source)
-                        sourceLink("调试", id: "sourceDebug", source: source)
-                        Spacer()
-                        Menu { Button("移入个人收藏") { if let index = demo.sources.firstIndex(where: { $0.id == source.id }) { demo.sources[index].group = "个人收藏" } }; Button("删除演示源", role: .destructive) { demo.sources.removeAll { $0.id == source.id } } } label: { Image(systemName: "ellipsis").frame(width: 30, height: 30) }.accessibilityLabel("管理\(source.name)")
-                    }.font(.system(size: 11)).foregroundStyle(Palette.green)
-                }.padding(15).background(.white.opacity(0.7), in: .rect(cornerRadius: 13))
-            }
-            if demo.sources.isEmpty { ContentUnavailableView("还没有书源", systemImage: "externaldrive", description: Text("通过新建或导入添加示例书源。")) }
-        }
+        VStack(alignment: .leading, spacing: 13) { DemoSourceRows(group: group, route: $route) }
+            .navigationDestination(item: $route) { item in FeatureDemoView(feature: FeatureCatalog.feature(item.featureID), scope: item.sourceID) }
     }
-    private func sourceLink(_ title: String, id: String, source: DemoSource) -> some View {
-        NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id), scope: source.id) } label: { Text(title).frame(minWidth: 34, minHeight: 30) }
+}
+
+struct SourceActionRoute: Hashable, Identifiable {
+    let sourceID: String
+    let featureID: String
+    var id: String { sourceID + featureID }
+}
+
+struct DemoSourceRows: View {
+    @EnvironmentObject private var demo: FeatureDemoStore
+    var group = "全部"
+    var query = ""
+    @Binding var route: SourceActionRoute?
+    @State private var removal: DemoSource?
+    private var sources: [DemoSource] {
+        demo.sources.filter { (group == "全部" || $0.group == group) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)) }
+    }
+    var body: some View {
+        ForEach(sources) { source in
+            NavigationLink { DemoSourceDetail(sourceID: source.id) } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "externaldrive").font(.system(size: 21)).foregroundStyle(Palette.green)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(source.name).font(.system(size: 15, weight: .medium)).foregroundStyle(Palette.green)
+                        Text(source.detail).font(.system(size: 10)).foregroundStyle(Palette.muted)
+                        Text("\(source.loginStatus.title) · \(source.enabled ? "已启用" : "已停用") · 演示")
+                            .font(.system(size: 10)).foregroundStyle(source.loginStatus == .expired ? Palette.accent : Palette.muted)
+                    }
+                    Spacer(minLength: 0)
+                }.padding(15).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Palette.card, in: .rect(cornerRadius: 13)).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityIdentifier("source-row-\(source.id)")
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button { open("sourceLogin", source) } label: { Label(source.loginStatus.action, systemImage: "person.badge.key") }.tint(Palette.green)
+                        .accessibilityIdentifier("source-login-\(source.id)")
+                    Button { open("sourceEdit", source) } label: { Label("编辑", systemImage: "square.and.pencil") }.tint(Palette.accent)
+                        .accessibilityIdentifier("source-edit-\(source.id)")
+                }
+                .contextMenu {
+                    Button(source.loginStatus.action, systemImage: "person.badge.key") { open("sourceLogin", source) }
+                    Button("编辑", systemImage: "square.and.pencil") { open("sourceEdit", source) }
+                    Button("调试", systemImage: "ladybug") { open("sourceDebug", source) }
+                    Button(source.enabled ? "停用书源" : "启用书源", systemImage: "power") {
+                        if let index = demo.sources.firstIndex(where: { $0.id == source.id }) { demo.sources[index].enabled.toggle() }
+                    }
+                    Button("移入个人收藏", systemImage: "folder") {
+                        if let index = demo.sources.firstIndex(where: { $0.id == source.id }) { demo.sources[index].group = "个人收藏" }
+                    }
+                    Button("删除书源", systemImage: "trash", role: .destructive) { removal = source }
+                }
+        }
+        if sources.isEmpty { ContentUnavailableView("还没有书源", systemImage: "externaldrive", description: Text("通过新建或导入添加示例书源。")) }
+        Color.clear.frame(height: 0)
+            .alert("删除“\(removal?.name ?? "")”？", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } })) {
+                Button("确认删除书源", role: .destructive) { if let removal { demo.removeSource(removal.id) }; removal = nil }
+                Button("取消", role: .cancel) { removal = nil }
+            } message: { Text("仅移除演示书源，书架与阅读进度保留。") }
+    }
+    private func open(_ feature: String, _ source: DemoSource) { route = .init(sourceID: source.id, featureID: feature) }
+}
+
+struct DemoSourceDetail: View {
+    @EnvironmentObject private var demo: FeatureDemoStore
+    let sourceID: String
+    var body: some View {
+        ScrollView {
+            if let source = demo.sources.first(where: { $0.id == sourceID }) {
+                VStack(alignment: .leading, spacing: 22) {
+                    AppPageHeader(title: source.name, subtitle: source.url, icon: "externaldrive")
+                    DemoNotice()
+                    AppSettingsCard("书源信息", icon: "info.circle") {
+                        Text(source.detail).font(.system(size: 12))
+                        Text("分组：\(source.group)").font(.system(size: 12))
+                        Text("\(source.loginStatus.title) · 演示登录状态").font(.system(size: 12)).accessibilityIdentifier("sourceLoginStatus")
+                        Toggle("启用书源", isOn: Binding(get: { demo.sources.first { $0.id == sourceID }?.enabled ?? false }, set: { value in
+                            if let index = demo.sources.firstIndex(where: { $0.id == sourceID }) { demo.sources[index].enabled = value }
+                        }))
+                    }
+                    NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("sourceLogin"), scope: sourceID) } label: {
+                        Label(source.loginStatus.action, systemImage: "person.badge.key").frame(maxWidth: .infinity, minHeight: 48)
+                            .foregroundStyle(.white).background(Palette.green, in: .rect(cornerRadius: 12))
+                    }.buttonStyle(.plain).accessibilityIdentifier("sourceDetailLogin")
+                    ForEach(["sourceEdit", "sourceDebug"], id: \.self) { id in
+                        NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id), scope: sourceID) } label: { FeatureRow(feature: FeatureCatalog.feature(id)) }
+                    }
+                }.padding(22)
+            } else { ContentUnavailableView("书源已移除", systemImage: "externaldrive") }
+        }.appPageStyle().navigationTitle("书源详情").navigationBarTitleDisplayMode(.inline)
     }
 }
 

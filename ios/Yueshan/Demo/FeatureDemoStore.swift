@@ -1,12 +1,20 @@
 import Foundation
 import Combine
 
+enum DemoLoginStatus: String {
+    case signedOut, signedIn, expired
+    var title: String { switch self { case .signedOut: "未登录"; case .signedIn: "已登录"; case .expired: "登录已过期" } }
+    var action: String { switch self { case .signedOut: "登录"; case .signedIn: "管理登录"; case .expired: "重新登录" } }
+}
+
 struct DemoSource: Identifiable, Equatable {
     let id: String
     var name: String
     var group = "小说"
     var enabled = true
     var detail: String
+    var url = "https://books.example"
+    var loginStatus: DemoLoginStatus = .signedOut
 }
 struct DemoFile: Identifiable {
     let id: UUID = UUID()
@@ -39,8 +47,8 @@ final class FeatureDemoStore: ObservableObject {
     @Published var values: [String: String] = [:]
     @Published var sources = [
         DemoSource(id: "shanhai", name: "山海书库", detail: "143 ms · 搜索 / 详情 / 正文"),
-        DemoSource(id: "yunjian", name: "云间小说", detail: "216 ms · 章节更新及时"),
-        DemoSource(id: "paper", name: "纸上漫游", group: "漫画", detail: "超时 · 演示失败状态"),
+        DemoSource(id: "yunjian", name: "云间小说", detail: "216 ms · 章节更新及时", url: "https://yunjian.example", loginStatus: .expired),
+        DemoSource(id: "paper", name: "纸上漫游", group: "漫画", detail: "超时 · 演示失败状态", url: "https://paper.example", loginStatus: .signedIn),
     ]
     @Published var groups = ["追更中", "待读", "已读完"]
     @Published var bookGroups: [String: String] = ["changfeng": "追更中", "stars": "追更中", "sunset": "已读完"]
@@ -56,6 +64,23 @@ final class FeatureDemoStore: ObservableObject {
     @Published var selectedCover = "changfeng"
     @Published var downloadProgress = 0.35
     @Published var downloadPaused = true
+
+    func prepareSource(_ feature: DemoFeature, scope: String) {
+        guard let source = sources.first(where: { $0.id == scope }), feature.id == "sourceEdit" else { return }
+        for (id, value) in [("name", source.name), ("url", source.url)] {
+            let key = "\(feature.id):\(scope):\(id)"
+            if values[key] == nil { values[key] = value }
+        }
+    }
+    func setSourceLogin(_ id: String, status: DemoLoginStatus) {
+        guard let index = sources.firstIndex(where: { $0.id == id }) else { return }
+        sources[index].loginStatus = status
+    }
+    func removeSource(_ id: String) {
+        sources.removeAll { $0.id == id }
+        bookSources = bookSources.filter { $0.value != id }
+        for feature in FeatureCatalog.all { reset(feature, scope: id) }
+    }
 
     func value(_ feature: DemoFeature, _ field: DemoField, scope: String = "main") -> String {
         values["\(feature.id):\(scope):\(field.id)"] ?? field.initial
@@ -107,7 +132,7 @@ final class FeatureDemoStore: ObservableObject {
         case "保存演示配置":
             if let index = sources.firstIndex(where: { $0.id == scope }) {
                 let name = text(feature, "name", scope: scope).trimmingCharacters(in: .whitespacesAndNewlines)
-                if name.isEmpty { success = false; detail = "请填写书源名称。" } else { sources[index].name = name }
+                if name.isEmpty { success = false; detail = "请填写书源名称。" } else { sources[index].name = name; sources[index].url = text(feature, "url", scope: scope) }
             }
         case "新建示例书源": sources.append(.init(id: UUID().uuidString, name: "自定义书源 \(sources.count + 1)", detail: "待调试 · 演示配置"))
         case "全部启用", "全部停用":
@@ -143,8 +168,8 @@ final class FeatureDemoStore: ObservableObject {
             let name = text(feature, "rename", scope: scope).trimmingCharacters(in: .whitespacesAndNewlines)
             if name.isEmpty { success = false; detail = "文件名不能为空。" } else if !files.isEmpty { files[0].name = name }
         case "打开模拟播放器", "试听布局预览", "预览锁屏播放卡片": playerVisible = true; isPlaying.toggle(); detail = "播放器状态已更新。当前为无音频的界面演示。"
-        case "模拟登录": detail = "模拟登录成功 · 演示 Cookie 可复用；未发送账号或密码。"
-        case "清除演示 Cookie": detail = "演示会话已清除。"
+        case "模拟登录": setSourceLogin(scope, status: .signedIn); detail = "模拟登录成功 · 演示 Cookie 可复用；未发送账号或密码。"
+        case "清除演示 Cookie": setSourceLogin(scope, status: .signedOut); detail = "演示会话已清除。"
         case "模拟连接", "模拟连接测试", "模拟网络诊断": detail = "连接流程演示通过。没有发起请求，输入内容不会发送或保存。"
         case "恢复排版默认值": reset(feature, scope: scope)
         case "翻到下一页":

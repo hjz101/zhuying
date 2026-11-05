@@ -11,21 +11,35 @@ struct DemoNotice: View {
 struct FeatureHubView: View {
     var sourceOnly = false
     @State private var query = ""
+    @State private var sourceRoute: SourceActionRoute?
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
+        Group {
+            if sourceOnly { sourcePage }
+            else { hubPage }
+        }
+    }
+    private var sourcePage: some View {
+        List {
+            Section {
+                Text("连接每一种故事。").font(.system(size: 25, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
+                Text("左滑登录或编辑，长按查看更多操作。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                DemoNotice()
+            }.listRowBackground(Color.clear).listRowSeparator(.hidden)
+            Section("我的书源") {
+                DemoSourceRows(query: query.trimmingCharacters(in: .whitespacesAndNewlines), route: $sourceRoute)
+            }.listRowBackground(Color.clear).listRowSeparator(.hidden)
+            Section("书源工具") { featureResults(sourceOnly: true) }.listRowBackground(Color.clear)
+        }.listStyle(.plain).scrollContentBackground(.hidden).background(Palette.background)
+            .navigationDestination(item: $sourceRoute) { item in FeatureDemoView(feature: FeatureCatalog.feature(item.featureID), scope: item.sourceID) }
+            .navigationTitle("书源").navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书源或功能")
+    }
+    private var hubPage: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
-                if sourceOnly {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("YOUR SOURCES, YOUR STORIES").font(.system(size: 8)).tracking(2).foregroundStyle(Palette.muted)
-                        Text("连接每一种故事。").font(.system(size: 26, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
-                        Text("书源、规则、订阅和调试，一处整理。").font(.system(size: 11)).foregroundStyle(Palette.muted)
-                    }
-                    DemoNotice()
-                    DemoSourceList(scope: "hub")
-                    featureResults(sourceOnly: true)
-                } else if isSearching {
+                if isSearching {
                     featureResults(sourceOnly: false)
                 } else {
                     toolsHome
@@ -170,6 +184,13 @@ struct FeatureDemoView: View {
             VStack(alignment: .leading, spacing: 23) {
                 AppPageHeader(title: feature.title, subtitle: feature.summary, icon: feature.icon)
                 DemoNotice()
+                if let source = demo.sources.first(where: { $0.id == scope }) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("当前书源：\(source.name)").font(.system(size: 14, weight: .medium)).accessibilityIdentifier("currentSourceName")
+                        Text(source.url).font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        Text("\(source.loginStatus.title) · 演示状态").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    }
+                }
                 if !feature.fields.isEmpty {
                     AppSettingsCard("配置与选项", icon: "slider.horizontal.3") {
                         ForEach(feature.fields) { field in fieldView(field) }
@@ -195,7 +216,7 @@ struct FeatureDemoView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         SectionHeading(title: "相关功能")
                         ForEach(feature.related, id: \.self) { id in
-                            NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id), bookID: book.id, onRead: onRead) } label: { FeatureRow(feature: FeatureCatalog.feature(id)) }.buttonStyle(.plain)
+                            NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature(id), bookID: book.id, scope: scope, onRead: onRead) } label: { FeatureRow(feature: FeatureCatalog.feature(id)) }.buttonStyle(.plain)
                         }
                     }
                 }
@@ -206,6 +227,7 @@ struct FeatureDemoView: View {
         }
         }
         .appPageStyle().navigationTitle(feature.title).navigationBarTitleDisplayMode(.inline)
+        .onAppear { demo.prepareSource(feature, scope: scope) }
         .sheet(item: $filePreview) { item in DemoFilePreview(file: item) }
         .confirmationDialog("\(confirmAction ?? "")？", isPresented: Binding(get: { confirmAction != nil }, set: { if !$0 { confirmAction = nil } }), titleVisibility: .visible) {
             Button("确认演示") {
@@ -360,9 +382,13 @@ struct FeatureDemoView: View {
             }.padding(18).background(.white.opacity(0.7), in: .rect(cornerRadius: 12))
         case .browser:
             VStack(alignment: .leading, spacing: 18) {
-                Label(text("url").isEmpty ? "https://books.example/login" : text("url"), systemImage: "lock").font(.system(size: 11)).foregroundStyle(Palette.muted)
-                Text("山海书库").font(.system(size: 30, design: .serif)); Text("这是本地网页占位预览，表单和 Cookie 状态由演示数据呈现。").font(.system(size: 12)).foregroundStyle(Palette.muted)
-                NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("sourceLogin")) } label: { Label("打开登录流程", systemImage: "person.circle") }
+                let source = demo.sources.first { $0.id == scope }
+                Label(source.map { $0.url + "/login" } ?? (text("url").isEmpty ? "https://books.example/login" : text("url")), systemImage: "lock").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text(source?.name ?? "山海书库").font(.system(size: 30, design: .serif))
+                Text("这是本地网页占位预览，表单和 Cookie 状态由演示数据呈现。").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                if feature.id != "sourceLogin" {
+                    NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("sourceLogin"), scope: scope) } label: { Label("打开登录流程", systemImage: "person.circle") }
+                }
             }.padding(22).frame(maxWidth: .infinity, alignment: .leading).background(.white.opacity(0.7), in: .rect(cornerRadius: 15))
         case .covers:
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {

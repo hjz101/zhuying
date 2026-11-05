@@ -264,6 +264,30 @@ final class ProductionLibraryStoreTests: XCTestCase {
         XCTAssertTrue(final.books.isEmpty); XCTAssertTrue(final.bookmarks.isEmpty)
     }
 
+    func testDatabaseOpenFailurePreservesBytesAndCanRetryWithoutRelaunch() async throws {
+        let directory = root.appendingPathComponent("database")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("library.sqlite")
+        let damaged = Data("not a SQLite database".utf8)
+        try damaged.write(to: url)
+        let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
+            productionFactory: { try ProductionLibraryPersistence(directory: directory) })
+        await library.bootstrapProductionIfNeeded()
+        XCTAssertEqual(library.loadState, .failed)
+        library.settings.fontSize = 29
+        XCTAssertNil(defaults.data(forKey: LibraryStore.storageKey))
+        XCTAssertEqual(try Data(contentsOf: url), damaged)
+        let blocked = await library.flushPendingWrites(); XCTAssertFalse(blocked)
+        do { _ = try await library.importBookDurably(prepare()); XCTFail("No legacy fallback") } catch {}
+        // Simulate user restoring a valid database from their preserved backup.
+        try FileManager.default.removeItem(at: url)
+        await library.retryStorage()
+        XCTAssertEqual(library.loadState, .ready); XCTAssertNil(library.storageMessage)
+        XCTAssertTrue(library.books.isEmpty)
+        _ = try await library.importBookDurably(prepare())
+        XCTAssertEqual(library.books.count, 1)
+    }
+
     func testAlternatingBooksKeepIndependentPositionsAndRemovalPreservesUnfavoritedHistory() async throws {
         let library = try store()
         await library.bootstrapProductionIfNeeded()

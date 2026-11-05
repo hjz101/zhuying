@@ -2,6 +2,50 @@ import XCTest
 
 final class ProductionLaunchTests: XCTestCase {
     @MainActor
+    func testProductionOpenFailureCanRetryInPlace() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--production", "--storage-retry-fixture"]
+        app.launch()
+        let alert = app.alerts["本地记录提示"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 10))
+        XCTAssertTrue(alert.staticTexts["书库读取或升级失败，原有文件和记录已保留，请重试。"].exists)
+        alert.buttons["重试"].tap()
+        XCTAssertTrue(app.staticTexts["这里还没有故事"].waitForExistence(timeout: 10))
+        let dismissed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.alerts.firstMatch)
+        wait(for: [dismissed], timeout: 5)
+    }
+
+    @MainActor
+    func testProductionThemeSelectionSurvivesRestartUsingOriginalThemePage() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--production"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["这里还没有故事"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["我的"].tap()
+        let themes = app.buttons["profileThemes"]
+        for _ in 0..<8 { if themes.isHittable { break }; app.swipeUp() }
+        themes.tap()
+        let night = app.buttons["theme-card-night"]
+        for _ in 0..<8 { if night.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(night.isHittable); night.tap()
+        app.buttons["themeApply"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["activeThemeCard"].label.contains("夜读深林"))
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 5))
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "--production", "--preserve-ui-test-state"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["这里还没有故事"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["我的"].tap()
+        for _ in 0..<8 { if themes.isHittable { break }; app.swipeUp() }
+        themes.tap()
+        XCTAssertTrue(app.buttons["activeThemeCard"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["activeThemeCard"].label.contains("夜读深林"))
+    }
+    @MainActor
     func testLegacyLibraryMigratesAndRestartIgnoresStaleBrokenArchive() {
         continueAfterFailure = false
         let app = XCUIApplication()

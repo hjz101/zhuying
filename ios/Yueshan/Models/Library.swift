@@ -174,7 +174,9 @@ final class LibraryStore: ObservableObject {
     private let defaults: UserDefaults
     private let importsURL: URL?
     private var importedBooks: [Book] = []
-    private let productionPersistence: ProductionLibraryPersistence?
+    private var productionPersistence: ProductionLibraryPersistence?
+    private let productionFactory: (() throws -> ProductionLibraryPersistence)?
+    private var usesProductionStorage: Bool { productionPersistence != nil || productionFactory != nil }
     private var suppressPersistence = false
     private var bootstrapStarted = false
     private var pendingSave: Task<Void, Never>?
@@ -188,8 +190,10 @@ final class LibraryStore: ObservableObject {
     private var appearancePreparation: (() throws -> AppearanceMigrationInput)?
 
     init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil, seedDemoData: Bool = true,
-         productionPersistence: ProductionLibraryPersistence? = nil) {
+         productionPersistence: ProductionLibraryPersistence? = nil,
+         productionFactory: (() throws -> ProductionLibraryPersistence)? = nil) {
         self.productionPersistence = productionPersistence
+        self.productionFactory = productionFactory
         self.isDemo = seedDemoData
         self.books = books
         self.defaults = defaults
@@ -203,7 +207,7 @@ final class LibraryStore: ObservableObject {
         })
         settings = .init()
         updates = seedDemoData ? Dictionary(uniqueKeysWithValues: books.filter { $0.status == "连载中" }.map { ($0.id, UpdateNotice(firstChapter: max(0, $0.chapters.count - 3))) }) : [:]
-        if productionPersistence != nil { loadState = .loading; return }
+        if productionPersistence != nil || productionFactory != nil { loadState = .loading; return }
         if let importsURL, FileManager.default.fileExists(atPath: importsURL.path) {
             do {
                 let saved = try JSONDecoder().decode([Book].self, from: Data(contentsOf: importsURL))
@@ -409,7 +413,7 @@ final class LibraryStore: ObservableObject {
 
     func persist() {
         guard !suppressPersistence else { return }
-        if productionPersistence != nil {
+        if usesProductionStorage {
             guard loadState == .ready else { return }
             changeRevision += 1; hasPendingChanges = true
             scheduleSave()
@@ -429,12 +433,14 @@ final class LibraryStore: ObservableObject {
 
     func bootstrapProductionIfNeeded(prepareAppearance: (() throws -> AppearanceMigrationInput)? = nil, forceReload: Bool = false) async {
         if let prepareAppearance { appearancePreparation = prepareAppearance }
-        guard let backend = productionPersistence, !bootstrapStarted || loadState == .failed || forceReload else { return }
+        guard usesProductionStorage, !bootstrapStarted || loadState == .failed || forceReload else { return }
         if forceReload && loadState == .ready {
             guard await flushPendingWrites() else { return }
         }
         bootstrapStarted = true; loadState = .loading
         do {
+            if productionPersistence == nil { productionPersistence = try productionFactory?() }
+            guard let backend = productionPersistence else { throw ContentFailure.storageFailure }
             let appearance = try appearancePreparation?()
             let restored = try await backend.bootstrap(legacySnapshot: defaults.data(forKey: Self.storageKey), archiveURL: importsURL,
                                                        legacyThemeData: defaults.data(forKey: "yueshan.reader.theme-library.v1"), appearance: appearance)
@@ -464,6 +470,12 @@ final class LibraryStore: ObservableObject {
     func updateThemeLibrary(_ value: ThemeLibrarySnapshot) {
         guard loadState == .ready, themeLibrary != value else { return }
         themeLibrary = value; persist()
+    }
+
+    func retryStorage() async {
+        if loadState == .failed { await bootstrapProductionIfNeeded() }
+        else if hasPendingChanges { _ = await flushPendingWrites() }
+        else { await bootstrapProductionIfNeeded(forceReload: true) }
     }
 
     func moveBooks(_ ids: Set<String>, toGroup name: String) {
@@ -527,7 +539,8 @@ final class LibraryStore: ObservableObject {
 
     @discardableResult
     func importBookDurably(_ book: Book, group: String = "未分组") async throws -> Bool {
-        guard let backend = productionPersistence else { return try importBook(book, group: group) }
+        guard usesProductionStorage else { return try importBook(book, group: group) }
+        guard let backend = productionPersistence else { throw ContentFailure.storageFailure }
         guard loadState == .ready else { throw ContentFailure.storageFailure }
         enqueueSave()
         let previous = writeTail
@@ -588,7 +601,7 @@ final class LibraryStore: ObservableObject {
 
     @discardableResult
     func flushPendingWrites() async -> Bool {
-        guard productionPersistence != nil else { persist(); return true }
+        guard usesProductionStorage else { persist(); return true }
         guard loadState == .ready else { return false }
         while true {
             pendingSave?.cancel(); pendingSave = nil

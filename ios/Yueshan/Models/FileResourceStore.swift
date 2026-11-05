@@ -30,7 +30,7 @@ final class FileResourceStore: @unchecked Sendable {
         guard reference.isValid else { throw ContentFailure.storageFailure }
         let root = directory.standardizedFileURL.resolvingSymlinksInPath()
         let url = root.appendingPathComponent(reference.filename).standardizedFileURL.resolvingSymlinksInPath()
-        guard url.deletingLastPathComponent() == root else { throw ContentFailure.storageFailure }
+        guard url.deletingLastPathComponent().path == root.path else { throw ContentFailure.storageFailure }
         return url
     }
     func read(_ reference: ResourceFileReference) throws -> Data {

@@ -8,6 +8,11 @@ final class ThemeAssetsFlowTests: XCTestCase {
         let themes = app.buttons["profileThemes"]
         reveal(themes, app: app); themes.tap()
         XCTAssertTrue(app.segmentedControls["themeLibraryTabs"].waitForExistence(timeout: 8))
+        // Start this mixing scenario with an explicitly selected theme. A fresh
+        // reader otherwise shows its independent paper-color card.
+        app.buttons["theme-card-paper"].tap()
+        app.buttons["themeApply"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
         return app
     }
     @MainActor private func reveal(_ element: XCUIElement, app: XCUIApplication) {
@@ -36,6 +41,7 @@ final class ThemeAssetsFlowTests: XCTestCase {
         app.switches["assetLongTitle"].tap()
         capture(app, "Themes-LongTitle")
         app.buttons["themeAssetApply"].tap(); back(app)
+        for _ in 0..<8 { if app.buttons["activeThemeCard"].exists { break }; app.swipeDown() }
         XCTAssertTrue(app.buttons["activeThemeCard"].label.contains("山林侧题"))
         tab("段评气泡", app: app)
         let bubble = app.buttons["theme-asset-night:bubble:main"]
@@ -45,6 +51,7 @@ final class ThemeAssetsFlowTests: XCTestCase {
         capture(app, "Themes-SVGBubbles")
         app.buttons["themeAssetFavorite"].tap(); app.buttons["themeAssetApply"].tap(); back(app)
         let current = app.buttons["activeThemeCard"]
+        for _ in 0..<8 { if current.exists { break }; app.swipeDown() }
         XCTAssertTrue(current.label.contains("暖纸山林")); XCTAssertTrue(current.label.contains("山林侧题")); XCTAssertTrue(current.label.contains("夜读深林·气泡"))
         current.tap(); app.buttons["themeCustomize"].tap()
         XCTAssertTrue(app.navigationBars["自定义搭配"].waitForExistence(timeout: 5))

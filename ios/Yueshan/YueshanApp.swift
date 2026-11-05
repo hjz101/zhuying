@@ -54,8 +54,12 @@ struct YueshanApp: App {
                 try manager.createDirectory(at: documents, withIntermediateDirectories: true)
                 try ThemeStyleSamples.importData.write(to: documents.appendingPathComponent("阅读套装.json"))
             }
-            let backend = environment.isDemo ? nil : try ProductionLibraryPersistence(directory: databaseDirectory)
-            _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo, productionPersistence: backend))
+            var rejectFirstOpen = testing && ProcessInfo.processInfo.arguments.contains("--storage-retry-fixture")
+            _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo,
+                productionFactory: environment.isDemo ? nil : {
+                    if rejectFirstOpen { rejectFirstOpen = false; throw CocoaError(.fileWriteNoPermission) }
+                    return try ProductionLibraryPersistence(directory: databaseDirectory)
+                }))
             launchError = nil
         } catch {
             _library = StateObject(wrappedValue: LibraryStore(books: [], defaults: defaults, seedDemoData: environment.isDemo))
@@ -130,6 +134,7 @@ struct RootView: View {
             ReaderView(book: session.book, initialChapter: session.chapter).id(session.id).environmentObject(store)
         }
         .alert("本地记录提示", isPresented: Binding(get: { store.storageMessage != nil }, set: { if !$0 { store.storageMessage = nil } })) {
+            if !store.isDemo { Button("重试") { Task { await store.retryStorage() } } }
             Button("知道了") { store.storageMessage = nil }
         } message: { Text(store.storageMessage ?? "") }
     }

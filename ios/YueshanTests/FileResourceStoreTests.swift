@@ -8,6 +8,15 @@ final class FileResourceStoreTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     }
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: root) }
+    func testNewNestedDirectoryWithoutDirectoryURLHintCanStageResources() throws {
+        let path = root.appendingPathComponent("Application Support/resources/themes").path
+        let directory = URL(fileURLWithPath: path, isDirectory: false)
+        let store = FileResourceStore(directory: directory)
+        let bytes = Data(".chapter-title {}".utf8)
+        let staged = try store.stage(bytes, kind: .css)
+        XCTAssertEqual(try store.read(staged.reference), bytes)
+        XCTAssertEqual(try store.url(for: staged.reference).deletingLastPathComponent().path, path)
+    }
     func testHashReferenceSurvivesReopenAndDetectsByteCorruption() throws {
         let store = FileResourceStore(directory: root)
         let data = Data(".chapter-title { color: #123456; }".utf8)

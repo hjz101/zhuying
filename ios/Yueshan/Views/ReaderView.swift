@@ -90,11 +90,6 @@ struct ReaderView: View {
                 }
                 if controlsVisible {
                     footer
-                } else {
-                    Button { controlsVisible = true; haptic() } label: {
-                        Label("显示工具栏", systemImage: "ellipsis").font(.system(size: 10)).padding(.horizontal, 14).frame(height: 20).foregroundStyle(theme.secondary).background(theme.background.opacity(0.92), in: Capsule())
-                            .frame(height: 44, alignment: .bottom)
-                    }.accessibilityIdentifier("showReaderControls")
                 }
             }
         }

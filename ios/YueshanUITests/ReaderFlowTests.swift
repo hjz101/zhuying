@@ -481,6 +481,23 @@ final class ReaderFlowTests: XCTestCase {
     }
 
     @MainActor
+    private func assertReaderControlsHidden(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !app.otherElements["readerTopToolbar"].exists && !app.otherElements["readerFloatingToolbar"].exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, "Tapping the text center hides both reading toolbars", file: file, line: line)
+        XCTAssertFalse(app.otherElements["readerTopToolbar"].exists, file: file, line: line)
+        XCTAssertFalse(app.otherElements["readerFloatingToolbar"].exists, file: file, line: line)
+        XCTAssertFalse(app.sliders["chapterSlider"].exists, file: file, line: line)
+        XCTAssertFalse(app.staticTexts["readerPageStatus"].exists, file: file, line: line)
+        for id in ["readerMoreTools", "readerContents", "readerSettings", "readerNarration", "readerSkins", "previousChapter", "nextChapter", "showReaderControls"] {
+            XCTAssertFalse(app.buttons[id].exists, "Hidden reading controls must leave no button behind: \(id)", file: file, line: line)
+        }
+        XCTAssertFalse(app.buttons["显示工具栏"].exists, file: file, line: line)
+        XCTAssertFalse(app.staticTexts["显示工具栏"].exists, file: file, line: line)
+    }
+
+    @MainActor
     private func capture(_ app: XCUIApplication, name: String) {
         let preview = XCTAttachment(screenshot: app.screenshot())
         preview.name = name
@@ -601,10 +618,12 @@ final class ReaderFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 2 /"))
         app.buttons["readerTapCenter"].swipeLeft()
         XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 3 /"))
+        let pageBeforeHiding = app.staticTexts["readerPageStatus"].label
         app.buttons["readerTapCenter"].tap()
-        XCTAssertTrue(app.buttons["showReaderControls"].waitForExistence(timeout: 5))
-        app.buttons["showReaderControls"].tap()
-        XCTAssertTrue(app.buttons["readerContents"].isHittable)
+        assertReaderControlsHidden(in: app)
+        app.buttons["readerTapCenter"].tap()
+        assertFloatingToolbar(in: app)
+        XCTAssertEqual(app.staticTexts["readerPageStatus"].label, pageBeforeHiding, "Center taps toggle the controls without turning a page")
         let slider = app.sliders["chapterSlider"]
         slider.adjust(toNormalizedSliderPosition: 0.7)
         XCTAssertNotEqual(app.staticTexts["chapterTitle"].label, "第三章 山雨欲来")
@@ -632,8 +651,7 @@ final class ReaderFlowTests: XCTestCase {
         // UITextView.tap() can choose its top-left accessibility hit point,
         // which now sits under the overlaid back button. Tap the actual center.
         text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssertTrue(app.buttons["showReaderControls"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["readerSettings"].exists)
+        assertReaderControlsHidden(in: app)
         XCTAssertGreaterThan(text.frame.height, app.frame.height * 0.82, "Hidden controls must not reserve space above or below the text")
         XCTAssertGreaterThan(text.frame.maxY, app.frame.maxY - 65, "The text viewport must reach the bottom safe area")
         XCTAssertEqual(text.frame, frame, "Toggling the overlay must not resize or reflow the text")
@@ -641,7 +659,8 @@ final class ReaderFlowTests: XCTestCase {
         preview.name = "ImmersiveScrollingReader"
         preview.lifetime = .keepAlways
         add(preview)
-        app.buttons["showReaderControls"].tap()
+        text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        assertFloatingToolbar(in: app)
         XCTAssertEqual(text.frame, frame)
         XCTAssertEqual(app.staticTexts["readerPageStatus"].label, progress)
 
@@ -649,10 +668,17 @@ final class ReaderFlowTests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
         XCTAssertTrue(text.waitForExistence(timeout: 5))
+        let landscapeFrame = text.frame
+        let landscapeProgress = app.staticTexts["readerPageStatus"].label
         text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssertTrue(app.buttons["showReaderControls"].waitForExistence(timeout: 5))
+        assertReaderControlsHidden(in: app)
         XCTAssertGreaterThan(text.frame.height, app.frame.height * 0.82)
         XCTAssertGreaterThan(text.frame.maxY, app.frame.maxY - 65)
+        text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["readerContents"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.sliders["chapterSlider"].exists)
+        XCTAssertEqual(text.frame, landscapeFrame)
+        XCTAssertEqual(app.staticTexts["readerPageStatus"].label, landscapeProgress)
     }
 
     @MainActor
@@ -671,8 +697,7 @@ final class ReaderFlowTests: XCTestCase {
         XCTAssertTrue(text.waitForExistence(timeout: 5))
         let frame = text.frame
         app.buttons["readerTapCenter"].tap()
-        XCTAssertTrue(app.buttons["showReaderControls"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["readerContents"].exists)
+        assertReaderControlsHidden(in: app)
         XCTAssertGreaterThan(text.frame.height, app.frame.height * 0.78, "Pagination must use the full reading height")
         XCTAssertGreaterThan(text.frame.maxY, app.frame.maxY - 85)
         XCTAssertEqual(text.frame, frame)
@@ -680,7 +705,7 @@ final class ReaderFlowTests: XCTestCase {
         preview.name = "ImmersivePagedReader"
         preview.lifetime = .keepAlways
         add(preview)
-        app.buttons["showReaderControls"].tap()
+        app.buttons["readerTapCenter"].tap()
         XCTAssertEqual(app.staticTexts["readerPageStatus"].label, page, "Showing controls must preserve the current page and page count")
         XCTAssertEqual(text.frame, frame)
         assertFloatingToolbar(in: app)

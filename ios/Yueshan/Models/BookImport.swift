@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-enum ImportEncoding: String, CaseIterable {
+enum ImportEncoding: String, CaseIterable, Sendable {
     case automatic = "自动识别", utf8 = "UTF-8", gb18030 = "GB18030", utf16 = "UTF-16"
 }
 
@@ -10,13 +10,13 @@ enum BookImportError: LocalizedError {
     var errorDescription: String? { switch self { case .message(let text): text } }
 }
 
-struct PreparedBookImport {
+struct PreparedBookImport: Sendable {
     let book: Book
     let bytes: Int
     let encoding: String
 }
 
-enum BookImportInput {
+enum BookImportInput: Sendable {
     case file(URL), remote(URL), text(String)
     var name: String {
         switch self {
@@ -31,13 +31,13 @@ enum BookImporter {
 
     static func remoteURL(_ input: String) throws -> URL {
         guard let url = URL(string: input.trimmingCharacters(in: .whitespacesAndNewlines)),
-              url.scheme?.lowercased() == "https", url.host != nil else {
+              url.scheme?.lowercased() == "https", url.host != nil, url.user == nil, url.password == nil else {
             throw BookImportError.message("请输入完整的 https 文件链接；书源和主题链接请使用对应的导入入口。")
         }
         return url
     }
 
-    static func load(_ input: BookImportInput, encoding: ImportEncoding) async throws -> PreparedBookImport {
+    static func load(_ input: BookImportInput, encoding: ImportEncoding, downloader: any BookImportDownloading = BoundedBookDownloader()) async throws -> PreparedBookImport {
         switch input {
         case .text(let text): return try prepare(data: Data(text.utf8), name: input.name, encoding: .utf8)
         case .file(let url):
@@ -48,16 +48,10 @@ enum BookImporter {
             try validateSize(values.fileSize ?? 0)
             return try prepare(data: Data(contentsOf: url), name: url.lastPathComponent, encoding: encoding)
         case .remote(let url):
-            let (file, response) = try await URLSession.shared.download(from: url)
-            defer { try? FileManager.default.removeItem(at: file) }
-            guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
-                throw BookImportError.message("下载失败，请检查链接后重试。")
-            }
-            let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            try validateSize(size)
-            let suggested = response.suggestedFilename ?? url.lastPathComponent
+            let downloaded = try await downloader.fetch(url)
+            let suggested = downloaded.suggestedName ?? url.lastPathComponent
             let name = (suggested as NSString).pathExtension.isEmpty ? url.lastPathComponent : suggested
-            return try prepare(data: Data(contentsOf: file), name: name, encoding: encoding)
+            return try prepare(data: downloaded.data, name: name, encoding: encoding)
         }
     }
 
@@ -109,7 +103,7 @@ enum BookImporter {
 
 }
 
-enum ImportItemStatus: Equatable { case ready, duplicate, imported, failed(String) }
+enum ImportItemStatus: Equatable { case ready, duplicate, imported, cancelled, failed(String) }
 struct BookImportItem: Identifiable {
     let id = UUID()
     let input: BookImportInput
@@ -125,26 +119,52 @@ final class BookImportSession: ObservableObject {
     @Published var progressText = ""
     @Published var message: String?
     @Published var finished = false
+    private let loader: any BookImportLoading
+    private var activeLoad: Task<PreparedBookImport, Error>?
+    private var cancelRequested = false
+    init(loader: any BookImportLoading = NativeBookImportLoader()) { self.loader = loader }
+    var cancelledCount: Int { items.filter { $0.status == .cancelled }.count }
+    var retryableCount: Int { failedCount + cancelledCount }
     var readyCount: Int { items.filter { $0.status == .ready && selection.contains($0.id) }.count }
     var failedCount: Int { items.filter { if case .failed = $0.status { return true }; return false }.count }
     var summary: String {
-        "成功 \(items.filter { $0.status == .imported }.count) 项 · 重复 \(items.filter { $0.status == .duplicate }.count) 项 · 失败 \(failedCount) 项"
+        "成功 \(items.filter { $0.status == .imported }.count) 项 · 重复 \(items.filter { $0.status == .duplicate }.count) 项 · 失败 \(failedCount) 项" + (cancelledCount > 0 ? " · 取消 \(cancelledCount) 项" : "")
     }
 
     func add(_ inputs: [BookImportInput], encoding: ImportEncoding, library: LibraryStore) async {
         guard !busy else { return }
-        busy = true; finished = items.contains { $0.status == .imported }; message = nil
-        defer { busy = false; progressText = "" }
+        busy = true; cancelRequested = false; finished = items.contains { $0.status == .imported }; message = nil
+        defer { activeLoad = nil; busy = false; progressText = "" }
         for (index, input) in inputs.enumerated() {
+            if cancelRequested || Task.isCancelled { appendCancelled(Array(inputs.dropFirst(index))); break }
             progressText = "正在识别 \(index + 1) / \(inputs.count)"
             do {
-                let prepared = try await Task.detached { try await BookImporter.load(input, encoding: encoding) }.value
+                let loader = loader
+                let task = Task.detached { try await loader.load(input, encoding: encoding) }
+                activeLoad = task
+                let prepared = try await withTaskCancellationHandler(operation: { try await task.value }, onCancel: { task.cancel() })
+                guard !cancelRequested, !Task.isCancelled else { throw CancellationError() }
                 let duplicate = library.books.contains { $0.id == prepared.book.id } || items.contains { $0.prepared?.book.id == prepared.book.id && ($0.status == .ready || $0.status == .imported) }
                 let item = BookImportItem(input: input, prepared: prepared, status: duplicate ? .duplicate : .ready)
                 items.append(item)
                 if !duplicate { selection.insert(item.id) }
-            } catch { items.append(.init(input: input, status: .failed(error.localizedDescription))) }
+            } catch {
+                if cancelRequested || Task.isCancelled || error is CancellationError {
+                    appendCancelled(Array(inputs.dropFirst(index))); break
+                }
+                items.append(.init(input: input, status: .failed(error.localizedDescription)))
+            }
         }
+    }
+    private func appendCancelled(_ inputs: [BookImportInput]) {
+        items.append(contentsOf: inputs.map { .init(input: $0, status: .cancelled) })
+        message = "已停止后续处理，已完成项目保留，可重试取消项。"
+    }
+    func cancel() {
+        guard busy else { return }
+        cancelRequested = true; activeLoad?.cancel()
+        progressText = "正在停止，保留已完成项目"
+        message = "已停止后续处理，已完成项目保留。"
     }
 
     func remove(_ id: UUID, library: LibraryStore) {
@@ -161,19 +181,29 @@ final class BookImportSession: ObservableObject {
 
     func retry(encoding: ImportEncoding, library: LibraryStore) async {
         guard !busy else { return }
-        let failed = items.filter { if case .failed = $0.status { return true }; return false }
-        let ids = Set(failed.map(\.id))
-        items.removeAll { ids.contains($0.id) }
-        await add(failed.map(\.input), encoding: encoding, library: library)
+        var inputs: [BookImportInput] = [], removeIDs = Set<UUID>()
+        var known = Set(library.books.map(\.id) + items.filter { $0.status == .ready || $0.status == .imported }.compactMap { $0.prepared?.book.id })
+        for index in items.indices {
+            guard items[index].status == .cancelled || { if case .failed = items[index].status { return true }; return false }() else { continue }
+            if let prepared = items[index].prepared {
+                let duplicate = !known.insert(prepared.book.id).inserted
+                items[index].status = duplicate ? .duplicate : .ready
+                if !duplicate { selection.insert(items[index].id) }
+            } else { inputs.append(items[index].input); removeIDs.insert(items[index].id) }
+        }
+        items.removeAll { removeIDs.contains($0.id) }; finished = false; message = nil
+        if !inputs.isEmpty { await add(inputs, encoding: encoding, library: library) }
     }
 
     func commit(library: LibraryStore, group: String) async {
         guard !busy, readyCount > 0 else { return }
-        busy = true
+        busy = true; cancelRequested = false; message = nil
         defer { busy = false; progressText = "" }
         for index in items.indices where items[index].status == .ready && selection.contains(items[index].id) {
+            if cancelRequested || Task.isCancelled { break }
             progressText = "正在保存 \(items[index].input.name)"
             await Task.yield()
+            if cancelRequested || Task.isCancelled { break }
             guard let book = items[index].prepared?.book else { continue }
             do { items[index].status = try await library.importBookDurably(book, group: group) ? .imported : .duplicate }
             catch { items[index].status = .failed("保存失败：\(error.localizedDescription)") }

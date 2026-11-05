@@ -32,8 +32,8 @@ struct SmartImportView: View {
                 if session.finished {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(session.summary).font(.system(size: 14, weight: .medium)).accessibilityIdentifier("importSummary")
-                        if session.failedCount > 0 {
-                            Button("重试失败项") { retry() }.font(.system(size: 13)).accessibilityIdentifier("importRetry")
+                        if session.retryableCount > 0 {
+                            Button(session.cancelledCount > 0 ? "重试未完成项" : "重试失败项") { retry() }.font(.system(size: 13)).accessibilityIdentifier("importRetry")
                         }
                         if session.readyCount > 0 { Text("未选中的文件仍在清单中，可继续导入。").font(.system(size: 11)).foregroundStyle(Palette.muted) }
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Palette.soft, in: .rect(cornerRadius: 12))
@@ -60,6 +60,7 @@ struct SmartImportView: View {
                 }
             }
             .onAppear { if openPickerOnAppear { showingFiles = true } }
+            .onDisappear { session.cancel() }
             .onChange(of: source) { _, _ in session.message = nil }
             .sheet(isPresented: $showingHelp) { help }
     }
@@ -115,7 +116,7 @@ struct SmartImportView: View {
             HStack {
                 Text("导入预览 · \(session.items.count) 项").font(.system(size: 15, weight: .medium))
                 Spacer()
-                if session.failedCount > 0 && !session.finished { Button("重试失败项") { retry() }.font(.system(size: 12)).accessibilityIdentifier("importRetry") }
+                if session.retryableCount > 0 && !session.finished { Button(session.cancelledCount > 0 ? "重试未完成项" : "重试失败项") { retry() }.font(.system(size: 12)).accessibilityIdentifier("importRetry") }
             }
             ForEach(session.items) { item in
                 VStack(spacing: 12) {
@@ -161,7 +162,13 @@ struct SmartImportView: View {
 
     private var primaryAction: some View {
         VStack(spacing: 8) {
-            if session.busy { HStack { ProgressView(); Text(session.progressText).font(.system(size: 12)) }.accessibilityIdentifier("importProgress") }
+            if session.busy {
+                HStack {
+                    ProgressView(); Text(session.progressText).font(.system(size: 12))
+                    Spacer()
+                    Button("取消") { session.cancel() }.accessibilityIdentifier("importCancel")
+                }.accessibilityIdentifier("importProgress")
+            }
             if session.readyCount > 0 {
                 Button("导入选中的 \(session.readyCount) 项") { Task { await session.commit(library: library, group: group) } }
                     .buttonStyle(PrimaryButtonStyle()).disabled(session.busy).accessibilityIdentifier("importConfirm")
@@ -207,7 +214,7 @@ struct SmartImportView: View {
     }
     private func statusText(_ status: ImportItemStatus) -> String {
         switch status {
-        case .ready: "可导入"; case .duplicate: "内容重复，已跳过"; case .imported: "已导入书架"; case .failed(let message): message
+        case .ready: "可导入"; case .duplicate: "内容重复，已跳过"; case .imported: "已导入书架"; case .cancelled: "已取消，可重试"; case .failed(let message): message
         }
     }
 }

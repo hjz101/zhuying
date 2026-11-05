@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-struct Book: Codable, Identifiable, Hashable {
+struct Book: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let title: String
     let author: String

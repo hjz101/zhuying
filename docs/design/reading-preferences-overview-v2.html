@@ -1,0 +1,234 @@
+<style>
+#pref-overview-v2 { --bg:light-dark(#f7f5ef,#232923);--panel:light-dark(#fffefa,#303831);--ink:light-dark(#354e40,#dce7da);--muted:light-dark(#737c70,#adb8a9);--line:light-dark(#e1e4d9,#485247);--soft:light-dark(#eaede4,#3b473b);--selected:light-dark(#354e40,#c5d8bf);--on:light-dark(#fffefa,#233126);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;color:var(--ink); }
+#pref-overview-v2 * {box-sizing:border-box}
+#pref-overview-v2 .stage {padding:20px 8px;display:flex;justify-content:center}
+#pref-overview-v2 .phone {width:100%;max-width:420px;min-height:930px;background:var(--bg);border:1px solid var(--line);border-radius:28px;box-shadow:0 12px 30px #22332210;overflow:hidden;font-size:14px;line-height:1.55}
+#pref-overview-v2 :where(.phone) button,#pref-overview-v2 :where(.phone) input,#pref-overview-v2 :where(.phone) textarea,#pref-overview-v2 :where(.phone) select {font:inherit;color:inherit}
+#pref-overview-v2 :where(.phone) button {border:0;background:none;padding:0;text-align:left}
+#pref-overview-v2 .status {display:flex;justify-content:space-between;padding:17px 23px 7px;font-size:12px}
+#pref-overview-v2 .nav {display:grid;grid-template-columns:48px 1fr 48px;align-items:center;margin:0 18px;height:50px}
+#pref-overview-v2 .nav strong {font-size:16px;font-weight:500;text-align:center}
+#pref-overview-v2 .nav button {min-height:44px;display:flex;align-items:center;font-size:12px}
+#pref-overview-v2 .nav button:last-child {justify-content:flex-end}
+#pref-overview-v2 .nav svg {width:18px;height:18px}
+#pref-overview-v2 .content {padding:8px 18px 24px}
+#pref-overview-v2 h2 {font:500 25px/1.45 'Songti SC','STSong',serif;margin:9px 0 6px}
+#pref-overview-v2 h3 {font-size:13px;font-weight:500;margin:18px 0 9px}
+#pref-overview-v2 p {margin:0}
+#pref-overview-v2 .sub {color:var(--muted);font-size:11px}
+#pref-overview-v2 .intro {padding:12px 0 21px;border-bottom:1px solid var(--line);margin-bottom:17px}
+#pref-overview-v2 .eyebrow {font-size:10px;letter-spacing:.14em;color:var(--muted)}
+#pref-overview-v2 .grid {display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#pref-overview-v2 .category {background:var(--panel);border-radius:14px;min-height:118px;padding:15px 12px;display:flex;flex-direction:column;gap:4px}
+#pref-overview-v2 .category svg {width:20px;height:20px;margin-bottom:8px}
+#pref-overview-v2 .category strong {font-weight:500;font-size:14px}
+#pref-overview-v2 .category span {font-size:11px;color:var(--muted)}
+#pref-overview-v2 .list {background:var(--panel);border-radius:13px;padding:0 13px;margin:12px 0}
+#pref-overview-v2 .row {display:flex;gap:9px;align-items:center;justify-content:space-between;width:100%;min-height:47px;text-align:left}
+#pref-overview-v2 .row + .row {border-top:1px solid var(--line)}
+#pref-overview-v2 .row .end {color:var(--muted);font-size:11px;display:flex;align-items:center;gap:4px;max-width:58%;text-align:right}
+#pref-overview-v2 .end svg {height:13px;width:13px;flex-shrink:0}
+#pref-overview-v2 .actions {display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+#pref-overview-v2 .action {min-height:38px;border-radius:8px;background:var(--soft);padding:9px 12px;font-size:12px;text-align:center}
+#pref-overview-v2 .action.main {background:var(--selected);color:var(--on)}
+#pref-overview-v2 .action[aria-pressed='true'] {background:var(--selected);color:var(--on)}
+#pref-overview-v2 .filters {display:flex;gap:4px;padding:4px;background:var(--soft);border-radius:9px;margin:14px 0}
+#pref-overview-v2 .filters button {flex:1;text-align:center;min-height:34px;font-size:12px;border-radius:6px}
+#pref-overview-v2 .filters button[aria-pressed='true'] {background:var(--panel)}
+#pref-overview-v2 .paper {--reader-paper:#f1efdf;--reader-ink:#474f40;--reader-accent:#8b6449;background:var(--reader-paper);color:var(--reader-ink);border-radius:12px;margin:13px 0;padding:16px 20px;font-family:'Songti SC','STSong',serif}
+#pref-overview-v2 .chapter-title {font-size:17px;font-weight:500;line-height:1.65;text-align:center;margin:5px 0 13px;overflow-wrap:anywhere;max-width:100%}
+#pref-overview-v2 .page-header,#pref-overview-v2 .page-footer {display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;font:10px/1.5 -apple-system,sans-serif;opacity:.65;margin:0 0 12px}
+#pref-overview-v2 .page-footer {margin:14px 0 0}
+#pref-overview-v2 .page-header span:nth-child(2),#pref-overview-v2 .page-footer span:nth-child(2) {text-align:center}
+#pref-overview-v2 .page-header span:last-child,#pref-overview-v2 .page-footer span:last-child {text-align:right}
+#pref-overview-v2 .body-text {font-size:18px;line-height:1.9;overflow-wrap:anywhere}
+#pref-overview-v2 .body-text p {margin:0 0 12px}
+#pref-overview-v2 .paragraph-end {display:inline-flex;align-items:center;gap:3px;vertical-align:baseline;font:10px/1.2 -apple-system,sans-serif;border-radius:12px;padding:3px 6px;margin-left:5px;background:color-mix(in srgb,var(--reader-ink) 11%,transparent);color:var(--reader-ink);border:1px solid transparent;white-space:nowrap}
+#pref-overview-v2 .paragraph-end svg {width:10px;height:10px;display:inline-block}
+#pref-overview-v2 .paragraph-end[data-skin='描边'] {background:transparent;border-color:currentColor}
+#pref-overview-v2 .paragraph-end[data-skin='圆角方形'] {border-radius:4px;background:var(--reader-accent);color:var(--reader-paper)}
+#pref-overview-v2 .god-comment {font:12px/1.7 -apple-system,sans-serif;margin:4px 0 16px;padding:10px 12px;background:color-mix(in srgb,var(--reader-paper) 65%,#fff);border:1px solid color-mix(in srgb,var(--reader-ink) 15%,transparent);border-radius:9px;color:var(--reader-ink)}
+#pref-overview-v2 .god-comment[data-skin='液态玻璃'] {background:linear-gradient(120deg,#ffffffa0,#ffffff30);backdrop-filter:blur(12px);border:1px solid #ffffffa0;box-shadow:inset 0 1px 0 #fffd,0 3px 12px #2233220b}
+#pref-overview-v2 .god-comment[data-skin='画框'] {background:transparent;border:3px double var(--reader-accent);border-radius:2px;padding:9px 11px}
+#pref-overview-v2 .god-comment b {font-weight:500;font-size:11px;color:var(--reader-accent)}
+#pref-overview-v2 .sample-system {font-size:.88em;opacity:.8}
+#pref-overview-v2 .dropcap:first-letter {float:left;font-size:2.6em;line-height:1.1;margin:3px 5px 0 0;color:var(--reader-accent)}
+#pref-overview-v2 .preview-wrap .paper {margin-top:0}
+#pref-overview-v2 .preview-wrap .body-text > p:not(:first-child) {display:none}
+#pref-overview-v2 .preview-wrap .body-text .god-comment {margin-bottom:0}
+#pref-overview-v2 .theme-card {display:block;width:100%;border-radius:12px;margin:12px 0;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
+#pref-overview-v2 .theme-card .mini {padding:15px 16px;font-family:'Songti SC',serif}
+#pref-overview-v2 .theme-card .mini-title {font-size:16px;margin-bottom:6px}
+#pref-overview-v2 .theme-card .mini-text {font-size:13px;line-height:1.8}
+#pref-overview-v2 .theme-card .meta {display:flex;justify-content:space-between;gap:7px;padding:10px 13px;font-size:12px}
+#pref-overview-v2 .theme-card .meta span {font-size:11px;color:var(--muted)}
+#pref-overview-v2 .font-item {display:block;width:100%;padding:14px 0;border-bottom:1px solid var(--line)}
+#pref-overview-v2 .font-item .meta {display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px}
+#pref-overview-v2 .font-item .sample {font-size:20px;line-height:1.7;overflow-wrap:anywhere}
+#pref-overview-v2 label.field {display:block;font-size:12px;margin:13px 0}
+#pref-overview-v2 .field > span {display:flex;justify-content:space-between;margin-bottom:6px;gap:10px}
+#pref-overview-v2 .field input[type='text'],#pref-overview-v2 .field textarea,#pref-overview-v2 .field select {width:100%;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:10px 11px;min-height:39px}
+#pref-overview-v2 .field textarea {resize:vertical;min-height:130px;line-height:1.7}
+#pref-overview-v2 .field input[type='range'] {width:100%;accent-color:var(--ink);margin:3px 0}
+#pref-overview-v2 .field input[type='color'] {width:100%;height:39px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
+#pref-overview-v2 .two {display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#pref-overview-v2 .toggle {appearance:none;width:35px;height:21px;border-radius:25px;background:var(--line);position:relative;flex-shrink:0;margin:0}
+#pref-overview-v2 .toggle:before {content:'';position:absolute;left:2px;top:2px;width:17px;height:17px;border-radius:50%;background:var(--panel)}
+#pref-overview-v2 .toggle:checked {background:var(--selected)}
+#pref-overview-v2 .toggle:checked:before {left:16px;background:var(--on)}
+#pref-overview-v2 .rule {padding:13px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:6px 12px}
+#pref-overview-v2 .rule button {font-size:13px;min-height:28px}
+#pref-overview-v2 .rule .sub {grid-column:1/3}
+#pref-overview-v2 .note {font-size:11px;color:var(--muted);margin:10px 0;line-height:1.7}
+#pref-overview-v2 .error {font-size:12px;color:light-dark(#9b4133,#f1a18c);margin:8px 0}
+#pref-overview-v2 .footer {font-size:11px;color:var(--muted);margin:19px 0 9px;display:flex;justify-content:space-between;gap:10px}
+#pref-overview-v2 .message {font-size:11px;color:var(--muted);min-height:18px;margin-top:9px}
+#pref-overview-v2 .handle {height:4px;width:100px;background:var(--ink);border-radius:5px;margin:5px auto 12px;opacity:.65}
+#pref-overview-v2 [hidden] {display:none!important}
+@media(max-width:380px){#pref-overview-v2 .content{padding:8px 13px 20px}#pref-overview-v2 .category{padding:13px 10px}#pref-overview-v2 .phone{border-radius:22px}#pref-overview-v2 .two{gap:8px}}
+@media(pointer:coarse){#pref-overview-v2 .action,#pref-overview-v2 .filters button,#pref-overview-v2 .row{min-height:44px}#pref-overview-v2 .field input,#pref-overview-v2 .field select,#pref-overview-v2 .field textarea{font-size:16px}}
+</style>
+<div id="pref-overview-v2" class="viz-dotted-background">
+ <div class="stage"><div class="phone" aria-label="阅读偏好总览深化方案">
+  <div class="status"><span>9:41</span><span>阅山 · 阅读空间</span></div>
+  <div class="nav"><button type="button" data-back aria-label="返回上一级" class="cursor-interaction"><i data-lucide="chevron-left" aria-hidden="true"></i></button><strong data-nav-title>阅读偏好</strong><button type="button" data-home class="cursor-interaction">总览</button></div>
+  <div class="content" data-content></div>
+  <div class="handle"></div>
+  <input type="file" data-file hidden aria-label="选择本地样式文件">
+ </div></div>
+</div>
+<script>
+(function(){
+ const root=document.getElementById('pref-overview-v2');
+ const content=root.querySelector('[data-content]');
+ const file=root.querySelector('[data-file]');
+ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const themes=[
+  {id:'warm',name:'暖纸',source:'内置',paper:'#f1efdf',ink:'#474f40',accent:'#8b6449',bubble:'轻量胶囊',god:'纯色',css:'.chapter-title { text-align: center; color: var(--reader-accent); letter-spacing: 2px; }'},
+  {id:'mountain',name:'远山信笺',source:'导入示例',paper:'#e7eeea',ink:'#365449',accent:'#637c69',bubble:'描边',god:'液态玻璃',css:'.chapter-title { text-align: left; border-left: 3px solid var(--reader-accent); padding-left: 12px; }'},
+  {id:'frame',name:'旧书画廊',source:'导入示例',paper:'#f2e5d2',ink:'#594735',accent:'#9a6a42',bubble:'圆角方形',god:'画框',css:'.chapter-title { text-align: center; border-bottom: 1px solid var(--reader-accent); padding-bottom: 10px; }'}
+ ];
+ const fonts=[{id:'serif',name:'系统宋体',source:'内置',family:"'Songti SC','STSong',serif"},{id:'sans',name:'系统黑体',source:'内置',family:'-apple-system,BlinkMacSystemFont,sans-serif'},{id:'kai',name:'系统楷体',source:'内置',family:"'Kaiti SC','STKaiti',serif"}];
+ const defaults=()=>({theme:'warm',font:'serif',fontSize:19,left:28,right:16,linked:false,header:true,footer:true,hLeft:'书名',hCenter:'无',hRight:'时间',fLeft:'章节',fCenter:'进度',fRight:'无',headerGap:16,footerGap:16,css:null,bubble:null,god:null,showBubble:true,showGod:true,bubbleRadius:12,godRadius:9,bubbleName:'我的段尾气泡',godName:'我的神评卡片',bubbleColor:'#637c69',godColor:'#e8ebe3',godAccent:'#8b6449',mode:'上下滚动',tap:true,haptics:true,filter:'全部',testText:'山海有相逢，长风自有归处。Aa 0123，。！？',rules:[{id:'dialog',name:'人物对话',match:'对话引号',kind:'文字高亮',color:'#8f5442',enabled:true},{id:'system',name:'系统消息',match:'系统提示',kind:'段落底色',color:'#667e67',enabled:false},{id:'poem',name:'诗词',match:'诗词段落',kind:'居中斜体',color:'#876846',enabled:false},{id:'drop',name:'章节首字下沉',match:'章节首段',kind:'首字下沉',color:'#8b6449',enabled:false}]});
+ let s=defaults(),view='overview',history=[],selectedTheme='warm',ruleIndex=0,skinType='bubble',fontSerial=0;
+ let draft={name:'我的对话样式',match:'对话引号',kind:'文字高亮',color:'#8f5442',pattern:'「[^」]+」',scope:'全部书籍'};
+ const saved=globalThis.openai?.widgetState;
+ if(saved?.privateContent?.preferencesV2) Object.assign(s,saved.privateContent.preferencesV2);
+ else if(saved?.preferencesV2) Object.assign(s,saved.preferencesV2);
+ if(!themes.some(t=>t.id===s.theme))s.theme='warm';
+ if(!fonts.some(f=>f.id===s.font))s.font='serif';
+ function save(){if(globalThis.openai?.setWidgetState){const snapshot={...s,font:fonts.find(f=>f.id===s.font)?.source==='内置'?s.font:'serif',theme:themes.find(t=>t.id===s.theme)?.source==='我的导入'?'warm':s.theme};if(JSON.stringify(snapshot).length>3500)return;globalThis.openai.setWidgetState({modelContent:null,privateContent:{preferencesV2:snapshot}}).catch(()=>{});}}
+ const theme=()=>themes.find(t=>t.id===s.theme)||themes[0];
+ const font=()=>fonts.find(f=>f.id===s.font)||fonts[0];
+ const bubble=()=>s.bubble??theme().bubble;
+ const god=()=>s.god??theme().god;
+ const css=()=>s.css??theme().css;
+ const icon=n=>`<i data-lucide="${n}" aria-hidden="true"></i>`;
+ const action=(text,attrs='',main=false)=>`<button type="button" class="action ${main?'main ':''}cursor-interaction" ${attrs}>${text}</button>`;
+ const row=(name,value,target)=>`<button type="button" class="row cursor-interaction" data-open="${target}"><span>${name}</span><span class="end">${esc(value)}${icon('chevron-right')}</span></button>`;
+ const toggle=(name,key)=>`<label class="row cursor-interaction"><span>${name}</span><input type="checkbox" class="toggle" data-bind="${key}" aria-label="${name}" ${s[key]?'checked':''}></label>`;
+ const select=(label,key,values,value=s[key])=>`<label class="field"><span>${label}</span><select data-bind="${key}" aria-label="${label}">${values.map(v=>`<option ${v===value?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`;
+ const range=(label,key,min,max)=>`<label class="field"><span>${label}<output data-value="${key}">${s[key]} pt</output></span><input type="range" min="${min}" max="${max}" value="${s[key]}" data-bind="${key}" aria-label="${label}"></label>`;
+ const texts=()=>({书名:'长风渡山海',章节:'第三章',时间:'09:41',进度:s.mode==='左右分页'?'12 / 180':'章进度 36%',无:''});
+ function cssDeclarations(input){
+   if(typeof input!=='string'||input.length>20000)throw Error('CSS 内容过大。');
+   const clean=input.replace(/\/\*[\s\S]*?\*\//g,'').trim();
+   const m=clean.match(/^\.chapter-title\s*\{([^{}]*)\}\s*$/);
+   if(!m)throw Error('此预览支持 .chapter-title { … }，样式仅作用于章节标题。');
+   const allowed=new Set(['color','background','background-color','font-size','font-weight','font-style','font-family','text-align','letter-spacing','line-height','padding','padding-top','padding-bottom','padding-left','padding-right','border','border-left','border-right','border-top','border-bottom','border-radius','text-shadow','box-shadow']);
+   const result={};
+   for(const part of m[1].split(';')) {if(!part.trim())continue;const i=part.indexOf(':');if(i<1)throw Error('CSS 属性缺少冒号。');const key=part.slice(0,i).trim().toLowerCase(),value=part.slice(i+1).trim();if(!allowed.has(key))throw Error('当前预览暂不支持：'+key);if(!value||/[{}<>@]|url\s*\(|expression\s*\(|!important/i.test(value))throw Error('请使用标题区域的颜色、字体、边框和间距属性。');result[key]=value;}
+   return result;
+ }
+ function effectiveMargins(side,value){const v=Math.max(8,Math.min(56,Number(value)));return {left:side==='left'||s.linked?v:s.left,right:side==='right'||s.linked?v:s.right};}
+ function regexFor(rule){const presets={'对话引号':'[「“][^」”]+[」”]','系统提示':'【系统[^】]*】','诗词段落':'长风破浪会有时，直挂云帆济沧海。'};const pattern=rule.match==='正则表达式'?rule.pattern:presets[rule.match];if(!pattern)return null;return new RegExp(pattern,'gu');}
+ function styledText(text){let segments=[{text,styled:false}];for(const r of s.rules.filter(r=>r.enabled&&r.kind==='文字高亮')){let re;try{re=regexFor(r);}catch{continue;}if(!re)continue;const next=[];for(const segment of segments){if(segment.styled){next.push(segment);continue;}let at=0;for(const match of segment.text.matchAll(re)){if(!match[0])continue;if(match.index>at)next.push({text:segment.text.slice(at,match.index),styled:false});next.push({text:match[0],styled:true,color:r.color});at=match.index+match[0].length;}if(at<segment.text.length)next.push({text:segment.text.slice(at),styled:false});}segments=next;}return segments.map(seg=>seg.styled?`<span style="color:${esc(seg.color)}">${esc(seg.text)}</span>`:esc(seg.text)).join('');}
+ function paper(full=false){
+  const t=theme();const has=k=>s.rules.some(r=>r.enabled&&r.kind===k);
+  const bubbleHTML=s.showBubble?`<button type="button" class="paragraph-end cursor-interaction" data-open="comments" data-skin="${bubble()}" style="${s.bubble==='自定义'?'background:'+s.bubbleColor+';color:'+t.paper+';border-radius:'+s.bubbleRadius+'px':''}" aria-label="查看本段 12 条评论">${icon('message-circle')}12</button>`:'';
+  const godHTML=s.showGod?`<div class="god-comment" data-skin="${god()}" style="${god()==='自定义'?'border-radius:'+s.godRadius+'px;background:'+s.godColor+';border:1px solid '+s.godAccent:''}"><b>神人评论 · 山间客</b><p>这盏茶，怕不是等了整整一章。</p></div>`:'';
+  return `<div class="paper" data-paper style="--reader-paper:${t.paper};--reader-ink:${t.ink};--reader-accent:${t.accent};padding-left:${s.left}px;padding-right:${s.right}px;font-family:${esc(font().family)}">${s.header?`<div class="page-header" style="margin-bottom:${s.headerGap}px"><span>${texts()[s.hLeft]}</span><span>${texts()[s.hCenter]}</span><span>${texts()[s.hRight]}</span></div>`:''}<div class="chapter-title" data-title>第三章 · 山海有相逢</div><div class="body-text" style="font-size:${s.fontSize}px"><p class="${has('首字下沉')?'dropcap':''}">${styledText('雨是在午后停的。她说：「山路尽头，总有人为你留一盏茶。」')}${bubbleHTML}</p>${godHTML}${full?`<p class="sample-system" style="${has('段落底色')?'background:'+s.rules.find(r=>r.enabled&&r.kind==='段落底色').color+'22;padding:7px;border-radius:6px':''}">【系统提示：已解锁山海图鉴】</p><p style="${has('居中斜体')?'text-align:center;font-style:italic;color:'+s.rules.find(r=>r.enabled&&r.kind==='居中斜体').color:''}">长风破浪会有时，直挂云帆济沧海。</p>`:''}</div>${s.footer?`<div class="page-footer" style="margin-top:${s.footerGap}px"><span>${texts()[s.fLeft]}</span><span>${texts()[s.fCenter]}</span><span>${texts()[s.fRight]}</span></div>`:''}</div>`;
+ }
+ function rulePreview(){const current=s.rules;s.rules=current.map(r=>({...r}));const entry={...draft,enabled:true};if(ruleIndex<0)s.rules.push(entry);else s.rules[ruleIndex]=entry;const html=paper(true);s.rules=current;return html;}
+ function preview(){return `<div class="preview-wrap" data-preview>${paper()}</div>`;}
+ function screen(){
+  if(view==='overview')return `<div class="intro"><span class="eyebrow">YOUR READING SPACE</span><h2>你的阅读，自成风格。</h2><p class="sub">${esc(theme().name)} · ${esc(font().name)} · ${s.fontSize} pt</p></div><div class="grid">${[['palette','主题与字体','我的主题 · 本地字体','appearance'],['panels-top-left','排版与页面','章节 CSS · 边距 · 页眉页脚','layout'],['hand','翻页与手势','阅读方式 · 单手操作','operation'],['messages-square','正文与段评','样式规则 · 气泡 · 神人评论','content']].map(([i,n,d,id])=>`<button type="button" class="category cursor-interaction" data-open="${id}">${icon(i)}<strong>${n}</strong><span>${d}</span></button>`).join('')}</div><h3>当前阅读效果</h3><div data-preview>${paper(true)}</div><div class="footer"><span>偏好总览 · 交互提案</span><span>所有调整仅在预览中生效</span></div>`;
+  if(view==='appearance')return `${preview()}<div class="list">${row('阅读主题',theme().name,'themes')}${row('字体管理',font().name,'fonts')}</div><p class="note">主题包可包含配色、章节样式、段尾气泡和神评皮肤。个人已自定义的组件在切换主题时保留。</p><div class="list">${row('主题包含的组件','查看与应用','themeDetail')}</div>`;
+  if(view==='themes')return `<div class="filters">${['全部','内置','我的导入'].map(x=>`<button type="button" class="cursor-interaction" data-filter="${x}" aria-pressed="${s.filter===x}">${x}</button>`).join('')}</div><div class="actions">${action('导入主题包','data-import="theme"',true)}</div>${themes.filter(t=>s.filter==='全部'||(s.filter==='内置'?t.source==='内置':t.source!=='内置')).map(t=>`<button type="button" class="theme-card cursor-interaction" data-theme-detail="${t.id}"><div class="mini" style="background:${t.paper};color:${t.ink}"><div class="mini-title">${esc(t.name)}</div><p class="mini-text">山海有相逢，长风自有归处。 <span style="color:${t.accent}">▱ 12</span></p><p style="font:11px/1.6 -apple-system,sans-serif;margin-top:6px">神评皮肤：${t.god} · 气泡：${t.bubble}</p></div><div class="meta"><span>${esc(t.source)}</span><span>${t.id===s.theme?'使用中':'查看整页效果 ›'}</span></div></button>`).join('')}<p class="note">“我的导入”中包含两套示例，实际导入内容会以文件中的名称显示。</p>`;
+  if(view==='themeDetail'){const t=themes.find(t=>t.id===selectedTheme)||theme();return `<h2>${esc(t.name)}</h2><p class="sub">${esc(t.source)} · 完整阅读主题</p><div class="theme-card"><div class="mini" style="background:${t.paper};color:${t.ink}"><div class="mini-title">第三章 · 山海有相逢</div><p class="mini-text">山路尽头，总有人为你留一盏茶。</p><p class="mini-text">段尾气泡：${t.bubble}</p><p class="mini-text">神评皮肤：${t.god}</p></div></div><div class="list"><div class="row"><span>主题配色</span><span class="end">纸色 · 正文 · 强调色</span></div><div class="row"><span>章节样式</span><span class="end">${s.css?'保留个人自定义':'跟随主题'}</span></div><div class="row"><span>段尾气泡 / 神评</span><span class="end">${s.bubble||s.god?'保留个人自定义':'跟随主题'}</span></div></div><div class="actions">${action('应用主题 · 保留自定义',`data-apply-theme="${t.id}"`,true)}${action('仅应用配色',`data-colors-theme="${t.id}"`)}</div><p class="note">章节标题只在“排版与页面”编辑；本页仅展示主题包内的组件。</p>`;}
+  if(view==='fonts')return `${preview()}<label class="field"><span>自定义试字</span><input type="text" data-bind="testText" value="${esc(s.testText)}" aria-label="自定义试字"></label>${range('试读字号','fontSize',14,30)}<div class="actions">${action('导入 TTF / OTF 字体','data-import="font"',true)}</div><div data-font-list>${fontList()}</div><p class="note">导入后每行直接用字体文件排字；正文、中文标点、数字可一起对比。预览中的字体文件仅在当前会话加载。</p>`;
+  if(view==='layout')return `${preview()}<div class="list">${row('正文排版',s.fontSize+' pt · 行段距与字重','body')}${row('页面边距','左 '+s.left+' / 右 '+s.right+' pt','margins')}${row('章节标题',s.css?'自定义 CSS':'跟随主题','title')}${row('页眉与页脚','内容 · 位置 · 留白','headers')}</div><p class="note">章节样式的唯一编辑入口在这里。主题导入的标题 CSS 也在同一处预览、复制与编辑。</p>`;
+  if(view==='body')return `${preview()}${range('文字大小','fontSize',14,30)}<div class="list">${row('正文样式规则','对话 · 系统消息 · 诗词 · 首字下沉','rules')}${row('字体管理',font().name,'fonts')}</div>`;
+  if(view==='margins')return `${preview()}<div class="list">${toggle('左右边距联动','linked')}</div><div class="two">${range('左边距','left',8,56)}${range('右边距','right',8,56)}</div><p class="note">关闭联动后独立调节；例如左侧 32 pt、右侧 12 pt。预览同步显示正文偏移。</p><div class="actions">${action('左 32 / 右 12','data-asymmetric',true)}</div>`;
+  if(view==='headers')return `${preview()}<div class="list">${toggle('显示页眉','header')}${toggle('显示页脚','footer')}</div><h3>页眉</h3><div class="two">${select('页眉左侧','hLeft',['无','书名','章节','时间','进度'])}${select('页眉中间','hCenter',['无','书名','章节','时间','进度'])}${select('页眉右侧','hRight',['无','书名','章节','时间','进度'])}</div><h3>页脚</h3><div class="two">${select('页脚左侧','fLeft',['无','书名','章节','时间','进度'])}${select('页脚中间','fCenter',['无','书名','章节','时间','进度'])}${select('页脚右侧','fRight',['无','书名','章节','时间','进度'])}</div><div class="two">${range('页眉留白','headerGap',8,36)}${range('页脚留白','footerGap',8,36)}</div><p class="note">分页显示页码；滚动显示章节进度。页眉页脚留白计入页面排版，正文不会被覆盖。</p>`;
+  if(view==='title')return `${preview()}<p class="sub">${s.css?'个人自定义 · 优先于主题':'跟随主题 · '+esc(theme().name)}</p><div class="actions">${action('新建 CSS','data-new-css',true)}${action('导入 CSS','data-import="css"')}${action('恢复跟随主题','data-follow="css"')}</div><label class="field"><span>章节标题 CSS</span><textarea data-css spellcheck="false" aria-label="章节标题 CSS">${esc(css())}</textarea></label><div class="error" role="alert" data-css-error></div><p class="note">当前提案预览支持 .chapter-title 的颜色、字体、边框、圆角与间距。编辑即预览；不支持的 CSS 会显示提示。</p><div class="actions">${action('细线分隔','data-title-preset="line"')}${action('左侧题签','data-title-preset="tag"')}</div>`;
+  if(view==='operation')return `${preview()}${select('阅读方式','mode',['上下滚动','左右分页'])}<div class="list">${toggle('轻触翻页','tap')}${toggle('触觉反馈','haptics')}</div><p class="note">页眉页脚中的进度内容随滚动／分页切换。</p>`;
+  if(view==='content')return `${preview()}<div class="list">${row('正文样式规则',s.rules.length+' 条 · 可新增与编辑','rules')}${row('段评与神人评论','段尾气泡 · 段下精选评论','comments')}</div><p class="note">规则决定正文怎样呈现；评论皮肤分别控制段尾入口与段下评论卡片。</p>`;
+  if(view==='rules')return `<div data-preview>${paper(true)}</div><div class="actions">${action('＋ 新建规则','data-new-rule',true)}</div><div class="list">${s.rules.map((r,i)=>`<div class="rule"><button type="button" data-rule="${i}" class="cursor-interaction">${esc(r.name)} ›</button><input type="checkbox" class="toggle" data-rule-toggle="${i}" aria-label="启用${esc(r.name)}" ${r.enabled?'checked':''}><div class="sub">${esc(r.match)} → ${esc(r.kind)} · ${esc(r.scope||'全部书籍')}</div></div>`).join('')}</div><p class="note">从上到下决定同类样式的匹配优先级。首字下沉属于段落装饰，可以与对话高亮同时使用。</p>`;
+  if(view==='ruleEdit')return `<div data-preview>${rulePreview()}</div><label class="field"><span>规则名称</span><input type="text" data-draft="name" value="${esc(draft.name)}" aria-label="规则名称"></label>${draftSelect('匹配对象','match',['对话引号','系统提示','诗词段落','章节首段','正则表达式'])}${draft.match==='正则表达式'?`<label class="field"><span>正则表达式</span><input type="text" data-draft="pattern" value="${esc(draft.pattern||'')}" aria-label="正则表达式"></label>`:''}${draftSelect('呈现方式','kind',['文字高亮','段落底色','居中斜体','首字下沉'])}<label class="field"><span>规则颜色</span><input type="color" data-draft="color" value="${esc(draft.color)}" aria-label="规则颜色"></label>${draftSelect('作用范围','scope',['全部书籍','当前书籍','当前书源'])}<div class="error" role="alert" data-rule-error></div><div class="actions">${action('保存规则','data-save-rule',true)}${action('提升优先级','data-rule-up')}</div><p class="note">当前预览演示对话文字高亮、系统段落底色、诗词居中及章节首字下沉；自定义结构识别需在正式阅读器中实现。</p>`;
+  if(view==='comments')return `<div data-preview>${paper(true)}</div><h3>段尾气泡 · 紧接段落末尾</h3><div class="list">${toggle('显示段评气泡','showBubble')}${row('气泡皮肤',bubble()+(s.bubble?' · 自定义':' · 跟随主题'),'bubble')}</div><h3>神人评论 · 显示在该段下方</h3><div class="list">${toggle('显示神人评论','showGod')}${row('神评卡片皮肤',god()+(s.god?' · 自定义':' · 跟随主题'),'god')}</div><p class="note">主题包可以携带两种皮肤；也可在这里分别新建、单独导入。正式阅读器建议每段默认展示一条神评，更多评论点击段尾气泡展开。</p>`;
+  if(view==='bubble'||view==='god'){skinType=view;const isBubble=view==='bubble';return `<div data-preview>${paper(true)}</div><p class="sub">${s[view]?'个人自定义':'跟随主题 · '+esc(theme().name)}</p><div class="actions">${(isBubble?['轻量胶囊','描边','圆角方形']:['纯色','液态玻璃','画框']).map(x=>action(x,`data-select-skin="${x}" aria-pressed="${(isBubble?bubble():god())===x}"`)).join('')}</div><div class="actions">${action('新建皮肤','data-create-skin',true)}${action('导入皮肤','data-import="skin"')}${action('恢复跟随主题',`data-follow="${view}"`)}</div>${s[view]==='自定义'?`<label class="field"><span>皮肤名称</span><input type="text" data-bind="${isBubble?'bubbleName':'godName'}" value="${esc(s[isBubble?'bubbleName':'godName'])}" aria-label="皮肤名称"></label><label class="field"><span>底色</span><input type="color" data-bind="${isBubble?'bubbleColor':'godColor'}" value="${s[isBubble?'bubbleColor':'godColor']}" aria-label="皮肤底色"></label>${range('自定义圆角',isBubble?'bubbleRadius':'godRadius',0,24)}`:''}<p class="note">${isBubble?'气泡控制轮廓、颜色、计数和圆角，位置始终紧接段落末尾。':'神评卡片可用纯色、玻璃与画框；液态玻璃在正文背景上预览可读性。'}</p>`;}
+  return '';
+ }
+ function fontList(){return fonts.map(f=>`<button type="button" class="font-item cursor-interaction" data-font="${f.id}"><div class="meta"><span>${esc(f.name)} · ${esc(f.source)}</span><span>${s.font===f.id?'使用中':'使用字体'}</span></div><div class="sample" style="font-family:${esc(f.family)};font-size:${s.fontSize}px">${esc(s.testText)}</div></button>`).join('');}
+ function draftSelect(label,key,values){return `<label class="field"><span>${label}</span><select data-draft="${key}" aria-label="${label}">${values.map(v=>`<option ${draft[key]===v?'selected':''}>${v}</option>`).join('')}</select></label>`;}
+ const names={overview:'阅读偏好',appearance:'主题与字体',themes:'我的主题库',themeDetail:'主题详情',fonts:'字体管理',layout:'排版与页面',body:'正文排版',margins:'页面边距',headers:'页眉与页脚',title:'章节标题样式',operation:'翻页与手势',content:'正文与段评',rules:'正文样式规则',ruleEdit:'编辑样式规则',comments:'段评与神人评论',bubble:'段尾气泡皮肤',god:'神人评论皮肤'};
+ function render(){root.querySelector('[data-nav-title]').textContent=names[view];content.innerHTML=screen()+'<div class="message" role="status" data-message></div>';applyTitle();if(globalThis.lucide)lucide.createIcons({attrs:{width:16,height:16}});}
+ function applyTitle(){let declarations;try{declarations=cssDeclarations(css());}catch{return;}root.querySelectorAll('[data-title]').forEach(el=>{for(const [key,value]of Object.entries(declarations))el.style.setProperty(key,value);});if(s.bubble==='自定义')root.querySelectorAll('.paragraph-end').forEach(el=>el.style.borderRadius=s.bubbleRadius+'px');}
+ function updatePreview(){root.querySelectorAll('[data-preview]').forEach(el=>el.innerHTML=view==='ruleEdit'?rulePreview():el.classList.contains('preview-wrap')?paper():paper(true));applyTitle();if(globalThis.lucide)lucide.createIcons({attrs:{width:16,height:16}});}
+ function go(next){history.push(view);view=next;if(view==='themeDetail')selectedTheme=s.theme;render();}
+ function message(text){const el=root.querySelector('[data-message]');if(el)el.textContent=text;}
+ function edited(){save();}
+ root.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||!root.contains(b))return;
+  if(b.hasAttribute('data-back')){view=history.pop()||'overview';render();}
+  if(b.hasAttribute('data-home')){view='overview';history=[];render();}
+  if(b.dataset.open)go(b.dataset.open);
+  if(b.dataset.filter){s.filter=b.dataset.filter;render();edited();}
+  if(b.dataset.themeDetail){selectedTheme=b.dataset.themeDetail;history.push(view);view='themeDetail';render();}
+  if(b.dataset.applyTheme){s.theme=b.dataset.applyTheme;render();edited();message('已应用主题，个人自定义组件保留。');}
+  if(b.dataset.colorsTheme){const old=theme();s.css=s.css??old.css;s.bubble=s.bubble??old.bubble;s.god=s.god??old.god;s.theme=b.dataset.colorsTheme;render();edited();message('已应用配色，章节与评论皮肤保持原样。');}
+  if(b.dataset.font){s.font=b.dataset.font;render();edited();}
+  if(b.hasAttribute('data-asymmetric')){s.left=32;s.right=12;s.linked=false;render();edited();}
+  if(b.hasAttribute('data-new-css')){s.css='.chapter-title {\n  color: var(--reader-accent);\n  text-align: center;\n  border-bottom: 1px solid var(--reader-accent);\n  padding-bottom: 10px;\n}';render();edited();}
+  if(b.dataset.titlePreset){s.css=b.dataset.titlePreset==='line'?themes[2].css:themes[1].css;render();edited();}
+  if(b.dataset.follow){s[b.dataset.follow]=null;render();edited();}
+  if(b.dataset.import){file.dataset.kind=b.dataset.import;file.accept=b.dataset.import==='font'?'.ttf,.otf':b.dataset.import==='css'?'.css':'.json';file.value='';file.click();}
+  if(b.hasAttribute('data-new-rule')){ruleIndex=-1;draft={name:'我的对话样式',match:'对话引号',kind:'文字高亮',color:'#8f5442',pattern:'「[^」]+」',scope:'全部书籍'};go('ruleEdit');}
+  if(b.hasAttribute('data-rule')){ruleIndex=Number(b.dataset.rule);draft={scope:'全部书籍',...s.rules[ruleIndex]};go('ruleEdit');}
+  if(b.hasAttribute('data-save-rule')){try{if(!draft.name.trim())throw Error('请输入规则名称。');if(draft.match==='正则表达式')regexFor(draft);const value={...draft,id:ruleIndex<0?'rule-'+Date.now():s.rules[ruleIndex].id,enabled:true};if(ruleIndex<0){s.rules.push(value);ruleIndex=s.rules.length-1;}else s.rules[ruleIndex]=value;edited();view='rules';render();message('规则已保存。');}catch(err){root.querySelector('[data-rule-error]').textContent=err.message;}}
+  if(b.hasAttribute('data-rule-up')){if(ruleIndex>0){[s.rules[ruleIndex-1],s.rules[ruleIndex]]=[s.rules[ruleIndex],s.rules[ruleIndex-1]];ruleIndex--;edited();message('已提升匹配优先级。');}else message('保存规则后可调整顺序。');}
+  if(b.dataset.selectSkin){s[skinType]=b.dataset.selectSkin;render();edited();}
+  if(b.hasAttribute('data-create-skin')){s[skinType]='自定义';render();edited();}
+ });
+ root.addEventListener('input',e=>{
+  const el=e.target;
+  if(el.hasAttribute('data-css')){try{cssDeclarations(el.value);s.css=el.value;root.querySelector('[data-css-error]').textContent='';updatePreview();edited();}catch(err){root.querySelector('[data-css-error]').textContent=err.message;}return;}
+  if(el.dataset.draft){draft[el.dataset.draft]=el.value;if(el.dataset.draft==='match')render();else updatePreview();return;}
+  if(el.hasAttribute('data-rule-toggle')){s.rules[Number(el.dataset.ruleToggle)].enabled=el.checked;updatePreview();edited();return;}
+  if(!el.dataset.bind)return;
+  const key=el.dataset.bind;const value=el.type==='checkbox'?el.checked:el.type==='range'?Number(el.value):el.value;
+  if(key==='left'||key==='right'){Object.assign(s,effectiveMargins(key,value));root.querySelectorAll('input[data-bind="left"],input[data-bind="right"]').forEach(input=>input.value=s[input.dataset.bind]);}
+  else if(key==='linked'){s.linked=value;if(value)s.right=s.left;root.querySelectorAll('input[data-bind="left"],input[data-bind="right"]').forEach(input=>input.value=s[input.dataset.bind]);}
+  else s[key]=value;
+  root.querySelectorAll('[data-value]').forEach(o=>o.textContent=s[o.dataset.value]+' pt');
+  if(key==='testText'||key==='fontSize'){const list=root.querySelector('[data-font-list]');if(list)list.innerHTML=fontList();}
+  updatePreview();edited();
+ });
+ file.addEventListener('change',async()=>{
+  const f=file.files[0];if(!f)return;
+  try{
+   const kind=file.dataset.kind;
+   if(f.size>(kind==='font'?20*1024*1024:128*1024))throw Error('文件过大，请使用较小的样式文件。');
+   if(kind==='font'){const id='localfont'+(++fontSerial);const face=new FontFace(id,await f.arrayBuffer());await face.load();document.fonts.add(face);fonts.push({id,name:f.name,source:'我的导入',family:id});s.font=id;render();message('字体已加载，列表与正文使用此字体预览。');}
+   else if(kind==='css'){const text=await f.text();cssDeclarations(text);s.css=text;render();message('章节 CSS 已导入。');}
+   else if(kind==='theme'){const obj=JSON.parse(await f.text());if(typeof obj.name!=='string'||!obj.name.trim()||!['paper','ink','accent'].every(k=>/^#[0-9a-f]{6}$/i.test(obj[k]||'')))throw Error('主题需包含 name、paper、ink、accent 六位色值。');if(obj.css)cssDeclarations(obj.css);const id='theme'+Date.now();themes.push({...theme(),...obj,id,source:'我的导入',bubble:['轻量胶囊','描边','圆角方形'].includes(obj.bubble)?obj.bubble:theme().bubble,god:['纯色','液态玻璃','画框'].includes(obj.god)?obj.god:theme().god});selectedTheme=id;history.push(view);view='themeDetail';render();message('主题已加入“我的导入”，确认应用后切换。');}
+   else {const obj=JSON.parse(await f.text());const choices=skinType==='bubble'?['轻量胶囊','描边','圆角方形']:['纯色','液态玻璃','画框'];if(!choices.includes(obj.style))throw Error('当前提案支持导入已展示的皮肤类型。');s[skinType]=obj.style;render();message('已导入'+(skinType==='bubble'?'气泡':'神评')+'皮肤。');}
+   edited();
+  }catch(err){message('导入失败：'+err.message);}
+ });
+ window.addEventListener('openai:set_globals',e=>{const incoming=e.detail?.globals?.widgetState;const next=incoming?.privateContent?.preferencesV2||incoming?.preferencesV2;if(next){Object.assign(s,next);render();}});
+ render();
+ if(globalThis.Tweak){const opts={radius:14};const tweak=new Tweak({container:root.querySelector('.phone'),onChange:()=>root.querySelectorAll('.category').forEach(el=>el.style.borderRadius=opts.radius+'px')});tweak.addSlider(opts,'radius',{label:'总览分类圆角',min:6,max:22,unit:'px'});}
+})();
+</script>

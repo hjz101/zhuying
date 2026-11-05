@@ -156,6 +156,8 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
     func save(bookmark: LibraryBookmarkRecord) throws {
         let data = try JSONEncoder().encode(bookmark)
         try database.write { db in
+            guard let chapter = try Data.fetchOne(db, sql: "SELECT payload FROM chapter_records WHERE id = ? AND bookID = ?", arguments: [bookmark.anchor.chapterID, bookmark.anchor.bookID]),
+                  try JSONDecoder().decode(ChapterRecord.self, from: chapter).access == .readable else { throw ContentFailure.missingChapter }
             try db.execute(sql: "INSERT INTO bookmarks(id, bookID, payload) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", arguments: [bookmark.id, bookmark.anchor.bookID, data])
         }
     }
@@ -168,6 +170,20 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
     }
     func removeBookmark(id: String) throws {
         try database.write { try $0.execute(sql: "DELETE FROM bookmarks WHERE id = ?", arguments: [id]) }
+    }
+    func allBookmarks() throws -> [LibraryBookmarkRecord] {
+        try database.read { db in
+            try Data.fetchAll(db, sql: "SELECT payload FROM bookmarks ORDER BY id").map { try JSONDecoder().decode(LibraryBookmarkRecord.self, from: $0) }
+        }
+    }
+    /// Explicit permanent deletion; removing a favorite never calls this.
+    func deleteBook(id: String, preferences: [String: Data]) throws {
+        try database.write { db in
+            try db.execute(sql: "DELETE FROM book_records WHERE id = ?", arguments: [id])
+            for (key, data) in preferences {
+                try db.execute(sql: "INSERT INTO preferences(key, payload) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload", arguments: [key, data])
+            }
+        }
     }
     func savePreference(_ data: Data, key: String) throws {
         try database.write { db in

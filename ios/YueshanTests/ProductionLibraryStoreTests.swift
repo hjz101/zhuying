@@ -213,6 +213,57 @@ final class ProductionLibraryStoreTests: XCTestCase {
         XCTAssertEqual(restored.settings, library.settings)
     }
 
+    func testGroupsBookmarksAndPermanentDeletionHaveSeparateDurableBoundaries() async throws {
+        let library = try store(); await library.bootstrapProductionIfNeeded()
+        let first = try prepare()
+        let second = try BookImporter.prepare(data: Data("第一章 山\n第二本书的正文。".utf8), name: "山.txt").book
+        _ = try await library.importBookDurably(first); _ = try await library.importBookDurably(second)
+        library.moveBooks([first.id, second.id], toGroup: "待读")
+        library.renameGroup("待读", to: "收藏")
+        library.record(first, chapter: 1, characterOffset: 3)
+        let mark = try await library.saveBookmark(first, chapter: 1, paragraph: 0, offset: 3, title: "回声")
+        _ = try await library.saveBookmark(first, chapter: 1, paragraph: 0, offset: 3, title: "新的名称")
+        _ = try await library.saveBookmark(second, chapter: 0, paragraph: 0, title: "山")
+        let removal = library.removeFavorites([first.id])
+        let flushed = await library.flushPendingWrites(); XCTAssertTrue(flushed)
+        let restored = try store(); await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.bookmarks.count, 2)
+        XCTAssertEqual(restored.bookmarks.first { $0.id == mark.id }?.title, "新的名称")
+        XCTAssertEqual(restored.progress[first.id]?.chapter, 1)
+        XCTAssertEqual(Set(restored.importedGroups.values), ["收藏"])
+        try await restored.removeBookmark(id: mark.id)
+        restored.removeGroup("收藏")
+        try await restored.permanentlyDeleteBook(id: first.id)
+        restored.undoRemoval(removal) // A stale undo cannot resurrect a deleted book.
+        _ = await restored.flushPendingWrites()
+        let final = try store(); await final.bootstrapProductionIfNeeded()
+        XCTAssertEqual(final.books.map(\.id), [second.id])
+        XCTAssertEqual(final.favorites, [second.id])
+        XCTAssertNil(final.progress[first.id]); XCTAssertNil(final.importedGroups[first.id])
+        XCTAssertEqual(final.importedGroups[second.id], "未分组")
+        XCTAssertEqual(final.bookmarks.map { $0.anchor.bookID }, [second.id])
+    }
+
+    func testFailedBookmarkAndDeleteCommitNeverPublishSuccessOrEraseRecords() async throws {
+        let library = try store(); await library.bootstrapProductionIfNeeded()
+        let book = try prepare(); _ = try await library.importBookDurably(book)
+        library.record(book, chapter: 1); _ = await library.flushPendingWrites()
+        try execute("CREATE TRIGGER deny_bookmark BEFORE INSERT ON bookmarks BEGIN SELECT RAISE(ABORT, 'injected'); END")
+        do { _ = try await library.saveBookmark(book, chapter: 1, paragraph: 0, title: "保存失败"); XCTFail("Must fail") } catch {}
+        XCTAssertTrue(library.bookmarks.isEmpty)
+        try execute("DROP TRIGGER deny_bookmark")
+        _ = try await library.saveBookmark(book, chapter: 1, paragraph: 0, title: "重试成功")
+        try execute("CREATE TRIGGER deny_delete BEFORE DELETE ON book_records BEGIN SELECT RAISE(ABORT, 'injected'); END")
+        do { try await library.permanentlyDeleteBook(id: book.id); XCTFail("Must fail") } catch {}
+        XCTAssertEqual(library.books.map(\.id), [book.id])
+        let restored = try store(); await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.progress[book.id]?.chapter, 1); XCTAssertEqual(restored.bookmarks.count, 1)
+        try execute("DROP TRIGGER deny_delete")
+        try await library.permanentlyDeleteBook(id: book.id)
+        let final = try store(); await final.bootstrapProductionIfNeeded()
+        XCTAssertTrue(final.books.isEmpty); XCTAssertTrue(final.bookmarks.isEmpty)
+    }
+
     func testAlternatingBooksKeepIndependentPositionsAndRemovalPreservesUnfavoritedHistory() async throws {
         let library = try store()
         await library.bootstrapProductionIfNeeded()

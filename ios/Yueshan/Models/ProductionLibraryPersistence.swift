@@ -6,6 +6,7 @@ struct ProductionLibraryState {
     var unresolvedBookIDs: Set<String>
     var themeLibrary: ThemeLibrarySnapshot? = nil
     var warnings: [String] = []
+    var bookmarks: [LibraryBookmarkRecord] = []
 }
 
 struct AppearanceMigrationInput {
@@ -82,6 +83,38 @@ actor ProductionLibraryPersistence {
 
     func saveState(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot? = nil) async throws {
         try await serialized { try await $0.performSave(snapshot, themeLibrary: themeLibrary) }
+    }
+
+    func saveBookmark(_ bookmark: LibraryBookmarkRecord) async throws {
+        try await serialized { backend in
+            let document = try await backend.document(bookmark.anchor.chapterID)
+            guard case .exact = ReadingAnchorResolver.resolve(bookmark.anchor, in: document) else { throw ContentFailure.missingChapter }
+            try await backend.records.save(bookmark: bookmark)
+        }
+    }
+
+    func removeBookmark(id: String) async throws {
+        try await serialized { try await $0.records.removeBookmark(id: id) }
+    }
+
+    /// Commit the cascade before removing files. An interrupted cleanup leaves
+    /// only unreferenced files, reclaimed on the next open.
+    func deleteBook(id: String) async throws -> Bool {
+        try await serialized { try await $0.performDeleteBook(id: id) }
+    }
+
+    private func performDeleteBook(id: String) async throws -> Bool {
+        let chapters = try await catalog(id)
+        var unresolved = Set<String>()
+        if let data = try await records.preference(key: Self.unresolvedKey) {
+            unresolved = Set(try JSONDecoder().decode([String].self, from: data))
+        }
+        unresolved.remove(id)
+        try await records.deleteBook(id: id, preferences: [Self.unresolvedKey: try JSONEncoder().encode(unresolved.sorted())])
+        catalogs.removeValue(forKey: id)
+        for chapter in chapters { documents.removeValue(forKey: chapter.id) }
+        do { try await files.removeBatch(Set(chapters.map(\.id))); return true }
+        catch { return false }
     }
 
     private func migrateAppearance(legacyThemeData: Data?, input: AppearanceMigrationInput) async throws {
@@ -264,6 +297,7 @@ actor ProductionLibraryPersistence {
             }
         }
         var state = ProductionLibraryState(books: books, snapshot: snapshot, unresolvedBookIDs: unresolved)
+        state.bookmarks = try await records.allBookmarks()
         if let data = try await records.preference(key: Self.themeLibraryKey) {
             guard let themes else { throw ContentFailure.storageFailure }
             let loaded = try themes.load(data)

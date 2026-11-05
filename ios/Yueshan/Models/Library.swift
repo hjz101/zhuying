@@ -170,6 +170,7 @@ final class LibraryStore: ObservableObject {
     @Published var storageMessage: String?
     @Published private(set) var loadState: LibraryLoadState = .ready
     @Published private(set) var unresolvedBookIDs: Set<String> = []
+    @Published private(set) var bookmarks: [LibraryBookmarkRecord] = []
     private let defaults: UserDefaults
     private let importsURL: URL?
     private var importedBooks: [Book] = []
@@ -318,7 +319,7 @@ final class LibraryStore: ObservableObject {
         return receipt
     }
     func undoRemoval(_ receipt: ShelfRemoval) {
-        for entry in receipt.entries.sorted(by: { $0.index < $1.index }) where !favorites.contains(entry.id) {
+        for entry in receipt.entries.sorted(by: { $0.index < $1.index }) where !favorites.contains(entry.id) && books.contains(where: { $0.id == entry.id }) {
             favorites.insert(entry.id, at: min(entry.index, favorites.count))
         }
         persist()
@@ -450,6 +451,7 @@ final class LibraryStore: ObservableObject {
             hasSeenReadingGuide = restored.snapshot.hasSeenReadingGuide ?? false
             themeLibrary = restored.themeLibrary
             unresolvedBookIDs = restored.unresolvedBookIDs
+            bookmarks = restored.bookmarks
             suppressPersistence = false; loadState = .ready
             var messages = restored.warnings
             if !unresolvedBookIDs.intersection(Set(books.map(\.id))).isEmpty { messages.append("部分旧阅读位置无法定位，历史记录已保留，请从章节目录重新选章。") }
@@ -462,6 +464,65 @@ final class LibraryStore: ObservableObject {
     func updateThemeLibrary(_ value: ThemeLibrarySnapshot) {
         guard loadState == .ready, themeLibrary != value else { return }
         themeLibrary = value; persist()
+    }
+
+    func moveBooks(_ ids: Set<String>, toGroup name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard loadState == .ready, !name.isEmpty, name.count <= 100 else { return }
+        for book in books where ids.contains(book.id) { importedGroups[book.id] = name }
+        persist()
+    }
+    func renameGroup(_ oldName: String, to newName: String) {
+        moveBooks(Set(importedGroups.filter { $0.value == oldName }.keys), toGroup: newName)
+    }
+    func removeGroup(_ name: String) {
+        moveBooks(Set(importedGroups.filter { $0.value == name }.keys), toGroup: "未分组")
+    }
+
+    @discardableResult
+    func saveBookmark(_ book: Book, chapter: Int, paragraph: Int, offset: Int = 0, title: String) async throws -> LibraryBookmarkRecord {
+        guard let backend = productionPersistence, loadState == .ready, books.contains(where: { $0.id == book.id }),
+              book.content.indices.contains(chapter) else { throw ContentFailure.missingChapter }
+        let document = ChapterDocument(chapterID: StableContentID.make(book.id, "local-v1", String(chapter)), paragraphs: book.content[chapter])
+        let bookmark = LibraryBookmarkRecord(title: title, anchor: try ReadingAnchor(bookID: book.id, document: document, paragraph: paragraph, offset: offset))
+        let previous = writeTail
+        let operation = Task { @MainActor in
+            await previous?.value
+            try await backend.saveBookmark(bookmark)
+            self.bookmarks.removeAll { $0.id == bookmark.id }; self.bookmarks.append(bookmark)
+        }
+        queueRevision += 1; writeTail = Task { _ = await operation.result }
+        try await operation.value
+        return bookmark
+    }
+
+    func removeBookmark(id: String) async throws {
+        guard let backend = productionPersistence, loadState == .ready else { throw ContentFailure.storageFailure }
+        let previous = writeTail
+        let operation = Task { @MainActor in
+            await previous?.value
+            try await backend.removeBookmark(id: id)
+            self.bookmarks.removeAll { $0.id == id }
+        }
+        queueRevision += 1; writeTail = Task { _ = await operation.result }
+        try await operation.value
+    }
+
+    func permanentlyDeleteBook(id: String) async throws {
+        guard let backend = productionPersistence, loadState == .ready, await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        let previous = writeTail
+        let operation = Task { @MainActor in
+            await previous?.value
+            let cleaned = try await backend.deleteBook(id: id)
+            self.books.removeAll { $0.id == id }; self.importedBooks.removeAll { $0.id == id }
+            self.favorites.removeAll { $0 == id }; self.progress.removeValue(forKey: id)
+            self.importedGroups.removeValue(forKey: id); self.updates.removeValue(forKey: id)
+            self.unresolvedBookIDs.remove(id); self.bookmarks.removeAll { $0.anchor.bookID == id }
+            if self.reader?.book.id == id { self.reader = nil }
+            if !cleaned { self.storageMessage = "作品记录已删除，部分文件将在下次打开书库时清理。" }
+        }
+        queueRevision += 1; writeTail = Task { _ = await operation.result }
+        try await operation.value
     }
 
     @discardableResult

@@ -2,6 +2,14 @@ import XCTest
 @testable import Yueshan
 
 final class FileChapterRepositoryTests: XCTestCase {
+    private struct RejectSecondChapter: AtomicFileWriting {
+        func write(_ data: Data, to url: URL) throws {
+            if let document = try? JSONDecoder().decode(ChapterDocument.self, from: data), document.chapterID == "second-new" {
+                throw CocoaError(.fileWriteOutOfSpace)
+            }
+            try data.write(to: url, options: .atomic)
+        }
+    }
     private struct RejectManifest: AtomicFileWriting {
         func write(_ data: Data, to url: URL) throws {
             if url.lastPathComponent == "manifest.json" { throw CocoaError(.fileWriteOutOfSpace) }
@@ -63,5 +71,35 @@ final class FileChapterRepositoryTests: XCTestCase {
         try Data("{\"version\":1,\"entries\":{\"c\":\"../outside.json\"}}".utf8).write(to: root.appendingPathComponent("manifest.json"))
         XCTAssertThrowsError(try FileChapterRepository(directory: root))
         XCTAssertTrue(FileManager.default.fileExists(atPath: preserved.path))
+    }
+
+    func testBatchObjectFailureKeepsOldManifestAndRemovesEarlierNewObjects() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let original = ChapterDocument(chapterID: "original", paragraphs: ["已提交正文"])
+        let valid = try FileChapterRepository(directory: root)
+        try await valid.save(original)
+        let failing = try FileChapterRepository(directory: root, writer: RejectSecondChapter())
+        do {
+            try await failing.saveBatch([.init(chapterID: "first-new", paragraphs: ["第一份新正文"]), .init(chapterID: "second-new", paragraphs: ["失败正文"])])
+            XCTFail("Second object must fail the complete batch")
+        } catch {}
+        let reopened = try FileChapterRepository(directory: root)
+        let ids = await reopened.chapterIDs()
+        let preserved = try await reopened.document(chapterID: "original")
+        XCTAssertEqual(ids, ["original"])
+        XCTAssertEqual(preserved, original)
+        let objects = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("objects"), includingPropertiesForKeys: nil)
+        XCTAssertEqual(objects.count, 1)
+    }
+
+    func testBatchDuplicateChapterIsRejectedBeforeChangingAnyContent() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = try FileChapterRepository(directory: root)
+        do { try await repository.saveBatch([.init(chapterID: "same", paragraphs: ["一"]), .init(chapterID: "same", paragraphs: ["二"])]); XCTFail("Duplicate chapter") }
+        catch { XCTAssertEqual(error as? ContentFailure, .invalidResponse) }
+        let ids = await repository.chapterIDs()
+        XCTAssertTrue(ids.isEmpty)
     }
 }

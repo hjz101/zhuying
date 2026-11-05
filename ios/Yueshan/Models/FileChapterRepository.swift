@@ -56,21 +56,40 @@ actor FileChapterRepository: ChapterContentRepository {
     }
 
     func save(_ document: ChapterDocument) throws {
-        guard !document.chapterID.isEmpty, !document.paragraphs.isEmpty,
+        try saveBatch([document])
+    }
+
+    func chapterIDs() -> Set<String> { Set(manifest.entries.keys) }
+
+    func saveBatch(_ documents: [ChapterDocument]) throws {
+        guard Set(documents.map(\.chapterID)).count == documents.count else { throw ContentFailure.invalidResponse }
+        for document in documents {
+          guard !document.chapterID.isEmpty, !document.paragraphs.isEmpty,
               document.paragraphs.allSatisfy({ !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
               document == ChapterDocument(chapterID: document.chapterID, paragraphs: document.paragraphs.map(\.text)) else { throw ContentFailure.invalidResponse }
-        let data = try JSONEncoder().encode(document)
-        let filename = Self.digest(data) + ".json"
-        let target = try Self.objectURL(filename, root: root)
-        let existed = FileManager.default.fileExists(atPath: target.path)
-        if existed {
-            guard Self.digest(try Data(contentsOf: target)) == Self.digest(data) else { throw ContentFailure.storageFailure }
-        } else { try writer.write(data, to: target) }
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        var created: [URL] = []
         var next = manifest
-        next.entries[document.chapterID] = filename
-        do { try writer.write(JSONEncoder().encode(next), to: root.appendingPathComponent("manifest.json")) }
-        catch {
-            if !existed { try? FileManager.default.removeItem(at: target) }
+        do {
+          for document in documents {
+            try Task.checkCancellation()
+            let data = try encoder.encode(document)
+            let filename = Self.digest(data) + ".json"
+            let target = try Self.objectURL(filename, root: root)
+            if FileManager.default.fileExists(atPath: target.path) {
+            guard Self.digest(try Data(contentsOf: target)) == Self.digest(data) else { throw ContentFailure.storageFailure }
+            } else {
+                try writer.write(data, to: target)
+                created.append(target)
+            }
+            next.entries[document.chapterID] = filename
+          }
+          try Task.checkCancellation()
+          try writer.write(encoder.encode(next), to: root.appendingPathComponent("manifest.json"))
+        } catch {
+            for target in created { try? FileManager.default.removeItem(at: target) }
             throw error
         }
         manifest = next
@@ -79,9 +98,13 @@ actor FileChapterRepository: ChapterContentRepository {
     }
 
     func remove(chapterID: String) throws {
-        guard manifest.entries[chapterID] != nil else { return }
+        try removeBatch([chapterID])
+    }
+
+    func removeBatch(_ chapterIDs: Set<String>) throws {
+        guard chapterIDs.contains(where: { manifest.entries[$0] != nil }) else { return }
         var next = manifest
-        next.entries.removeValue(forKey: chapterID)
+        for id in chapterIDs { next.entries.removeValue(forKey: id) }
         try writer.write(JSONEncoder().encode(next), to: root.appendingPathComponent("manifest.json"))
         manifest = next
     }

@@ -52,6 +52,19 @@ struct LibraryBookRecord: Codable, Identifiable, Equatable, Sendable {
     var coverURL: String?
     var source: SourceBookReference?
     var addedAt: Date
+    var display: BookDisplayMetadata? = nil
+}
+
+/// Presentation metadata retained when migrating the existing Demo book model.
+/// Text remains in the chapter repository, never in this metadata record.
+struct BookDisplayMetadata: Codable, Equatable, Sendable {
+    var genre: String
+    var category: String
+    var status: String
+    var words: String
+    var color: String
+    var subtitle: String
+    var tags: [String]
 }
 
 struct ChapterRecord: Codable, Identifiable, Equatable, Sendable {

@@ -60,6 +60,9 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
                 t.column("payload", .blob).notNull()
             }
         }
+        migrator.registerMigration("v2-shelf-order") { db in
+            try db.alter(table: "shelf_entries") { $0.add(column: "position", .integer) }
+        }
         try migrator.migrate(queue)
         database = queue
     }
@@ -73,6 +76,14 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
     }
 
     func save(book: LibraryBookRecord, chapters: [ChapterRecord]) throws {
+        try commitBook(book, chapters: chapters, importedGroup: nil)
+    }
+
+    func importBook(_ book: LibraryBookRecord, chapters: [ChapterRecord], group: String) throws {
+        try commitBook(book, chapters: chapters, importedGroup: group)
+    }
+
+    private func commitBook(_ book: LibraryBookRecord, chapters: [ChapterRecord], importedGroup: String?) throws {
         guard !book.id.isEmpty, !book.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               chapters.allSatisfy({ $0.bookID == book.id && !$0.id.isEmpty && $0.order >= 0 }),
               Set(chapters.map(\.id)).count == chapters.count,
@@ -88,6 +99,11 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
             try db.execute(sql: "DELETE FROM chapter_records WHERE bookID = ?", arguments: [book.id])
             for (record, data) in records {
                 try db.execute(sql: "INSERT INTO chapter_records(id, bookID, position, payload) VALUES (?, ?, ?, ?)", arguments: [record.id, book.id, record.order, data])
+            }
+            if let group = importedGroup {
+                let position = (try Int.fetchOne(db, sql: "SELECT MIN(position) FROM shelf_entries") ?? 0) - 1
+                try db.execute(sql: "INSERT INTO shelf_entries(bookID, addedAt, position) VALUES (?, ?, ?) ON CONFLICT(bookID) DO NOTHING", arguments: [book.id, book.addedAt, position])
+                try db.execute(sql: "INSERT INTO book_groups(bookID, name) VALUES (?, ?) ON CONFLICT(bookID) DO UPDATE SET name=excluded.name", arguments: [book.id, group])
             }
         }
     }
@@ -119,12 +135,13 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
     func setFavorite(bookID: String, enabled: Bool, now: Date = Date()) throws {
         try database.write { db in
             if enabled {
-                try db.execute(sql: "INSERT INTO shelf_entries(bookID, addedAt) VALUES (?, ?) ON CONFLICT(bookID) DO NOTHING", arguments: [bookID, now])
+                let position = (try Int.fetchOne(db, sql: "SELECT MIN(position) FROM shelf_entries") ?? 0) - 1
+                try db.execute(sql: "INSERT INTO shelf_entries(bookID, addedAt, position) VALUES (?, ?, ?) ON CONFLICT(bookID) DO NOTHING", arguments: [bookID, now, position])
             } else { try db.execute(sql: "DELETE FROM shelf_entries WHERE bookID = ?", arguments: [bookID]) }
         }
     }
     func favoriteIDs() throws -> [String] {
-        try database.read { try String.fetchAll($0, sql: "SELECT bookID FROM shelf_entries ORDER BY addedAt DESC, bookID") }
+        try database.read { try String.fetchAll($0, sql: "SELECT bookID FROM shelf_entries ORDER BY position IS NULL, position, addedAt DESC, bookID") }
     }
     func setGroup(bookID: String, name: String) throws {
         try database.write { db in
@@ -159,5 +176,50 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
     }
     func preference(key: String) throws -> Data? {
         try database.read { try Data.fetchOne($0, sql: "SELECT payload FROM preferences WHERE key = ?", arguments: [key]) }
+    }
+
+    func allChapterIDs() throws -> Set<String> {
+        try database.read { Set(try String.fetchAll($0, sql: "SELECT id FROM chapter_records")) }
+    }
+
+    func allProgress() throws -> [String: ReadingAnchor] {
+        try database.read { db in
+            var result: [String: ReadingAnchor] = [:]
+            for row in try Row.fetchAll(db, sql: "SELECT bookID, payload FROM reading_progress") {
+                let id: String = row["bookID"]
+                let anchor = try JSONDecoder().decode(ReadingAnchor.self, from: row["payload"] as Data)
+                guard anchor.bookID == id else { throw ContentFailure.storageFailure }
+                result[id] = anchor
+            }
+            return result
+        }
+    }
+
+    /// One commit point for settings, shelf order, groups and confirmed locations.
+    /// Missing locations are retained rather than interpreted as a deletion.
+    func commitState(favorites: [String], groups: [String: String], progress: [ReadingAnchor], preferences: [String: Data]) throws {
+        guard Set(favorites).count == favorites.count else { throw ContentFailure.invalidResponse }
+        let anchors = try progress.map { ($0, try JSONEncoder().encode($0)) }
+        try database.write { db in
+            let dates = Dictionary(uniqueKeysWithValues: try Row.fetchAll(db, sql: "SELECT bookID, addedAt FROM shelf_entries").map { ($0["bookID"] as String, $0["addedAt"] as Date) })
+            for (anchor, _) in anchors {
+                guard let data = try Data.fetchOne(db, sql: "SELECT payload FROM chapter_records WHERE id = ? AND bookID = ?", arguments: [anchor.chapterID, anchor.bookID]),
+                      try JSONDecoder().decode(ChapterRecord.self, from: data).access == .readable else { throw ContentFailure.missingChapter }
+            }
+            try db.execute(sql: "DELETE FROM shelf_entries")
+            for (index, id) in favorites.enumerated() {
+                try db.execute(sql: "INSERT INTO shelf_entries(bookID, addedAt, position) VALUES (?, ?, ?)", arguments: [id, dates[id] ?? Date(), index])
+            }
+            try db.execute(sql: "DELETE FROM book_groups")
+            for (id, name) in groups {
+                try db.execute(sql: "INSERT INTO book_groups(bookID, name) VALUES (?, ?)", arguments: [id, name])
+            }
+            for (anchor, data) in anchors {
+                try db.execute(sql: "INSERT INTO reading_progress(bookID, payload) VALUES (?, ?) ON CONFLICT(bookID) DO UPDATE SET payload=excluded.payload", arguments: [anchor.bookID, data])
+            }
+            for (key, data) in preferences {
+                try db.execute(sql: "INSERT INTO preferences(key, payload) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload", arguments: [key, data])
+            }
+        }
     }
 }

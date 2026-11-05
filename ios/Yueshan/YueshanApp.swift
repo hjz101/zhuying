@@ -55,11 +55,14 @@ struct YueshanApp: App {
                 try ThemeStyleSamples.importData.write(to: documents.appendingPathComponent("阅读套装.json"))
             }
             var rejectFirstOpen = testing && ProcessInfo.processInfo.arguments.contains("--storage-retry-fixture")
+            let cacheRoot = manager.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent(environment.databaseComponent + "/RecentChapters")
+            if environment.resetsTestState { try? manager.removeItem(at: cacheRoot) }
+            let online = environment.isDemo ? nil : OnlineReadingService(cache: try RecentChapterCache(directory: cacheRoot))
             _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo,
                 productionFactory: environment.isDemo ? nil : {
                     if rejectFirstOpen { rejectFirstOpen = false; throw CocoaError(.fileWriteNoPermission) }
                     return try ProductionLibraryPersistence(directory: databaseDirectory)
-                }))
+                }, onlineService: online))
             launchError = nil
         } catch {
             _library = StateObject(wrappedValue: LibraryStore(books: [], defaults: defaults, seedDemoData: environment.isDemo))
@@ -117,11 +120,13 @@ struct RootView: View {
             }
             #endif
         }
-        .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store) } }
+        .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store); configureSource() } }
+        .onChange(of: store.sources) { _, _ in configureSource() }
         .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.saveBeforeSuspending() } } }
         .onChange(of: store.reader?.id) { _, id in if id == nil { Task { await store.flushPendingWrites() } } }
         .onAppear { demo.connectReader(store) }
-        .onReceive(shushan.$credential) { demo.updateShushanAccount($0, host: shushan.hostText) }
+        .onReceive(shushan.$credential) { demo.updateShushanAccount($0, host: shushan.hostText); configureSource() }
+        .onChange(of: shushan.expired) { _, _ in configureSource() }
         .tint(Palette.green)
         .preferredColorScheme(.light)
         .onReceive(NotificationCenter.default.publisher(for: .showImportedShelf)) { _ in selectedTab = .shelf }
@@ -137,6 +142,15 @@ struct RootView: View {
             if !store.isDemo { Button("重试") { Task { await store.retryStorage() } } }
             Button("知道了") { store.storageMessage = nil }
         } message: { Text(store.storageMessage ?? "") }
+    }
+    private func configureSource() {
+        Task {
+            await store.onlineService?.setAuthenticationHandler { @MainActor in shushan.markExpired() }
+            await store.configureOnline(credential: shushan.credentialForRequests, expired: shushan.expired)
+            if shushan.expired, let index = demo.sources.firstIndex(where: { $0.id == "shushan" }), demo.sources[index].loginStatus != .expired {
+                demo.sources[index].loginStatus = .expired
+            }
+        }
     }
     @ViewBuilder private var navigationTabs: some View {
         if #available(iOS 26.0, *) {

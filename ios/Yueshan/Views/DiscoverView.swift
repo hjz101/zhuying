@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DiscoverView: View {
     @EnvironmentObject private var store: LibraryStore
+    @StateObject private var online = OnlineSearchStore()
     var searchEntry = false
     @State private var query = ""
     @State private var category = "全部"
@@ -31,6 +32,7 @@ struct DiscoverView: View {
                         }
                     }
                 }
+                if store.isDemo {
                 let results = store.search(query, category: category)
                 SectionHeading(title: query.isEmpty ? "故事小馆" : "搜索结果", subtitle: "\(results.count) 部示例作品")
                 if results.isEmpty {
@@ -44,6 +46,9 @@ struct DiscoverView: View {
                         }
                     }
                 }
+                } else {
+                    onlineResults
+                }
             }.padding(.horizontal, 22).padding(.top, 19).padding(.bottom, 25)
         }
         .background(Palette.background)
@@ -51,7 +56,40 @@ struct DiscoverView: View {
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书名或作者")
         .onAppear { if searchEntry { searchPresented = true } }
+        .onChange(of: query) { _, _ in runSearch() }
+        .onChange(of: store.onlineRevision) { _, _ in runSearch() }
+        .onDisappear { online.cancel() }
         .autocorrectionDisabled()
         .navigationDestination(for: Book.self) { BookDetailView(book: $0) }
     }
+    private func runSearch() {
+        guard !store.isDemo, let service = store.onlineService else { return }
+        online.search(query, service: service)
+    }
+    @ViewBuilder private var onlineResults: some View {
+        SectionHeading(title: query.isEmpty ? "故事小馆" : "搜索结果", subtitle: "\(online.results.count) 个来源版本")
+        if online.busy && online.results.isEmpty { ProgressView("正在搜索书源").frame(maxWidth: .infinity).accessibilityIdentifier("onlineSearching") }
+        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            ContentUnavailableView("搜索书名或作者", systemImage: "magnifyingglass", description: Text("使用已启用并登录的书山聚合查找作品。"))
+        } else if online.results.isEmpty && !online.busy && online.message == nil { ContentUnavailableView.search(text: query) }
+        if let message = online.message {
+            Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("onlineSearchError")
+            Button("重试") { runSearch() }.buttonStyle(PrimaryButtonStyle(filled: false))
+            NavigationLink("管理书源与登录") { SourceManagementView() }
+        }
+        if online.partial { Text("部分站点未返回结果，已保留可用来源版本。").font(.system(size: 11)).foregroundStyle(Palette.muted) }
+        LazyVStack(spacing: 23) {
+            ForEach(online.results) { record in
+                NavigationLink { BookDetailView(book: record.presentation(chapters: []), onlineRecord: record) } label: {
+                    BookRow(book: record.presentation(chapters: []))
+                }.buttonStyle(.plain).accessibilityIdentifier("online-result-\(record.id)")
+                if record.id != online.results.last?.id { Divider().overlay(Palette.line) }
+            }
+        }
+        if online.nextPage != nil {
+            Button(online.busy ? "正在加载" : "加载更多") { if let service = store.onlineService { online.more(service: service) } }
+                .disabled(online.busy).accessibilityIdentifier("onlineSearchMore")
+        }
+    }
+
 }

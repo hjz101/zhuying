@@ -23,7 +23,7 @@ struct Book: Codable, Identifiable, Hashable, Sendable {
 
     func chapterTitle(_ index: Int) -> String {
         guard chapters.indices.contains(index) else { return "章节不可用" }
-        if id.hasPrefix("local-") { return chapters[index] }
+        if id.hasPrefix("local-") || id.hasPrefix("remote-") { return chapters[index] }
         let numerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"]
         return "第\(index < numerals.count ? numerals[index] : String(index + 1))章 \(chapters[index])"
     }
@@ -177,6 +177,10 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var loadState: LibraryLoadState = .ready
     @Published private(set) var unresolvedBookIDs: Set<String> = []
     @Published private(set) var bookmarks: [LibraryBookmarkRecord] = []
+    @Published private(set) var sources: [DemoSource] = []
+    @Published private(set) var onlineRevision = 0
+    private(set) var onlineService: OnlineReadingService?
+    private var remoteBooks: [String: LibraryBookRecord] = [:]
     private let defaults: UserDefaults
     private let importsURL: URL?
     private var importedBooks: [Book] = []
@@ -200,9 +204,10 @@ final class LibraryStore: ObservableObject {
 
     init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil, seedDemoData: Bool = true,
          productionPersistence: ProductionLibraryPersistence? = nil,
-         productionFactory: (() throws -> ProductionLibraryPersistence)? = nil) {
+         productionFactory: (() throws -> ProductionLibraryPersistence)? = nil, onlineService: OnlineReadingService? = nil) {
         self.productionPersistence = productionPersistence
         self.productionFactory = productionFactory
+        self.onlineService = onlineService
         self.isDemo = seedDemoData
         self.books = books
         self.defaults = defaults
@@ -464,7 +469,8 @@ final class LibraryStore: ObservableObject {
             guard let backend = productionPersistence else { throw ContentFailure.storageFailure }
             let appearance = try appearancePreparation?()
             let restored = try await backend.bootstrap(legacySnapshot: defaults.data(forKey: Self.storageKey), archiveURL: importsURL,
-                                                       legacyThemeData: defaults.data(forKey: "yueshan.reader.theme-library.v1"), appearance: appearance)
+                                                       legacyThemeData: defaults.data(forKey: "yueshan.reader.theme-library.v1"), appearance: appearance,
+                                                       legacySources: defaults.data(forKey: "yueshan.production.sources.v1"))
             suppressPersistence = true
             books = restored.books; importedBooks = restored.books
             favorites = restored.snapshot.favorites; progress = restored.snapshot.progress
@@ -480,6 +486,7 @@ final class LibraryStore: ObservableObject {
             unresolvedBookIDs = restored.unresolvedBookIDs
             bookmarks = restored.bookmarks
             chapterCatalogs = restored.catalogs; stableProgress = restored.anchors
+            remoteBooks = restored.remoteBooks; sources = restored.sources
             suppressPersistence = false; loadState = .ready
             var messages = restored.warnings
             if !unresolvedBookIDs.intersection(Set(books.map(\.id))).isEmpty { messages.append("部分旧阅读位置无法定位，历史记录已保留，请从章节目录重新选章。") }
@@ -499,6 +506,9 @@ final class LibraryStore: ObservableObject {
         return book.content.indices.contains(chapter) ? book.content[chapter] : []
     }
     func chapterRepository(for book: Book) -> any ChapterDocumentLoading {
+        if let remote = remoteBooks[book.id], let service = onlineService {
+            return OnlineChapterRepository(service: service, book: remote, catalog: chapterCatalogs[book.id] ?? [])
+        }
         if let backend = productionPersistence { return backend }
         return EmbeddedChapterRepository(book: book)
     }
@@ -521,7 +531,48 @@ final class LibraryStore: ObservableObject {
     @discardableResult func confirmChapter(_ book: Book, chapter: Int, document: ChapterDocument, anchor: ReaderAnchor) -> Bool {
         guard let request = try? chapterRequest(for: book, chapter: chapter), request.chapter.id == document.chapterID else { return false }
         activeDocuments[document.chapterID] = document
-        return record(book, chapter: chapter, paragraph: anchor.paragraph, characterOffset: anchor.offset)
+        let result = record(book, chapter: chapter, paragraph: anchor.paragraph, characterOffset: anchor.offset)
+        if result, let remote = remoteBooks[book.id], let service = onlineService, let catalog = chapterCatalogs[book.id] {
+            Task { await service.prefetchNext(book: remote, current: request.chapter, next: catalog[safe: chapter + 1]) }
+        }
+        return result
+    }
+    func chapterAccess(_ book: Book, chapter: Int) -> ChapterRecord.Access { chapterCatalogs[book.id]?[safe: chapter]?.access ?? .readable }
+    func remoteMetadata(_ id: String) -> LibraryBookRecord? { remoteBooks[id] }
+    func updateSources(_ value: [DemoSource]) {
+        guard loadState == .ready, sources != value else { return }
+        sources = value; onlineRevision += 1; persist()
+    }
+    func configureOnline(credential: ShushanCredential?, expired: Bool = false) async {
+        guard let service = onlineService else { return }
+        let source = sources.first { $0.id == "shushan" && $0.enabled && $0.kind == .novel }
+        if let source, let credential, (try? ShushanClient.host(source.url)) == credential.host, !expired {
+            await service.configure(source: ShushanBookSource(credential: credential))
+        } else { await service.configure(source: nil, failure: source == nil ? .sourceDisabled : .authenticationRequired) }
+        onlineRevision += 1
+    }
+    @discardableResult func registerRemoteBook(_ record: LibraryBookRecord, chapters: [ChapterRecord]) async throws -> Book {
+        guard let backend = productionPersistence, loadState == .ready else { throw ContentFailure.storageFailure }
+        guard await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        let previous = writeTail
+        let operation = Task { @MainActor in
+            await previous?.value
+            try await backend.saveRemoteBook(record, chapters: chapters)
+            let book = record.presentation(chapters: chapters)
+            self.books.removeAll { $0.id == book.id }; self.books.append(book)
+            self.remoteBooks[book.id] = record.withDisplayMetadata(); self.chapterCatalogs[book.id] = chapters
+            if let anchor = self.stableProgress[book.id] {
+                if let index = chapters.firstIndex(where: { $0.id == anchor.chapterID }) {
+                    self.progress[book.id] = .init(chapter: index, paragraph: anchor.paragraphIndex, updatedAt: anchor.updatedAt, characterOffset: anchor.utf16Offset)
+                } else {
+                    self.progress.removeValue(forKey: book.id); self.unresolvedBookIDs.insert(book.id)
+                    self.storageMessage = "原阅读章节已不可用，历史记录保留，请从目录重新选章。"
+                }
+            }
+            return book
+        }
+        queueRevision += 1; writeTail = Task { _ = await operation.result }
+        return try await operation.value
     }
 
     func retryStorage() async {
@@ -553,7 +604,7 @@ final class LibraryStore: ObservableObject {
         let previous = writeTail
         let operation = Task { @MainActor in
             await previous?.value
-            try await backend.saveBookmark(bookmark)
+            try await backend.saveBookmark(bookmark, document: document)
             self.bookmarks.removeAll { $0.id == bookmark.id }; self.bookmarks.append(bookmark)
         }
         queueRevision += 1; writeTail = Task { _ = await operation.result }
@@ -585,6 +636,7 @@ final class LibraryStore: ObservableObject {
             self.unresolvedBookIDs.remove(id); self.bookmarks.removeAll { $0.anchor.bookID == id }
             for chapter in self.chapterCatalogs[id] ?? [] { self.activeDocuments.removeValue(forKey: chapter.id) }
             self.chapterCatalogs.removeValue(forKey: id); self.stableProgress.removeValue(forKey: id)
+            self.remoteBooks.removeValue(forKey: id)
             if self.reader?.book.id == id { self.reader = nil }
             if !cleaned { self.storageMessage = "作品记录已删除，部分文件将在下次打开书库时清理。" }
         }
@@ -639,8 +691,10 @@ final class LibraryStore: ObservableObject {
             let revision = self.changeRevision
             let current = self.snapshot
             let themes = self.themeLibrary
+            let sources = self.sources
+            let anchors = Array(self.stableProgress.values)
             do {
-                try await backend.saveState(current, themeLibrary: themes)
+                try await backend.saveState(current, themeLibrary: themes, sources: sources, confirmedAnchors: anchors)
                 if self.changeRevision == revision { self.hasPendingChanges = false }
                 self.lastWriteFailed = false
                 if self.storageMessage == self.lastWriteMessage { self.storageMessage = nil }

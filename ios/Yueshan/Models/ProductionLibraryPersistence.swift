@@ -9,6 +9,8 @@ struct ProductionLibraryState {
     var bookmarks: [LibraryBookmarkRecord] = []
     var catalogs: [String: [ChapterRecord]] = [:]
     var anchors: [String: ReadingAnchor] = [:]
+    var remoteBooks: [String: LibraryBookRecord] = [:]
+    var sources: [DemoSource] = []
 }
 
 struct AppearanceMigrationInput {
@@ -38,6 +40,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
     static let legacySnapshotKey = "migration.legacy-library.original-snapshot"
     static let appearanceMigrationKey = "migration.appearance.v1"
     static let themeLibraryKey = "appearance.theme-library.v1"
+    static let sourcesKey = "sources.configuration.v1"
     private static let viewKey = "library.view-preferences.v1"
     private static let unresolvedKey = "library.unresolved-history.v1"
     private let records: SQLiteLibraryRepository
@@ -47,6 +50,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
     private var documents = ChapterMemoryCache()
     private var savedAnchors: [String: ReadingAnchor] = [:]
     private var catalogs: [String: [ChapterRecord]] = [:]
+    private var remoteDocuments = ChapterMemoryCache()
 
     init(directory: URL, writer: any AtomicFileWriting = AtomicFileWriter()) throws {
         records = try SQLiteLibraryRepository(url: directory.appendingPathComponent("library.sqlite"))
@@ -70,10 +74,11 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         return try await withTaskCancellationHandler(operation: { try await operation.value }, onCancel: { operation.cancel() })
     }
 
-    func bootstrap(legacySnapshot: Data?, archiveURL: URL?, legacyThemeData: Data? = nil, appearance: AppearanceMigrationInput? = nil) async throws -> ProductionLibraryState {
+    func bootstrap(legacySnapshot: Data?, archiveURL: URL?, legacyThemeData: Data? = nil, appearance: AppearanceMigrationInput? = nil, legacySources: Data? = nil) async throws -> ProductionLibraryState {
         try await serialized {
             try await $0.performBootstrap(legacySnapshot: legacySnapshot, archiveURL: archiveURL)
             if let appearance { try await $0.migrateAppearance(legacyThemeData: legacyThemeData, input: appearance) }
+            try await $0.migrateSources(legacySources)
             var state = try await $0.loadState()
             state.warnings.append(contentsOf: appearance?.warnings ?? [])
             return state
@@ -84,21 +89,50 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         try await serialized { try await $0.performImport(book, group: group) }
     }
 
-    func saveState(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot? = nil) async throws {
-        try await serialized { try await $0.performSave(snapshot, themeLibrary: themeLibrary) }
+    func saveState(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot? = nil, sources: [DemoSource]? = nil, confirmedAnchors: [ReadingAnchor]? = nil) async throws {
+        try await serialized { try await $0.performSave(snapshot, themeLibrary: themeLibrary, sources: sources, confirmedAnchors: confirmedAnchors) }
     }
 
     func document(chapterID: String) async throws -> ChapterDocument? {
         try await serialized { try await $0.cachedDocument(chapterID) }
     }
+    func saveRemoteBook(_ book: LibraryBookRecord, chapters: [ChapterRecord]) async throws {
+        try await serialized { backend in try await backend.performSaveRemoteBook(book, chapters: chapters) }
+    }
+    private func performSaveRemoteBook(_ book: LibraryBookRecord, chapters: [ChapterRecord]) async throws {
+        guard book.source != nil, !chapters.isEmpty else { throw ContentFailure.invalidResponse }
+        try await records.save(book: book.withDisplayMetadata(), chapters: chapters)
+        catalogs[book.id] = chapters
+    }
+    func confirmRemoteAnchor(_ anchor: ReadingAnchor, document: ChapterDocument) async throws {
+        try await serialized { backend in try await backend.performConfirmRemoteAnchor(anchor, document: document) }
+    }
+    private func performConfirmRemoteAnchor(_ anchor: ReadingAnchor, document: ChapterDocument) async throws {
+        guard case .exact = ReadingAnchorResolver.resolve(anchor, in: document) else { throw ContentFailure.missingChapter }
+        try await records.save(progress: anchor)
+        savedAnchors[anchor.bookID] = anchor; remoteDocuments[document.chapterID] = document
+    }
     func cachedChapterCount() -> Int { documents.count }
 
-    func saveBookmark(_ bookmark: LibraryBookmarkRecord) async throws {
+    func saveBookmark(_ bookmark: LibraryBookmarkRecord, document supplied: ChapterDocument? = nil) async throws {
         try await serialized { backend in
-            let document = try await backend.cachedDocument(bookmark.anchor.chapterID)
+            let document: ChapterDocument
+            if let supplied { document = supplied } else { document = try await backend.cachedDocument(bookmark.anchor.chapterID) }
             guard case .exact = ReadingAnchorResolver.resolve(bookmark.anchor, in: document) else { throw ContentFailure.missingChapter }
             try await backend.records.save(bookmark: bookmark)
         }
+    }
+
+    private func migrateSources(_ data: Data?) async throws {
+        guard try await records.preference(key: Self.sourcesKey) == nil else { return }
+        let sources = try data.map { try JSONDecoder().decode([DemoSource].self, from: $0) } ?? [.init(id: "shushan", name: "书山聚合", detail: "固定原生书源", url: ShushanClient.defaultHost)]
+        try Self.validateSources(sources)
+        var values = [Self.sourcesKey: try JSONEncoder().encode(sources)]
+        if let data { values["migration.sources.original.v1"] = data }
+        try await records.savePreferences(values)
+    }
+    private static func validateSources(_ sources: [DemoSource]) throws {
+        guard Set(sources.map(\.id)).count == sources.count, sources.allSatisfy({ !$0.id.isEmpty && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (try? ShushanClient.host($0.url)) != nil }) else { throw ContentFailure.invalidResponse }
     }
 
     func removeBookmark(id: String) async throws {
@@ -232,6 +266,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
     }
 
     private func cachedDocument(_ id: String) async throws -> ChapterDocument {
+        if let saved = remoteDocuments[id] { return saved }
         if let saved = documents[id] { return saved }
         guard let document = try await files.document(chapterID: id) else { throw ContentFailure.storageFailure }
         documents[id] = document
@@ -254,12 +289,24 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         return result
     }
 
-    private func performSave(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot?) async throws {
+    private func performSave(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot?, sources: [DemoSource]?, confirmedAnchors: [ReadingAnchor]?) async throws {
         var unresolved = Set<String>()
-        let progress = try await anchors(from: snapshot.progress, unresolved: &unresolved)
+        let progress: [ReadingAnchor]
+        if let confirmedAnchors {
+            let byBook = Dictionary(uniqueKeysWithValues: confirmedAnchors.map { ($0.bookID, $0) })
+            var locations: [ReadingAnchor] = []
+            for (id, value) in snapshot.progress {
+                let chapters = try await self.catalog(id)
+                guard let saved = byBook[id], chapters[safe: value.chapter]?.id == saved.chapterID,
+                      saved.paragraphIndex == value.paragraph, saved.utf16Offset == value.characterOffset else { throw ContentFailure.missingChapter }
+                locations.append(saved)
+            }
+            progress = locations
+        } else { progress = try await anchors(from: snapshot.progress, unresolved: &unresolved) }
         // A UI bug must not replace valid locations with guessed chapter indices.
         guard unresolved.isEmpty else { throw ContentFailure.missingChapter }
         var preferences = [Self.viewKey: try JSONEncoder().encode(LibraryViewPreferences(snapshot))]
+        if let sources { try Self.validateSources(sources); preferences[Self.sourcesKey] = try JSONEncoder().encode(sources) }
         let staged = try themeLibrary.map { value -> ThemeLibraryRepository.Staged in
             guard let themes else { throw ContentFailure.storageFailure }
             return try themes.stage(value)
@@ -305,6 +352,8 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         var state = ProductionLibraryState(books: books, snapshot: snapshot, unresolvedBookIDs: unresolved)
         state.bookmarks = try await records.allBookmarks()
         state.catalogs = catalogs; state.anchors = savedAnchors
+        state.remoteBooks = Dictionary(uniqueKeysWithValues: metadata.filter { $0.source != nil }.map { ($0.id, $0) })
+        if let data = try await records.preference(key: Self.sourcesKey) { state.sources = try JSONDecoder().decode([DemoSource].self, from: data) }
         if let data = try await records.preference(key: Self.themeLibraryKey) {
             guard let themes else { throw ContentFailure.storageFailure }
             let loaded = try themes.load(data)

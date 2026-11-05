@@ -9,7 +9,7 @@ struct ShushanBookSource: BookSource {
     let credential: ShushanCredential
     let transport: any HTTPTransport
     var supportsPagination = false
-    init(credential: ShushanCredential, transport: any HTTPTransport = SourceHTTPTransport(), supportsPagination: Bool = false) {
+    init(credential: ShushanCredential, transport: any HTTPTransport = ResilientSourceTransport(), supportsPagination: Bool = false) {
         self.credential = credential; self.transport = transport; self.supportsPagination = supportsPagination
     }
 
@@ -28,7 +28,7 @@ struct ShushanBookSource: BookSource {
     }
 
     func details(for book: LibraryBookRecord) async throws -> LibraryBookRecord {
-        guard let source = book.source, source.sourceID == sourceID else { throw ContentFailure.invalidResponse }
+        guard let source = book.source, source.sourceID == sourceID, source.origin == nil || source.origin == credential.host.absoluteString else { throw ContentFailure.invalidResponse }
         let response = try await request("details", body: ["source": source.provider, "url": source.bookURL,
                                                           "cover": book.coverURL ?? "", "desc": book.summary, "name": book.title, "tab": "novel"])
         guard let data = response["data"] as? [String: Any] else { throw ContentFailure.invalidResponse }
@@ -45,7 +45,7 @@ struct ShushanBookSource: BookSource {
     }
 
     func chapters(for book: LibraryBookRecord) async throws -> [ChapterRecord] {
-        guard let source = book.source, source.sourceID == sourceID else { throw ContentFailure.invalidResponse }
+        guard let source = book.source, source.sourceID == sourceID, source.origin == nil || source.origin == credential.host.absoluteString else { throw ContentFailure.invalidResponse }
         let response = try await request("catalog", body: ["source": source.provider, "url": source.bookURL,
                                                           "name": book.title, "bookid": source.remoteBookID, "tab": "novel"])
         guard let data = response["data"] as? [[String: Any]] else { throw ContentFailure.invalidResponse }
@@ -90,7 +90,8 @@ struct ShushanBookSource: BookSource {
     }
 
     func document(for chapter: ChapterRecord, book: LibraryBookRecord) async throws -> ChapterDocument {
-        guard chapter.bookID == book.id, book.source?.sourceID == sourceID else { throw ContentFailure.invalidResponse }
+        guard chapter.bookID == book.id, book.source?.sourceID == sourceID,
+              book.source?.origin == nil || book.source?.origin == credential.host.absoluteString else { throw ContentFailure.invalidResponse }
         guard chapter.access == .readable else { throw ContentFailure.restricted }
         let response = try await request("content", body: chapter.requestParameters)
         guard let data = response["data"] as? [String: Any], var text = data["content"] as? String else { throw ContentFailure.invalidResponse }
@@ -106,7 +107,8 @@ struct ShushanBookSource: BookSource {
         }
         let paragraphs = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
             .components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        guard !paragraphs.isEmpty else { throw ContentFailure.invalidResponse }
+        guard !paragraphs.isEmpty, text.utf16.count >= 10,
+              !text.localizedCaseInsensitiveContains("<!doctype html"), !text.localizedCaseInsensitiveContains("<html") else { throw ContentFailure.invalidResponse }
         return .init(chapterID: chapter.id, paragraphs: paragraphs)
     }
 
@@ -115,7 +117,7 @@ struct ShushanBookSource: BookSource {
               let title = Self.text(row["title"]), !title.isEmpty, !provider.isEmpty, !url.isEmpty else { throw ContentFailure.invalidResponse }
         let nativeID = Self.text(row["bookid"]) ?? url
         let reference = SourceBookReference(sourceID: sourceID, nativeBookID: StableContentID.make(provider, nativeID),
-                                            provider: provider, bookURL: url, remoteBookID: Self.text(row["bookid"]) ?? "")
+                                            provider: provider, bookURL: url, remoteBookID: Self.text(row["bookid"]) ?? "", origin: credential.host.absoluteString)
         return .init(id: "remote-" + reference.id, title: title, author: Self.text(row["author"]) ?? "",
                      summary: Self.text(row["desc"]) ?? "", coverURL: Self.text(row["cover"]), source: reference, addedAt: Date())
     }
@@ -139,6 +141,7 @@ struct ShushanBookSource: BookSource {
         let (data, response) = try await transport.send(request)
         try Task.checkCancellation()
         if response.statusCode == 401 || response.statusCode == 403 { throw ContentFailure.authenticationRequired }
+        if response.statusCode == 429 { throw ContentFailure.rateLimited }
         guard (200..<300).contains(response.statusCode) else { throw ContentFailure.unavailable }
         guard data.count <= 20 * 1024 * 1024,
               let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw ContentFailure.invalidResponse }

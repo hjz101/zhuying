@@ -56,6 +56,8 @@ struct FeatureDemoView: View {
             else if feature.id == "highlight" { ReadingStyleRulesView().navigationTitle(feature.title) }
             else if feature.id == "comments" { ReadingCommentsPreferencesView().navigationTitle(feature.title) }
             else if !library.isDemo && feature.id == "sourceLogin" && scope == "shushan" { ShushanLoginView() }
+            else if !library.isDemo && feature.id == "sourceEdit" && scope == "shushan" { SourceConfigurationView(sourceID: scope) }
+            else if !library.isDemo && feature.id == "search" { DiscoverView(searchEntry: true) }
             else if !library.isDemo {
                 ContentUnavailableView(feature.title, systemImage: feature.icon, description: Text("当前版本暂不支持此功能。"))
                     .appPageStyle().navigationTitle(feature.title)

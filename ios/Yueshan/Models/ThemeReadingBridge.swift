@@ -55,6 +55,10 @@ enum ThemeReaderBridge {
 @MainActor extension FeatureDemoStore {
     func connectReader(_ library: LibraryStore) {
         readingLibrary = library
+        if !library.isDemo, library.loadState == .ready {
+            restoringSources = true; sources = library.sources; restoringSources = false
+            sourcePersistence = { [weak library] in library?.updateSources($0) }
+        }
         if !library.isDemo, library.loadState == .ready, let snapshot = library.themeLibrary {
             restoringThemeLibrary = true
             themes = snapshot.themes; themeAssets = snapshot.assets

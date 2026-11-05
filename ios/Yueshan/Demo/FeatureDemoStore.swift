@@ -127,6 +127,8 @@ struct ThemeImportResult: Equatable {
 final class FeatureDemoStore: ObservableObject {
     let isDemo: Bool
     private var sourceDefaults: UserDefaults?
+    var sourcePersistence: (([DemoSource]) -> Void)?
+    var restoringSources = false
     @Published var values: [String: String] = [:]
     @Published var sources = [
         DemoSource(id: "shanhai", name: "山海书库", detail: "143 ms · 搜索 / 详情 / 正文", responseMilliseconds: 143),
@@ -193,6 +195,8 @@ final class FeatureDemoStore: ObservableObject {
     }
 
     private func persistProductionSources() {
+        guard !restoringSources else { return }
+        if let sourcePersistence { sourcePersistence(sources); return }
         guard !isDemo, let sourceDefaults, let data = try? JSONEncoder().encode(sources) else { return }
         sourceDefaults.set(data, forKey: "yueshan.production.sources.v1")
     }
@@ -278,6 +282,12 @@ final class FeatureDemoStore: ObservableObject {
     }
     @discardableResult
     func createSource(kind: DemoSourceKind = .novel, group: String? = nil) -> String {
+        if !isDemo {
+            if !sources.contains(where: { $0.id == "shushan" }) {
+                sources.append(.init(id: "shushan", name: "书山聚合", group: group ?? "小说", detail: "固定原生适配器", url: ShushanClient.defaultHost))
+            }
+            return "shushan"
+        }
         let id = UUID().uuidString
         sources.append(.init(id: id, name: "自定义书源 \(sources.count + 1)", group: group ?? kind.rawValue, detail: "待调试 · 演示配置", kind: kind))
         return id

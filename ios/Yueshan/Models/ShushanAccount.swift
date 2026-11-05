@@ -141,6 +141,7 @@ struct ShushanKeychain: ShushanCredentialStorage {
 
 @MainActor
 final class ShushanAccountStore: ObservableObject {
+    @Published private(set) var expired = false
     @Published var hostText: String
     @Published private(set) var credential: ShushanCredential?
     @Published private(set) var busy = false
@@ -179,6 +180,7 @@ final class ShushanAccountStore: ObservableObject {
             guard attempt == operation else { return }
             try vault.save(result)
             credential = result
+            expired = false
             hostText = host.absoluteString
             defaults.set(hostText, forKey: "yueshan.shushan.host")
             message = "登录成功，登录状态已保存在此设备。"
@@ -190,7 +192,12 @@ final class ShushanAccountStore: ObservableObject {
         do {
             if let credential { try vault.remove(host: credential.host) }
             credential = nil
+            expired = false
             message = "已退出书源登录，书架与阅读记录保留。"
         } catch { message = error.localizedDescription }
+    }
+    func markExpired() {
+        expired = true
+        message = "登录已过期，请在书源登录页重新登录；书架和阅读记录保留。"
     }
 }

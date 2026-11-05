@@ -216,6 +216,11 @@ enum SourceFeasibilityValidation {
             case .missingChapter: return "missing-chapter"
             case .invalidResponse: return "invalid-response"
             case .storageFailure: return "storage-failure"
+            case .offline: return "offline"
+            case .timedOut: return "timed-out"
+            case .rateLimited: return "rate-limited"
+            case .sourceDisabled: return "source-disabled"
+            case .cacheMiss: return "cache-miss"
             }
         }
         return "transport-or-decoding-error"

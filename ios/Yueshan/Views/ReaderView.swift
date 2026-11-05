@@ -324,6 +324,7 @@ private extension View {
 }
 
 struct ContentsView: View {
+    @EnvironmentObject private var library: LibraryStore
     @Environment(\.dismiss) private var dismiss
     let book: Book
     let currentChapter: Int?
@@ -348,12 +349,15 @@ struct ContentsView: View {
                                     HStack(spacing: 12) {
                                         Text(book.chapterTitle(index)).font(.system(size: 14))
                                         Spacer()
+                                        if library.chapterAccess(book, chapter: index) != .readable {
+                                            Text(library.chapterAccess(book, chapter: index) == .volume ? "分卷" : "受限").font(.system(size: 10))
+                                        }
                                         if index == currentChapter { Text("正在阅读").font(.system(size: 10)); Image(systemName: "waveform").font(.system(size: 12)) }
                                         else { Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted) }
                                     }.foregroundStyle(Palette.green).padding(.horizontal, 16).frame(minHeight: 56)
                                         .background(index == currentChapter ? Palette.soft : Color.clear)
                                         .contentShape(Rectangle())
-                                }.buttonStyle(.plain).id(index).accessibilityIdentifier("chapter-\(index)")
+                                }.buttonStyle(.plain).disabled(library.chapterAccess(book, chapter: index) != .readable).id(index).accessibilityIdentifier("chapter-\(index)")
                                 if index != visibleChapters.last { Divider().overlay(Palette.line).padding(.horizontal, 16) }
                             }
                         }

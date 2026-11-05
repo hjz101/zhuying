@@ -3,6 +3,7 @@ import CryptoKit
 
 enum ContentFailure: Error, LocalizedError, Equatable, Sendable {
     case authenticationRequired, unavailable, restricted, missingChapter, invalidResponse, storageFailure
+    case offline, timedOut, rateLimited, sourceDisabled, cacheMiss
     var errorDescription: String? {
         switch self {
         case .authenticationRequired: "请先登录书源，或重新登录后重试。"
@@ -11,6 +12,11 @@ enum ContentFailure: Error, LocalizedError, Equatable, Sendable {
         case .missingChapter: "原章节已不可用，请重新选择章节；之前的阅读记录已保留。"
         case .invalidResponse: "书源返回的内容无法识别，请稍后重试。"
         case .storageFailure: "保存失败，请检查设备空间后重试。"
+        case .offline: "当前没有网络，已缓存章节仍可阅读。"
+        case .timedOut: "书源响应超时，请重试。"
+        case .rateLimited: "书源请求频繁，请稍后重试。"
+        case .sourceDisabled: "书源已停用或移除，书架、缓存与历史记录保留。"
+        case .cacheMiss: "该章节尚未缓存，请联网并启用书源后重试。"
         }
     }
 }
@@ -48,7 +54,8 @@ struct SourceBookReference: Codable, Equatable, Sendable {
     var provider: String
     var bookURL: String
     var remoteBookID: String = ""
-    var id: String { StableContentID.make(sourceID, nativeBookID) }
+    var origin: String? = nil
+    var id: String { origin.map { StableContentID.make(sourceID, $0, nativeBookID) } ?? StableContentID.make(sourceID, nativeBookID) }
 }
 
 struct LibraryBookRecord: Codable, Identifiable, Equatable, Sendable {

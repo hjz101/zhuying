@@ -293,10 +293,11 @@ final class FeatureFlowTests: XCTestCase {
 
     @MainActor func testSourceToolbarImportNewAndAdvancedTools() {
         let app = launch(); openSources(app)
-        app.buttons["sourceAdd"].tap(); app.buttons["导入文件"].tap()
+        app.buttons["sourceAdd"].tap(); app.buttons["导入书源"].tap()
         XCTAssertTrue(app.navigationBars["书源导入导出"].waitForExistence(timeout: 5))
-        let method = app.descendants(matching: .any)["demo-field-method"]
-        XCTAssertTrue(method.label.contains("JSON 文件"), method.debugDescription)
+        XCTAssertTrue(app.segmentedControls["sourceImportMethod"].exists)
+        app.segmentedControls["sourceImportMethod"].buttons["文件"].tap()
+        XCTAssertTrue(app.buttons["sourceImportChooseFile"].exists)
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.buttons["sourceMore"].tap(); app.buttons["批量检测"].tap()
         XCTAssertTrue(app.navigationBars["批量测试"].waitForExistence(timeout: 5))
@@ -318,6 +319,53 @@ final class FeatureFlowTests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["sourceCount"].label.contains("1 个书源"))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "自定义书源 5")).firstMatch.exists)
+    }
+
+    @MainActor func testSourceLinkValidationAndSwitchClearsPreview() {
+        let app = launch(); openSources(app)
+        app.buttons["sourceAdd"].tap(); app.buttons["导入书源"].tap()
+        let input = app.textFields["sourceImportURL"].exists ? app.textFields["sourceImportURL"] : app.textViews["sourceImportURL"]
+        input.tap(); input.typeText("invalid")
+        app.buttons["sourceImportLinkPreview"].tap()
+        XCTAssertTrue(app.staticTexts["sourceImportError"].exists)
+        input.tap(); input.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 7))
+        input.typeText("https://sources.example/list.json")
+        app.buttons["sourceImportLinkPreview"].tap()
+        XCTAssertTrue(app.staticTexts["sourceImportSummary"].exists)
+        app.swipeDown()
+        capture(app, name: "Source-Import-Link")
+        app.segmentedControls["sourceImportMethod"].buttons["文件"].tap()
+        XCTAssertFalse(app.staticTexts["sourceImportSummary"].exists)
+        XCTAssertFalse(app.staticTexts["sourceImportError"].exists)
+        XCTAssertTrue(app.buttons["sourceImportChooseFile"].exists)
+    }
+
+    @MainActor func testUnifiedSourceImportFilePickerPreviewAndConfirmation() {
+        let app = launch()
+        openSources(app)
+        app.buttons["sourceAdd"].tap()
+        XCTAssertFalse(app.buttons["导入链接"].exists)
+        XCTAssertFalse(app.buttons["导入文件"].exists)
+        app.buttons["导入书源"].tap()
+        XCTAssertTrue(app.segmentedControls["sourceImportMethod"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["sourceImportLinkPreview"].isEnabled)
+        app.segmentedControls["sourceImportMethod"].buttons["文件"].tap()
+        XCTAssertFalse(app.textFields["sourceImportURL"].exists)
+        app.buttons["sourceImportChooseFile"].tap()
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "取消"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        cancel.tap()
+        XCTAssertFalse(app.staticTexts["sourceImportSummary"].exists)
+        app.buttons["sourceImportExample"].tap()
+        XCTAssertTrue(app.staticTexts["sourceImportFilename"].label.contains("示例书源.json"))
+        XCTAssertTrue(app.staticTexts["sourceImportSummary"].label.contains("可新增 1"))
+        capture(app, name: "Source-Import-File")
+        let confirm = app.buttons["sourceImportConfirm"]
+        reveal(confirm, app: app); confirm.tap()
+        XCTAssertTrue(app.staticTexts["sourceImportResult"].exists)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["sourceCount"].label.contains("4 个书源"))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "远山书屋")).firstMatch.exists)
     }
 
     @MainActor func testSourceSwipeLoginAndDetailFallback() {

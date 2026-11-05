@@ -26,6 +26,47 @@ struct DemoSource: Identifiable, Equatable {
     var responseMilliseconds: Int?
     var hasFailure = false
 }
+struct SourceImportPreview {
+    let sources: [DemoSource]
+    let duplicates: Int
+    let invalid: Int
+
+    static func parse(_ data: Data, existing: [DemoSource]) throws -> SourceImportPreview {
+        guard data.count <= 5 * 1024 * 1024 else { throw SourceImportError.message("文件超过 5 MB，请拆分后重试。") }
+        let json: Any
+        do { json = try JSONSerialization.jsonObject(with: data) }
+        catch { throw SourceImportError.message("无法解析 JSON，请检查文件格式。") }
+        let rows: [Any]
+        if let array = json as? [Any] { rows = array }
+        else if let object = json as? [String: Any] { rows = [object] }
+        else { throw SourceImportError.message("请选择书源对象或书源数组格式的 JSON。") }
+        var seen = Set(existing.map { $0.url.trimmingCharacters(in: CharacterSet(charactersIn: "/")) })
+        var sources: [DemoSource] = [], duplicates = 0, invalid = 0
+        for row in rows {
+            guard let object = row as? [String: Any],
+                  let name = (object["bookSourceName"] ?? object["name"]) as? String,
+                  let address = (object["bookSourceUrl"] ?? object["url"]) as? String,
+                  !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let url = URL(string: address.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host?.isEmpty == false else {
+                invalid += 1; continue
+            }
+            let normalizedAddress = url.absoluteString
+            guard seen.insert(normalizedAddress.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).inserted else { duplicates += 1; continue }
+            let kind: DemoSourceKind = (object["bookSourceType"] as? Int) == 2 ? .comic : .novel
+            sources.append(.init(id: UUID().uuidString, name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                                 group: object["bookSourceGroup"] as? String ?? "导入书源", enabled: object["enabled"] as? Bool ?? true,
+                                 detail: "已导入 · 待调试", url: normalizedAddress, kind: kind))
+        }
+        return .init(sources: sources, duplicates: duplicates, invalid: invalid)
+    }
+}
+
+enum SourceImportError: LocalizedError {
+    case message(String)
+    var errorDescription: String? { switch self { case .message(let text): return text } }
+}
+
 struct DemoFile: Identifiable {
     let id: UUID = UUID()
     var name: String
@@ -197,6 +238,14 @@ final class FeatureDemoStore: ObservableObject {
         sources.append(.init(id: id, name: "自定义书源 \(sources.count + 1)", group: group ?? kind.rawValue, detail: "待调试 · 演示配置", kind: kind))
         return id
     }
+    @discardableResult
+    func confirmSourceImport(_ preview: SourceImportPreview) -> Int {
+        var urls = Set(sources.map { $0.url.trimmingCharacters(in: CharacterSet(charactersIn: "/")) })
+        let additions = preview.sources.filter { urls.insert($0.url.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).inserted }
+        sources.append(contentsOf: additions)
+        return additions.count
+    }
+
     func removeSource(_ id: String) {
         sources.removeAll { $0.id == id }
         bookSources = bookSources.filter { $0.value != id }

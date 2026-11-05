@@ -163,6 +163,14 @@ struct FeatureDemoView: View {
     private var outcomeKey: String { "\(feature.id):\(scope)" }
 
     var body: some View {
+        if feature.id == "sourceImport" {
+            SourceImportView()
+        } else {
+            standardBody
+        }
+    }
+
+    private var standardBody: some View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 23) {

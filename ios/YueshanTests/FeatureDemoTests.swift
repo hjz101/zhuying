@@ -54,6 +54,39 @@ final class FeatureDemoTests: XCTestCase {
         XCTAssertTrue(FeatureCatalog.search("不存在的模块").isEmpty)
     }
 
+    func testSourceFilePreviewValidatesDeduplicatesAndRequiresConfirmation() throws {
+        let data = Data("""
+        [{"bookSourceName":"远山","bookSourceUrl":"https://new.example","bookSourceGroup":"收藏","bookSourceType":2,"enabled":false},
+         {"name":"重复","url":"https://new.example/"},
+         {"name":"已有","url":"https://books.example"},
+         {"name":"无网址"}, 42, {"name":"坏链接","url":"file:///tmp/source"},
+         {"name":"  ","url":"https://blank.example"}]
+        """.utf8)
+        let original = demo.sources
+        let preview = try SourceImportPreview.parse(data, existing: demo.sources)
+        XCTAssertEqual(demo.sources, original)
+        XCTAssertEqual(preview.sources.count, 1)
+        XCTAssertEqual(preview.duplicates, 2)
+        XCTAssertEqual(preview.invalid, 4)
+        XCTAssertEqual(preview.sources.first?.kind, .comic)
+        XCTAssertEqual(preview.sources.first?.group, "收藏")
+        XCTAssertEqual(preview.sources.first?.enabled, false)
+        XCTAssertEqual(demo.confirmSourceImport(preview), 1)
+        XCTAssertEqual(demo.sources.count, original.count + 1)
+        XCTAssertEqual(demo.confirmSourceImport(preview), 0)
+    }
+
+    func testSourceFileRejectsMalformedOversizedAndEmptyContent() throws {
+        for value in ["bad JSON", "null", "42", "\"text\""] {
+            XCTAssertThrowsError(try SourceImportPreview.parse(Data(value.utf8), existing: []))
+        }
+        XCTAssertThrowsError(try SourceImportPreview.parse(Data(repeating: 32, count: 5 * 1024 * 1024 + 1), existing: []))
+        let empty = try SourceImportPreview.parse(Data("[]".utf8), existing: [])
+        XCTAssertTrue(empty.sources.isEmpty)
+        let single = try SourceImportPreview.parse(Data("{\"name\":\"  新源  \",\"url\":\"https://single.example\"}".utf8), existing: [])
+        XCTAssertEqual(single.sources.first?.name, "新源")
+    }
+
     func testSourceFiltersComposeCategoryGroupStatusAndSearch() {
         XCTAssertEqual(demo.filteredSources(kind: .novel).map(\.id), ["shanhai", "yunjian"])
         XCTAssertEqual(demo.filteredSources(kind: .comic, status: .failed).map(\.id), ["paper"])

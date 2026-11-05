@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SourceManagementView: View {
     @EnvironmentObject private var demo: FeatureDemoStore
@@ -107,8 +108,9 @@ struct SourceManagementView: View {
             Button("完成") { managing = false; selection.removeAll() }.accessibilityIdentifier("sourceManageDone")
         } else {
             Menu {
-                Button("导入链接", systemImage: "link") { openImport("URL") }
-                Button("导入文件", systemImage: "doc") { openImport("JSON 文件") }
+                Button("导入书源", systemImage: "square.and.arrow.down") {
+                    route = .init(sourceID: "main", featureID: "sourceImport")
+                }
                 Button("手动新建", systemImage: "square.and.pencil") {
                     route = .init(sourceID: demo.createSource(kind: kind ?? .novel, group: group), featureID: "sourceEdit")
                 }
@@ -119,12 +121,6 @@ struct SourceManagementView: View {
                 Button("规则调试", systemImage: "curlybraces") { route = .init(sourceID: "main", featureID: "engine") }
             } label: { Image(systemName: "ellipsis") }.accessibilityLabel("更多书源工具").accessibilityIdentifier("sourceMore")
         }
-    }
-
-    private func openImport(_ method: String) {
-        let feature = FeatureCatalog.feature("sourceImport")
-        if let field = feature.fields.first(where: { $0.id == "method" }) { demo.set(method, feature: feature, field: field) }
-        route = .init(sourceID: "main", featureID: "sourceImport")
     }
 
     private var batchActions: some View {
@@ -598,5 +594,124 @@ struct DemoFilePreview: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
                 .safeAreaInset(edge: .bottom) { VStack(spacing: 8) { Slider(value: $page, in: 1...12, step: 1).tint(Palette.green); Text("\(Int(page)) / 12 · 模拟文件内容，无真实解析").font(.system(size: 10)).foregroundStyle(Palette.muted) }.padding(18).background(.regularMaterial) }
         }.appPageStyle().presentationBackground(Palette.background).presentationCornerRadius(26)
+    }
+}
+
+struct SourceImportView: View {
+    @EnvironmentObject private var demo: FeatureDemoStore
+    @State private var method = "链接"
+    @State private var address = ""
+    @FocusState private var linkFocused: Bool
+    @State private var showFiles = false
+    @State private var filename: String?
+    @State private var preview: SourceImportPreview?
+    @State private var message: String?
+    @State private var error: String?
+    private let example = Data("[{\"bookSourceName\":\"远山书屋\",\"bookSourceUrl\":\"https://yuanshan.example\"}]".utf8)
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                Text("导入书源").font(.system(size: 25, weight: .medium, design: .serif))
+                Text("粘贴分享链接，或从文件中选择 JSON 书源。")
+                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                Picker("导入方式", selection: $method) {
+                    Label("链接", systemImage: "link").tag("链接")
+                    Label("文件", systemImage: "doc").tag("文件")
+                }.pickerStyle(.segmented).accessibilityIdentifier("sourceImportMethod")
+                AppSettingsCard(method == "链接" ? "书源链接" : "书源文件", icon: method == "链接" ? "link" : "doc") {
+                    if method == "链接" {
+                        TextField("粘贴 URL 或阅读 3.0 分享链接", text: $address, axis: .vertical)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                            .padding(12).background(Palette.background, in: .rect(cornerRadius: 8))
+                            .focused($linkFocused).accessibilityIdentifier("sourceImportURL")
+                        Text("支持 HTTP / HTTPS、yuedu:// 和 qireader://；当前仅预览示例，不下载链接内容。")
+                            .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        Button("预览链接示例") { previewLink() }
+                            .buttonStyle(PrimaryButtonStyle(filled: true))
+                            .disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .accessibilityIdentifier("sourceImportLinkPreview")
+                    } else {
+                        Button { showFiles = true } label: {
+                            Label(filename == nil ? "选择 JSON 文件" : "重新选择文件", systemImage: "folder")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }.buttonStyle(PrimaryButtonStyle(filled: true)).accessibilityIdentifier("sourceImportChooseFile")
+                        if let filename { Label(filename, systemImage: "doc.text").font(.system(size: 12)).accessibilityIdentifier("sourceImportFilename") }
+                        Text("支持单个书源或书源数组，最大 5 MB。选择后先预览，再确认导入。")
+                            .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        Button("使用示例文件") { load(example, name: "示例书源.json") }
+                            .font(.system(size: 12)).frame(minHeight: 44).accessibilityIdentifier("sourceImportExample")
+                    }
+                }
+                if let error { Label(error, systemImage: "exclamationmark.circle").font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourceImportError") }
+                if let preview {
+                    AppSettingsCard("导入预览", icon: "list.bullet.rectangle") {
+                        Text("可新增 \(preview.sources.count) · 重复 \(preview.duplicates) · 无效 \(preview.invalid)")
+                            .font(.system(size: 12)).accessibilityIdentifier("sourceImportSummary")
+                        ForEach(preview.sources) { source in
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(source.name).font(.system(size: 14, weight: .medium))
+                                Text(source.url).font(.system(size: 11)).foregroundStyle(Palette.muted)
+                            }
+                        }
+                        Button("确认导入 \(preview.sources.count) 个书源") {
+                            let added = demo.confirmSourceImport(preview)
+                            self.preview = nil
+                            message = "已导入 \(added) 个书源，可返回书源列表查看。"
+                        }.buttonStyle(PrimaryButtonStyle(filled: true)).disabled(preview.sources.isEmpty)
+                            .accessibilityIdentifier("sourceImportConfirm")
+                    }
+                }
+                if let message { Label(message, systemImage: "checkmark.circle").font(.system(size: 12)).accessibilityIdentifier("sourceImportResult") }
+                Text("导入的基本信息仅保留在本次运行中，暂不执行书源规则。")
+                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Divider()
+                DisclosureGroup("导出书源 · JSON 预览") {
+                    Text("仅展示当前列表的基本信息，不写入文件或导出解析规则。")
+                        .font(.system(size: 11)).foregroundStyle(Palette.muted).padding(.vertical, 8)
+                    Text(exportJSON).font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("sourceExportPreview")
+                }.font(.system(size: 13)).accessibilityIdentifier("sourceExportDisclosure")
+            }.padding(22)
+        }.appPageStyle().navigationTitle("书源导入导出").navigationBarTitleDisplayMode(.inline)
+            .onChange(of: method) { _, _ in clearPreview(); filename = nil; linkFocused = false }
+            .onChange(of: address) { _, _ in clearPreview() }
+            .fileImporter(isPresented: $showFiles, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    let access = url.startAccessingSecurityScopedResource()
+                    defer { if access { url.stopAccessingSecurityScopedResource() } }
+                    do {
+                        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                        guard size <= 5 * 1024 * 1024 else { throw SourceImportError.message("文件超过 5 MB，请拆分后重试。") }
+                        load(try Data(contentsOf: url), name: url.lastPathComponent)
+                    } catch { clearPreview(); filename = nil; self.error = error.localizedDescription }
+                case .failure(let error): clearPreview(); self.error = error.localizedDescription
+                }
+            }
+    }
+
+    private var exportJSON: String {
+        let rows = demo.sources.map { ["bookSourceName": $0.name, "bookSourceUrl": $0.url, "bookSourceGroup": $0.group] }
+        guard let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return "[]" }
+        return text
+    }
+    private func clearPreview() { preview = nil; error = nil; message = nil }
+    private func load(_ data: Data, name: String? = nil) {
+        clearPreview(); filename = name
+        do { preview = try SourceImportPreview.parse(data, existing: demo.sources) }
+        catch { self.error = error.localizedDescription }
+    }
+    private func previewLink() {
+        linkFocused = false
+        let value = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: value), let scheme = url.scheme?.lowercased(),
+              ["http", "https", "yuedu", "qireader"].contains(scheme),
+              !["http", "https"].contains(scheme) || url.host?.isEmpty == false else {
+            clearPreview(); error = "请输入有效的书源 URL 或阅读分享链接。"; return
+        }
+        load(example)
     }
 }

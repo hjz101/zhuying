@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 enum ThemeAssetKind: String, Codable, CaseIterable { case title, bubble }
-struct ThemeAsset: Identifiable, Equatable {
+struct ThemeAsset: Identifiable, Codable, Equatable {
     let id: String
     var name: String
     let kind: ThemeAssetKind
@@ -73,7 +73,7 @@ enum ThemePackageParser {
             let attachments = readAssets(row, owner: id, source: name)
             themes.append(.init(id: id, name: name, mode: mode, background: background, ink: ink, accent: accent,
                                 summary: row["summary"] as? String ?? "导入的阅读套装", source: "文件导入", version: row["version"] as? String ?? "1.0",
-                                titleStyleIDs: attachments.0, bubbleStyleIDs: attachments.1, assetIssues: Array(issues.dropFirst(issueStart))))
+                                titleStyleIDs: attachments.0, bubbleStyleIDs: attachments.1, assetIssues: Array(issues.dropFirst(issueStart)), godStyle: row["godStyle"] as? String))
         }
         if let root, root["name"] == nil { _ = readAssets(root, owner: nil, source: root["source"] as? String ?? "独立导入") }
         return .init(themes: themes, assets: assets, duplicates: duplicates, invalid: invalid, issues: issues)
@@ -201,12 +201,14 @@ enum ThemeStyleSamples {
     func applyThemeAsset(_ id: String) {
         guard let asset = themeAssets.first(where: { $0.id == id }) else { return }
         if asset.kind == .title { activeTitleStyleID = id } else { activeBubbleStyleID = id }
+        updateReaderAsset(asset)
     }
     @discardableResult func applyThemeMix(themeID: String, titleID: String?, bubbleID: String?) -> Bool {
         guard themes.contains(where: { $0.id == themeID }),
               titleID == nil || themeAssets.contains(where: { $0.id == titleID && $0.kind == .title }),
               bubbleID == nil || themeAssets.contains(where: { $0.id == bubbleID && $0.kind == .bubble }) else { return false }
-        activeThemeID = themeID; activeTitleStyleID = titleID; activeBubbleStyleID = bubbleID; return true
+        activeThemeID = themeID; activeTitleStyleID = titleID; activeBubbleStyleID = bubbleID
+        updateReaderTheme(resetMissingComponents: true); return true
     }
     func toggleThemeAssetFavorite(_ id: String) {
         guard let index = themeAssets.firstIndex(where: { $0.id == id }) else { return }

@@ -57,8 +57,9 @@ enum ReadingTheme: String, Codable, CaseIterable {
 }
 
 enum ReadingMode: String, Codable, CaseIterable {
-    case scroll, paged
-    var title: String { self == .scroll ? "上下滚动" : "左右翻页" }
+    case scroll, paged, verticalPaged
+    var title: String { switch self { case .scroll: "上下滚动"; case .paged: "左右翻页"; case .verticalPaged: "上下翻页" } }
+    var isPaged: Bool { self != .scroll }
 }
 
 enum ShelfSort: String, Codable, CaseIterable {
@@ -93,12 +94,13 @@ struct ReadingSettings: Codable, Equatable {
     var mode: ReadingMode = .scroll
     var tapToTurn = false
     var haptics = true
+    var preferences: ReaderPreferences = .init()
 
-    private enum CodingKeys: String, CodingKey { case fontSize, lineSpacing, theme, mode, tapToTurn, haptics }
+    private enum CodingKeys: String, CodingKey { case fontSize, lineSpacing, theme, mode, tapToTurn, haptics, preferences }
     init(fontSize: Double = 20, lineSpacing: Double = 12, theme: ReadingTheme = .paper,
-         mode: ReadingMode = .scroll, tapToTurn: Bool = false, haptics: Bool = true) {
+         mode: ReadingMode = .scroll, tapToTurn: Bool = false, haptics: Bool = true, preferences: ReaderPreferences = .init()) {
         self.fontSize = fontSize; self.lineSpacing = lineSpacing; self.theme = theme
-        self.mode = mode; self.tapToTurn = tapToTurn; self.haptics = haptics
+        self.mode = mode; self.tapToTurn = tapToTurn; self.haptics = haptics; self.preferences = preferences
     }
     init(from decoder: Decoder) throws {
         let box = try decoder.container(keyedBy: CodingKeys.self)
@@ -108,6 +110,7 @@ struct ReadingSettings: Codable, Equatable {
         mode = try box.decodeIfPresent(ReadingMode.self, forKey: .mode) ?? .scroll
         tapToTurn = try box.decodeIfPresent(Bool.self, forKey: .tapToTurn) ?? false
         haptics = try box.decodeIfPresent(Bool.self, forKey: .haptics) ?? true
+        preferences = try box.decodeIfPresent(ReaderPreferences.self, forKey: .preferences) ?? .init()
     }
 }
 
@@ -208,8 +211,9 @@ final class LibraryStore: ObservableObject {
                 updates = savedUpdates.filter { ids.contains($0.key) }.mapValues { UpdateNotice(firstChapter: max(0, $0.firstChapter), readThrough: max(-1, $0.readThrough)) }
             }
             settings = snapshot.settings
-            settings.fontSize = [16, 18, 20, 22, 24].contains(settings.fontSize) ? settings.fontSize : 20
-            settings.lineSpacing = [6, 12, 18].contains(settings.lineSpacing) ? settings.lineSpacing : 12
+            settings.fontSize = ReaderPreferenceBounds.clamp(settings.fontSize, 14...30, fallback: 20)
+            settings.lineSpacing = ReaderPreferenceBounds.clamp(settings.lineSpacing, 0...24, fallback: 12)
+            settings.preferences.normalize()
         } catch {
             storageMessage = "本地记录暂时无法读取，已载入示例书架。"
         }

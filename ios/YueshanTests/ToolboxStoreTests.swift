@@ -56,6 +56,26 @@ final class ToolboxStoreTests: XCTestCase {
             XCTAssertEqual(FeatureCatalog.feature(id).capabilityBadge, "演示")
         }
         XCTAssertEqual(FeatureCatalog.feature("sources").capabilityBadge, "部分演示")
-        XCTAssertEqual(FeatureCatalog.feature("themes").capabilityBadge, "部分演示")
+        XCTAssertEqual(FeatureCatalog.feature("comments").capabilityBadge, "部分演示")
+        for id in ["pageStyle", "typography", "highlight", "fonts", "titleDesign", "themes"] {
+            XCTAssertNil(FeatureCatalog.feature(id).capabilityBadge, "Native reading preference route must not be labelled as a demo: \(id)")
+        }
     }
+    func testNativeReadingMetadataDescribesOnlyImplementedControls() {
+        let typography = FeatureCatalog.feature("typography")
+        XCTAssertTrue(typography.summary.contains("行距／段距"))
+        XCTAssertTrue(typography.summary.contains("独立四边留白"))
+        XCTAssertFalse(typography.summary.contains("对齐"))
+        XCTAssertFalse(FeatureCatalog.search("两端对齐").contains { $0.id == "typography" })
+        let title = FeatureCatalog.feature("titleDesign")
+        XCTAssertTrue(title.summary.contains("CSS 子集导入"))
+        for unsupported in ["图层", "撤销", "导出", "画布拖动"] { XCTAssertFalse(title.summary.contains(unsupported)) }
+        XCTAssertTrue(FeatureCatalog.feature("highlight").summary.contains("正文样式规则"))
+        XCTAssertTrue(FeatureCatalog.feature("comments").summary.contains("示例"))
+        for id in ["pageStyle", "typography", "highlight", "fonts", "titleDesign", "themes"] {
+            XCTAssertTrue(FeatureCatalog.feature(id).fields.isEmpty, "Native settings own their form instead of exposing stale demo fields")
+            XCTAssertTrue(FeatureCatalog.feature(id).actions.isEmpty, "Native settings own their actions")
+        }
+    }
+
 }

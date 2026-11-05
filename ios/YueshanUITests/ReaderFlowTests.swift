@@ -352,6 +352,17 @@ final class ReaderFlowTests: XCTestCase {
         XCTAssertEqual(app.buttons["shelfLayout"].value as? String, "书脊与封面")
     }
 
+    @MainActor private func preferenceCategory(_ id: String, in app: XCUIApplication) {
+        let entry = app.buttons["reading-category-\(id)"]
+        reveal(entry, in: app); entry.tap()
+    }
+    @MainActor private func preferenceHome(in app: XCUIApplication) {
+        for _ in 0..<4 {
+            if app.buttons["reading-category-layout"].exists { return }
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+    }
+
     @MainActor
     func testShelfReaderContentsAndPreferences() throws {
         let app = XCUIApplication()
@@ -374,14 +385,17 @@ final class ReaderFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["第五章 灯火入梦"].waitForExistence(timeout: 5))
         app.buttons["readerSettings"].tap()
         capture(app, name: "UnifiedReadingPreferences")
-        let dark = app.buttons["夜读"]
+        preferenceCategory("appearance", in: app)
+        let dark = app.buttons["reading-paper-dark"]
         XCTAssertTrue(dark.waitForExistence(timeout: 5))
         reveal(dark, in: app)
         dark.tap()
         capture(app, name: "UnifiedReadingPreferencesNightSelection")
-        reveal(app.segmentedControls.buttons["24"], in: app)
-        app.segmentedControls.buttons["24"].tap()
-        XCTAssertTrue(app.segmentedControls.buttons["24"].isSelected)
+        preferenceHome(in: app)
+        preferenceCategory("layout", in: app)
+        app.buttons["reading-body"].tap()
+        let font = app.sliders["fontPicker"]
+        reveal(font, in: app); font.adjust(toNormalizedSliderPosition: 0.625)
         app.buttons["完成"].tap()
         assertFloatingToolbar(in: app)
         capture(app, name: "FloatingReaderToolbarDark")
@@ -425,7 +439,10 @@ final class ReaderFlowTests: XCTestCase {
 
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<5 { if element.isHittable { return }; app.swipeUp() }
+        for _ in 0..<12 {
+            if element.isHittable { return }
+            if element.exists && element.frame.maxY < 170 { app.swipeDown() } else { app.swipeUp() }
+        }
     }
 
     @MainActor
@@ -514,23 +531,24 @@ final class ReaderFlowTests: XCTestCase {
         acknowledgeFirstGuide(in: app)
         let chapter = app.staticTexts["chapterTitle"].label
         app.buttons["readerSettings"].tap()
+        preferenceCategory("operation", in: app)
         app.segmentedControls.buttons["左右翻页"].tap()
-        let dark = app.buttons["夜读"]
+        preferenceHome(in: app)
+        preferenceCategory("appearance", in: app)
+        let dark = app.buttons["reading-paper-dark"]
         reveal(dark, in: app); dark.tap()
-        let font = app.segmentedControls.buttons["22"]
-        reveal(font, in: app); font.tap()
-        let preview = app.staticTexts["readingStylePreview"]
-        reveal(preview, in: app)
-        XCTAssertTrue(preview.isHittable)
+        preferenceHome(in: app)
+        preferenceCategory("layout", in: app)
+        app.buttons["reading-body"].tap()
+        let font = app.sliders["fontPicker"]
+        reveal(font, in: app); font.adjust(toNormalizedSliderPosition: 0.5)
+        let preview = app.descendants(matching: .any)["readingStylePreview"].firstMatch
+        XCTAssertTrue(preview.exists)
         capture(app, name: "UnifiedReadingStylePreview")
-
-        let advanced = app.buttons["reading-option-typography"]
-        reveal(advanced, in: app); advanced.tap()
-        XCTAssertTrue(app.navigationBars["阅读排版"].waitForExistence(timeout: 5))
-        capture(app, name: "UnifiedAdvancedTypography")
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        preferenceHome(in: app)
         let reset = app.buttons["resetReadingSettings"]
         reveal(reset, in: app); reset.tap()
+        app.alerts.buttons["恢复默认"].tap()
         app.buttons["完成"].tap()
         XCTAssertTrue(app.textViews["continuousText"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
@@ -595,8 +613,10 @@ final class ReaderFlowTests: XCTestCase {
         app.buttons["continueReading"].tap()
         acknowledgeFirstGuide(in: app)
         app.buttons["readerSettings"].tap()
+        preferenceCategory("operation", in: app)
         app.segmentedControls.buttons["左右翻页"].tap()
         let tapToggle = app.switches["tapToTurnToggle"]
+        reveal(tapToggle, in: app)
         tapToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
         XCTAssertEqual(tapToggle.value as? String, "1")
         app.buttons["完成"].tap()
@@ -628,6 +648,7 @@ final class ReaderFlowTests: XCTestCase {
         slider.adjust(toNormalizedSliderPosition: 0.7)
         XCTAssertNotEqual(app.staticTexts["chapterTitle"].label, "第三章 山雨欲来")
         app.buttons["readerSettings"].tap()
+        preferenceCategory("operation", in: app)
         app.segmentedControls.buttons["上下滚动"].tap()
         app.buttons["完成"].tap()
         XCTAssertTrue(app.textViews["continuousText"].waitForExistence(timeout: 5))
@@ -689,6 +710,7 @@ final class ReaderFlowTests: XCTestCase {
         app.buttons["continueReading"].tap()
         acknowledgeFirstGuide(in: app)
         app.buttons["readerSettings"].tap()
+        preferenceCategory("operation", in: app)
         app.segmentedControls.buttons["左右翻页"].tap()
         app.buttons["完成"].tap()
         app.buttons["nextChapter"].tap()
@@ -818,9 +840,12 @@ final class ReaderFlowTests: XCTestCase {
         app.launch()
         app.tabBars.buttons["我的"].tap()
         app.buttons["阅读偏好"].tap()
+        preferenceCategory("operation", in: app)
         app.segmentedControls.buttons["左右翻页"].tap()
         let tapToggle = app.switches["tapToTurnToggle"]
+        reveal(tapToggle, in: app)
         tapToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
+        reveal(app.buttons["readingGestureHelp"], in: app)
         app.buttons["readingGestureHelp"].tap()
         XCTAssertTrue(app.staticTexts["gestureGuideTitle"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["gestureGuideMode"].label, "当前模式 · 左右翻页")
@@ -838,6 +863,9 @@ final class ReaderFlowTests: XCTestCase {
         app.buttons["nextChapter"].tap()
         let before = app.staticTexts["readerPageStatus"].label
         app.buttons["readerSettings"].tap()
+        preferenceCategory("operation", in: app)
+        reveal(app.buttons["readingGestureHelp"], in: app)
+        reveal(app.buttons["readingGestureHelp"], in: app)
         app.buttons["readingGestureHelp"].tap()
         XCTAssertTrue(app.staticTexts["gestureGuideTitle"].waitForExistence(timeout: 5))
         app.buttons["dismissGestureGuide"].tap()

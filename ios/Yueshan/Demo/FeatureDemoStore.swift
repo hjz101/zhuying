@@ -93,12 +93,12 @@ struct DemoOutcome {
     let detail: String
 }
 
-enum DemoThemeMode: String, CaseIterable {
+enum DemoThemeMode: String, Codable, CaseIterable {
     case light, dark
     var title: String { self == .light ? "浅色" : "深色" }
 }
 
-struct DemoTheme: Identifiable, Equatable {
+struct DemoTheme: Identifiable, Codable, Equatable {
     let id: String
     var name: String
     var mode: DemoThemeMode
@@ -112,6 +112,7 @@ struct DemoTheme: Identifiable, Equatable {
     var titleStyleIDs: [String] = []
     var bubbleStyleIDs: [String] = []
     var assetIssues: [String] = []
+    var godStyle: String? = nil
 }
 
 struct ThemeImportResult: Equatable {
@@ -144,6 +145,10 @@ final class FeatureDemoStore: ObservableObject {
     @Published var selectedCover = "changfeng"
     @Published var downloadProgress = 0.35
     @Published var downloadPaused = true
+    var themeLibraryDefaults: UserDefaults?
+    var restoringThemeLibrary = false
+    weak var readingLibrary: LibraryStore?
+    @Published var readerThemeMessage: String?
     @Published var themes: [DemoTheme] = [
         .init(id: "paper", name: "暖纸山林", mode: .light, background: 0xEDE8D9, ink: 0x354F40, accent: 0xB7815A, summary: "温暖纸色 · 森林绿", source: "内置主题", version: "1.0", favorite: true),
         .init(id: "white", name: "纯白阅读", mode: .light, background: 0xFFFFFF, ink: 0x27352E, accent: 0x557A63, summary: "高对比 · 长文阅读", source: "内置主题", version: "1.0"),
@@ -154,19 +159,24 @@ final class FeatureDemoStore: ObservableObject {
         .init(id: "sand", name: "沙丘旧书", mode: .light, background: 0xF0E4CC, ink: 0x594A35, accent: 0xB98552, summary: "复古纸张 · 棕金", source: "主题包", version: "3.0"),
         .init(id: "ocean", name: "深海回声", mode: .dark, background: 0x1F2D3D, ink: 0xC5D9E8, accent: 0x72A7CC, summary: "深海蓝 · 冷色", source: "主题包", version: "1.1")
     ]
-    @Published var activeThemeID = "paper"
-    @Published var themeAssets: [ThemeAsset] = []
-    @Published var activeTitleStyleID: String? = "paper:title:main"
-    @Published var activeBubbleStyleID: String? = "paper:bubble:main"
+    { didSet { persistThemeLibrary() } }
+    @Published var activeThemeID = "paper" { didSet { persistThemeLibrary() } }
+    @Published var themeAssets: [ThemeAsset] = [] { didSet { persistThemeLibrary() } }
+    @Published var activeTitleStyleID: String? = "paper:title:main" { didSet { persistThemeLibrary() } }
+    @Published var activeBubbleStyleID: String? = "paper:bubble:main" { didSet { persistThemeLibrary() } }
     @Published var themeImportMessage: String?
 
-    init() {
+    init(defaults: UserDefaults? = nil) {
+        themeLibraryDefaults = defaults
+        restoringThemeLibrary = true
         themeAssets = ThemeStyleSamples.assets(for: themes)
         for index in themes.indices {
             let id = themes[index].id
             themes[index].titleStyleIDs = themeAssets.filter { $0.sourceThemeID == id && $0.kind == .title }.map(\.id)
             themes[index].bubbleStyleIDs = themeAssets.filter { $0.sourceThemeID == id && $0.kind == .bubble }.map(\.id)
         }
+        restoringThemeLibrary = false
+        restoreThemeLibrary()
     }
 
     func prepareSource(_ feature: DemoFeature, scope: String) {
@@ -182,6 +192,7 @@ final class FeatureDemoStore: ObservableObject {
         activeThemeID = id
         if let title = themeAssets(theme, kind: .title).first { activeTitleStyleID = title.id }
         if let bubble = themeAssets(theme, kind: .bubble).first { activeBubbleStyleID = bubble.id }
+        updateReaderTheme()
     }
     func toggleThemeFavorite(_ id: String) {
         guard let index = themes.firstIndex(where: { $0.id == id }) else { return }

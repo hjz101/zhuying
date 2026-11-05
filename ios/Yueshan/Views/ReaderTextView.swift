@@ -10,6 +10,8 @@ struct ContinuousReaderText: UIViewRepresentable {
     let onAnchor: (ReaderAnchor) -> Void
     let onTap: (Double) -> Void
     let onBoundary: (Bool) -> Void
+    var insets: UIEdgeInsets = UIEdgeInsets(top: 24, left: 25, bottom: 20, right: 25)
+    var onComment: (Int) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> UITextView {
@@ -17,7 +19,7 @@ struct ContinuousReaderText: UIViewRepresentable {
         view.isEditable = false
         view.isSelectable = false
         view.backgroundColor = .clear
-        view.textContainerInset = UIEdgeInsets(top: 25, left: 25, bottom: 45, right: 25)
+        view.textContainerInset = insets
         view.textContainer.lineFragmentPadding = 0
         view.showsVerticalScrollIndicator = false
         view.delegate = context.coordinator
@@ -29,6 +31,7 @@ struct ContinuousReaderText: UIViewRepresentable {
     func updateUIView(_ view: UITextView, context: Context) {
         let coordinator = context.coordinator
         coordinator.parent = self
+        view.textContainerInset = insets
         if coordinator.layoutID != layoutID || coordinator.restoreID != restoreID {
             coordinator.layoutID = layoutID
             coordinator.restoreID = restoreID
@@ -83,7 +86,14 @@ struct ContinuousReaderText: UIViewRepresentable {
         }
         @objc func tap(_ recognizer: UITapGestureRecognizer) {
             guard let view = recognizer.view else { return }
-            parent.onTap(recognizer.location(in: view).x / max(1, view.bounds.width))
+            let point = recognizer.location(in: view)
+            if let textView = view as? UITextView {
+                let location = CGPoint(x: point.x - textView.textContainerInset.left, y: point.y - textView.textContainerInset.top)
+                if let paragraph = ReaderDocument.comment(at: location, text: parent.document.text, size: textView.textContainer.size) {
+                    parent.onComment(paragraph); return
+                }
+            }
+            parent.onTap(point.x / max(1, view.bounds.width))
         }
     }
 }
@@ -93,6 +103,11 @@ struct PagedReaderText: UIViewRepresentable {
     let text: NSAttributedString
     let onTap: (Double) -> Void
     let onSwipe: (Bool) -> Void
+    var mode: ReadingMode = .paged
+    var effect = "平移"
+    var pageID = 0
+    var layoutID = ""
+    var paperColor: UIColor = .clear
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> ReaderPageCanvas {
         let view = ReaderPageCanvas()
@@ -102,7 +117,25 @@ struct PagedReaderText: UIViewRepresentable {
     }
     func updateUIView(_ view: ReaderPageCanvas, context: Context) {
         context.coordinator.parent = self
-        if !view.textView.attributedText.isEqual(to: text) { view.textView.attributedText = text }
+        guard !view.textView.attributedText.isEqual(to: text) else { return }
+        let forward = pageID >= view.lastPageID
+        let shouldAnimate = view.lastLayoutID == layoutID && pageID != view.lastPageID && view.hasText && !UIAccessibility.isReduceMotionEnabled
+        view.lastLayoutID = layoutID; view.lastPageID = pageID; view.hasText = true
+        view.backgroundColor = paperColor
+        if shouldAnimate && effect == "仿真" && mode == .paged {
+            UIView.transition(with: view, duration: 0.5, options: [forward ? .transitionCurlUp : .transitionCurlDown, .allowAnimatedContent]) {
+                view.textView.attributedText = text
+            }
+        } else {
+            if shouldAnimate && effect != "无动画" {
+                let transition = CATransition(); transition.duration = 0.28
+                transition.type = effect == "覆盖" ? .moveIn : .push
+                transition.subtype = mode == .verticalPaged ? (forward ? .fromBottom : .fromTop) : (forward ? .fromRight : .fromLeft)
+                transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                view.layer.add(transition, forKey: "reading-page")
+            }
+            view.textView.attributedText = text
+        }
     }
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: ReaderPageCanvas, context: Context) -> CGSize? {
         CGSize(width: proposal.width ?? 350, height: proposal.height ?? 500)
@@ -117,13 +150,18 @@ struct PagedReaderText: UIViewRepresentable {
         @objc func pan(_ recognizer: UIPanGestureRecognizer) {
             guard recognizer.state == .ended else { return }
             let movement = recognizer.translation(in: recognizer.view)
-            if abs(movement.x) > 45 && abs(movement.x) > abs(movement.y) { parent.onSwipe(movement.x < 0) }
+            if parent.mode == .verticalPaged {
+                if abs(movement.y) > 45 && abs(movement.y) > abs(movement.x) { parent.onSwipe(movement.y < 0) }
+            } else if abs(movement.x) > 45 && abs(movement.x) > abs(movement.y) { parent.onSwipe(movement.x < 0) }
         }
     }
 }
 
 final class ReaderPageCanvas: UIView {
     let textView = UITextView()
+    var lastPageID = 0
+    var lastLayoutID = ""
+    var hasText = false
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .clear

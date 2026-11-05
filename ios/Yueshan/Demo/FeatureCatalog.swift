@@ -103,8 +103,8 @@ struct DemoFeature: Identifiable {
     var actions: [String] = []
     var related: [String] = []
     var capabilityBadge: String? {
-        if ["import", "fulltext", "contents", "progress", "details", "reading"].contains(id) { return nil }
-        if ["shelf", "sources", "sourceImport", "sourceEdit", "bookmarks", "themes"].contains(id) { return "部分演示" }
+        if ["import", "fulltext", "contents", "progress", "details", "reading", "pageStyle", "typography", "highlight", "fonts", "titleDesign", "themes"].contains(id) { return nil }
+        if ["shelf", "sources", "sourceImport", "sourceEdit", "bookmarks", "comments"].contains(id) { return "部分演示" }
         return "演示"
     }
 }
@@ -137,10 +137,8 @@ enum FeatureCatalog {
         .init(id: "progress", title: "阅读进度", icon: "clock.arrow.circlepath", group: .reading, summary: "保存章节与文字位置 · 断点续读", preview: .books, related: ["reading", "bookmarks"]),
         .init(id: "bookmarks", title: "书签", icon: "bookmark", group: .reading, summary: "位置列表 · 跳转书签 · 删除书签", preview: .bookmarks, actions: ["添加当前进度书签"]),
         .init(id: "reading", title: "正文阅读", icon: "book", group: .reading, summary: "原生分页 · 连续滚动 · 上下章 · 按需加载", preview: .paper, actions: ["打开原生阅读器"], related: ["pageStyle", "typography", "chapterCache"]),
-        .init(id: "pageStyle", title: "翻页方式", icon: "rectangle.on.rectangle", group: .reading, summary: "覆盖 · 平移 · 滚动 · 无动画 · 仿真", preview: .paper,
-              fields: [.choice("effect", "效果预览", ["覆盖", "平移", "滚动", "无动画", "仿真翻页"])], actions: ["翻到下一页"]),
-        .init(id: "typography", title: "阅读排版", icon: "textformat.size", group: .reading, summary: "字号 · 字重 · 行段距 · 边距 · 缩进 · 对齐", preview: .paper,
-              fields: [.slider("size", "字号", 20, 14, 30, "pt"), .choice("weight", "字重", ["常规", "细体", "中等", "粗体"]), .slider("line", "行距", 10, 0, 24, "pt"), .slider("paragraph", "段距", 18, 0, 32, "pt"), .slider("margin", "左右边距", 20, 8, 40, "pt"), .toggle("indent", "首行缩进"), .choice("align", "文本对齐", ["左对齐", "两端对齐", "居中"])], actions: ["恢复排版默认值"]),
+        .init(id: "pageStyle", title: "翻页方式", icon: "rectangle.on.rectangle", group: .reading, summary: "左右／上下翻页 · 平移／覆盖／仿真／无动画 · 连续滚动", preview: .paper),
+        .init(id: "typography", title: "阅读排版", icon: "textformat.size", group: .reading, summary: "字号与字重 · 行距／段距 · 独立四边留白 · 首行缩进", preview: .paper),
         .init(id: "chapterCache", title: "章节缓存", icon: "arrow.down.circle", group: .reading, summary: "缓存章节 · 预下载 · 下载队列", preview: .cache,
               fields: [.choice("range", "缓存范围", ["后续 10 章", "后续 50 章", "全部章节"]), .toggle("wifi", "仅 Wi-Fi 下载")], actions: ["模拟预下载", "暂停下载"], related: ["cache"]),
         .init(id: "txt", title: "TXT 阅读", icon: "doc.plaintext", group: .files, summary: "文件导入 · 编码识别 · 章节分割", preview: .files,
@@ -181,15 +179,11 @@ enum FeatureCatalog {
               fields: [.choice("provider", "服务商", ["自定义兼容服务", "本地服务"]), .text("url", "Base URL", "https://ai.example/v1"), .text("model", "模型", "demo-model"), .secret("key", "API Key（仅占位）"), .toggle("secure", "使用钥匙串（界面示意）")], actions: ["模拟连接测试"]),
         .init(id: "purify", title: "正文净化", icon: "line.3.horizontal.decrease", group: .style, summary: "正则／JS 替换 · 分组启停 · 导入导出 · 作用域", preview: .rules,
               fields: [.choice("scope", "作用域", ["全部书籍", "当前书籍", "当前书源"]), .choice("type", "规则类型", ["正则", "JavaScript"]), .text("pattern", "匹配内容", "\\(本章完\\)"), .text("replacement", "替换为"), .toggle("enabled", "启用规则")], actions: ["预览净化结果", "模拟导入导出"]),
-        .init(id: "highlight", title: "高亮规则", icon: "highlighter", group: .style, summary: "规则管理 · 高亮颜色 · 背景样式", preview: .rules,
-              fields: [.text("pattern", "关键词", "陆青崖"), .choice("color", "颜色", ["暖金", "青绿", "浅蓝", "珊瑚"]), .choice("style", "样式", ["背景", "文字", "下划线"]), .toggle("enabled", "启用高亮")], actions: ["保存演示规则"]),
-        .init(id: "themes", title: "主题管理", icon: "paintpalette", group: .style, summary: "主题库 · 预览 · 收藏 · 批量导入", preview: .paper),
-        .init(id: "fonts", title: "字体管理", icon: "textformat", group: .style, summary: "TTF · OTF · TTC · 字体导入与使用", preview: .paper,
-              fields: [.choice("font", "字体预览", ["系统宋体", "系统黑体", "圆体"]), .choice("format", "导入格式", ["TTF", "OTF", "TTC"])], actions: ["模拟导入字体"]),
-        .init(id: "titleDesign", title: "章节标题设计", icon: "square.on.circle", group: .style, summary: "画布拖动 · 图层管理 · 撤销重做 · 样式导出", preview: .canvas,
-              fields: [.text("title", "标题文字", "第三章 山雨欲来")], actions: ["模拟导出样式"]),
-        .init(id: "comments", title: "段评与皮肤", icon: "bubble.left.and.bubble.right", group: .style, summary: "段评气泡 · 评论入口 · 气泡样式编辑导入", preview: .comments,
-              fields: [.choice("skin", "气泡皮肤", ["简约", "圆角", "纸片"]), .slider("opacity", "透明度", 90, 20, 100, "%"), .toggle("enabled", "显示段评气泡")], actions: ["模拟导入皮肤"]),
+        .init(id: "highlight", title: "高亮规则", icon: "highlighter", group: .style, summary: "正文样式规则 · 对话／系统／诗词模板 · 正则与关键词 · 首字下沉", preview: .rules),
+        .init(id: "themes", title: "主题管理", icon: "paintpalette", group: .style, summary: "本地套装导入 · 配色／标题／气泡 · 搭配预览与应用", preview: .paper),
+        .init(id: "fonts", title: "字体管理", icon: "textformat", group: .style, summary: "本地 TTF／OTF／TTC 导入 · 试字预览 · 应用于正文", preview: .paper),
+        .init(id: "titleDesign", title: "章节标题设计", icon: "square.on.circle", group: .style, summary: "自定义标题 · 字号／对齐／颜色 · CSS 子集导入 · 实时预览", preview: .canvas),
+        .init(id: "comments", title: "段评与皮肤", icon: "bubble.left.and.bubble.right", group: .style, summary: "段尾气泡 · 神人评论示例 · 个人皮肤创建与导入", preview: .comments),
         .init(id: "backup", title: "本地备份", icon: "externaldrive.badge.timemachine", group: .system, summary: "创建备份 · 恢复 .qibackup", preview: .backup,
               fields: [.toggle("sources", "包含书源"), .toggle("progress", "包含阅读进度"), .toggle("settings", "包含偏好")], actions: ["创建演示备份", "模拟恢复所选备份"]),
         .init(id: "icloud", title: "iCloud", icon: "icloud", group: .system, summary: "云端备份 · 同步状态 · 冲突处理", preview: .backup,

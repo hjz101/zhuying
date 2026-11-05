@@ -49,6 +49,12 @@ struct FeatureDemoView: View {
         Group {
             if feature.id == "import" { SmartImportView() }
             else if feature.id == "themes" { ThemeLibraryView() }
+            else if feature.id == "fonts" { ReadingFontManagerView() }
+            else if feature.id == "typography" { ReadingTypographyPreferencesView().navigationTitle(feature.title) }
+            else if feature.id == "pageStyle" { ReadingOperationPreferencesView().navigationTitle(feature.title) }
+            else if feature.id == "titleDesign" { ReadingTitlePreferencesView().navigationTitle(feature.title) }
+            else if feature.id == "highlight" { ReadingStyleRulesView().navigationTitle(feature.title) }
+            else if feature.id == "comments" { ReadingCommentsPreferencesView().navigationTitle(feature.title) }
             else { demoBody }
         }
     }

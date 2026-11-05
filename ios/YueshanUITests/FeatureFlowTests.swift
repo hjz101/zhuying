@@ -54,7 +54,7 @@ final class FeatureFlowTests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let settings = app.buttons["profileReadingSettings"]
         reveal(settings, app: app); settings.tap()
-        XCTAssertTrue(app.segmentedControls["readingModePicker"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["reading-category-operation"].waitForExistence(timeout: 5))
         app.buttons["完成"].tap()
         for (id, title) in [("readingHistory", "阅读历史"), ("profile-tool-import", "智能导入"), ("profileThemes", "主题管理"), ("profileSources", "书源")] {
             let shortcut = app.buttons[id]
@@ -92,7 +92,7 @@ final class FeatureFlowTests: XCTestCase {
         app.buttons["profileSettings"].tap()
         XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 5))
         app.buttons["阅读偏好"].tap()
-        XCTAssertTrue(app.segmentedControls["readingModePicker"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["reading-category-operation"].waitForExistence(timeout: 5))
         app.buttons["完成"].tap()
         app.buttons["profileGestureHelp"].tap()
         XCTAssertTrue(app.staticTexts["gestureGuideTitle"].waitForExistence(timeout: 5))
@@ -230,7 +230,9 @@ final class FeatureFlowTests: XCTestCase {
     @MainActor func testThemeLibraryImportPreviewFiltersAndDetails() {
         let app = launch()
         open("themes", title: "主题管理", app: app)
-        XCTAssertTrue(app.buttons["activeThemeCard"].waitForExistence(timeout: 5))
+        let activePaper = app.descendants(matching: .any)["activePaperCard"].firstMatch
+        XCTAssertTrue(activePaper.waitForExistence(timeout: 5))
+        XCTAssertTrue(activePaper.label.contains("暖纸"))
         XCTAssertTrue(app.buttons["themeImport"].exists)
         XCTAssertTrue(app.buttons["theme-filter-all"].exists)
         XCTAssertTrue(app.buttons["theme-card-paper"].exists)

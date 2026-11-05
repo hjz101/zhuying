@@ -215,8 +215,8 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(store.favorites, ["changfeng"])
         XCTAssertEqual(store.progress["changfeng"]?.chapter, 11)
         XCTAssertEqual(store.progress["changfeng"]?.paragraph, 0)
-        XCTAssertEqual(store.settings.fontSize, 20)
-        XCTAssertEqual(store.settings.lineSpacing, 12)
+        XCTAssertEqual(store.settings.fontSize, 30)
+        XCTAssertEqual(store.settings.lineSpacing, 0)
     }
     func testOldSnapshotMigratesWithoutLosingData() throws {
         let store = LibraryStore(books: books, defaults: defaults)

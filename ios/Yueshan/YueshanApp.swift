@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct YueshanApp: App {
     @StateObject private var library: LibraryStore
-    @StateObject private var featureDemo = FeatureDemoStore()
+    @StateObject private var featureDemo: FeatureDemoStore
     @StateObject private var navigation: NavigationStore
     @StateObject private var toolbox: ToolboxStore
     private let launchError: String?
@@ -16,6 +16,8 @@ struct YueshanApp: App {
                 defaults.removePersistentDomain(forName: "com.yueshan.ui-tests")
             }
         } else { defaults = .standard }
+        _featureDemo = StateObject(wrappedValue: FeatureDemoStore(defaults: defaults))
+        ReadingFontLibrary.shared.reload(reset: ProcessInfo.processInfo.arguments.contains("--ui-testing") && !ProcessInfo.processInfo.arguments.contains("--preserve-ui-test-state"))
         _navigation = StateObject(wrappedValue: NavigationStore(defaults: defaults))
         _toolbox = StateObject(wrappedValue: ToolboxStore(defaults: defaults))
         do {
@@ -65,6 +67,7 @@ struct RootView: View {
 
     var body: some View {
         navigationTabs
+        .onAppear { demo.connectReader(store) }
         .tint(Palette.green)
         .preferredColorScheme(.light)
         .onReceive(NotificationCenter.default.publisher(for: .showImportedShelf)) { _ in selectedTab = .shelf }

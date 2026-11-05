@@ -8,6 +8,12 @@
 
 正式开发的当前状态与验证证据见 [实施记录](docs/IMPLEMENTATION-STATUS.md)，书山聚合的接口子集及待联调范围见 [接入记录](docs/SHUSHAN-INTEGRATION.md)。界面与交互一致性按 `AGENTS.md` 执行。
 
+## 冻结 Demo
+
+原 Demo 的完整源码、截图和保存清单位于 [保存分支](https://github.com/hjz101/zhuying/tree/codex/saved-demo-2026-11-05)，固定提交为 `ea3b91c9b6cfcdbc411567ac4c7a7c0ae70a70e4`。主分支通过 `阅山Demo-2026-11-05/` 子模块引用该版本，保留独立历史。
+
+克隆时使用 `git clone --recurse-submodules https://github.com/hjz101/zhuying.git`；已有仓库运行 `git submodule update --init --recursive` 取回 Demo。在该目录运行 `python3 verification/verify_snapshot.py` 可校验快照，打开其 `ios/Yueshan.xcodeproj` 可运行原 Demo。
+
 ## 旧网页草稿启动
 
 需要 Node.js 18 或更新版本。在仓库目录运行：

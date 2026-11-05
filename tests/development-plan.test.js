@@ -6,6 +6,7 @@ const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const plan = read('../docs/DEVELOPMENT-PLAN.md');
 const features = read('../ios/FEATURES.md');
 const prd = read('../docs/PRD.md');
+const instructions = read('../AGENTS.md');
 
 function tableRows(markdown) {
   return markdown.split('\n')
@@ -155,4 +156,14 @@ test('dependency validation rejects missing tasks, duplicate IDs and circular sc
   assert.throws(() => validateGraph([task('T001'), task('T001')]), /unique/);
   assert.throws(() => validateGraph([task('T001', ['T002']), task('T002', ['T001'])]), /cycle/);
   assert.throws(() => validateGraph([task('T001', ['T001'])]), /cycle/);
+});
+
+test('release scope preserves Demo entry points in accordance with AGENTS.md', () => {
+  assert.match(instructions, /正式版.*Demo.*保持一致/);
+  assert.match(instructions, /不另行改版或删除原有功能入口/);
+  const delivery = tasks.find(task => task.id === 'T034');
+  assert.match(delivery.work, /保留 Demo 的全部功能入口/);
+  assert.match(delivery.acceptance, /保留原入口/);
+  assert.doesNotMatch(delivery.work + delivery.acceptance, /隐藏未交付入口|删除原有入口/);
+  assert.match(plan, /AGENTS\.md/);
 });

@@ -31,18 +31,40 @@ final class NavigationFlowTests: XCTestCase {
         XCTAssertFalse(app.tabBars.buttons["书源"].exists)
         capture(app, "NavigationDefault")
         app.tabBars.buttons["足迹"].tap()
-        XCTAssertTrue(app.staticTexts["阅读热力图"].waitForExistence(timeout: 5))
-        let before = app.staticTexts["selectedActivityDate"].label
-        capture(app, "ReadingFootprints")
-        app.buttons["activity-day-0"].tap()
-        XCTAssertNotEqual(app.staticTexts["selectedActivityDate"].label, before)
+        XCTAssertTrue(app.segmentedControls["activityPeriod"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["activityComparison"].label.contains("昨天同时刻"))
+        capture(app, "Footprints-Day")
+        app.segmentedControls["activityPeriod"].buttons["周"].tap()
+        XCTAssertTrue(app.staticTexts["activityComparison"].label.contains("上周同期"))
+        XCTAssertEqual(app.staticTexts["activityRankingPeriod"].label, "按本周阅读时长排序")
+        app.segmentedControls["activityPeriod"].buttons["月"].tap()
+        XCTAssertTrue(app.staticTexts["月历热力图"].waitForExistence(timeout: 5))
+        capture(app, "Footprints-Month")
+        let first = app.buttons["activity-date-1"]
+        reveal(first, in: app); first.tap()
+        let date = app.staticTexts["selectedActivityDate"]
+        reveal(date, in: app)
+        XCTAssertTrue(date.label.contains("1日"))
         app.buttons["activityToday"].tap()
-        XCTAssertEqual(app.staticTexts["selectedActivityDate"].label, before)
-        let book = app.buttons["activity-book-changfeng"]
-        reveal(book, in: app); book.tap()
+        app.swipeDown(); app.swipeDown(); app.swipeDown()
+        let year = app.segmentedControls["activityPeriod"].buttons["年"]
+        for _ in 0..<5 { if year.isHittable { break }; app.swipeDown() }
+        year.tap()
+        XCTAssertTrue(app.scrollViews["activityYearGrid"].waitForExistence(timeout: 5))
+        capture(app, "Footprints-Year")
+        app.segmentedControls.buttons["月度柱状图"].tap()
+        XCTAssertTrue(app.otherElements["activityBars"].waitForExistence(timeout: 5))
+        let all = app.buttons["activityAllRanks"]
+        reveal(all, in: app); all.tap()
+        XCTAssertTrue(app.buttons["activity-rank-5"].exists)
+        let rank = app.buttons["activity-rank-0"]
+        for _ in 0..<5 { if rank.isHittable { break }; app.swipeDown() }
+        rank.tap()
+        XCTAssertTrue(app.navigationBars["阅读记录"].waitForExistence(timeout: 5))
+        app.buttons["activityResume"].tap()
         let guide = app.buttons["dismissGestureGuide"]
         XCTAssertTrue(guide.waitForExistence(timeout: 5)); guide.tap()
-        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 山雨欲来")
+        XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
     }
     @MainActor
     func testNavigationCustomizationLimitOrderingPersistenceAndReset() {

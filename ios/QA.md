@@ -142,3 +142,13 @@ v0.2 验证结果：19 项单元测试通过，8 条界面流程全部通过，0
 2026-11-05 最终验证：37 项 iOS 单元测试、27 条界面流程全部通过，包含 47 个功能页逐项打开检查。导航、热力图和自动收起／固定模式的截图均来自最终通过测试的版本。iPhone 17 Pro 模拟器已更新。iOS 17–25 固定导航回退已通过编译，其他系统版本和真机尚未逐一验证。
 
 预览：`screenshots/navigation-default.png`、`screenshots/navigation-collapsed.png`、`screenshots/navigation-settings.png`、`screenshots/navigation-collapse-setting.png`、`screenshots/reading-footprints.png`。
+
+
+## 2026-11-05 · 足迹多周期统计
+
+- 日／周／月／年切换联动总时长、同比／环比、图表和书籍排行。按昨天同时刻、上周同期、上月同期与去年同期比较；没有基期时长时显示“暂无对比”。
+- 日与周柱状图、月历热力图、全年横向热力图与月度柱状图；日期点击联动当天各书时长，排行展示前五／全部并可进入单书会话记录继续阅读。
+- 示例会话和实际阅读进度隔离。按日历处理跨日、月底、闰年与夏令时；会话统计按区间交集计算，未来时段不计入。未接入真实使用计时或听书计时。
+- 41 项 iOS 单元测试、3 项足迹／导航界面测试、12 项网页测试通过，语法与 diff 检查通过。
+- 首轮界面测试发现中文日期受系统语言影响，以及滚动热力图查询类型不匹配，已修复并复验通过。
+- 截图：`screenshots/footprints-day.png`、`screenshots/footprints-month.png`、`screenshots/footprints-year.png`。

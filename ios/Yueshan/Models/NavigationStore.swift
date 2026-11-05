@@ -87,3 +87,102 @@ struct ReadingActivity {
         return (0..<(weeks * 7)).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 }
+
+// Demo sessions are separate from actual reader progress and never represent tracked usage.
+enum ActivityPeriod: String, CaseIterable {
+    case day, week, month, year
+    var title: String { switch self { case .day: "日"; case .week: "周"; case .month: "月"; case .year: "年" } }
+    var comparison: String { switch self { case .day: "较昨天同时刻"; case .week: "较上周同期"; case .month: "较上月同期"; case .year: "较去年同期" } }
+    var component: Calendar.Component { switch self { case .day: .day; case .week: .weekOfYear; case .month: .month; case .year: .year } }
+    func start(containing date: Date, calendar: Calendar) -> Date {
+        if self == .week {
+            let offset = (calendar.component(.weekday, from: date) + 5) % 7
+            return calendar.date(byAdding: .day, value: -offset, to: calendar.startOfDay(for: date))!
+        }
+        return calendar.dateInterval(of: component, for: date)!.start
+    }
+    func previousCutoff(for date: Date, calendar: Calendar) -> Date {
+        // Calendar addition clamps month ends and February 29, preserving local wall time.
+        calendar.date(byAdding: component, value: -1, to: date)!
+    }
+}
+
+struct ActivitySession {
+    let bookID: String
+    let start: Date
+    let seconds: TimeInterval
+    var end: Date { start.addingTimeInterval(seconds) }
+    func duration(in interval: DateInterval) -> TimeInterval {
+        max(0, min(end, interval.end).timeIntervalSince(max(start, interval.start)))
+    }
+    static func demo(books: [Book], now: Date, calendar: Calendar) -> [ActivitySession] {
+        guard !books.isEmpty else { return [] }
+        let today = calendar.startOfDay(for: now)
+        let yearStart = ActivityPeriod.year.start(containing: now, calendar: calendar)
+        let start = calendar.date(byAdding: .year, value: -1, to: yearStart)!
+        var result: [ActivitySession] = []
+        var day = start
+        while day <= today {
+            let ordinal = calendar.ordinality(of: .day, in: .era, for: day) ?? 0
+            if ordinal % 6 != 0 {
+                for (index, hour) in [8, 13, 20].enumerated() {
+                    let minutes = 5 + (ordinal + index * 11) % 24
+                    let time = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day)!
+                    result.append(.init(bookID: books[(ordinal + index) % books.count].id, start: time, seconds: Double(minutes * 60)))
+                }
+            }
+            day = calendar.date(byAdding: .day, value: 1, to: day)!
+        }
+        return result
+    }
+}
+
+struct ActivityBookTotal: Identifiable {
+    let id: String
+    let seconds: TimeInterval
+}
+
+struct ActivityReport {
+    let sessions: [ActivitySession]
+    let now: Date
+    let period: ActivityPeriod
+    var calendar: Calendar = .current
+    var interval: DateInterval { .init(start: period.start(containing: now, calendar: calendar), end: now) }
+    var previousInterval: DateInterval {
+        let cutoff = period.previousCutoff(for: now, calendar: calendar)
+        return .init(start: period.start(containing: cutoff, calendar: calendar), end: cutoff)
+    }
+    func total(in interval: DateInterval, bookID: String? = nil) -> TimeInterval {
+        sessions.lazy.filter { bookID == nil || $0.bookID == bookID }.reduce(0) { $0 + $1.duration(in: interval) }
+    }
+    var seconds: TimeInterval { total(in: interval) }
+    var previousSeconds: TimeInterval { total(in: previousInterval) }
+    var changePercent: Int? {
+        guard previousSeconds > 0 else { return nil }
+        return Int(((seconds - previousSeconds) / previousSeconds * 100).rounded())
+    }
+    func ranking(in range: DateInterval? = nil) -> [ActivityBookTotal] {
+        let range = range ?? interval
+        return Set(sessions.map(\.bookID)).compactMap { id in
+            let seconds = total(in: range, bookID: id)
+            return seconds > 0 ? ActivityBookTotal(id: id, seconds: seconds) : nil
+        }.sorted { $0.seconds == $1.seconds ? $0.id < $1.id : $0.seconds > $1.seconds }
+    }
+    func dayInterval(_ date: Date) -> DateInterval {
+        let start = calendar.startOfDay(for: date)
+        let end = min(calendar.date(byAdding: .day, value: 1, to: start)!, now)
+        return .init(start: min(start, end), end: end)
+    }
+    var elapsedDays: Int { max(1, (calendar.dateComponents([.day], from: interval.start, to: now).day ?? 0) + 1) }
+    var readingDays: Int {
+        (0..<elapsedDays).filter { offset in
+            let date = calendar.date(byAdding: .day, value: offset, to: interval.start)!
+            return total(in: dayInterval(date)) > 0
+        }.count
+    }
+    static func duration(_ seconds: TimeInterval) -> String {
+        let minutes = Int(seconds / 60)
+        if seconds > 0 && minutes == 0 { return "不足 1 分钟" }
+        return minutes >= 60 ? "\(minutes / 60) 小时 \(minutes % 60) 分钟" : "\(minutes) 分钟"
+    }
+}

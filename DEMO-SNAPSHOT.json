@@ -1,0 +1,623 @@
+{
+  "name": "阅山 iOS Demo 保存副本",
+  "saved_at": "2026-11-05T20:29:15+08:00",
+  "timezone": "Asia/Shanghai",
+  "source_commit": "21516ef10c3428c406e344d2a431450ba54dbba1",
+  "saved_branch": "codex/saved-demo-2026-11-05",
+  "source_file_count": 145,
+  "source_files": {
+    ".gitignore": {
+      "bytes": 81,
+      "sha256": "4150879afb9e418ac5df95d049dcc360d69fc128219fea5a57b66b7d6cae65f2"
+    },
+    "AGENTS.md": {
+      "bytes": 246,
+      "sha256": "fb02421c8ef0dfe161e3f43ea5e487397b16f8357362329cca1339187754c2be"
+    },
+    "README.md": {
+      "bytes": 2276,
+      "sha256": "0255701b8b245225245de5b27300760de96cf6ffb8280a984b4befeffeb4310b"
+    },
+    "docs/DEMO-QA.md": {
+      "bytes": 3030,
+      "sha256": "dd3de07d0088db50b4af98c9e411eaf2f557a4242682deb3dfaa4e40df23baf8"
+    },
+    "docs/DEVELOPMENT-PLAN.md": {
+      "bytes": 41455,
+      "sha256": "5805185aaf019cf05ce94437af97c8546f13b0ea613a1a8a293c14b728f65e78"
+    },
+    "docs/PRD.md": {
+      "bytes": 19973,
+      "sha256": "853e1d35ca1b0c9d2431506134dad636a1f335b8d5604d2bb3b6695aa48a602a"
+    },
+    "docs/design/reading-preferences-layouts.html": {
+      "bytes": 37071,
+      "sha256": "d353a33d99a66c13b385a32cc116ad7f310ece7aaa6fc01740b22c5ae7d8c0e5"
+    },
+    "docs/design/reading-preferences-layouts.md": {
+      "bytes": 1982,
+      "sha256": "c5c94b51d1255663f9b8571386be197ccf02346f2af4279a5d45e9bd394fe0da"
+    },
+    "docs/design/reading-preferences-overview-v2.html": {
+      "bytes": 62246,
+      "sha256": "f4b15840c3c3e344daa66e4ec6c24232572736ce07a756de1b8e50f90078272e"
+    },
+    "docs/design/reading-preferences-overview-v2.md": {
+      "bytes": 10497,
+      "sha256": "2415f590de2889aa6aec8ac0c848ae69e9de0ea9e699fad9586f5dbebe0ea5ec"
+    },
+    "docs/screenshots/shelf-desktop.jpg": {
+      "bytes": 60345,
+      "sha256": "30f5f377e560a4b48555bab405bc7db3d9b60c6dc68e7b01f580b816e6f2fa32"
+    },
+    "docs/screenshots/shelf-mobile.jpg": {
+      "bytes": 33205,
+      "sha256": "8817840468f7768a39989c62dd7dc8d7ad6ae3a024a8c6acca3fe4ad3c82af16"
+    },
+    "index.html": {
+      "bytes": 1025,
+      "sha256": "10a21cd228e888ad7299dde45e445d1837ef5f739c186c9c2097da1b178c9fca"
+    },
+    "ios/FEATURES.md": {
+      "bytes": 14053,
+      "sha256": "4f5d0de9d9eb8b5cf0a498ad1152f545b21dde1730b5d7c71f2b19a158920189"
+    },
+    "ios/NAVIGATION.md": {
+      "bytes": 3126,
+      "sha256": "4fff5559be51dbbf5be3a70254d8699669135026fca00b0c84dd9ca3e7ad0a1d"
+    },
+    "ios/QA.md": {
+      "bytes": 29338,
+      "sha256": "e2fe91ac3a108ff77e482ebad48e35f3f5736343aa4b7be2e23e3c8a5fa3ebbd"
+    },
+    "ios/README.md": {
+      "bytes": 18379,
+      "sha256": "3982032eecd942153e502ecee78a11f88f87fa0c66b354d2a225d09c883a9170"
+    },
+    "ios/THEME.md": {
+      "bytes": 3488,
+      "sha256": "084d27bd5e48be0689fc1c01210e83b97eb6996f82ef74064fb3c87d3cd15a83"
+    },
+    "ios/THEME_PACKAGES.md": {
+      "bytes": 4459,
+      "sha256": "064f88c101fd3d31c47133d3bc1b07d7a653526e02b8c0cfde40f5deda892be0"
+    },
+    "ios/Yueshan.xcodeproj/project.pbxproj": {
+      "bytes": 43536,
+      "sha256": "a8ee2e9b6f969bb35a59015cc76a68dab4bbaf9b02999aa0444d587a80adb27b"
+    },
+    "ios/Yueshan.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
+      "bytes": 135,
+      "sha256": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+    },
+    "ios/Yueshan.xcodeproj/xcshareddata/xcschemes/Yueshan.xcscheme": {
+      "bytes": 4312,
+      "sha256": "40a22a64db7f2198f09f6f9daa29c953ae3e415a2dde763246a513398a0a10d8"
+    },
+    "ios/Yueshan/Demo/DemoPreviews.swift": {
+      "bytes": 36893,
+      "sha256": "876fede043ba92fe2ced23d6c32a4a8bd4bdc8b4322d7ee55149dd726fa2cad8"
+    },
+    "ios/Yueshan/Demo/FeatureCatalog.swift": {
+      "bytes": 23723,
+      "sha256": "25ad7a8d504ec5e03bd70e68d556c185d7e951ff025a7fee75bf9e76ee7bb7b5"
+    },
+    "ios/Yueshan/Demo/FeatureDemoStore.swift": {
+      "bytes": 23312,
+      "sha256": "c3e01e9d90f101ef49a0f08c3a1808bcbd4c9885f2e7b821679255d56f08646e"
+    },
+    "ios/Yueshan/Demo/FeatureDemoView.swift": {
+      "bytes": 24034,
+      "sha256": "eb7692fc4226f52ff76060ced7c9f1dc0a61a8f02681b10e85eda6a2f9ad2e34"
+    },
+    "ios/Yueshan/Info.plist": {
+      "bytes": 798,
+      "sha256": "67ef9d16db188c67ab434929d7e28f8cc0b2917f8fcc3055b446cadb881e50d4"
+    },
+    "ios/Yueshan/Models/BookImport.swift": {
+      "bytes": 11599,
+      "sha256": "d18bde9db9c9703b7cc33f23007a14c315813a5337c9160c5d46155bc335acd7"
+    },
+    "ios/Yueshan/Models/Library.swift": {
+      "bytes": 18174,
+      "sha256": "1288988cfb228dda98a6fd4fc89e008c05427b54e15fe71470bbd0bc9f404074"
+    },
+    "ios/Yueshan/Models/NavigationStore.swift": {
+      "bytes": 8984,
+      "sha256": "a81095cdd7ba9eec55433761405338ff9ff8fc31d73a0909884d1bc0b4da3af3"
+    },
+    "ios/Yueshan/Models/ReaderEngine.swift": {
+      "bytes": 20770,
+      "sha256": "2ac192710cc7ffb965b7300c6b3d33038b91168137120626dadbf358fb2dcd5e"
+    },
+    "ios/Yueshan/Models/ReaderPreferences.swift": {
+      "bytes": 21006,
+      "sha256": "8a19c84e12389046e7ed21057064f86d934dfa92f6239511fc42f3fac4c83d5f"
+    },
+    "ios/Yueshan/Models/ReadingFontLibrary.swift": {
+      "bytes": 6166,
+      "sha256": "21f820b32e86621f0a80ca6fe999c0b57fb6afe4730dbbbc51458e445c46fb69"
+    },
+    "ios/Yueshan/Models/ThemeAssets.swift": {
+      "bytes": 16868,
+      "sha256": "3fc579a062368f7ee9a3d5141b6bafac63da4a8667b8ee02cf2b09f66eaec1ce"
+    },
+    "ios/Yueshan/Models/ThemeReadingBridge.swift": {
+      "bytes": 12167,
+      "sha256": "d5a3212ebc320461ecf93746b50912fa2851a882b7be1bdcd5319cdf39097af4"
+    },
+    "ios/Yueshan/Models/ToolboxStore.swift": {
+      "bytes": 2496,
+      "sha256": "de65e0e9883b942b56ed80ca38f41c919ab7833d9c9a8f61529692b13638940e"
+    },
+    "ios/Yueshan/Resources/library.json": {
+      "bytes": 154073,
+      "sha256": "df644ce2b553e217e7d8bf21261ca1217f742cdea71c541407ae4ca6259cc22d"
+    },
+    "ios/Yueshan/Views/BookDetailView.swift": {
+      "bytes": 5513,
+      "sha256": "67773ac464cdaa20cd76ff820d66a812269b88c7622499bc4a175cbd73191eca"
+    },
+    "ios/Yueshan/Views/Components.swift": {
+      "bytes": 12600,
+      "sha256": "e47d0a2c1813eb4476a0b8076aace3ee8a3ca1564cb1c5a073130faf71bb0cf1"
+    },
+    "ios/Yueshan/Views/DiscoverView.swift": {
+      "bytes": 3885,
+      "sha256": "dfe16a2f63278ad4ac57fa77fa9aee32f3404fbf041fd74939f1a2171953a0fc"
+    },
+    "ios/Yueshan/Views/FootprintsView.swift": {
+      "bytes": 16512,
+      "sha256": "647aae9e3fa880c1b203f2443c02ff5c7eaba34200231ea5dcc85670bd92f6e4"
+    },
+    "ios/Yueshan/Views/NavigationSettingsView.swift": {
+      "bytes": 3898,
+      "sha256": "def232740c4f04953e60df55b377e85b94b56dab5d5227382254731bf72cc5dd"
+    },
+    "ios/Yueshan/Views/ProfileView.swift": {
+      "bytes": 12227,
+      "sha256": "950041e3d525eb27bd87ef9b2664f8129f547dbb3b00d4a848a01bf910defefd"
+    },
+    "ios/Yueshan/Views/ReaderPageFurniture.swift": {
+      "bytes": 2371,
+      "sha256": "3d152a5a144f2a37c76070cbd1fb47f6ea6d8cf252074c269796cc1bab935c80"
+    },
+    "ios/Yueshan/Views/ReaderTextView.swift": {
+      "bytes": 9060,
+      "sha256": "af27951ff8bbf5726487434df3470abcf3429c582e5d2c72ffa1e98d0e5a1ad7"
+    },
+    "ios/Yueshan/Views/ReaderView.swift": {
+      "bytes": 22616,
+      "sha256": "895a356ace9c8aed388568d938844ce4002711da88306963869d4ff6bb4d3436"
+    },
+    "ios/Yueshan/Views/ReadingAppearanceView.swift": {
+      "bytes": 6971,
+      "sha256": "7c607bd7a62a8eabfc22af268a38f9e360bff3d5943724a312c76c19c3c3a41a"
+    },
+    "ios/Yueshan/Views/ReadingContentPreferences.swift": {
+      "bytes": 16757,
+      "sha256": "024368f1755c25a732b1878275b202544ceb896f4ed11b3443ac777afde888a4"
+    },
+    "ios/Yueshan/Views/ReadingGestureGuideView.swift": {
+      "bytes": 4108,
+      "sha256": "f5242f9ae7ecf4869aac93e1fc61fef46794de5e01238af37b169ebfec7de5e0"
+    },
+    "ios/Yueshan/Views/ReadingHistoryView.swift": {
+      "bytes": 5962,
+      "sha256": "35205ee155eaef5a633b73a8e1eea9b93862aeeae7ad54fc7e9aa05210c32acb"
+    },
+    "ios/Yueshan/Views/ReadingPageEditors.swift": {
+      "bytes": 17803,
+      "sha256": "f3985c70203311cf988947ecd0762ad186c4775d5c52e6894374dc344b701d51"
+    },
+    "ios/Yueshan/Views/ReadingPreferencesView.swift": {
+      "bytes": 22038,
+      "sha256": "76dfb88ba1257a83ce023373f17acb03c28d334c90b66010a0a7ee03d36b119f"
+    },
+    "ios/Yueshan/Views/ShelfView.swift": {
+      "bytes": 28534,
+      "sha256": "e19616401886c6c6c6de392b6b566a46d4a993cd3491fb9633736a9e66ba288c"
+    },
+    "ios/Yueshan/Views/SmartImportView.swift": {
+      "bytes": 14132,
+      "sha256": "fbf808584592e5e7a4d99542d9ec2f1e05155252254d899d8e9b16c86f38b549"
+    },
+    "ios/Yueshan/Views/ThemeLibraryView.swift": {
+      "bytes": 29001,
+      "sha256": "6f09a08bd0cae913427e210866b2531cdc0c59eeea42af58a4018c12351edbd9"
+    },
+    "ios/Yueshan/Views/ThemeStylePreview.swift": {
+      "bytes": 7790,
+      "sha256": "9fb273002e8ce61b609955ff3a2a7850c502da2edf1df69b31cd62f3e3d086f0"
+    },
+    "ios/Yueshan/Views/ToolboxView.swift": {
+      "bytes": 14173,
+      "sha256": "d89850bd40ba175efa2a546e5f83b799ef465be08810fb6fa225297516861bfd"
+    },
+    "ios/Yueshan/YueshanApp.swift": {
+      "bytes": 7267,
+      "sha256": "6a3348b6990ac574c1d1d23f7f1407ee07577ce3757aef3f32c68ad44c1c7329"
+    },
+    "ios/YueshanTests/BookImportTests.swift": {
+      "bytes": 9090,
+      "sha256": "ceb11f8be81dff7e6fca87001405ad9f076d2c338cb6fe7cd8a74d2b0674f374"
+    },
+    "ios/YueshanTests/FeatureDemoTests.swift": {
+      "bytes": 17076,
+      "sha256": "ea8501aab87efee5ce969a35e4d945aa427d892c1e928d580573a253a883a381"
+    },
+    "ios/YueshanTests/Fixtures/ReaderTestFont.ttf": {
+      "bytes": 3896,
+      "sha256": "d000786c4b27fe13eafb724beea948ef9ad6cfb3a5bf21abac18cdc8c43fa1a1"
+    },
+    "ios/YueshanTests/LibraryStoreTests.swift": {
+      "bytes": 17239,
+      "sha256": "05a9f7f84618a4c57065f9d38512ed912c544e3dcd91749e617b5a1de18df7eb"
+    },
+    "ios/YueshanTests/NavigationStoreTests.swift": {
+      "bytes": 9145,
+      "sha256": "953c84e4eceab34c7e4de4ce486ea01e08dfd7ff6f6129c26122a5efa484bce2"
+    },
+    "ios/YueshanTests/ReaderEngineTests.swift": {
+      "bytes": 3774,
+      "sha256": "574c905255bc6d61274933c46734331ace58ccaaf7df7349ce106ab700710b35"
+    },
+    "ios/YueshanTests/ReaderPreferencesTests.swift": {
+      "bytes": 12884,
+      "sha256": "1554a5ec04312c6d5281b299cadefc307571db2f206ef203964998d892f95bfe"
+    },
+    "ios/YueshanTests/ReaderRenderingPreferencesTests.swift": {
+      "bytes": 9054,
+      "sha256": "2570cfeee48ec33ce6f3016145bbdbc2fb47a238ef0c9756f65b80bd874a3a4f"
+    },
+    "ios/YueshanTests/ReadingAppearanceTests.swift": {
+      "bytes": 8233,
+      "sha256": "ac2257d0190973c4337617a203433c6d76385095084b6ccd00c33d0a9bc2416d"
+    },
+    "ios/YueshanTests/ReadingFontLibraryTests.swift": {
+      "bytes": 12921,
+      "sha256": "b8e35c72e43fb9ccd30f6d0613242eded9267242cc8f03a1c3b84b9d6859e5bb"
+    },
+    "ios/YueshanTests/ReadingPreferencePresentationTests.swift": {
+      "bytes": 6014,
+      "sha256": "ded31403f336b1b8fdc831d213abbce61d2fe72a51f3f08f79fd59d52ceb5aca"
+    },
+    "ios/YueshanTests/ThemeAssetsTests.swift": {
+      "bytes": 9038,
+      "sha256": "6e4b1a8e0b096a894819ef076eb2a6d46e8709b1589d858d7db36a6b725ac7ba"
+    },
+    "ios/YueshanTests/ToolboxStoreTests.swift": {
+      "bytes": 4882,
+      "sha256": "64ed73e8eaa0059b2c42c0e03bc469d3b63a3eb5ae73fdc6fa67ccadd565ef24"
+    },
+    "ios/YueshanUITests/FeatureFlowTests.swift": {
+      "bytes": 31659,
+      "sha256": "6cf7099087801356b7e11684cca948837af2260bde8b397842d8a5546055fdaf"
+    },
+    "ios/YueshanUITests/NavigationFlowTests.swift": {
+      "bytes": 6628,
+      "sha256": "76c208571e04bc90005a6798c3a614f50b41904093abffdb74179630ce69307d"
+    },
+    "ios/YueshanUITests/ReaderFlowTests.swift": {
+      "bytes": 44822,
+      "sha256": "adb49233909c0be141f0c7e4b7581fe65ffbb6ba4fbd3570e4f0e0d6706bcda0"
+    },
+    "ios/YueshanUITests/ReadingPreferencesFlowTests.swift": {
+      "bytes": 11319,
+      "sha256": "c52a7a885cff8d11c7285cd309f057af250772e1bdcff992fcb887514b0dbab2"
+    },
+    "ios/YueshanUITests/SmartImportFlowTests.swift": {
+      "bytes": 6370,
+      "sha256": "902b1d6ffad289e1dabca738193bfcd246956087d79231335efe90469ce93d06"
+    },
+    "ios/YueshanUITests/ThemeAssetsFlowTests.swift": {
+      "bytes": 5640,
+      "sha256": "22118e4c79dd93bd00e34a1dc1e110c30e7d08f5edb068340d9832368067a765"
+    },
+    "ios/project.yml": {
+      "bytes": 1570,
+      "sha256": "fbe61520f33c7f0b3cb94f9aa44272c602466e69ab6b836d546d19bbd03a2163"
+    },
+    "ios/screenshots/catalog-airoles.png": {
+      "bytes": 318097,
+      "sha256": "563e198e088379ecd8e695cd92e851fb7b5b6726a678683a438f2266a5a0eaa0"
+    },
+    "ios/screenshots/catalog-filepreview.png": {
+      "bytes": 489361,
+      "sha256": "e39efc43c16714373c493cb46f34324cf96c0cde5ba6f83b883098f28cd6de36"
+    },
+    "ios/screenshots/catalog-miniplayer.png": {
+      "bytes": 535790,
+      "sha256": "821e06f3ac654e58075783dccf691f6c382d0e5cfc1d1680621f3ca9ad5327df"
+    },
+    "ios/screenshots/catalog-player.png": {
+      "bytes": 433468,
+      "sha256": "2486c9a195b42545a32501a6f640554a3f6c48c8da0d717b315daccab2cbca9d"
+    },
+    "ios/screenshots/catalog-sources.png": {
+      "bytes": 360481,
+      "sha256": "22adb513d984aeea1a0799742e429c4861cfc83cd58c32128e08957ea758ec6f"
+    },
+    "ios/screenshots/catalog-testreport.png": {
+      "bytes": 347821,
+      "sha256": "ac75222e2725d29d17e04336f26671929b944d1fcee8ab4833217d592b6f75f5"
+    },
+    "ios/screenshots/catalog-titledesign.png": {
+      "bytes": 322400,
+      "sha256": "b4ec5402a65178039a110562d4d33577140a1b234b86801c91c70cae5ffb482b"
+    },
+    "ios/screenshots/catalog-toolshome.png": {
+      "bytes": 385443,
+      "sha256": "7bf6783efb3bdb4f1dbec4381242bad293701aa581d58c1ab00ea93d0e6a93f9"
+    },
+    "ios/screenshots/catalog-typography.png": {
+      "bytes": 361959,
+      "sha256": "d0f8fa17f5566ed48b8a1ed9d0e5f556fd1576467d95ed4baa9902e57706c84f"
+    },
+    "ios/screenshots/footprints-day.png": {
+      "bytes": 309983,
+      "sha256": "dc7c03c89834a65f5d99cb1467cf3e5cf70305e37ad31175a45293bebce485bc"
+    },
+    "ios/screenshots/footprints-month.png": {
+      "bytes": 326891,
+      "sha256": "42cec08a0a5676f81e0069fc0bbfe67df65469211476115fecc6edb3b0cf9c90"
+    },
+    "ios/screenshots/footprints-year.png": {
+      "bytes": 361435,
+      "sha256": "5d6d5e04367599c89f31211239219848d088cef63cf71be29ddac66ebfaf9bdb"
+    },
+    "ios/screenshots/import-local.png": {
+      "bytes": 220256,
+      "sha256": "e0fcfbd26c3fa1c37ca1367f299fa0b4b11463541a380753308468696763283f"
+    },
+    "ios/screenshots/import-preview.png": {
+      "bytes": 247274,
+      "sha256": "003959dd2e14e2841b0a8c798117ffcfbf522109b470a3dfe139ffaf64707017"
+    },
+    "ios/screenshots/iphone-gesture-guide.png": {
+      "bytes": 314293,
+      "sha256": "f6b32fe12974d3ff7ac3847d54bb3d156cfcc221359259a961e787d65392de78"
+    },
+    "ios/screenshots/iphone-profile.png": {
+      "bytes": 270015,
+      "sha256": "4ca417617c54d8a229acd71ca59c9f4c0c90a5195b21190523a50d733186ea17"
+    },
+    "ios/screenshots/iphone-reader.png": {
+      "bytes": 357189,
+      "sha256": "21b687d07755854ac92a576782f7dcc6b62114a56b10febc5372195866b0308e"
+    },
+    "ios/screenshots/iphone-shelf.png": {
+      "bytes": 536756,
+      "sha256": "f74f99469e48e4ae9f4fbc2c6989231ea4fcb0ad80b3481b1d2e0a9ff22834d5"
+    },
+    "ios/screenshots/navigation-collapse-setting.png": {
+      "bytes": 277162,
+      "sha256": "65b3c12932784ee7e9ee018c74b2647f3da8c85688cf1d0c654d8333308d8b2f"
+    },
+    "ios/screenshots/navigation-collapsed.png": {
+      "bytes": 522680,
+      "sha256": "2a48d6f36cb9b5494a5bce5ba1a32471e69e937dc6c294ae35c4f0162293de6f"
+    },
+    "ios/screenshots/navigation-default.png": {
+      "bytes": 456669,
+      "sha256": "79d8968a49bb8a199bb3f0367c4080664c0ec698ecb3d66c287bc32dcaf2681f"
+    },
+    "ios/screenshots/navigation-settings.png": {
+      "bytes": 341963,
+      "sha256": "154d767572d2663f7051a65364eeae63bbf1f5406cda302a527f21367b9e5536"
+    },
+    "ios/screenshots/profile-magazine-entries.png": {
+      "bytes": 440304,
+      "sha256": "8b4401ddf801c07f57dedbeef96df0a413ae90e7f0e53059edc5484f5ea8456d"
+    },
+    "ios/screenshots/profile-magazine.png": {
+      "bytes": 441218,
+      "sha256": "e1138776651fb311f5d88c52f7f072cd61716a77d96d1bb94eb5c2a30b7a0dbb"
+    },
+    "ios/screenshots/profile-merged.png": {
+      "bytes": 224317,
+      "sha256": "35fe7176e2c334cf57eb70ba7ce0fb12ecc96506b2e29a63906e90263554a077"
+    },
+    "ios/screenshots/reader-custom-page-header.png": {
+      "bytes": 322327,
+      "sha256": "4a8cba18dc627349a95bc27326a40aadec730cf1ffbafb8fa301828e40b8ec3d"
+    },
+    "ios/screenshots/reader-floating-toolbar-dark.png": {
+      "bytes": 551192,
+      "sha256": "d9215fa99c52001f75793b3895976df4cbed05a2aa6c97d51ba7a59885ea05bd"
+    },
+    "ios/screenshots/reader-floating-toolbar.png": {
+      "bytes": 549616,
+      "sha256": "4e4c710df1c08d773d1c2e87deeef548ceea236c7110dcf47d65229bfb44917e"
+    },
+    "ios/screenshots/reader-fullheight-paged.png": {
+      "bytes": 369303,
+      "sha256": "6117539135b1e0f53c7295d2fedce5100e8e09676ab78c784c22e58451670390"
+    },
+    "ios/screenshots/reader-fullheight-scroll.png": {
+      "bytes": 345020,
+      "sha256": "8e476163145c61ba7f935e81160031d09ed3d0e4910a73054329eaa888d01c4a"
+    },
+    "ios/screenshots/reader-more-menu.png": {
+      "bytes": 655243,
+      "sha256": "3f0b20b532950c8e40e0a02ba35a0688a23a420e29bf48b44c87204660e18ce7"
+    },
+    "ios/screenshots/reading-footprints.png": {
+      "bytes": 393394,
+      "sha256": "c51a6ecf3c76a3380e154bcc6546fbd9986efc76531cfe7af49d51ca291aa9cb"
+    },
+    "ios/screenshots/reading-preferences-comments.png": {
+      "bytes": 303269,
+      "sha256": "90fa7196d74543dfdee80329ea9fe3478c83290f99cd09d52e894fca8bf7fd6c"
+    },
+    "ios/screenshots/reading-preferences-overview.png": {
+      "bytes": 279237,
+      "sha256": "9cfb2d78ccb92d47abca233f80448462180483954c7c2288773c66f87222d5e9"
+    },
+    "ios/screenshots/reading-preferences-page-elements.png": {
+      "bytes": 239678,
+      "sha256": "6adde7f6253be42ab5ce56056f10cf0432577a3f8a11365f52915869e0a7c816"
+    },
+    "ios/screenshots/reading-preferences-title.png": {
+      "bytes": 276272,
+      "sha256": "d4704d4421eced0a3e28d78f7d14c42989ea1c80d40306c2121ef375f1a954e4"
+    },
+    "ios/screenshots/reading-preferences-typography.png": {
+      "bytes": 317725,
+      "sha256": "3cb24b7a0682c8cd78de14847b569304a27281317028606dd9d53a1f38a927ff"
+    },
+    "ios/screenshots/shelf-compact-segments.png": {
+      "bytes": 514135,
+      "sha256": "5f1ab2d846817eed0bd32409513dcfc4d1615744f603f049a15a8aceb7fdb69e"
+    },
+    "ios/screenshots/shelf-spines-cover.png": {
+      "bytes": 741736,
+      "sha256": "98f69a6e1a2714c1d94be5fe14ba2b94e640a58345d75ca7b3ad80d3a9ff79f7"
+    },
+    "ios/screenshots/source-import-file.png": {
+      "bytes": 352979,
+      "sha256": "ae9d2ce8729f7469c794997b3a2fdeb3d6711058b9d48845e82102df25552e41"
+    },
+    "ios/screenshots/source-swipe-actions.png": {
+      "bytes": 342644,
+      "sha256": "5862d29fa34a4780e80a949509e38490e73f74d4d7b5e2107f7161d57bce30a8"
+    },
+    "ios/screenshots/sources-batch.png": {
+      "bytes": 220845,
+      "sha256": "31836d5ee6d89ba64fb67d501f4eaeaa456be0322975b3c9d636ff63afbf053d"
+    },
+    "ios/screenshots/sources-compact.png": {
+      "bytes": 249008,
+      "sha256": "78f44733d09ee6d2ed79d42815665ca1fe5e63d58e536b85de52801d19655254"
+    },
+    "ios/screenshots/theme-bundles.png": {
+      "bytes": 432420,
+      "sha256": "f6580a1314a51ce9dfe3282f67d0ee5c11ec4e215218a74ef2a388bd6ab473ae"
+    },
+    "ios/screenshots/theme-css-title.png": {
+      "bytes": 218355,
+      "sha256": "40aec0e51d1c8a18077027ef826807741bc90782dccc4fd2d84c2d0fa4cb9067"
+    },
+    "ios/screenshots/theme-custom-mix.png": {
+      "bytes": 247878,
+      "sha256": "1ee48e95c492eaf892c211431c915361d2a1b9c5762bc1b1f12f4974fb4ddb10"
+    },
+    "ios/screenshots/theme-svg-bubbles.png": {
+      "bytes": 217280,
+      "sha256": "5f5fab756316f4d0d2cacef221117575beeef66ee4ddcb9090fbe919ddbbe3b5"
+    },
+    "ios/screenshots/toolbox-directory.png": {
+      "bytes": 378489,
+      "sha256": "9e32c7eb9ddb2c2fddee3074624a3266e347e7ecaafc6931fb2fc7e70938c275"
+    },
+    "ios/screenshots/toolbox-formats.png": {
+      "bytes": 402771,
+      "sha256": "830820602039c25ca72856f13f8e3bdc90e3d8f14e9b8ff97a5d56f6dcc434ab"
+    },
+    "ios/screenshots/unified-advanced-typography.png": {
+      "bytes": 255607,
+      "sha256": "a6e38a12538338b79a0cb310cfd3b5ca3cb60b83a7ca166551c8c0b85e9e7089"
+    },
+    "ios/screenshots/unified-chapter-contents.png": {
+      "bytes": 301248,
+      "sha256": "4a5ff4913dbbb37e612e7a9fa3bde9e5f241d89ce6056a033f9e28beebaa8d6b"
+    },
+    "ios/screenshots/unified-preferences-night-selection.png": {
+      "bytes": 274104,
+      "sha256": "aa8d033cb34863c13db0b67ea4f2f77f8ad15de002b7b0666490c1f9f4d18669"
+    },
+    "ios/screenshots/unified-reading-preferences.png": {
+      "bytes": 277219,
+      "sha256": "4375aa6963a528802e859b26c6879f7c45c03da1d6b137a2ea905a405f30841a"
+    },
+    "ios/screenshots/unified-reading-style-preview.png": {
+      "bytes": 259366,
+      "sha256": "518ffd62edd6e1ebd2e61076d60c4a61d47e13a1c35e66c1426e9b56dcd6b05a"
+    },
+    "ios/scripts/README-ReaderTestFont.md": {
+      "bytes": 1215,
+      "sha256": "c97bbf0ac68a4f1ba090c2dc188092d70c4e28bac3b528751c260b6acbf10970"
+    },
+    "ios/scripts/generate_reader_test_font.py": {
+      "bytes": 6522,
+      "sha256": "20edb7e6a0b5326625c885ddc76c0e2768b8d6a2a69a12c3defa46c937e4e726"
+    },
+    "package.json": {
+      "bytes": 329,
+      "sha256": "c595f136b74b1e128a0435200d915b1e69aea07549dba43697a85adbdf836b1a"
+    },
+    "server.mjs": {
+      "bytes": 1515,
+      "sha256": "09fabae29f4fe29a23c2b2c820b9cc9ad9b7d7aafde200f1e0420b1b920dc2da"
+    },
+    "src/app.js": {
+      "bytes": 31167,
+      "sha256": "f05d5becfc547a447a974a1804600e23000638794867a6298979134583d44459"
+    },
+    "src/data.js": {
+      "bytes": 12466,
+      "sha256": "8f82b5695f2b4ef55464b13d98413136cf69003fa7339f8c5cba992904bbb0f0"
+    },
+    "src/store.js": {
+      "bytes": 4503,
+      "sha256": "273ccc9abe9deb5d23074293c023b655befc823641f0354623a22f51775566b1"
+    },
+    "src/styles.css": {
+      "bytes": 44733,
+      "sha256": "da0ccb8cfed96d0e8cca875509e02f39f8daada40ecd2fa43168caa28b904b7f"
+    },
+    "tests/development-plan.test.js": {
+      "bytes": 6998,
+      "sha256": "7f23db391d9b651ba9f9f02c9ff1fb01d71cff110c45a52d4e1aea9a8cf11b5d"
+    },
+    "tests/reading-layout-editor.test.js": {
+      "bytes": 11971,
+      "sha256": "5c83b06975915fcd8e2a13c6c3f966b61a77feff45f56d74b2f9b50062875986"
+    },
+    "tests/reading-layouts.test.js": {
+      "bytes": 5167,
+      "sha256": "34c5a38ecc17480aa2da833d8625f64696418fe1a44bcc5cc60e5e4b39461d74"
+    },
+    "tests/reading-preferences-v2.test.js": {
+      "bytes": 21607,
+      "sha256": "c016aaad368da034b5250757d17c7fc8e9b3668db923af3ac0c0b0a8f6dcaecc"
+    },
+    "tests/store.test.js": {
+      "bytes": 5813,
+      "sha256": "c498ef531c390cdc8fc8dd3e53cdff120f382bc627fa983b5fc623cc8ad9f5e0"
+    }
+  },
+  "save_files": {
+    "保存说明.md": {
+      "bytes": 1771,
+      "sha256": "5610bfbbd013be5389702e59b6e5c8a32f6984b6ff987b56c70d54dff4d2245e"
+    },
+    "verification/verify_snapshot.py": {
+      "bytes": 4056,
+      "sha256": "52e072785395d07eca57248c37118f73c3c78a8909a7ed908f0aeeb2a4444c49"
+    }
+  },
+  "validation": {
+    "snapshot_integrity": {
+      "status": "passed",
+      "tests": 7,
+      "command": "python3 verification/verify_snapshot.py"
+    },
+    "web_tests": {
+      "status": "passed",
+      "tests": 47,
+      "command": "npm test"
+    },
+    "web_syntax": {
+      "status": "passed",
+      "command": "npm run check"
+    },
+    "ios_simulator_build": {
+      "status": "passed",
+      "destination": "generic/platform=iOS Simulator",
+      "scheme": "Yueshan",
+      "code_signing_required": false
+    }
+  },
+  "device_data_included": false
+}

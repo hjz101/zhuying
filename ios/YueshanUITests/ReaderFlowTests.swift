@@ -607,7 +607,12 @@ final class ReaderFlowTests: XCTestCase {
 
     @MainActor
     func testPagedReadingTapZonesSliderAndModeSwitch() {
+        continueAfterFailure = false
         let app = XCUIApplication()
+        func waitForPage(_ page: Int) {
+            let rendered = expectation(for: NSPredicate(format: "label CONTAINS %@", "本章 \(page) /"), evaluatedWith: app.staticTexts["readerPageStatus"])
+            wait(for: [rendered], timeout: 5)
+        }
         app.launchArguments = ["--ui-testing"]
         app.launch()
         app.buttons["continueReading"].tap()
@@ -624,20 +629,21 @@ final class ReaderFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 1 /"))
         XCTAssertTrue(app.buttons["readerTapCenter"].waitForExistence(timeout: 5))
         app.buttons["nextChapter"].tap()
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 2 /"))
+        waitForPage(2)
         // Both edges advance; only the center controls the toolbar.
         app.buttons["readerTapLeft"].tap()
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 3 /"), app.staticTexts["readerPageStatus"].label)
+        let diagnostic = XCTAttachment(screenshot: app.screenshot()); diagnostic.name = "Reader-Paged-Selection-Compatible"; diagnostic.lifetime = .keepAlways; add(diagnostic)
+        waitForPage(3)
         // Do not assume a fixed page count: full-height text fits more per page.
         app.buttons["previousChapter"].tap()
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 2 /"))
+        waitForPage(2)
         app.buttons["readerTapRight"].tap()
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 3 /"), app.staticTexts["readerPageStatus"].label)
+        waitForPage(3)
         app.buttons["readerTapCenter"].swipeRight()
         XCTAssertTrue(app.buttons["readerSettings"].isHittable, "A swipe must not also trigger the center tap and hide controls")
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 2 /"))
+        waitForPage(2)
         app.buttons["readerTapCenter"].swipeLeft()
-        XCTAssertTrue(app.staticTexts["readerPageStatus"].label.contains("本章 3 /"))
+        waitForPage(3)
         let pageBeforeHiding = app.staticTexts["readerPageStatus"].label
         app.buttons["readerTapCenter"].tap()
         assertReaderControlsHidden(in: app)

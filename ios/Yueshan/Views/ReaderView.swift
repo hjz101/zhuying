@@ -63,34 +63,11 @@ struct ReaderView: View {
                         .position(x: layout.scrollFrame.midX, y: layout.scrollFrame.midY)
                 } else if initialized && !ranges.isEmpty {
                     if ranges.indices.contains(page) {
-                        ZStack {
-                            PagedReaderText(text: document.pageText(in: ranges[page]), onTap: handleTap, onSwipe: { flip(forward: $0) },
-                                            mode: store.settings.mode, effect: store.settings.preferences.effect(for: store.settings.mode),
-                                            pageID: chapter * 100_000 + page, layoutID: key, paperColor: palette.background)
-                                .frame(width: layout.textFrame.width, height: layout.textFrame.height)
-                                .position(x: layout.textFrame.midX, y: layout.textFrame.midY)
-                                .allowsHitTesting(false)
-                            HStack(spacing: 0) {
-                                tapArea(0.1, label: "轻触左侧", id: "readerTapLeft").frame(width: geo.size.width * 0.3)
-                                tapArea(0.5, label: "显示或隐藏阅读工具栏", id: "readerTapCenter")
-                                tapArea(0.9, label: "轻触右侧", id: "readerTapRight").frame(width: geo.size.width * 0.3)
-                            }.frame(width: geo.size.width, height: geo.size.height)
-                                // One exclusive gesture prevents a swipe from also activating a tap zone.
-                                .highPriorityGesture(SpatialTapGesture().exclusively(before: DragGesture(minimumDistance: 25)).onEnded { event in
-                                    switch event {
-                                    case .first(let tap):
-                                        let point = CGPoint(x: tap.location.x - layout.textFrame.minX, y: tap.location.y - layout.textFrame.minY)
-                                        if store.isDemo, let paragraph = ReaderDocument.comment(at: point, text: document.pageText(in: ranges[page]), size: layout.textFrame.size) {
-                                            commentParagraph = paragraph
-                                        } else { handleTap(tap.location.x / max(1, geo.size.width)) }
-                                    case .second(let drag):
-                                        let horizontal = store.settings.mode == .paged
-                                        let primary = horizontal ? drag.translation.width : drag.translation.height
-                                        let secondary = horizontal ? drag.translation.height : drag.translation.width
-                                        if abs(primary) > 45 && abs(primary) > abs(secondary) { flip(forward: primary < 0) }
-                                    }
-                                })
-                        }.frame(width: geo.size.width, height: geo.size.height).clipped()
+                        PagedReaderText(text: document.pageText(in: ranges[page]), onTap: handleTap, onSwipe: { flip(forward: $0) },
+                                        mode: store.settings.mode, effect: store.settings.preferences.effect(for: store.settings.mode),
+                                        pageID: chapter * 100_000 + page, layoutID: key, paperColor: palette.background,
+                                        onComment: { if store.isDemo { commentParagraph = $0 } }, documentFrame: layout.textFrame)
+                            .frame(width: geo.size.width, height: geo.size.height)
                     }
                 }
             }
@@ -261,11 +238,6 @@ struct ReaderView: View {
         .padding(.horizontal, 18).padding(.bottom, 8)
     }
 
-    private func tapArea(_ fraction: Double, label: String, id: String) -> some View {
-        Button { handleTap(fraction) } label: {
-            Color.white.opacity(0.02).frame(maxWidth: .infinity, maxHeight: .infinity).contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityLabel(label).accessibilityIdentifier(id)
-    }
     private func tool(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { toolLabel(title, icon: icon) }
     }

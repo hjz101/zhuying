@@ -1,6 +1,10 @@
 import XCTest
 
 final class ProductionLaunchTests: XCTestCase {
+    @MainActor private func assertReaderText(_ value: String, app: XCUIApplication) {
+        let rendered = expectation(for: NSPredicate(format: "value CONTAINS %@", value), evaluatedWith: app.textViews["continuousText"])
+        wait(for: [rendered], timeout: 5)
+    }
     @MainActor
     func testProductionOpenFailureCanRetryInPlace() {
         continueAfterFailure = false
@@ -54,7 +58,7 @@ final class ProductionLaunchTests: XCTestCase {
         let resume = app.buttons["continueReading"]
         XCTAssertTrue(resume.waitForExistence(timeout: 10)); resume.tap()
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第二章 重逢")
-        XCTAssertTrue(app.staticTexts["升级前已经读到的真实段落。"].exists)
+        assertReaderText("升级前已经读到的真实段落。", app: app)
         XCTAssertFalse(app.buttons["dismissGestureGuide"].exists)
         app.buttons["readerSettings"].tap()
         XCTAssertTrue(app.navigationBars["阅读偏好"].waitForExistence(timeout: 5))
@@ -65,7 +69,7 @@ final class ProductionLaunchTests: XCTestCase {
         app.launch()
         XCTAssertTrue(resume.waitForExistence(timeout: 10)); resume.tap()
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第二章 重逢")
-        XCTAssertTrue(app.staticTexts["升级前已经读到的真实段落。"].exists)
+        assertReaderText("升级前已经读到的真实段落。", app: app)
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Production-Legacy-Migration-Restored"
         attachment.lifetime = .keepAlways

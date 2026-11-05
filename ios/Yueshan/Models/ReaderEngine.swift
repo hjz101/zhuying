@@ -345,6 +345,10 @@ enum ReaderPaginator {
 
 enum ReadingTapAction { case previous, next, controls }
 enum ReaderInteraction {
+    static func acceptsPageDrag(_ movement: CGPoint, mode: ReadingMode, selectedLength: Int) -> Bool {
+        guard selectedLength == 0 else { return false }
+        return mode == .verticalPaged ? abs(movement.y) > abs(movement.x) : abs(movement.x) > abs(movement.y)
+    }
     static func action(at fraction: Double, settings: ReadingSettings) -> ReadingTapAction {
         guard settings.tapToTurn else { return .controls }
         if fraction > 0.3 && fraction < 0.7 { return .controls }

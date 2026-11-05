@@ -17,14 +17,16 @@ struct ContinuousReaderText: UIViewRepresentable {
     func makeUIView(context: Context) -> UITextView {
         let view = UITextView()
         view.isEditable = false
-        view.isSelectable = false
+        view.isSelectable = true
         view.backgroundColor = .clear
         view.textContainerInset = insets
         view.textContainer.lineFragmentPadding = 0
         view.showsVerticalScrollIndicator = false
         view.delegate = context.coordinator
         view.accessibilityIdentifier = "continuousText"
-        view.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:))))
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:)))
+        tap.cancelsTouchesInView = false; tap.delegate = context.coordinator
+        view.addGestureRecognizer(tap)
         return view
     }
 
@@ -67,7 +69,7 @@ struct ContinuousReaderText: UIViewRepresentable {
         CGSize(width: proposal.width ?? 350, height: proposal.height ?? 500)
     }
 
-    final class Coordinator: NSObject, UITextViewDelegate {
+    final class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
         var parent: ContinuousReaderText
         var layoutID = ""
         var restoreID = -1
@@ -91,6 +93,10 @@ struct ContinuousReaderText: UIViewRepresentable {
                 self.parent.onAnchor(anchor)
             }
         }
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            (gestureRecognizer.view as? UITextView)?.selectedRange.length == 0
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
         @objc func tap(_ recognizer: UITapGestureRecognizer) {
             guard let view = recognizer.view else { return }
             let point = recognizer.location(in: view)
@@ -115,22 +121,32 @@ struct PagedReaderText: UIViewRepresentable {
     var pageID = 0
     var layoutID = ""
     var paperColor: UIColor = .clear
+    var onComment: (Int) -> Void = { _ in }
+    var documentFrame: CGRect? = nil
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> ReaderPageCanvas {
         let view = ReaderPageCanvas()
-        view.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:))))
-        view.addGestureRecognizer(UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:))))
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:)))
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
+        tap.cancelsTouchesInView = false
+        tap.delegate = context.coordinator; pan.delegate = context.coordinator
+        tap.require(toFail: pan)
+        view.addGestureRecognizer(tap); view.addGestureRecognizer(pan)
         return view
     }
     func updateUIView(_ view: ReaderPageCanvas, context: Context) {
         context.coordinator.parent = self
+        view.onTap = onTap; view.onSwipe = onSwipe
+        view.documentFrame = documentFrame
+        view.backgroundColor = paperColor
+        view.textView.backgroundColor = paperColor
         guard !view.textView.attributedText.isEqual(to: text) else { return }
         let forward = pageID >= view.lastPageID
         let shouldAnimate = view.lastLayoutID == layoutID && pageID != view.lastPageID && view.hasText && !UIAccessibility.isReduceMotionEnabled
         view.lastLayoutID = layoutID; view.lastPageID = pageID; view.hasText = true
-        view.backgroundColor = paperColor
+        view.textView.selectedRange = NSRange(location: 0, length: 0)
         if shouldAnimate && effect == "仿真" && mode == .paged {
-            UIView.transition(with: view, duration: 0.5, options: [forward ? .transitionCurlUp : .transitionCurlDown, .allowAnimatedContent]) {
+            UIView.transition(with: view.textView, duration: 0.5, options: [forward ? .transitionCurlUp : .transitionCurlDown, .allowAnimatedContent, .allowUserInteraction, .beginFromCurrentState]) {
                 view.textView.attributedText = text
             }
         } else {
@@ -139,7 +155,7 @@ struct PagedReaderText: UIViewRepresentable {
                 transition.type = effect == "覆盖" ? .moveIn : .push
                 transition.subtype = mode == .verticalPaged ? (forward ? .fromBottom : .fromTop) : (forward ? .fromRight : .fromLeft)
                 transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                view.layer.add(transition, forKey: "reading-page")
+                view.textView.layer.add(transition, forKey: "reading-page")
             }
             view.textView.attributedText = text
         }
@@ -147,12 +163,26 @@ struct PagedReaderText: UIViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: ReaderPageCanvas, context: Context) -> CGSize? {
         CGSize(width: proposal.width ?? 350, height: proposal.height ?? 500)
     }
-    final class Coordinator: NSObject {
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: PagedReaderText
         init(_ parent: PagedReaderText) { self.parent = parent }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let canvas = gestureRecognizer.view as? ReaderPageCanvas, canvas.textView.selectedRange.length == 0 else { return false }
+            if let pan = gestureRecognizer as? UIPanGestureRecognizer {
+                let movement = pan.translation(in: canvas)
+                return ReaderInteraction.acceptsPageDrag(movement, mode: parent.mode, selectedLength: canvas.textView.selectedRange.length)
+            }
+            return true
+        }
         @objc func tap(_ recognizer: UITapGestureRecognizer) {
             guard let view = recognizer.view else { return }
-            parent.onTap(recognizer.location(in: view).x / max(1, view.bounds.width))
+            let point = recognizer.location(in: view)
+            if let canvas = view as? ReaderPageCanvas {
+                let local = CGPoint(x: point.x - canvas.textView.frame.minX, y: point.y - canvas.textView.frame.minY)
+                if let paragraph = ReaderDocument.comment(at: local, text: parent.text, size: canvas.textView.bounds.size) { parent.onComment(paragraph); return }
+            }
+            parent.onTap(point.x / max(1, view.bounds.width))
         }
         @objc func pan(_ recognizer: UIPanGestureRecognizer) {
             guard recognizer.state == .ended else { return }
@@ -169,18 +199,45 @@ final class ReaderPageCanvas: UIView {
     var lastPageID = 0
     var lastLayoutID = ""
     var hasText = false
+    var onTap: (Double) -> Void = { _ in }
+    var onSwipe: (Bool) -> Void = { _ in }
+    var documentFrame: CGRect? { didSet { if documentFrame != oldValue { setNeedsLayout() } } }
+    private var zones: [ReaderTapAccessibilityElement] = []
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .clear
         accessibilityIdentifier = "readerTouchSurface"
-        isAccessibilityElement = true
-        accessibilityLabel = "阅读操作区域，轻触中间显示菜单，左右滑动翻页"
-        textView.isEditable = false; textView.isSelectable = false; textView.isScrollEnabled = false
-        textView.isUserInteractionEnabled = false
+        isAccessibilityElement = false
+        textView.accessibilityIdentifier = "pagedText"
+        textView.isEditable = false; textView.isSelectable = true; textView.isScrollEnabled = false
+        textView.isUserInteractionEnabled = true
         textView.backgroundColor = .clear; textView.textContainerInset = .zero
         textView.textContainer.lineFragmentPadding = 0
         addSubview(textView)
+        for (id, label, fraction) in [("readerTapLeft", "轻触左侧", 0.1), ("readerTapCenter", "显示或隐藏阅读工具栏", 0.5), ("readerTapRight", "轻触右侧", 0.9)] {
+            let zone = ReaderTapAccessibilityElement(accessibilityContainer: self)
+            zone.accessibilityIdentifier = id; zone.accessibilityLabel = label; zone.accessibilityTraits = .button
+            zone.activate = { [weak self] in self?.onTap(fraction) }
+            zones.append(zone)
+        }
+        accessibilityElements = zones.map { $0 as Any } + [textView]
+        textView.accessibilityCustomActions = [
+            UIAccessibilityCustomAction(name: "下一页") { [weak self] _ in self?.onSwipe(true); return true },
+            UIAccessibilityCustomAction(name: "上一页") { [weak self] _ in self?.onSwipe(false); return true },
+            UIAccessibilityCustomAction(name: "显示或隐藏阅读工具栏") { [weak self] _ in self?.onTap(0.5); return true }
+        ]
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    override func layoutSubviews() { super.layoutSubviews(); textView.frame = bounds }
+    override func layoutSubviews() {
+        super.layoutSubviews(); textView.frame = documentFrame ?? bounds
+        for (index, zone) in zones.enumerated() {
+            let start: CGFloat = index == 0 ? 0 : index == 1 ? 0.3 : 0.7
+            zone.accessibilityFrameInContainerSpace = CGRect(x: bounds.width * start, y: 0, width: bounds.width * (index == 1 ? 0.4 : 0.3), height: bounds.height)
+        }
+    }
+}
+
+final class ReaderTapAccessibilityElement: UIAccessibilityElement {
+    var activate: () -> Void = {}
+    override func accessibilityActivate() -> Bool { activate(); return true }
 }

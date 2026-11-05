@@ -1,6 +1,10 @@
 import XCTest
 
 final class SmartImportFlowTests: XCTestCase {
+    @MainActor private func assertReaderText(_ value: String, app: XCUIApplication) {
+        let rendered = expectation(for: NSPredicate(format: "value CONTAINS %@", value), evaluatedWith: app.textViews["continuousText"])
+        wait(for: [rendered], timeout: 5)
+    }
     @MainActor private func launch(production: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--import-fixtures"] + (production ? ["--production"] : []); app.launch(); return app
@@ -80,7 +84,7 @@ final class SmartImportFlowTests: XCTestCase {
         XCTAssertTrue(read.isHittable); read.tap()
         if app.buttons["dismissGestureGuide"].waitForExistence(timeout: 3) { app.buttons["dismissGestureGuide"].tap() }
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第一章 来信")
-        XCTAssertTrue(app.staticTexts["这是从系统文件选择器导入的真实正文。"].exists)
+        assertReaderText("这是从系统文件选择器导入的真实正文。", app: app)
         app.buttons["nextChapter"].tap()
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第二章 回声")
         app.buttons["返回书架"].tap()
@@ -123,7 +127,7 @@ final class SmartImportFlowTests: XCTestCase {
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第二章 回声")
         app.buttons["nextChapter"].tap()
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 远山")
-        XCTAssertTrue(app.staticTexts["远山之下的真实正文，来自同一个本地文件。"].exists)
+        assertReaderText("远山之下的真实正文，来自同一个本地文件。", app: app)
         app.buttons["readerSettings"].tap()
         app.buttons["reading-category-layout"].tap()
         app.buttons["reading-body"].tap()
@@ -143,7 +147,7 @@ final class SmartImportFlowTests: XCTestCase {
         let resume = app.buttons["continueReading"]
         XCTAssertTrue(resume.waitForExistence(timeout: 10)); resume.tap()
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 远山")
-        XCTAssertTrue(app.staticTexts["远山之下的真实正文，来自同一个本地文件。"].exists)
+        assertReaderText("远山之下的真实正文，来自同一个本地文件。", app: app)
         XCTAssertFalse(app.buttons["dismissGestureGuide"].exists)
         capture(app, "Production-Database-Restored-Reader")
         app.buttons["readerSettings"].tap()

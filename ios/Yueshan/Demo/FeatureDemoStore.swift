@@ -109,12 +109,17 @@ struct DemoTheme: Identifiable, Equatable {
     var source: String
     var version: String
     var favorite = false
+    var titleStyleIDs: [String] = []
+    var bubbleStyleIDs: [String] = []
+    var assetIssues: [String] = []
 }
 
 struct ThemeImportResult: Equatable {
     let added: Int
     let duplicates: Int
     let invalid: Int
+    var titlesAdded = 0
+    var bubblesAdded = 0
 }
 
 @MainActor
@@ -150,7 +155,19 @@ final class FeatureDemoStore: ObservableObject {
         .init(id: "ocean", name: "深海回声", mode: .dark, background: 0x1F2D3D, ink: 0xC5D9E8, accent: 0x72A7CC, summary: "深海蓝 · 冷色", source: "主题包", version: "1.1")
     ]
     @Published var activeThemeID = "paper"
+    @Published var themeAssets: [ThemeAsset] = []
+    @Published var activeTitleStyleID: String? = "paper:title:main"
+    @Published var activeBubbleStyleID: String? = "paper:bubble:main"
     @Published var themeImportMessage: String?
+
+    init() {
+        themeAssets = ThemeStyleSamples.assets(for: themes)
+        for index in themes.indices {
+            let id = themes[index].id
+            themes[index].titleStyleIDs = themeAssets.filter { $0.sourceThemeID == id && $0.kind == .title }.map(\.id)
+            themes[index].bubbleStyleIDs = themeAssets.filter { $0.sourceThemeID == id && $0.kind == .bubble }.map(\.id)
+        }
+    }
 
     func prepareSource(_ feature: DemoFeature, scope: String) {
         guard let source = sources.first(where: { $0.id == scope }), feature.id == "sourceEdit" else { return }
@@ -161,8 +178,10 @@ final class FeatureDemoStore: ObservableObject {
     }
 
     func applyTheme(_ id: String) {
-        guard themes.contains(where: { $0.id == id }) else { return }
+        guard let theme = themes.first(where: { $0.id == id }) else { return }
         activeThemeID = id
+        if let title = themeAssets(theme, kind: .title).first { activeTitleStyleID = title.id }
+        if let bubble = themeAssets(theme, kind: .bubble).first { activeBubbleStyleID = bubble.id }
     }
     func toggleThemeFavorite(_ id: String) {
         guard let index = themes.firstIndex(where: { $0.id == id }) else { return }
@@ -173,19 +192,8 @@ final class FeatureDemoStore: ObservableObject {
     }
     @discardableResult
     func importDemoThemes() -> ThemeImportResult {
-        let incoming = [
-            DemoTheme(id: "mist", name: "雾蓝来信", mode: .light, background: 0xE6EEF0, ink: 0x2F4B57, accent: 0x6F9AA8, summary: "雾蓝 · 清透", source: "导入主题包", version: "2.1"),
-            DemoTheme(id: "cinnamon", name: "肉桂书页", mode: .light, background: 0xF0DED0, ink: 0x5F4038, accent: 0xB86F55, summary: "肉桂 · 温柔", source: "导入主题包", version: "1.0"),
-            DemoTheme(id: "aurora", name: "极光夜色", mode: .dark, background: 0x202B3D, ink: 0xD2E4D9, accent: 0x79BBA0, summary: "极光绿 · 深蓝", source: "导入主题包", version: "1.0"),
-            DemoTheme(id: "broken", name: "无效主题", mode: .light, background: 0, ink: 0, accent: 0, summary: "格式无法解析", source: "导入主题包", version: "?")
-        ]
-        let existing = Set(themes.map(\.id))
-        let valid = incoming.filter { $0.id != "broken" }
-        let additions = valid.filter { !existing.contains($0.id) }
-        themes.append(contentsOf: additions)
-        let result = ThemeImportResult(added: additions.count, duplicates: valid.count - additions.count, invalid: incoming.count - valid.count)
-        themeImportMessage = "已扫描 4 个主题：新增 \(result.added) 个 · 重复 \(result.duplicates) 个 · 无效 \(result.invalid) 个"
-        return result
+        // The demo follows the same parser and association rules as selected JSON files.
+        (try? importThemeData(ThemeStyleSamples.importData)) ?? .init(added: 0, duplicates: 0, invalid: 1)
     }
     func setSourceLogin(_ id: String, status: DemoLoginStatus) {
         guard let index = sources.firstIndex(where: { $0.id == id }) else { return }

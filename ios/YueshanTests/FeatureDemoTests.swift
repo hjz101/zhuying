@@ -191,12 +191,12 @@ final class FeatureDemoTests: XCTestCase {
         XCTAssertEqual(demo.themes.count, 8)
         XCTAssertEqual(demo.activeThemeID, "paper")
         let first = demo.importDemoThemes()
-        XCTAssertEqual(first, ThemeImportResult(added: 2, duplicates: 1, invalid: 1))
+        XCTAssertEqual(first, ThemeImportResult(added: 2, duplicates: 1, invalid: 1, titlesAdded: 3, bubblesAdded: 3))
         XCTAssertEqual(demo.themes.count, 10)
         XCTAssertEqual(demo.themes.filter { $0.id == "mist" }.count, 1)
         XCTAssertEqual(demo.activeThemeID, "paper")
         let second = demo.importDemoThemes()
-        XCTAssertEqual(second, ThemeImportResult(added: 0, duplicates: 3, invalid: 1))
+        XCTAssertEqual(second, ThemeImportResult(added: 0, duplicates: 5, invalid: 1))
         XCTAssertEqual(demo.themes.count, 10)
     }
 

@@ -32,6 +32,11 @@ struct YueshanApp: App {
                     .write(to: documents.appendingPathComponent("导入测试.txt"))
                 try Data("unsupported".utf8).write(to: documents.appendingPathComponent("不支持的格式.epub"))
             }
+            if testing && ProcessInfo.processInfo.arguments.contains("--theme-fixtures") {
+                let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                try manager.createDirectory(at: documents, withIntermediateDirectories: true)
+                try ThemeStyleSamples.importData.write(to: documents.appendingPathComponent("阅读套装.json"))
+            }
             _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive))
             launchError = nil
         } catch {

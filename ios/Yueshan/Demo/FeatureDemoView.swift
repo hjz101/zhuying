@@ -48,6 +48,7 @@ struct FeatureDemoView: View {
     var body: some View {
         Group {
             if feature.id == "import" { SmartImportView() }
+            else if feature.id == "themes" { ThemeLibraryView() }
             else { demoBody }
         }
     }

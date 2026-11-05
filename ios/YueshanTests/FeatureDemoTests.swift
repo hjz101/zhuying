@@ -54,6 +54,60 @@ final class FeatureDemoTests: XCTestCase {
         XCTAssertTrue(FeatureCatalog.search("不存在的模块").isEmpty)
     }
 
+    func testSourceFiltersComposeCategoryGroupStatusAndSearch() {
+        XCTAssertEqual(demo.filteredSources(kind: .novel).map(\.id), ["shanhai", "yunjian"])
+        XCTAssertEqual(demo.filteredSources(kind: .comic, status: .failed).map(\.id), ["paper"])
+        XCTAssertTrue(demo.filteredSources(kind: .audio).isEmpty)
+        XCTAssertEqual(demo.filteredSources(status: .expired).map(\.id), ["yunjian"])
+        XCTAssertEqual(demo.filteredSources(query: "  YUNJIAN.EXAMPLE \n").map(\.id), ["yunjian"])
+        demo.moveSources(["shanhai", "paper"], group: "常用")
+        XCTAssertEqual(demo.filteredSources(kind: .novel, group: "常用").map(\.id), ["shanhai"])
+        XCTAssertEqual(demo.filteredSources(query: "常用").map(\.id), ["shanhai", "paper"])
+        XCTAssertTrue(demo.filteredSources(kind: .comic, status: .expired).isEmpty)
+    }
+
+    func testSourceSortingKeepsPinsFirstAndUnknownOrFailedResponsesLast() {
+        let newID = demo.createSource()
+        XCTAssertEqual(demo.filteredSources(sort: .response).map(\.id), ["shanhai", "yunjian", "paper", newID])
+        demo.toggleSourcePin("paper")
+        XCTAssertEqual(demo.filteredSources(sort: .response).first?.id, "paper")
+        XCTAssertEqual(demo.filteredSources(sort: .name).first?.id, "paper")
+        demo.toggleSourcePin("paper")
+        XCTAssertEqual(demo.filteredSources(sort: .response).first?.id, "shanhai")
+        demo.sources[1].responseMilliseconds = 143
+        XCTAssertEqual(demo.filteredSources(sort: .response).map(\.id), ["shanhai", "yunjian", "paper", newID])
+        demo.toggleSourcePin("missing")
+        XCTAssertFalse(demo.sources.contains { $0.pinned })
+    }
+
+    func testSourceBatchChangesOnlySelectedSourcesAndPreservesCategoryAndReading() {
+        let before = library.progress
+        demo.setSourcesEnabled(["shanhai", "paper", "missing"], enabled: false)
+        XCTAssertEqual(Set(demo.filteredSources(status: .disabled).map(\.id)), ["shanhai", "paper"])
+        XCTAssertTrue(demo.sources[1].enabled)
+        demo.moveSources(["paper"], group: "  我的常用  ")
+        XCTAssertEqual(demo.sources[2].group, "我的常用")
+        XCTAssertEqual(demo.sources[2].kind, .comic)
+        demo.moveSources(["paper"], group: " \n")
+        XCTAssertEqual(demo.sources[2].group, "我的常用")
+        demo.setSourcesEnabled([], enabled: false)
+        demo.setSourcesEnabled(["paper"], enabled: true)
+        XCTAssertEqual(demo.filteredSources(status: .disabled).map(\.id), ["shanhai"])
+        XCTAssertEqual(library.progress, before)
+    }
+
+    func testNewSourceOpensItsOwnEditableDraft() {
+        let id = demo.createSource()
+        let edit = FeatureCatalog.feature("sourceEdit")
+        demo.prepareSource(edit, scope: id)
+        XCTAssertEqual(demo.text(edit, "name", scope: id), "自定义书源 4")
+        XCTAssertEqual(demo.sources.last?.kind, .novel)
+        XCTAssertNil(demo.sources.last?.responseMilliseconds)
+        XCTAssertFalse(demo.sources.last!.hasFailure)
+        let comicID = demo.createSource(kind: .comic, group: "个人收藏")
+        XCTAssertEqual(demo.filteredSources(kind: .comic, group: "个人收藏").map(\.id), [comicID])
+    }
+
     func testSourceLoginStatusAndEditorStayScopedToSelectedSource() {
         let login = FeatureCatalog.feature("sourceLogin")
         let edit = FeatureCatalog.feature("sourceEdit")

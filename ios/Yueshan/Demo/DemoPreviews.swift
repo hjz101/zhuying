@@ -1,5 +1,150 @@
 import SwiftUI
 
+struct SourceManagementView: View {
+    @EnvironmentObject private var demo: FeatureDemoStore
+    @State private var query = ""
+    @State private var kind: DemoSourceKind?
+    @State private var group: String?
+    @State private var status = SourceStatusFilter.all
+    @State private var sort = SourceSort.original
+    @State private var route: SourceActionRoute?
+    @State private var managing = false
+    @State private var selection = Set<String>()
+    @State private var pendingRemoval = Set<String>()
+    @State private var showNewGroup = false
+    @State private var newGroup = ""
+
+    private var sources: [DemoSource] { demo.filteredSources(kind: kind, group: group, status: status, sort: sort, query: query) }
+    private var visibleIDs: Set<String> { Set(sources.map(\.id)) }
+    private var groups: [String] { Array(Set(demo.sources.map(\.group) + ["个人收藏"])).sorted() }
+    private var isFiltered: Bool { group != nil || status != .all || sort != .original }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            controls
+            List {
+                DemoSourceRows(providedSources: sources, compact: true, managing: managing, selection: $selection, route: $route)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                    .listRowBackground(Color.clear)
+            }.listStyle(.plain).scrollContentBackground(.hidden)
+        }.background(Palette.background)
+            .navigationTitle("书源").navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索名称、网址或分组")
+            .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { toolbarActions } }
+            .safeAreaInset(edge: .bottom, spacing: 0) { if managing { batchActions } }
+            .navigationDestination(item: $route) { item in FeatureDemoView(feature: FeatureCatalog.feature(item.featureID), scope: item.sourceID) }
+            .onChange(of: kind) { _, _ in selection.removeAll() }
+            .onChange(of: group) { _, _ in selection.removeAll() }
+            .onChange(of: status) { _, _ in selection.removeAll() }
+            .onChange(of: query) { _, _ in selection.removeAll() }
+            .onChange(of: visibleIDs) { _, ids in selection.formIntersection(ids) }
+            .alert("删除选中的 \(pendingRemoval.count) 个书源？", isPresented: Binding(get: { !pendingRemoval.isEmpty }, set: { if !$0 { pendingRemoval.removeAll() } })) {
+                Button("确认删除书源", role: .destructive) {
+                    for id in pendingRemoval { demo.removeSource(id) }
+                    selection.subtract(pendingRemoval); pendingRemoval.removeAll()
+                }
+                Button("取消", role: .cancel) { pendingRemoval.removeAll() }
+            } message: { Text("书架与阅读进度保留。") }
+            .alert("新建分组", isPresented: $showNewGroup) {
+                TextField("分组名称", text: $newGroup)
+                Button("移动所选书源") { demo.moveSources(selection, group: newGroup) }
+                    .disabled(newGroup.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("取消", role: .cancel) {}
+            }
+    }
+
+    private var controls: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 0) {
+                categoryButton(nil)
+                ForEach(DemoSourceKind.allCases, id: \.self) { categoryButton($0) }
+            }.padding(4).background(Palette.green.opacity(0.05), in: .rect(cornerRadius: 10))
+            HStack {
+                Text(managing ? "已选 \(selection.count) / \(sources.count)" : "\(sources.count) 个书源 · 示例数据")
+                    .font(.system(size: 11)).foregroundStyle(Palette.muted).accessibilityIdentifier("sourceCount")
+                Spacer()
+                if managing {
+                    Button(!visibleIDs.isEmpty && selection == visibleIDs ? "取消全选" : "全选当前结果") {
+                        selection = selection == visibleIDs ? [] : visibleIDs
+                    }.font(.system(size: 12)).disabled(visibleIDs.isEmpty).accessibilityIdentifier("sourceSelectAll")
+                } else {
+                    filterMenu
+                    Button("管理") { managing = true; selection.removeAll() }.font(.system(size: 12)).accessibilityIdentifier("sourceManage")
+                }
+            }
+        }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 10).foregroundStyle(Palette.green)
+            .overlay(alignment: .bottom) { Rectangle().fill(Palette.green.opacity(0.12)).frame(height: 0.5) }
+    }
+
+    private func categoryButton(_ value: DemoSourceKind?) -> some View {
+        let count = demo.sources.filter { value == nil || $0.kind == value }.count
+        return Button { kind = value } label: {
+            Text("\(value?.rawValue ?? "全部") \(count)")
+                .font(.system(size: 12, weight: kind == value ? .semibold : .regular))
+                .frame(maxWidth: .infinity, minHeight: 36)
+                .background(kind == value ? Palette.card : .clear, in: .rect(cornerRadius: 7))
+        }.buttonStyle(.plain).accessibilityIdentifier("source-kind-\(value?.rawValue ?? "全部")")
+            .accessibilityAddTraits(kind == value ? .isSelected : [])
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Picker("状态", selection: $status) { ForEach(SourceStatusFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+            Menu("分组") {
+                Button("全部分组") { group = nil }
+                ForEach(groups, id: \.self) { value in Button(value) { group = value } }
+            }
+            Picker("排序", selection: $sort) { ForEach(SourceSort.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+            if isFiltered { Button("重置筛选与排序") { group = nil; status = .all; sort = .original } }
+        } label: {
+            Label(isFiltered ? "已筛选" : "筛选", systemImage: "line.3.horizontal.decrease")
+                .font(.system(size: 12)).padding(.trailing, 10)
+        }.accessibilityIdentifier("sourceFilter")
+    }
+
+    @ViewBuilder private var toolbarActions: some View {
+        if managing {
+            Button("完成") { managing = false; selection.removeAll() }.accessibilityIdentifier("sourceManageDone")
+        } else {
+            Menu {
+                Button("导入链接", systemImage: "link") { openImport("URL") }
+                Button("导入文件", systemImage: "doc") { openImport("JSON 文件") }
+                Button("手动新建", systemImage: "square.and.pencil") {
+                    route = .init(sourceID: demo.createSource(kind: kind ?? .novel, group: group), featureID: "sourceEdit")
+                }
+            } label: { Image(systemName: "plus") }.accessibilityLabel("添加书源").accessibilityIdentifier("sourceAdd")
+            Menu {
+                Button("导出书源", systemImage: "square.and.arrow.up") { route = .init(sourceID: "main", featureID: "sourceImport") }
+                Button("批量检测", systemImage: "checklist") { route = .init(sourceID: "main", featureID: "sourceBatch") }
+                Button("规则调试", systemImage: "curlybraces") { route = .init(sourceID: "main", featureID: "engine") }
+            } label: { Image(systemName: "ellipsis") }.accessibilityLabel("更多书源工具").accessibilityIdentifier("sourceMore")
+        }
+    }
+
+    private func openImport(_ method: String) {
+        let feature = FeatureCatalog.feature("sourceImport")
+        if let field = feature.fields.first(where: { $0.id == "method" }) { demo.set(method, feature: feature, field: field) }
+        route = .init(sourceID: "main", featureID: "sourceImport")
+    }
+
+    private var batchActions: some View {
+        HStack(spacing: 0) {
+            Button { demo.setSourcesEnabled(selection, enabled: true) } label: { batchLabel("启用", "power") }.accessibilityIdentifier("sourceBatchEnable")
+            Button { demo.setSourcesEnabled(selection, enabled: false) } label: { batchLabel("停用", "pause.circle") }.accessibilityIdentifier("sourceBatchDisable")
+            Menu {
+                ForEach(groups, id: \.self) { value in Button(value) { demo.moveSources(selection, group: value) } }
+                Button("新建分组…") { newGroup = ""; showNewGroup = true }
+            } label: { batchLabel("分组", "folder") }.accessibilityIdentifier("sourceBatchGroup")
+            Button(role: .destructive) { pendingRemoval = selection } label: { batchLabel("删除", "trash").foregroundStyle(Palette.accent) }.accessibilityIdentifier("sourceBatchDelete")
+        }.font(.system(size: 12)).buttonStyle(.plain).foregroundStyle(Palette.green)
+            .disabled(selection.isEmpty).padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Palette.card).overlay(alignment: .top) { Divider() }
+    }
+    private func batchLabel(_ text: String, _ icon: String) -> some View {
+        VStack(spacing: 4) { Image(systemName: icon).font(.system(size: 17)); Text(text) }.frame(maxWidth: .infinity, minHeight: 44)
+    }
+}
+
 struct DemoSourceList: View {
     var scope: String
     var group = "全部"
@@ -20,25 +165,31 @@ struct DemoSourceRows: View {
     @EnvironmentObject private var demo: FeatureDemoStore
     var group = "全部"
     var query = ""
+    var providedSources: [DemoSource]?
+    var compact = false
+    var managing = false
+    var selection: Binding<Set<String>> = .constant([])
     @Binding var route: SourceActionRoute?
     @State private var removal: DemoSource?
     private var sources: [DemoSource] {
-        demo.sources.filter { (group == "全部" || $0.group == group) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)) }
+        providedSources ?? demo.sources.filter { (group == "全部" || $0.group == group) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)) }
     }
     var body: some View {
         ForEach(sources) { source in
+            if managing {
+                Button {
+                    if selection.wrappedValue.contains(source.id) { selection.wrappedValue.remove(source.id) }
+                    else { selection.wrappedValue.insert(source.id) }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: selection.wrappedValue.contains(source.id) ? "checkmark.circle.fill" : "circle").foregroundStyle(Palette.green)
+                        rowLabel(source)
+                    }.contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityIdentifier("source-select-\(source.id)")
+                    .accessibilityValue(selection.wrappedValue.contains(source.id) ? "已选择" : "未选择")
+            } else {
             NavigationLink { DemoSourceDetail(sourceID: source.id) } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "externaldrive").font(.system(size: 21)).foregroundStyle(Palette.green)
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(source.name).font(.system(size: 15, weight: .medium)).foregroundStyle(Palette.green)
-                        Text(source.detail).font(.system(size: 10)).foregroundStyle(Palette.muted)
-                        Text("\(source.loginStatus.title) · \(source.enabled ? "已启用" : "已停用") · 演示")
-                            .font(.system(size: 10)).foregroundStyle(source.loginStatus == .expired ? Palette.accent : Palette.muted)
-                    }
-                    Spacer(minLength: 0)
-                }.padding(15).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Palette.card, in: .rect(cornerRadius: 13)).contentShape(Rectangle())
+                rowLabel(source)
             }.buttonStyle(.plain).accessibilityIdentifier("source-row-\(source.id)")
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button { open("sourceLogin", source) } label: { Label(source.loginStatus.action, systemImage: "person.badge.key") }.tint(Palette.green)
@@ -47,24 +198,44 @@ struct DemoSourceRows: View {
                         .accessibilityIdentifier("source-edit-\(source.id)")
                 }
                 .contextMenu {
+                    Button(source.pinned ? "取消置顶" : "置顶书源", systemImage: "pin") { demo.toggleSourcePin(source.id) }
                     Button(source.loginStatus.action, systemImage: "person.badge.key") { open("sourceLogin", source) }
                     Button("编辑", systemImage: "square.and.pencil") { open("sourceEdit", source) }
                     Button("调试", systemImage: "ladybug") { open("sourceDebug", source) }
                     Button(source.enabled ? "停用书源" : "启用书源", systemImage: "power") {
-                        if let index = demo.sources.firstIndex(where: { $0.id == source.id }) { demo.sources[index].enabled.toggle() }
+                        demo.setSourcesEnabled([source.id], enabled: !source.enabled)
                     }
                     Button("移入个人收藏", systemImage: "folder") {
-                        if let index = demo.sources.firstIndex(where: { $0.id == source.id }) { demo.sources[index].group = "个人收藏" }
+                        demo.moveSources([source.id], group: "个人收藏")
                     }
                     Button("删除书源", systemImage: "trash", role: .destructive) { removal = source }
                 }
+            }
         }
-        if sources.isEmpty { ContentUnavailableView("还没有书源", systemImage: "externaldrive", description: Text("通过新建或导入添加示例书源。")) }
-        Color.clear.frame(height: 0)
+        if sources.isEmpty { ContentUnavailableView(demo.sources.isEmpty ? "还没有书源" : "没有符合条件的书源", systemImage: "externaldrive", description: Text(demo.sources.isEmpty ? "点击右上角添加书源。" : "试试其他分类、筛选条件或关键词。")) }
+        Color.clear.frame(height: 0).listRowSeparator(.hidden)
             .alert("删除“\(removal?.name ?? "")”？", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } })) {
                 Button("确认删除书源", role: .destructive) { if let removal { demo.removeSource(removal.id) }; removal = nil }
                 Button("取消", role: .cancel) { removal = nil }
             } message: { Text("仅移除演示书源，书架与阅读进度保留。") }
+    }
+    private func rowLabel(_ source: DemoSource) -> some View {
+        HStack(spacing: 12) {
+            if !compact { Image(systemName: "externaldrive").font(.system(size: 21)) }
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 6) {
+                    if source.pinned { Image(systemName: "pin.fill").font(.system(size: 10)).accessibilityLabel("已置顶") }
+                    Text(source.name).font(.system(size: 15, weight: .medium)).lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(source.loginStatus.title).font(.system(size: 10))
+                        .foregroundStyle(source.loginStatus == .expired ? Palette.accent : Palette.muted)
+                }
+                Text("\(source.detail) · \(source.enabled ? "已启用" : "已停用")")
+                    .font(.system(size: 10)).foregroundStyle(source.hasFailure ? Palette.accent : Palette.muted).lineLimit(1)
+            }
+        }.foregroundStyle(Palette.green).padding(.vertical, compact ? 15 : 16).padding(.horizontal, compact ? 0 : 15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(compact ? Color.clear : Palette.card, in: .rect(cornerRadius: compact ? 0 : 13)).contentShape(Rectangle())
     }
     private func open(_ feature: String, _ source: DemoSource) { route = .init(sourceID: source.id, featureID: feature) }
 }

@@ -227,6 +227,99 @@ final class FeatureFlowTests: XCTestCase {
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第一章 旧巷听风")
     }
 
+    @MainActor private func openSources(_ app: XCUIApplication) {
+        app.tabBars.buttons["我的"].tap()
+        let entry = app.buttons["profileSources"]
+        reveal(entry, app: app); entry.tap()
+        XCTAssertTrue(app.buttons["source-kind-全部"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor func testCompactSourcesCategoriesFiltersSearchAndPin() {
+        let app = launch(); openSources(app)
+        XCTAssertFalse(app.staticTexts["连接每一种故事。"].exists)
+        XCTAssertFalse(app.staticTexts["书源工具"].exists)
+        let first = app.buttons["source-row-shanhai"]
+        let last = app.buttons["source-row-paper"]
+        XCTAssertTrue(first.isHittable); XCTAssertTrue(last.isHittable)
+        XCTAssertLessThan(first.frame.height, 100)
+        capture(app, name: "Sources-CompactList")
+        app.buttons["source-kind-漫画"].tap()
+        XCTAssertTrue(last.exists); XCTAssertFalse(first.exists)
+        app.buttons["source-kind-听书"].tap()
+        XCTAssertTrue(app.staticTexts["没有符合条件的书源"].exists)
+        app.buttons["source-kind-全部"].tap()
+        app.buttons["sourceFilter"].tap(); app.buttons["登录过期"].tap()
+        XCTAssertTrue(app.buttons["source-row-yunjian"].exists); XCTAssertFalse(first.exists)
+        app.buttons["sourceFilter"].tap(); app.buttons["重置筛选与排序"].tap()
+        let search = app.searchFields.firstMatch
+        search.tap(); search.typeText("PAPER.EXAMPLE")
+        XCTAssertTrue(last.exists); XCTAssertFalse(first.exists)
+        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 13))
+        search.typeText(XCUIKeyboardKey.return.rawValue)
+        last.press(forDuration: 1); app.buttons["置顶书源"].tap()
+        XCTAssertLessThan(last.frame.minY, first.frame.minY)
+        last.press(forDuration: 1); app.buttons["取消置顶"].tap()
+        XCTAssertLessThan(first.frame.minY, last.frame.minY)
+    }
+
+    @MainActor func testSourceBatchSelectionGroupingAndConfirmedDelete() {
+        let app = launch(); openSources(app)
+        app.buttons["sourceManage"].tap()
+        XCTAssertFalse(app.buttons["sourceBatchDelete"].isEnabled)
+        app.buttons["source-select-shanhai"].tap()
+        app.buttons["source-select-paper"].tap()
+        XCTAssertTrue(app.staticTexts["sourceCount"].label.contains("已选 2"))
+        app.buttons["sourceBatchDisable"].tap()
+        XCTAssertTrue(app.buttons["source-select-shanhai"].label.contains("已停用"))
+        XCTAssertTrue(app.buttons["source-select-paper"].label.contains("已停用"))
+        XCTAssertTrue(app.buttons["source-select-yunjian"].label.contains("已启用"))
+        app.buttons["sourceBatchGroup"].tap(); app.buttons["个人收藏"].tap()
+        app.buttons["source-kind-漫画"].tap()
+        XCTAssertEqual(app.buttons["source-select-paper"].value as? String, "未选择")
+        XCTAssertFalse(app.buttons["sourceBatchDelete"].isEnabled)
+        app.buttons["sourceSelectAll"].tap()
+        app.buttons["sourceBatchDelete"].tap(); app.buttons["取消"].tap()
+        XCTAssertTrue(app.buttons["source-select-paper"].exists)
+        capture(app, name: "Sources-BatchManagement")
+        app.buttons["sourceBatchDelete"].tap(); app.buttons["确认删除书源"].tap()
+        XCTAssertFalse(app.buttons["source-select-paper"].exists)
+        app.buttons["sourceManageDone"].tap(); app.buttons["source-kind-全部"].tap()
+        app.buttons["sourceFilter"].tap(); app.buttons["分组"].tap(); app.buttons["个人收藏"].tap()
+        XCTAssertTrue(app.buttons["source-row-shanhai"].exists)
+        XCTAssertFalse(app.buttons["source-row-yunjian"].exists)
+        app.buttons["sourceFilter"].tap(); app.buttons["重置筛选与排序"].tap()
+        XCTAssertTrue(app.buttons["source-row-yunjian"].exists)
+    }
+
+    @MainActor func testSourceToolbarImportNewAndAdvancedTools() {
+        let app = launch(); openSources(app)
+        app.buttons["sourceAdd"].tap(); app.buttons["导入文件"].tap()
+        XCTAssertTrue(app.navigationBars["书源导入导出"].waitForExistence(timeout: 5))
+        let method = app.descendants(matching: .any)["demo-field-method"]
+        XCTAssertTrue(method.label.contains("JSON 文件"), method.debugDescription)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["sourceMore"].tap(); app.buttons["批量检测"].tap()
+        XCTAssertTrue(app.navigationBars["批量测试"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["sourceMore"].tap(); app.buttons["规则调试"].tap()
+        XCTAssertTrue(app.navigationBars["书源兼容引擎"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["sourceMore"].tap(); app.buttons["导出书源"].tap()
+        XCTAssertTrue(app.navigationBars["书源导入导出"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["sourceAdd"].tap(); app.buttons["手动新建"].tap()
+        XCTAssertTrue(app.navigationBars["书源编辑"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["currentSourceName"].label, "当前书源：自定义书源 4")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["sourceCount"].label.contains("4 个书源"))
+        app.buttons["source-kind-听书"].tap()
+        app.buttons["sourceAdd"].tap(); app.buttons["手动新建"].tap()
+        XCTAssertTrue(app.navigationBars["书源编辑"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["sourceCount"].label.contains("1 个书源"))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "自定义书源 5")).firstMatch.exists)
+    }
+
     @MainActor func testSourceSwipeLoginAndDetailFallback() {
         let app = launch()
         app.tabBars.buttons["我的"].tap()

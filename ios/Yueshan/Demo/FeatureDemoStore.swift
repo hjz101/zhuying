@@ -7,6 +7,12 @@ enum DemoLoginStatus: String {
     var action: String { switch self { case .signedOut: "登录"; case .signedIn: "管理登录"; case .expired: "重新登录" } }
 }
 
+enum DemoSourceKind: String, CaseIterable { case novel = "小说", comic = "漫画", audio = "听书" }
+enum SourceStatusFilter: String, CaseIterable {
+    case all = "全部状态", enabled = "已启用", disabled = "已停用", expired = "登录过期", failed = "异常"
+}
+enum SourceSort: String, CaseIterable { case original = "默认顺序", response = "响应速度", name = "名称" }
+
 struct DemoSource: Identifiable, Equatable {
     let id: String
     var name: String
@@ -15,6 +21,10 @@ struct DemoSource: Identifiable, Equatable {
     var detail: String
     var url = "https://books.example"
     var loginStatus: DemoLoginStatus = .signedOut
+    var kind: DemoSourceKind = .novel
+    var pinned = false
+    var responseMilliseconds: Int?
+    var hasFailure = false
 }
 struct DemoFile: Identifiable {
     let id: UUID = UUID()
@@ -70,9 +80,9 @@ struct ThemeImportResult: Equatable {
 final class FeatureDemoStore: ObservableObject {
     @Published var values: [String: String] = [:]
     @Published var sources = [
-        DemoSource(id: "shanhai", name: "山海书库", detail: "143 ms · 搜索 / 详情 / 正文"),
-        DemoSource(id: "yunjian", name: "云间小说", detail: "216 ms · 章节更新及时", url: "https://yunjian.example", loginStatus: .expired),
-        DemoSource(id: "paper", name: "纸上漫游", group: "漫画", detail: "超时 · 演示失败状态", url: "https://paper.example", loginStatus: .signedIn),
+        DemoSource(id: "shanhai", name: "山海书库", detail: "143 ms · 搜索 / 详情 / 正文", responseMilliseconds: 143),
+        DemoSource(id: "yunjian", name: "云间小说", detail: "216 ms · 章节更新及时", url: "https://yunjian.example", loginStatus: .expired, responseMilliseconds: 216),
+        DemoSource(id: "paper", name: "纸上漫游", group: "漫画", detail: "超时 · 演示失败状态", url: "https://paper.example", loginStatus: .signedIn, kind: .comic, hasFailure: true),
     ]
     @Published var groups = ["追更中", "待读", "已读完"]
     @Published var bookGroups: [String: String] = ["changfeng": "追更中", "stars": "追更中", "sunset": "已读完"]
@@ -140,6 +150,53 @@ final class FeatureDemoStore: ObservableObject {
         guard let index = sources.firstIndex(where: { $0.id == id }) else { return }
         sources[index].loginStatus = status
     }
+    func filteredSources(kind: DemoSourceKind? = nil, group: String? = nil, status: SourceStatusFilter = .all,
+                         sort: SourceSort = .original, query: String = "") -> [DemoSource] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return sources.enumerated().filter { _, source in
+            let matchesStatus: Bool
+            switch status {
+            case .all: matchesStatus = true
+            case .enabled: matchesStatus = source.enabled
+            case .disabled: matchesStatus = !source.enabled
+            case .expired: matchesStatus = source.loginStatus == .expired
+            case .failed: matchesStatus = source.hasFailure
+            }
+            return (kind == nil || source.kind == kind) && (group == nil || source.group == group) && matchesStatus &&
+                (query.isEmpty || [source.name, source.url, source.group].contains { $0.localizedCaseInsensitiveContains(query) })
+        }.sorted { lhs, rhs in
+            if lhs.element.pinned != rhs.element.pinned { return lhs.element.pinned }
+            switch sort {
+            case .response:
+                let left = lhs.element.hasFailure ? Int.max : lhs.element.responseMilliseconds ?? Int.max
+                let right = rhs.element.hasFailure ? Int.max : rhs.element.responseMilliseconds ?? Int.max
+                if left != right { return left < right }
+            case .name:
+                let order = lhs.element.name.localizedStandardCompare(rhs.element.name)
+                if order != .orderedSame { return order == .orderedAscending }
+            case .original: break
+            }
+            return lhs.offset < rhs.offset
+        }.map(\.element)
+    }
+    func toggleSourcePin(_ id: String) {
+        guard let index = sources.firstIndex(where: { $0.id == id }) else { return }
+        sources[index].pinned.toggle()
+    }
+    func setSourcesEnabled(_ ids: Set<String>, enabled: Bool) {
+        for index in sources.indices where ids.contains(sources[index].id) { sources[index].enabled = enabled }
+    }
+    func moveSources(_ ids: Set<String>, group: String) {
+        let group = group.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !group.isEmpty else { return }
+        for index in sources.indices where ids.contains(sources[index].id) { sources[index].group = group }
+    }
+    @discardableResult
+    func createSource(kind: DemoSourceKind = .novel, group: String? = nil) -> String {
+        let id = UUID().uuidString
+        sources.append(.init(id: id, name: "自定义书源 \(sources.count + 1)", group: group ?? kind.rawValue, detail: "待调试 · 演示配置", kind: kind))
+        return id
+    }
     func removeSource(_ id: String) {
         sources.removeAll { $0.id == id }
         bookSources = bookSources.filter { $0.value != id }
@@ -198,7 +255,7 @@ final class FeatureDemoStore: ObservableObject {
                 let name = text(feature, "name", scope: scope).trimmingCharacters(in: .whitespacesAndNewlines)
                 if name.isEmpty { success = false; detail = "请填写书源名称。" } else { sources[index].name = name; sources[index].url = text(feature, "url", scope: scope) }
             }
-        case "新建示例书源": sources.append(.init(id: UUID().uuidString, name: "自定义书源 \(sources.count + 1)", detail: "待调试 · 演示配置"))
+        case "新建示例书源": createSource()
         case "全部启用", "全部停用":
             for index in sources.indices { sources[index].enabled = action == "全部启用" }
         case "新建分组":

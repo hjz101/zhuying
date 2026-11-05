@@ -11,7 +11,6 @@ struct DemoNotice: View {
 struct FeatureHubView: View {
     var sourceOnly = false
     @State private var query = ""
-    @State private var sourceRoute: SourceActionRoute?
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
@@ -20,22 +19,7 @@ struct FeatureHubView: View {
             else { hubPage }
         }
     }
-    private var sourcePage: some View {
-        List {
-            Section {
-                Text("连接每一种故事。").font(.system(size: 25, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
-                Text("左滑登录或编辑，长按查看更多操作。").font(.system(size: 11)).foregroundStyle(Palette.muted)
-                DemoNotice()
-            }.listRowBackground(Color.clear).listRowSeparator(.hidden)
-            Section("我的书源") {
-                DemoSourceRows(query: query.trimmingCharacters(in: .whitespacesAndNewlines), route: $sourceRoute)
-            }.listRowBackground(Color.clear).listRowSeparator(.hidden)
-            Section("书源工具") { featureResults(sourceOnly: true) }.listRowBackground(Color.clear)
-        }.listStyle(.plain).scrollContentBackground(.hidden).background(Palette.background)
-            .navigationDestination(item: $sourceRoute) { item in FeatureDemoView(feature: FeatureCatalog.feature(item.featureID), scope: item.sourceID) }
-            .navigationTitle("书源").navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书源或功能")
-    }
+    private var sourcePage: some View { SourceManagementView() }
     private var hubPage: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {

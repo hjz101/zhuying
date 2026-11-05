@@ -73,10 +73,8 @@ struct MountainShape: Shape {
     }
 }
 
-struct BookCover: View {
-    let book: Book
-    var width: CGFloat = 150
-    private var colors: (UInt32, UInt32, UInt32) {
+enum BookCoverPalette {
+    static func colors(for book: Book) -> (UInt32, UInt32, UInt32) {
         switch book.color {
         case "peach": (0xD4A78E, 0x6C473B, 0x739392)
         case "indigo": (0x29334E, 0xE0E1CC, 0x586784)
@@ -88,6 +86,13 @@ struct BookCover: View {
         default: (0x365851, 0xE8E3CA, 0x203E36)
         }
     }
+}
+
+struct BookCover: View {
+    let book: Book
+    var width: CGFloat = 150
+    var titleLineLimit: Int? = nil
+    private var colors: (UInt32, UInt32, UInt32) { BookCoverPalette.colors(for: book) }
     var body: some View {
         ZStack {
             Color(hex: colors.0)
@@ -105,7 +110,10 @@ struct BookCover: View {
             VStack(spacing: 0) {
                 Text("阅 山 · 故 事 典 藏").font(.system(size: width * 0.042)).tracking(1.2).opacity(0.5).padding(.top, width * 0.13)
                 Spacer().frame(height: width * 0.2)
-                Text(book.title).font(.system(size: width * 0.18, weight: .medium, design: .serif)).tracking(width * 0.015).multilineTextAlignment(.center).lineSpacing(7).frame(width: width * 0.75)
+                Text(book.title).font(.system(size: width * 0.18, weight: .medium, design: .serif)).tracking(width * 0.015).multilineTextAlignment(.center).lineSpacing(7)
+                    .lineLimit(titleLineLimit).minimumScaleFactor(titleLineLimit == nil ? 1 : 0.7)
+                    .frame(width: width * 0.75)
+                    .frame(maxHeight: titleLineLimit == nil ? nil : width * 0.55, alignment: .top)
                 Text("\(book.author) 著").font(.system(size: width * 0.05)).tracking(2).opacity(0.7).padding(.top, width * 0.09)
                 Spacer(minLength: 0)
                 Text("YUESHAN ORIGINAL").font(.system(size: width * 0.032)).tracking(1.3).opacity(0.5).padding(.bottom, width * 0.1)
@@ -122,6 +130,90 @@ struct BookCover: View {
         .overlay(RoundedRectangle(cornerRadius: 5).stroke(.black.opacity(0.04), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.09), radius: 5, x: 1, y: 4)
         .accessibilityLabel("\(book.title)封面")
+    }
+}
+
+struct BookSpine: View {
+    let book: Book
+    let width: CGFloat
+    var height: CGFloat = 184
+    var progress: Int = 0
+    var hasUpdates = false
+
+    private var colors: (UInt32, UInt32, UInt32) { BookCoverPalette.colors(for: book) }
+    private var titleFontSize: CGFloat { width < 52 ? 15 : 17 }
+    private var titleColumns: [[String]] {
+        let glyphs = book.title.map(String.init)
+        let perColumn = max(1, Int(max(20, height - 62) / (titleFontSize + 3)))
+        let maxColumns = width >= titleFontSize * 2 + 18 ? 2 : 1
+        let capacity = perColumn * maxColumns
+        let displayed = glyphs.count > capacity ? Array(glyphs.prefix(capacity - 1)) + ["⋮"] : glyphs
+        return stride(from: 0, to: displayed.count, by: perColumn).map {
+            Array(displayed[$0..<min($0 + perColumn, displayed.count)])
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color(hex: colors.0)
+            LinearGradient(colors: [.black.opacity(0.17), .white.opacity(0.07), .clear, .black.opacity(0.06)],
+                           startPoint: .leading, endPoint: .trailing)
+                .accessibilityHidden(true).allowsHitTesting(false)
+            VStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 4) {
+                    ForEach(Array(titleColumns.indices.reversed()), id: \.self) { column in
+                        VStack(spacing: 3) {
+                            ForEach(Array(titleColumns[column].enumerated()), id: \.offset) { _, glyph in
+                                Text(glyph).font(.system(size: titleFontSize, weight: .medium, design: .serif))
+                                    .frame(width: titleFontSize + 1, height: titleFontSize)
+                            }
+                        }
+                    }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                Text(book.author).font(.system(size: 10)).opacity(0.82).lineLimit(1).minimumScaleFactor(0.8)
+                    .padding(.top, 6)
+            }.padding(.horizontal, 6).padding(.top, 22).padding(.bottom, 18)
+            VStack {
+                Rectangle().frame(height: 0.5)
+                Spacer()
+                Rectangle().frame(height: 0.5)
+            }.foregroundStyle(Color(hex: colors.1).opacity(0.2)).padding(.horizontal, 7).padding(.vertical, 9)
+                .accessibilityHidden(true).allowsHitTesting(false)
+        }
+        .foregroundStyle(Color(hex: colors.1))
+        .frame(width: width, height: height)
+        .overlay(alignment: .topTrailing) {
+            if hasUpdates {
+                SpineBookmark().fill(Palette.accent).frame(width: 7, height: 15).padding(.trailing, 8)
+                    .accessibilityHidden(true).allowsHitTesting(false)
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if progress > 0 {
+                Rectangle().fill(Color(hex: colors.1).opacity(0.65))
+                    .frame(width: width * CGFloat(min(100, max(0, progress))) / 100, height: 2)
+                    .accessibilityHidden(true).allowsHitTesting(false)
+            }
+        }
+        .clipShape(.rect(cornerRadius: 3))
+        .contentShape(Rectangle())
+        .shadow(color: .black.opacity(0.09), radius: 2, x: 1, y: 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(book.title)，\(book.author)")
+        .accessibilityValue("\(progress > 0 ? "已读 \(min(100, progress))%" : "尚未开始")\(hasUpdates ? "，有章节更新" : "")")
+    }
+}
+
+private struct SpineBookmark: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: .zero)
+            path.addLine(to: CGPoint(x: rect.maxX, y: 0))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY * 0.76))
+            path.addLine(to: CGPoint(x: 0, y: rect.maxY))
+            path.closeSubpath()
+        }
     }
 }
 

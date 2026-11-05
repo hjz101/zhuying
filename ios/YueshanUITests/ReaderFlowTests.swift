@@ -196,6 +196,163 @@ final class ReaderFlowTests: XCTestCase {
     }
 
     @MainActor
+    func testSpineShelfGeometryFilteringAndLayoutPersistence() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        chooseShelfLayout("书脊与封面", in: app)
+        app.buttons["manageShelf"].tap()
+
+        let expected: Set<String> = ["changfeng", "stars", "sunset", "mountains", "letter", "reunion"]
+        assertShelfBooks(expected, managing: true, in: app)
+        let cover = app.buttons["select-changfeng"]
+        let spine = app.buttons["select-stars"]
+        XCTAssertTrue(app.descendants(matching: .any)["shelf-spine-cover-changfeng"].firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["shelf-spine-stars"].firstMatch.exists)
+        XCTAssertGreaterThan(cover.frame.width, spine.frame.width * 1.7, "The featured book faces forward and uses about two spine slots")
+        XCTAssertEqual(cover.frame.maxY, spine.frame.maxY, accuracy: 2, "Books share a shelf baseline")
+        var previous = cover
+        for id in ["stars", "sunset", "mountains"] {
+            let book = app.buttons["select-\(id)"]
+            XCTAssertEqual(book.frame.maxY, cover.frame.maxY, accuracy: 2)
+            XCTAssertGreaterThan(book.frame.minX, previous.frame.maxX)
+            previous = book
+        }
+        XCTAssertGreaterThan(app.buttons["select-letter"].frame.minY, cover.frame.maxY)
+        for id in expected {
+            let book = app.buttons["select-\(id)"]
+            XCTAssertGreaterThanOrEqual(book.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(book.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(book.frame.minX, app.frame.minX + 21)
+            XCTAssertLessThanOrEqual(book.frame.maxX, app.frame.maxX - 21)
+        }
+        capture(app, name: "ShelfSpinesAndCover")
+
+        app.buttons["shelf-filter-1"].tap()
+        assertShelfBooks(["changfeng", "stars", "sunset"], managing: true, in: app)
+        app.buttons["shelf-filter-2"].tap()
+        assertShelfBooks(["mountains", "letter", "reunion"], managing: true, in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["shelf-spine-cover-mountains"].firstMatch.exists, "An unread-only shelf features its first visible book")
+        XCTAssertFalse(app.descendants(matching: .any)["shelf-spine-cover-changfeng"].firstMatch.exists)
+        app.buttons["shelf-filter-0"].tap()
+        assertShelfBooks(expected, managing: true, in: app)
+
+        let sorting = app.buttons["shelfSort"]
+        sorting.tap(); app.buttons["加入时间"].tap()
+        let ordered = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "select-")).allElementsBoundByIndex.map(\.identifier)
+        XCTAssertEqual(ordered, ["changfeng", "sunset", "stars", "mountains", "letter", "reunion"].map { "select-\($0)" }, "The forward-facing book must not reorder the selected shelf sort")
+        revealShelfCategories(in: app)
+        app.buttons["shelf-category-comic"].tap()
+        XCTAssertTrue(app.staticTexts["还没有收藏的漫画"].exists)
+        assertShelfBooks([], managing: true, in: app)
+        app.buttons["shelf-category-novel"].tap()
+        assertShelfBooks(expected, managing: true, in: app)
+
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "--preserve-ui-test-state"]
+        app.launch()
+        let layout = app.buttons["shelfLayout"]
+        reveal(layout, in: app)
+        XCTAssertEqual(layout.value as? String, "书脊与封面")
+        XCTAssertEqual(sorting.value as? String, "加入时间")
+        app.buttons["manageShelf"].tap()
+        assertShelfBooks(expected, managing: true, in: app)
+    }
+
+    @MainActor
+    func testSpineShelfRemainsInsidePageAtAccessibilityTextSize() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        chooseShelfLayout("书脊与封面", in: app)
+        app.buttons["manageShelf"].tap()
+
+        let cover = app.buttons["select-changfeng"]
+        let spine = app.buttons["select-stars"]
+        reveal(spine, in: app)
+        XCTAssertTrue(cover.exists)
+        XCTAssertTrue(spine.isHittable)
+        XCTAssertEqual(cover.frame.maxY, spine.frame.maxY, accuracy: 2)
+        XCTAssertGreaterThanOrEqual(spine.frame.width, 44)
+        XCTAssertGreaterThan(spine.frame.minX, cover.frame.maxX)
+        for book in [cover, spine] {
+            XCTAssertGreaterThanOrEqual(book.frame.minX, app.frame.minX + 21)
+            XCTAssertLessThanOrEqual(book.frame.maxX, app.frame.maxX - 21)
+        }
+        let nextRow = app.buttons["select-sunset"]
+        reveal(nextRow, in: app)
+        XCTAssertTrue(nextRow.exists)
+        XCTAssertGreaterThan(nextRow.frame.minY, spine.frame.maxY, "Accessibility sizes reduce the first shelf to one cover and one spine")
+        capture(app, name: "ShelfSpinesAccessibility")
+    }
+
+    @MainActor
+    func testSpineShelfReadingRestoresProgressAndUpdatesFeaturedCover() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        chooseShelfLayout("书脊与封面", in: app)
+        let stars = app.buttons["read-stars"]
+        reveal(stars, in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["shelf-spine-stars"].firstMatch.exists)
+        stars.tap()
+        acknowledgeFirstGuide(in: app)
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第二章 未来来信")
+        app.buttons["nextChapter"].tap()
+        let chapter = app.staticTexts["chapterTitle"].label
+        XCTAssertTrue(chapter.hasPrefix("第三章"))
+        app.buttons["返回书架"].tap()
+
+        reveal(stars, in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["shelf-spine-cover-stars"].firstMatch.exists, "Reading a spine promotes that book to the forward-facing cover")
+        XCTAssertFalse(app.descendants(matching: .any)["shelf-spine-cover-changfeng"].firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["shelf-spine-changfeng"].firstMatch.exists)
+        XCTAssertEqual(app.buttons.matching(identifier: "read-stars").count, 1, "Promoting the cover must not duplicate the book")
+        capture(app, name: "ShelfSpinesRecentReading")
+        stars.tap()
+        XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
+        XCTAssertFalse(app.buttons["dismissGestureGuide"].exists)
+    }
+
+    @MainActor
+    func testSpineShelfContextSelectionLayoutChangeAndRemovalUndo() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        chooseShelfLayout("书脊与封面", in: app)
+        let stars = app.buttons["read-stars"]
+        reveal(stars, in: app)
+        stars.press(forDuration: 1)
+        app.buttons["选择多本"].tap()
+        let remove = app.buttons["removeSelected"]
+        XCTAssertTrue(remove.isEnabled)
+        XCTAssertTrue(remove.label.contains("1"))
+
+        chooseShelfLayout("两列 · 大封面", in: app)
+        XCTAssertTrue(remove.label.contains("1"))
+        chooseShelfLayout("书脊与封面", in: app)
+        XCTAssertTrue(remove.label.contains("1"), "Changing layouts preserves the current managed selection")
+        let changfeng = app.buttons["select-changfeng"]
+        reveal(changfeng, in: app)
+        changfeng.tap()
+        XCTAssertTrue(remove.label.contains("2"))
+        remove.tap()
+        app.buttons["移出收藏，保留阅读进度"].tap()
+        XCTAssertTrue(app.buttons["撤销"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["read-stars"].exists)
+        XCTAssertFalse(app.buttons["read-changfeng"].exists)
+        app.buttons["撤销"].tap()
+        let manage = app.buttons["manageShelf"]
+        revealShelfCategories(in: app)
+        reveal(manage, in: app)
+        manage.tap()
+        assertShelfBooks(["changfeng", "stars", "sunset", "mountains", "letter", "reunion"], managing: true, in: app)
+        XCTAssertFalse(remove.isEnabled)
+        XCTAssertEqual(app.buttons["shelfLayout"].value as? String, "书脊与封面")
+    }
+
+    @MainActor
     func testShelfReaderContentsAndPreferences() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
@@ -276,6 +433,33 @@ final class ReaderFlowTests: XCTestCase {
         let novel = app.buttons["shelf-category-novel"]
         for _ in 0..<5 { if novel.isHittable { return }; app.swipeDown() }
         XCTAssertTrue(novel.isHittable)
+    }
+
+    @MainActor
+    private func chooseShelfLayout(_ title: String, in app: XCUIApplication) {
+        let layout = app.buttons["shelfLayout"]
+        if !layout.isHittable {
+            revealShelfCategories(in: app)
+            reveal(layout, in: app)
+        }
+        layout.tap()
+        app.buttons[title].tap()
+        XCTAssertEqual(layout.value as? String, title)
+    }
+
+    @MainActor
+    private func assertShelfBooks(_ ids: Set<String>, managing: Bool, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let prefix = managing ? "select-" : "read-"
+        let query = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+        let stableBooks = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            query.count == ids.count && ids.allSatisfy { app.buttons.matching(identifier: prefix + $0).count == 1 }
+        }, object: nil)
+        let outcome = XCTWaiter.wait(for: [stableBooks], timeout: 5)
+        XCTAssertEqual(outcome, .completed, "The shelf finishes filtering before its book list is inspected", file: file, line: line)
+        guard outcome == .completed else { return }
+        let books = query.allElementsBoundByIndex
+        XCTAssertEqual(books.count, ids.count, "Every visible shelf book appears exactly once", file: file, line: line)
+        XCTAssertEqual(Set(books.map { String($0.identifier.dropFirst(prefix.count)) }), ids, file: file, line: line)
     }
 
     @MainActor

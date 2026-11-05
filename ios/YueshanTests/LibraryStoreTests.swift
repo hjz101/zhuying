@@ -44,7 +44,97 @@ final class LibraryStoreTests: XCTestCase {
             XCTAssertNil(restored.storageMessage)
         }
         store.settings = .init()
-        XCTAssertEqual(LibraryStore(books: books, defaults: defaults).shelfLayout, .list)
+        XCTAssertEqual(LibraryStore(books: books, defaults: defaults).shelfLayout, .spines)
+    }
+
+    func testSpineRowsPreserveSortFiltersAndUniqueBooksAcrossCapacities() {
+        let store = LibraryStore(books: books, defaults: defaults)
+        store.shelfLayout = .spines
+        for sort in ShelfSort.allCases {
+            store.sort = sort
+            let variants = [
+                store.shelf,
+                store.shelf.filter { store.progress[$0.id] != nil },
+                store.shelf.filter { store.progress[$0.id] == nil }
+            ]
+            for visible in variants {
+                let expectedCover = store.history.first { candidate in visible.contains { $0.id == candidate.id } }?.id ?? visible.first?.id
+                for capacity in [3, 5, 6] {
+                    let rows = store.spineRows(for: visible, columns: capacity)
+                    let flattened = rows.flatMap(\.books)
+                    XCTAssertEqual(flattened.map(\.id), visible.map(\.id), "Packing must preserve the selected sort and filter")
+                    XCTAssertEqual(Set(flattened.map(\.id)).count, visible.count)
+                    XCTAssertEqual(rows.compactMap(\.featuredID), expectedCover.map { [$0] } ?? [])
+                    for row in rows {
+                        XCTAssertFalse(row.books.isEmpty)
+                        XCTAssertEqual(row.id, row.books.first?.id)
+                        XCTAssertLessThanOrEqual(row.books.count + (row.featuredID == nil ? 0 : 1), capacity)
+                        if let featuredID = row.featuredID { XCTAssertTrue(row.books.contains { $0.id == featuredID }) }
+                    }
+                }
+            }
+        }
+    }
+
+    func testSpineFeaturedCoverFollowsVisibleReadingHistoryWithoutChangingOrder() throws {
+        let store = LibraryStore(books: books, defaults: defaults)
+        store.sort = .added
+        let originalOrder = store.shelf.map(\.id)
+        let selected = try XCTUnwrap(store.shelf.last)
+        store.record(selected, chapter: 1, now: Date(timeIntervalSince1970: 4_000_000_000))
+        let rows = store.spineRows(for: store.shelf, columns: 5)
+        XCTAssertEqual(rows.flatMap(\.books).map(\.id), originalOrder)
+        XCTAssertEqual(rows.compactMap(\.featuredID), [selected.id])
+        XCTAssertEqual(rows.last?.featuredID, selected.id, "A late cover can wrap onto the next shelf without moving ahead of other books")
+
+        let hidden = try XCTUnwrap(books.first { $0.id == "echo" })
+        store.record(hidden, chapter: 1, now: Date(timeIntervalSince1970: 4_000_000_001))
+        XCTAssertFalse(store.isFavorite(hidden))
+        XCTAssertEqual(store.spineRows(for: store.shelf, columns: 5).compactMap(\.featuredID), [selected.id])
+        let filtered = store.shelf.filter { $0.id != selected.id }
+        XCTAssertEqual(store.spineRows(for: filtered, columns: 5).compactMap(\.featuredID), ["changfeng"])
+    }
+
+    func testSpineRowsHandleEmptyUnreadSingleBookAndNarrowCapacity() throws {
+        let store = LibraryStore(books: books, defaults: defaults)
+        XCTAssertTrue(store.spineRows(for: [], columns: 5).isEmpty)
+        let unread = store.shelf.filter { store.progress[$0.id] == nil }
+        let first = try XCTUnwrap(unread.first)
+        let rows = store.spineRows(for: unread, columns: 5)
+        XCTAssertEqual(rows.compactMap(\.featuredID), [first.id])
+        XCTAssertEqual(rows.flatMap(\.books).map(\.id), unread.map(\.id))
+        let single = store.spineRows(for: [first], columns: 0)
+        XCTAssertEqual(single.count, 1)
+        XCTAssertEqual(single.first?.books.map(\.id), [first.id])
+        XCTAssertEqual(single.first?.featuredID, first.id)
+        let narrow = store.spineRows(for: store.shelf, columns: -1)
+        XCTAssertEqual(narrow.flatMap(\.books).map(\.id), store.shelf.map(\.id))
+        XCTAssertTrue(narrow.allSatisfy { $0.books.count + ($0.featuredID == nil ? 0 : 1) <= 3 })
+    }
+
+    func testSpineRowsKeepLongTitlesAndRestoreAfterRelaunch() throws {
+        let longTitle = "一封穿过群山与岁月终于抵达远方的来信"
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(books[0])) as? [String: Any])
+        object["title"] = longTitle
+        let renamed = try JSONDecoder().decode(Book.self, from: JSONSerialization.data(withJSONObject: object))
+        let library = [renamed] + books.dropFirst()
+        let store = LibraryStore(books: library, defaults: defaults)
+        store.shelfLayout = .spines
+        store.sort = .title
+        store.record(renamed, chapter: 4, paragraph: 6, now: Date(timeIntervalSince1970: 4_000_000_000))
+        let initialRows = store.spineRows(for: store.shelf, columns: 5)
+        let snapshot = try XCTUnwrap(JSONSerialization.jsonObject(with: defaults.data(forKey: LibraryStore.storageKey)!) as? [String: Any])
+        XCTAssertEqual(snapshot["shelfLayout"] as? String, "spines")
+        let restored = LibraryStore(books: library, defaults: defaults)
+        XCTAssertEqual(restored.shelfLayout, .spines)
+        XCTAssertEqual(restored.sort, .title)
+        XCTAssertEqual(restored.progress, store.progress)
+        XCTAssertEqual(restored.favorites, store.favorites)
+        let restoredRows = restored.spineRows(for: restored.shelf, columns: 5)
+        XCTAssertEqual(restoredRows.map { $0.books.map(\.id) }, initialRows.map { $0.books.map(\.id) })
+        XCTAssertEqual(restoredRows.compactMap(\.featuredID), [renamed.id])
+        XCTAssertEqual(restoredRows.flatMap(\.books).first { $0.id == renamed.id }?.title, longTitle)
+        XCTAssertNil(restored.storageMessage)
     }
 
     func testUnknownShelfLayoutFallsBackWithoutLosingSavedData() throws {

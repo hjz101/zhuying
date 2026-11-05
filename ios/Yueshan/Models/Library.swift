@@ -67,16 +67,23 @@ enum ShelfSort: String, Codable, CaseIterable {
 }
 
 enum ShelfLayout: String, CaseIterable {
-    case spacious, standard, compact, list
+    case spacious, standard, compact, list, spines
     var title: String {
         switch self {
         case .spacious: "两列 · 大封面"; case .standard: "三列 · 标准"
         case .compact: "四列 · 紧凑"; case .list: "列表"
+        case .spines: "书脊与封面"
         }
     }
     var columns: Int {
-        switch self { case .spacious: 2; case .standard: 3; case .compact: 4; case .list: 1 }
+        switch self { case .spacious: 2; case .standard: 3; case .compact: 4; case .list: 1; case .spines: 5 }
     }
+}
+
+struct ShelfSpineRow: Identifiable {
+    let books: [Book]
+    let featuredID: String?
+    var id: String { books.first?.id ?? "" }
 }
 
 struct ReadingSettings: Codable, Equatable {
@@ -219,6 +226,36 @@ final class LibraryStore: ObservableObject {
             default: return (favorites.firstIndex(of: a.id) ?? 0) < (favorites.firstIndex(of: b.id) ?? 0)
             }
         }
+    }
+
+    /// Preserve the active sort while reserving two spine slots for one visible cover.
+    func spineRows(for visibleBooks: [Book], columns: Int) -> [ShelfSpineRow] {
+        guard var featured = visibleBooks.first else { return [] }
+        for book in visibleBooks.dropFirst() {
+            guard let candidate = progress[book.id] else { continue }
+            if progress[featured.id].map({ candidate.updatedAt > $0.updatedAt }) ?? true {
+                featured = book
+            }
+        }
+
+        let capacity = max(3, columns)
+        var rows: [ShelfSpineRow] = []
+        var rowBooks: [Book] = []
+        var occupiedSlots = 0
+        for book in visibleBooks {
+            let slots = book.id == featured.id ? 2 : 1
+            if occupiedSlots + slots > capacity {
+                rows.append(ShelfSpineRow(books: rowBooks, featuredID: rowBooks.contains { $0.id == featured.id } ? featured.id : nil))
+                rowBooks = []
+                occupiedSlots = 0
+            }
+            rowBooks.append(book)
+            occupiedSlots += slots
+        }
+        if !rowBooks.isEmpty {
+            rows.append(ShelfSpineRow(books: rowBooks, featuredID: rowBooks.contains { $0.id == featured.id } ? featured.id : nil))
+        }
+        return rows
     }
 
     var history: [Book] {

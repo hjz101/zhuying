@@ -71,8 +71,10 @@ struct ShelfView: View {
                         }
                     }
                     if !managing && category == .novel {
-                        if let recent = store.recent { continueCard(recent) }
-                        else { welcomeCard }
+                        if store.shelfLayout != .spines {
+                            if let recent = store.recent { continueCard(recent) }
+                            else { welcomeCard }
+                        }
                         Button { showUpdates = true } label: {
                             HStack(spacing: 9) {
                                 Image(systemName: "sparkles")
@@ -111,6 +113,8 @@ struct ShelfView: View {
                                     Button("去发现好书", action: onDiscover).buttonStyle(.borderedProminent)
                                 }
                             }.padding(.vertical, 25).accessibilityIdentifier("shelfEmptyState")
+                        } else if store.shelfLayout == .spines {
+                            spineShelf(width: max(1, geo.size.width - 44))
                         } else if store.shelfLayout == .list {
                             LazyVStack(spacing: 21) {
                                 ForEach(filteredBooks) { book in
@@ -236,7 +240,7 @@ struct ShelfView: View {
                     ForEach(ShelfLayout.allCases, id: \.self) { layout in Text(layout.title).tag(layout) }
                 }
             } label: {
-                Image(systemName: store.shelfLayout == .list ? "list.bullet" : "square.grid.3x3")
+                Image(systemName: store.shelfLayout == .list ? "list.bullet" : store.shelfLayout == .spines ? "books.vertical" : "square.grid.3x3")
                     .font(.system(size: 15)).frame(width: 44, height: 44)
             }.accessibilityLabel("书架布局").accessibilityValue(store.shelfLayout.title).accessibilityIdentifier("shelfLayout")
             Button(managing ? "完成" : "管理") { managing.toggle(); selection = [] }
@@ -286,6 +290,72 @@ struct ShelfView: View {
                 Label("去发现好书", systemImage: "arrow.right").font(.system(size: 12))
             }.frame(maxWidth: .infinity, alignment: .leading).padding(25).foregroundStyle(Palette.green).background(Color(hex: 0xEAEEDE), in: .rect(cornerRadius: 18))
         }.buttonStyle(.plain)
+    }
+
+    private func spineShelf(width: CGFloat) -> some View {
+        let gap: CGFloat = 8
+        let columns = max(3, Int((width + gap) / (dynamicTypeSize.isAccessibilitySize ? 100 : 64)))
+        let spineWidth = (width - gap * CGFloat(columns - 1)) / CGFloat(columns)
+        let rows = store.spineRows(for: filteredBooks, columns: columns)
+        return LazyVStack(alignment: .leading, spacing: 26) {
+            ForEach(rows) { row in
+                VStack(spacing: 0) {
+                    HStack(alignment: .bottom, spacing: gap) {
+                        ForEach(row.books) { book in
+                            let featured = row.featuredID == book.id
+                            spineCell(book, width: featured ? spineWidth * 2 + gap : spineWidth, featured: featured)
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    Rectangle().fill(Palette.line).frame(height: 4)
+                        .shadow(color: Palette.green.opacity(0.06), radius: 3, y: 4)
+                        .accessibilityHidden(true).allowsHitTesting(false)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("shelf-spine-row-\(row.id)")
+            }
+        }
+    }
+
+    private func spineCell(_ book: Book, width: CGFloat, featured: Bool) -> some View {
+        VStack(spacing: 0) {
+            Button { if managing { toggleSelection(book) } else { store.read(book) } } label: {
+                Group {
+                    if featured {
+                        BookCover(book: book, width: width, titleLineLimit: 3)
+                            .accessibilityElement(children: .ignore)
+                            .overlay(alignment: .bottom) {
+                                Text(store.progress[book.id] == nil ? "尚未开始" : "最近阅读").font(.system(size: 9, weight: .medium))
+                                    .padding(.horizontal, 9).padding(.vertical, 5)
+                                    .foregroundStyle(Palette.green).background(Palette.background.opacity(0.95), in: Capsule())
+                                    .padding(.bottom, 10)
+                                    .accessibilityHidden(true).allowsHitTesting(false)
+                            }
+                    } else {
+                        BookSpine(book: book, width: width, progress: store.percent(book), hasUpdates: store.updateCount(book) > 0)
+                    }
+                }
+                .frame(width: width, height: featured ? width * 1.38 : 184)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(managing ? "选择\(book.title)" : "阅读\(book.title)，\(book.author)")
+            .accessibilityValue("\(store.progress[book.id] == nil ? "尚未开始" : "已读 \(store.percent(book))%")\(store.updateCount(book) > 0 ? "，更新 \(store.updateCount(book)) 章" : "")")
+            .accessibilityIdentifier(managing ? "select-\(book.id)" : "read-\(book.id)")
+            .contextMenu { if !managing { bookActions(book) } }
+            .overlay(alignment: .topLeading) {
+                if featured && store.updateCount(book) > 0 {
+                    Image(systemName: "bookmark.fill").font(.system(size: 15))
+                        .foregroundStyle(Palette.accent).padding(.leading, 9).padding(.top, 3)
+                        .accessibilityHidden(true).allowsHitTesting(false)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if managing { selectionIcon(book).scaleEffect(featured ? 1 : 0.8).padding(3).allowsHitTesting(false) }
+            }
+        }
+        .frame(width: width)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(featured ? "shelf-spine-cover-\(book.id)" : "shelf-spine-\(book.id)")
     }
 
     private func bookCell(_ book: Book, width: CGFloat) -> some View {

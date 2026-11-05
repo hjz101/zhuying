@@ -123,6 +123,8 @@ CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
 
 新增钥匙串集成测试需要模拟器的临时签名，`CODE_SIGN_IDENTITY=-` 无需开发者证书；不要关闭签名后将钥匙串失败当作通过。统一验证命令为 `bash ios/scripts/verify.sh unit`，`ui` 运行界面流程，`all` 运行全部；脚本目标为模拟器，真机签名在 Xcode 中配置。
 
+性能基线使用独立的 `Yueshan Performance` scheme，命令为 `bash ios/scripts/verify.sh performance`；日常 `all` 指功能测试，性能负载单独运行。固定负载、冻结目标、原始样本与未达标项见 [性能基线](../docs/PERFORMANCE-BASELINE.md)。基线测试验证测量与内容正确性，性能门槛是否达标须核对报告中的 `withinTarget`。
+
 使用 `Yueshan Production` scheme 运行正式模式，或使用 `--production` 启动参数；`Yueshan` 的 Debug 启动保留 Demo。两者共用原有界面，数据独立。正式模式“我的 → 书源管理 → 书山聚合 → 登录”提供原生登录入口；在线阅读尚需完成后续接入与登录联调，不能据登录页面可用宣称正式版已完成。
 
 正式本地流程：我的 → 智能导入 → 选择 TXT／文字 PDF → 预览确认 → 查看书架 → 阅读。旧正式归档、收藏、分组、进度及阅读偏好首次启动自动迁移并保留原件，后续从数据库恢复；迁移失败可重试。切章、退出阅读和后台补存，持续阅读节流保存；保存失败会提示并保留上次有效记录。正文暂以整本投影复用 Demo 阅读器，按章懒加载及完整 G2 验收继续开发。

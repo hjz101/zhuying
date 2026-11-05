@@ -1,0 +1,16 @@
+{
+  "id" : "app.empty-launch.ms",
+  "limit" : 3000,
+  "maximum" : 4023.1093331240118,
+  "method" : "XCTest process launch to hittable shelf; includes automation handshake, not dyld-only startup",
+  "profile" : "simulator-debug-m4-ios26.5-v1",
+  "samples" : [
+    4023.1093331240118,
+    3558.3788333460689,
+    3521.7423751018941,
+    3541.7097080498934,
+    3512.431291397661
+  ],
+  "schemaVersion" : 1,
+  "withinTarget" : false
+}

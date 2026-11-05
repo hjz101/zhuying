@@ -17,9 +17,8 @@ final class ReadingFontLibrary: ObservableObject {
     @Published var message: String?
     let directory: URL
     init(directory: URL? = nil) {
-        let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
         self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(testing ? "UITestReadingFonts" : "ReadingFonts")
+            .appendingPathComponent(AppEnvironment().fontsComponent)
         reload()
     }
     func reload(reset: Bool = false) {

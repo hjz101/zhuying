@@ -9,24 +9,19 @@ struct YueshanApp: App {
     private let launchError: String?
 
     init() {
-        let defaults: UserDefaults
-        if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
-            defaults = UserDefaults(suiteName: "com.yueshan.ui-tests")!
-            if !ProcessInfo.processInfo.arguments.contains("--preserve-ui-test-state") {
-                defaults.removePersistentDomain(forName: "com.yueshan.ui-tests")
-            }
-        } else { defaults = .standard }
+        let environment = AppEnvironment()
+        let defaults = environment.defaults()
         _featureDemo = StateObject(wrappedValue: FeatureDemoStore(defaults: defaults))
-        ReadingFontLibrary.shared.reload(reset: ProcessInfo.processInfo.arguments.contains("--ui-testing") && !ProcessInfo.processInfo.arguments.contains("--preserve-ui-test-state"))
+        ReadingFontLibrary.shared.reload(reset: environment.resetsTestState)
         _navigation = StateObject(wrappedValue: NavigationStore(defaults: defaults))
         _toolbox = StateObject(wrappedValue: ToolboxStore(defaults: defaults))
         do {
-            let books = try Book.load()
+            let books = environment.isDemo ? try Book.load() : []
             let manager = FileManager.default
             let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
             let archive = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent(testing ? "UITestImports/books.json" : "ImportedBooks/books.json")
-            if testing && !ProcessInfo.processInfo.arguments.contains("--preserve-ui-test-state") { try? manager.removeItem(at: archive) }
+                .appendingPathComponent(environment.importsComponent).appendingPathComponent("books.json")
+            if environment.resetsTestState { try? manager.removeItem(at: archive) }
             if testing && ProcessInfo.processInfo.arguments.contains("--import-fixtures") {
                 let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 try manager.createDirectory(at: documents, withIntermediateDirectories: true)
@@ -39,11 +34,11 @@ struct YueshanApp: App {
                 try manager.createDirectory(at: documents, withIntermediateDirectories: true)
                 try ThemeStyleSamples.importData.write(to: documents.appendingPathComponent("阅读套装.json"))
             }
-            _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive))
+            _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo))
             launchError = nil
         } catch {
-            _library = StateObject(wrappedValue: LibraryStore(books: [], defaults: defaults))
-            launchError = "示例书库加载失败，请重新安装 Demo。"
+            _library = StateObject(wrappedValue: LibraryStore(books: [], defaults: defaults, seedDemoData: environment.isDemo))
+            launchError = "书库加载失败，请保留本地数据后重试。"
         }
     }
 

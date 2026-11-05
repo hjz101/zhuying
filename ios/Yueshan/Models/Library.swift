@@ -145,6 +145,7 @@ struct ReaderSession: Identifiable {
 @MainActor
 final class LibraryStore: ObservableObject {
     static let storageKey = "yueshan.ios.demo.v1"
+    let isDemo: Bool
     @Published private(set) var books: [Book]
     @Published private(set) var importedGroups: [String: String] = [:]
     @Published private(set) var favorites: [String]
@@ -160,19 +161,20 @@ final class LibraryStore: ObservableObject {
     private let importsURL: URL?
     private var importedBooks: [Book] = []
 
-    init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil) {
+    init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil, seedDemoData: Bool = true) {
+        self.isDemo = seedDemoData
         self.books = books
         self.defaults = defaults
         self.importsURL = importsURL
-        favorites = Array(books.prefix(6)).map(\.id)
+        favorites = seedDemoData ? Array(books.prefix(6)).map(\.id) : []
         let now = Date()
-        let initial: [(String, Int, Double)] = [("changfeng", 2, 3600), ("stars", 1, 86400), ("sunset", 3, 172800)]
+        let initial: [(String, Int, Double)] = seedDemoData ? [("changfeng", 2, 3600), ("stars", 1, 86400), ("sunset", 3, 172800)] : []
         progress = Dictionary(uniqueKeysWithValues: initial.compactMap { id, chapter, seconds in
             guard let book = books.first(where: { $0.id == id }), book.chapters.indices.contains(chapter) else { return nil }
             return (id, ReadingProgress(chapter: chapter, paragraph: 0, updatedAt: now.addingTimeInterval(-seconds)))
         })
         settings = .init()
-        updates = Dictionary(uniqueKeysWithValues: books.filter { $0.status == "连载中" }.map { ($0.id, UpdateNotice(firstChapter: max(0, $0.chapters.count - 3))) })
+        updates = seedDemoData ? Dictionary(uniqueKeysWithValues: books.filter { $0.status == "连载中" }.map { ($0.id, UpdateNotice(firstChapter: max(0, $0.chapters.count - 3))) }) : [:]
         if let importsURL, FileManager.default.fileExists(atPath: importsURL.path) {
             do {
                 let saved = try JSONDecoder().decode([Book].self, from: Data(contentsOf: importsURL))
@@ -215,7 +217,7 @@ final class LibraryStore: ObservableObject {
             settings.lineSpacing = ReaderPreferenceBounds.clamp(settings.lineSpacing, 0...24, fallback: 12)
             settings.preferences.normalize()
         } catch {
-            storageMessage = "本地记录暂时无法读取，已载入示例书架。"
+            storageMessage = seedDemoData ? "本地记录暂时无法读取，已载入示例书架。" : "本地记录暂时无法读取，原始记录已保留，请稍后重试。"
         }
     }
 

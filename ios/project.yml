@@ -50,6 +50,13 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
 schemes:
+  Yueshan Production:
+    build:
+      targets:
+        Yueshan: all
+    run:
+      commandLineArguments:
+        --production: true
   Yueshan:
     build:
       targets:

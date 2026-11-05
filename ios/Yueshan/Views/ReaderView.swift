@@ -133,7 +133,7 @@ struct ReaderView: View {
             haptic()
         }
         .onChange(of: scenePhase) { _, phase in if phase != .active { save() } }
-        .onDisappear { save() }
+        .onDisappear { save(); Task { await store.flushPendingWrites() } }
         .sheet(isPresented: $showContents) {
             ContentsView(book: book, currentChapter: chapter) { target in goChapter(target); showContents = false }
         }

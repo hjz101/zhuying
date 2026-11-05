@@ -197,7 +197,7 @@ final class BookImportSession: ObservableObject {
             progressText = "正在保存 \(items[index].input.name)"
             await Task.yield()
             guard let book = items[index].prepared?.book else { continue }
-            do { items[index].status = try library.importBook(book, group: group) ? .imported : .duplicate }
+            do { items[index].status = try await library.importBookDurably(book, group: group) ? .imported : .duplicate }
             catch { items[index].status = .failed("保存失败：\(error.localizedDescription)") }
         }
         selection = selection.filter { id in items.contains { $0.id == id && $0.status == .ready } }

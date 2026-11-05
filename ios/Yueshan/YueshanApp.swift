@@ -24,20 +24,37 @@ struct YueshanApp: App {
             let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
             let archive = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent(environment.importsComponent).appendingPathComponent("books.json")
+            let databaseDirectory = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent(environment.databaseComponent)
             if environment.resetsTestState { try? manager.removeItem(at: archive) }
+            if environment.resetsTestState { try? manager.removeItem(at: databaseDirectory) }
             if testing && ProcessInfo.processInfo.arguments.contains("--import-fixtures") {
                 let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 try manager.createDirectory(at: documents, withIntermediateDirectories: true)
-                try Data("第一章 来信\n这是从系统文件选择器导入的真实正文。\n第二章 回声\n山谷里的回声来自远方。".utf8)
+                let text = "第一章 来信\n这是从系统文件选择器导入的真实正文。\n第二章 回声\n山谷里的回声来自远方。" + (environment.isDemo ? "" : "\n第三章 远山\n远山之下的真实正文，来自同一个本地文件。")
+                try Data(text.utf8)
                     .write(to: documents.appendingPathComponent("导入测试.txt"))
                 try Data("unsupported".utf8).write(to: documents.appendingPathComponent("不支持的格式.epub"))
+            }
+            if testing && !environment.isDemo && environment.resetsTestState && ProcessInfo.processInfo.arguments.contains("--legacy-library-fixtures") {
+                let book = try BookImporter.prepare(data: Data("第一章 旧信\n保留的第一章正文。\n第二章 重逢\n升级前已经读到的真实段落。".utf8), name: "迁移测试.txt").book
+                try manager.createDirectory(at: archive.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try JSONEncoder().encode([book]).write(to: archive, options: .atomic)
+                let snapshot = LibrarySnapshot(favorites: [book.id], progress: [book.id: .init(chapter: 1, paragraph: 0, updatedAt: Date(), characterOffset: 3)],
+                                               settings: .init(fontSize: 24, lineSpacing: 16, theme: .dark), sort: .title, hasSeenReadingGuide: true, shelfLayout: "list", importedGroups: [book.id: "升级前分组"])
+                defaults.set(try JSONEncoder().encode(snapshot), forKey: LibraryStore.storageKey)
+            }
+            if testing && !environment.isDemo && ProcessInfo.processInfo.arguments.contains("--corrupt-migrated-legacy-fixtures") {
+                try Data("corrupt old archive".utf8).write(to: archive, options: .atomic)
+                defaults.set(Data("corrupt old snapshot".utf8), forKey: LibraryStore.storageKey)
             }
             if testing && ProcessInfo.processInfo.arguments.contains("--theme-fixtures") {
                 let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 try manager.createDirectory(at: documents, withIntermediateDirectories: true)
                 try ThemeStyleSamples.importData.write(to: documents.appendingPathComponent("阅读套装.json"))
             }
-            _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo))
+            let backend = environment.isDemo ? nil : try ProductionLibraryPersistence(directory: databaseDirectory)
+            _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo, productionPersistence: backend))
             launchError = nil
         } catch {
             _library = StateObject(wrappedValue: LibraryStore(books: [], defaults: defaults, seedDemoData: environment.isDemo))
@@ -61,11 +78,31 @@ struct RootView: View {
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var navigation: NavigationStore
     @EnvironmentObject private var shushan: ShushanAccountStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = AppTab.shelf
     @State private var showPlayer = false
 
     var body: some View {
         navigationTabs
+        .allowsHitTesting(store.loadState == .ready)
+        .overlay {
+            if store.loadState != .ready {
+                ZStack {
+                    Palette.background.ignoresSafeArea()
+                    if store.loadState == .loading { ProgressView("正在打开书库") }
+                    else {
+                        ContentUnavailableView {
+                            Label("暂时无法打开书库", systemImage: "books.vertical")
+                        } description: { Text("原有记录和文件已保留，请重试。") }
+                        actions: { Button("重试") { Task { await store.bootstrapProductionIfNeeded() } } }
+                    }
+                }
+            }
+        }
+        .task { await store.bootstrapProductionIfNeeded() }
+        .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store) } }
+        .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.saveBeforeSuspending() } } }
+        .onChange(of: store.reader?.id) { _, id in if id == nil { Task { await store.flushPendingWrites() } } }
         .onAppear { demo.connectReader(store) }
         .onReceive(shushan.$credential) { demo.updateShushanAccount($0, host: shushan.hostText) }
         .tint(Palette.green)

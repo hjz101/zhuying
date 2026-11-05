@@ -1,9 +1,9 @@
 import XCTest
 
 final class SmartImportFlowTests: XCTestCase {
-    @MainActor private func launch() -> XCUIApplication {
+    @MainActor private func launch(production: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
-        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--import-fixtures"]; app.launch(); return app
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--import-fixtures"] + (production ? ["--production"] : []); app.launch(); return app
     }
     @MainActor private func openImport(_ app: XCUIApplication) {
         app.tabBars.buttons["我的"].tap()
@@ -103,5 +103,53 @@ final class SmartImportFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["importChooseFiles"].exists)
         app.buttons["关闭"].tap()
         XCTAssertTrue(app.buttons["shelfAddBook"].isHittable)
+    }
+
+    @MainActor func testProductionDatabaseImportThreeChaptersBackgroundAndRestart() {
+        let app = launch(production: true)
+        openImport(app)
+        app.buttons["importChooseFiles"].tap(); chooseFile("导入测试", app: app)
+        XCTAssertTrue(app.buttons["importConfirm"].waitForExistence(timeout: 10))
+        app.buttons["importConfirm"].tap()
+        XCTAssertTrue(app.staticTexts["importSummary"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["importSummary"].label.contains("成功 1 项"))
+        app.buttons["importShowShelf"].tap()
+        let read = app.buttons["阅读导入测试"]
+        for _ in 0..<6 { if read.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(read.isHittable); read.tap()
+        if app.buttons["dismissGestureGuide"].waitForExistence(timeout: 3) { app.buttons["dismissGestureGuide"].tap() }
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第一章 来信")
+        app.buttons["nextChapter"].tap()
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第二章 回声")
+        app.buttons["nextChapter"].tap()
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 远山")
+        XCTAssertTrue(app.staticTexts["远山之下的真实正文，来自同一个本地文件。"].exists)
+        app.buttons["readerSettings"].tap()
+        app.buttons["reading-category-layout"].tap()
+        app.buttons["reading-body"].tap()
+        let font = app.sliders["fontPicker"]
+        for _ in 0..<6 { if font.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(font.isHittable)
+        font.adjust(toNormalizedSliderPosition: 0.625)
+        let savedFont = font.value as? String
+        XCTAssertNotNil(savedFont)
+        app.buttons["完成"].tap()
+        capture(app, "Production-Database-Third-Chapter")
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 5))
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "--production", "--preserve-ui-test-state"]
+        app.launch()
+        let resume = app.buttons["continueReading"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 10)); resume.tap()
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第三章 远山")
+        XCTAssertTrue(app.staticTexts["远山之下的真实正文，来自同一个本地文件。"].exists)
+        XCTAssertFalse(app.buttons["dismissGestureGuide"].exists)
+        capture(app, "Production-Database-Restored-Reader")
+        app.buttons["readerSettings"].tap()
+        app.buttons["reading-category-layout"].tap()
+        app.buttons["reading-body"].tap()
+        for _ in 0..<6 { if font.isHittable { break }; app.swipeUp() }
+        XCTAssertEqual(font.value as? String, savedFont)
     }
 }

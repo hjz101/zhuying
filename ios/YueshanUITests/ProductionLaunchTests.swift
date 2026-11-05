@@ -2,6 +2,32 @@ import XCTest
 
 final class ProductionLaunchTests: XCTestCase {
     @MainActor
+    func testLegacyLibraryMigratesAndRestartIgnoresStaleBrokenArchive() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--production", "--legacy-library-fixtures"]
+        app.launch()
+        let resume = app.buttons["continueReading"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 10)); resume.tap()
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第二章 重逢")
+        XCTAssertTrue(app.staticTexts["升级前已经读到的真实段落。"].exists)
+        XCTAssertFalse(app.buttons["dismissGestureGuide"].exists)
+        app.buttons["readerSettings"].tap()
+        XCTAssertTrue(app.navigationBars["阅读偏好"].waitForExistence(timeout: 5))
+        app.buttons["完成"].tap()
+        app.buttons["返回书架"].tap()
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "--production", "--preserve-ui-test-state", "--corrupt-migrated-legacy-fixtures"]
+        app.launch()
+        XCTAssertTrue(resume.waitForExistence(timeout: 10)); resume.tap()
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, "第二章 重逢")
+        XCTAssertTrue(app.staticTexts["升级前已经读到的真实段落。"].exists)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Production-Legacy-Migration-Restored"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+    @MainActor
     func testProductionSourceLoginHasRealFieldsAndEmptyToolsDoNotCrash() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--production"]

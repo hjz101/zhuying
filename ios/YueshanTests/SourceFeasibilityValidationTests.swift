@@ -8,6 +8,9 @@ private struct FeasibilityFixtureSource: BookSource {
     var wrongDocument = false
     var duplicateBody = false
     var cancel = false
+    var placeholder = false
+    var repeatedAcrossWorks = false
+    var shortPreface = false
     func search(query: String, page: Int) async throws -> BookSearchPage {
         if cancel { throw CancellationError() }
         if page > 1 { return .init(books: [], nextPage: nil) }
@@ -16,11 +19,12 @@ private struct FeasibilityFixtureSource: BookSource {
     }
     func details(for book: LibraryBookRecord) async throws -> LibraryBookRecord { book }
     func chapters(for book: LibraryBookRecord) async throws -> [ChapterRecord] {
-        (0..<4).map { .init(id: "\(book.id)-\($0)", bookID: book.id, nativeChapterID: "\($0)", title: "章 \($0)", order: $0,
+        (0..<(shortPreface ? 5 : 4)).map { .init(id: "\(book.id)-\($0)", bookID: book.id, nativeChapterID: "\($0)", title: "章 \($0)", order: $0,
                            access: $0 == 0 ? .volume : restricted && $0 == 2 ? .restricted : .readable) }
     }
     func document(for chapter: ChapterRecord, book: LibraryBookRecord) async throws -> ChapterDocument {
-        .init(chapterID: wrongDocument ? "another-chapter" : chapter.id, paragraphs: [duplicateBody ? "重复正文" : "本章的原创内容 \(chapter.id)"])
+        let text = placeholder || (shortPreface && chapter.order == 1) ? "第\(chapter.order)页内容" : (duplicateBody ? "重复正文" : "本章的原创内容 \(repeatedAcrossWorks ? chapter.nativeChapterID : chapter.id)") + String(repeating: "山谷间传来回声，读者记下每一个不同的日子。", count: 20)
+        return .init(chapterID: wrongDocument ? "another-chapter" : chapter.id, paragraphs: [text])
     }
 }
 
@@ -39,7 +43,7 @@ private struct FeasibilityFixtureSource: BookSource {
     }
 
     func testRepeatedWorkRestrictedGapWrongChapterAndDuplicateProseNeverPass() async {
-        let cases = [FeasibilityFixtureSource(repeatedWork: true), .init(restricted: true), .init(wrongDocument: true), .init(duplicateBody: true)]
+        let cases = [FeasibilityFixtureSource(repeatedWork: true), .init(restricted: true), .init(wrongDocument: true), .init(duplicateBody: true), .init(placeholder: true), .init(repeatedAcrossWorks: true)]
         for source in cases {
             let report = await SourceFeasibilityValidation.run(source: source, queries: ["one", "two"])
             XCTAssertEqual(report.status, "failed")
@@ -55,6 +59,19 @@ private struct FeasibilityFixtureSource: BookSource {
         XCTAssertTrue(report.works.isEmpty)
         XCTAssertEqual(report.events.last?.result, "cancelled")
     }
+    func testShortPrefaceCanPrecedeARealRunWithoutSkippingAChapterInsideThatRun() async {
+        let report = await SourceFeasibilityValidation.run(source: FeasibilityFixtureSource(shortPreface: true), queries: ["one", "two"])
+        XCTAssertEqual(report.status, "passed")
+        XCTAssertEqual(report.works.map { $0.chapters.map(\.order) }, [[2, 3, 4], [2, 3, 4]])
+    }
+    func testProbeQueriesRequireTwoDistinctNonemptyBoundedBookNames() throws {
+        XCTAssertEqual(try SourceFeasibilityValidation.queries(arguments: []), ["西游记", "红楼梦"])
+        XCTAssertEqual(try SourceFeasibilityValidation.queries(arguments: ["--source-validation-queries", " 作品甲 | 作品乙 "]), ["作品甲", "作品乙"])
+        for value in ["", "一", "一|", "一|一", "一|二|三", String(repeating: "a", count: 81) + "|二"] {
+            XCTAssertThrowsError(try SourceFeasibilityValidation.queries(arguments: ["--source-validation-queries", value]))
+        }
+        XCTAssertThrowsError(try SourceFeasibilityValidation.queries(arguments: ["--source-validation-queries"]))
+    }
 
     private struct PrivateResponseTransport: HTTPTransport {
         func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
@@ -66,7 +83,7 @@ private struct FeasibilityFixtureSource: BookSource {
         let transport = SourceValidationTransport(base: PrivateResponseTransport())
         var request = URLRequest(url: URL(string: "https://example.test/content?key=private-query")!)
         request.setValue("private-header", forHTTPHeaderField: "X-Api-Key")
-        request.httpBody = Data("private-body".utf8); request.httpMethod = "POST"
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["cid": "private-body", "url": "https://example.test/?key=private-query"]); request.httpMethod = "POST"
         _ = try await transport.send(request)
         let records = await transport.records
         let encoded = String(decoding: try JSONEncoder().encode(records), as: UTF8.self)

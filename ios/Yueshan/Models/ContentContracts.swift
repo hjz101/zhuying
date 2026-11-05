@@ -170,6 +170,8 @@ struct BookSearchPage: Equatable, Sendable {
     var books: [LibraryBookRecord]
     /// nil means the adapter has reached its final page, or does not support pagination.
     var nextPage: Int?
+    /// An aggregate source may return usable results while some providers fail.
+    var hasPartialFailures = false
 }
 
 protocol BookSource: Sendable {

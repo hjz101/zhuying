@@ -103,7 +103,7 @@ struct RootView: View {
             await store.bootstrapProductionIfNeeded()
             #if DEBUG
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-step-zero-source") {
-                try? await SourceFeasibilityValidation.runDevelopmentProbe(credential: shushan.credential)
+                try? await SourceFeasibilityValidation.runDevelopmentProbe(credential: shushan.credentialForRequests)
             }
             #endif
         }

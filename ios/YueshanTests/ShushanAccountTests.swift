@@ -125,4 +125,26 @@ final class ShushanAccountTests: XCTestCase {
         XCTAssertFalse(account.busy)
         XCTAssertNil(try vault.load(host: ShushanClient.host(ShushanClient.defaultHost)))
     }
+    func testLegacyCredentialRestoresWithStableInstallationIdentityAndLoginUsesSameHeader() async throws {
+        let domain = "com.yueshan.shushan.identity.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let old = Data("{\"host\":\"https://v1.vossc.com\",\"apiKey\":\"fixture-key\",\"nickname\":\"测试\"}".utf8)
+        let credential = try JSONDecoder().decode(ShushanCredential.self, from: old)
+        XCTAssertNil(credential.deviceID)
+        let vault = MemoryShushanVault(); try vault.save(credential)
+        let account = ShushanAccountStore(defaults: defaults, vault: vault)
+        let restored = ShushanAccountStore(defaults: defaults, vault: vault)
+        XCTAssertEqual(account.deviceID, restored.deviceID)
+        XCTAssertNotNil(UUID(uuidString: account.deviceID))
+        XCTAssertEqual(account.credentialForRequests?.deviceID, account.deviceID)
+        XCTAssertEqual(account.credentialForRequests?.apiKey, "fixture-key")
+        let expectedID = account.deviceID
+        let client = ShushanClient(transport: LoginFixtureTransport { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Device-Id"), expectedID)
+        })
+        let result = try await client.login(host: credential.host, email: "test@example.test", password: "fixture", deviceID: expectedID)
+        XCTAssertEqual(result.deviceID, expectedID)
+        XCTAssertFalse(defaults.dictionaryRepresentation().values.contains { String(describing: $0).contains("fixture-key") })
+    }
 }

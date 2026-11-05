@@ -54,7 +54,7 @@ final class ShushanBookSourceTests: XCTestCase {
         let body = try XCTUnwrap(JSONSerialization.jsonObject(with: requests[3].httpBody!) as? [String: String])
         XCTAssertEqual(body["cid"], "c1")
         XCTAssertEqual(body["source"], "测试来源")
-        XCTAssertEqual(body["version"], "5.61")
+        XCTAssertEqual(body["version"], "12")
     }
     func testEmptySearchDoesNotRequestAndVerifiedPaginationHasExplicitNextPage() async throws {
         let (source, transport) = try setup()
@@ -86,6 +86,76 @@ final class ShushanBookSourceTests: XCTestCase {
         let book = try XCTUnwrap(page.books.first)
         let catalog = try await source.chapters(for: book)
         XCTAssertEqual(catalog.map(\.title), ["第一章 实际标题字段"])
+    }
+    func testAggregatePartialFailureKeepsUsableResultsButAuthenticationAndEmptyFailuresStillFail() async throws {
+        for error in ["部分来源超时", "缺少登录凭证", "Unauthorized"] {
+            let transport = ShushanFixtureTransport(responses: ["/search": try json(["data": [searchBook], "error": error])])
+            let source = ShushanBookSource(credential: try credential(), transport: transport)
+            do {
+                let page = try await source.search(query: "测试", page: 1)
+                XCTAssertEqual(error, "部分来源超时")
+                XCTAssertEqual(page.books.count, 1)
+                XCTAssertTrue(page.hasPartialFailures)
+            } catch {
+                XCTAssertNotEqual(error as? ContentFailure, .unavailable)
+                XCTAssertEqual(error as? ContentFailure, .authenticationRequired)
+            }
+        }
+        let transport = ShushanFixtureTransport(responses: ["/search": try json(["data": [], "error": "来源超时"])])
+        do { _ = try await ShushanBookSource(credential: try credential(), transport: transport).search(query: "测试", page: 1); XCTFail("Empty failure must not become an empty success") }
+        catch { XCTAssertEqual(error as? ContentFailure, .unavailable) }
+    }
+    func testDeviceHeaderIsOnlyInHeaderAndBusiness201CannotBecomeReadableProse() async throws {
+        var account = try credential(); account.deviceID = "fixture-installation-id"
+        for (message, expected) in [("缺少设备标识", ContentFailure.unavailable), ("请先登录", .authenticationRequired), ("需要会员", .restricted)] {
+            let transport = ShushanFixtureTransport(responses: ["/content": try json(["status": 201, "data": ["content": message]])], status: 201)
+            let source = ShushanBookSource(credential: account, transport: transport)
+            let book = LibraryBookRecord(id: "book", title: "书", author: "", summary: "", source: .init(sourceID: "shushan", nativeBookID: "id", provider: "来源", bookURL: "url"), addedAt: Date())
+            let chapter = ChapterRecord(id: "chapter", bookID: book.id, nativeChapterID: "1", title: "一", order: 0, access: .readable)
+            do { _ = try await source.document(for: chapter, book: book); XCTFail("Business failure must never become content") }
+            catch { XCTAssertEqual(error as? ContentFailure, expected) }
+            let requests = await transport.requests
+            let request = try XCTUnwrap(requests.first)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Device-Id"), account.deviceID)
+            XCTAssertFalse(request.url!.absoluteString.contains(account.deviceID!))
+            XCTAssertFalse(String(decoding: request.httpBody!, as: UTF8.self).contains(account.deviceID!))
+        }
+    }
+    func testTextSearchExcludesComicAudioVideoAndDownloadEntriesBeforeBuildingBookIdentity() async throws {
+        let rows = ["novel", "comic", "audio", "video", "download"].map { tab in searchBook.merging(["tab": tab, "book_url": "https://books.example.test/\(tab)"]) { _, new in new } }
+        let transport = ShushanFixtureTransport(responses: ["/search": try json(["data": rows])])
+        let result = try await ShushanBookSource(credential: try credential(), transport: transport).search(query: "测试", page: 1)
+        XCTAssertEqual(result.books.count, 1)
+        XCTAssertEqual(result.books.first?.source?.bookURL, "https://books.example.test/novel")
+    }
+    func testHTTP503IsServiceFailureEvenWhenBodyLooksLikeAChapter() async throws {
+        let transport = ShushanFixtureTransport(responses: ["/search": try json(["data": [searchBook]])], status: 503)
+        do { _ = try await ShushanBookSource(credential: try credential(), transport: transport).search(query: "测试", page: 1); XCTFail("Service failure") }
+        catch { XCTAssertEqual(error as? ContentFailure, .unavailable) }
+    }
+    func testPositionalCatalogCIDIsOnlyARequestParameterAndInsertionPreservesChapterIdentity() async throws {
+        let (first, _) = try setup(catalog: [["title": "旧章甲", "cid": 0], ["title": "旧章乙", "cid": 1]])
+        let (updated, _) = try setup(catalog: [["title": "新插入", "cid": 0], ["title": "旧章甲", "cid": 1], ["title": "旧章乙", "cid": 2]])
+        let results = try await first.search(query: "测试", page: 1)
+        let book = try XCTUnwrap(results.books.first)
+        let old = try await first.chapters(for: book), new = try await updated.chapters(for: book)
+        XCTAssertEqual(old.map(\.id), Array(new.dropFirst()).map(\.id))
+        XCTAssertEqual(old[0].requestParameters["cid"], "0")
+        XCTAssertEqual(new[1].requestParameters["cid"], "1")
+        XCTAssertNotEqual(old[0].nativeChapterID, "0")
+        let (ambiguous, _) = try setup(catalog: [["title": "重名", "cid": 0], ["title": "重名", "cid": 1]])
+        do { _ = try await ambiguous.chapters(for: book); XCTFail("Ambiguous title fallback must fail") }
+        catch { XCTAssertEqual(error as? ContentFailure, .invalidResponse) }
+    }
+    func testNonNovelContentCannotBecomeProseDespiteSuccessfulHTTPAndLongText() async throws {
+        for tab in ["comic", "audio", "video"] {
+            let (source, _) = try setup(content: ["content": String(repeating: "https://example.test/media ", count: 20), "tab": tab])
+            let result = try await source.search(query: "测试", page: 1)
+            let book = try XCTUnwrap(result.books.first)
+            let chapter = try await source.chapters(for: book)[1]
+            do { _ = try await source.document(for: chapter, book: book); XCTFail("Unsupported media cannot become a text chapter") }
+            catch { XCTAssertEqual(error as? ContentFailure, .invalidResponse) }
+        }
     }
     func testRestrictedChapterNeverSendsContentRequest() async throws {
         let (source, transport) = try setup()

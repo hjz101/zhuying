@@ -1,0 +1,430 @@
+{
+  "events" : [
+    {
+      "count" : 480,
+      "query" : "我在精神病院学斩神",
+      "result" : "page-1-partial",
+      "stage" : "search"
+    },
+    {
+      "count" : 36,
+      "query" : "我在精神病院学斩神",
+      "result" : "AU文学,QQ阅读,七猫小说,万相书城,书旗,二三中文,企鹅看书,全本,八零小说,台湾,夜伴书屋,寒武纪年,小说狂人,得间,思兔,新笔趣阁,无忧书城,星星,晋江,江湖小说,淘小说,爱下电子书,番茄小说,疯读,百度,看书网,穿越小说,笔趣阁55,笔趣阁78,米读,西瓜小说,追书神器,速读谷,错层小说,阅友,阅读网",
+      "stage" : "available-providers"
+    },
+    {
+      "count" : 24,
+      "query" : "我在精神病院学斩神",
+      "result" : "全本:readable=24,restricted=0,volumes=0",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "我在精神病院学斩神",
+      "result" : "全本:restricted",
+      "stage" : "candidate-failure"
+    },
+    {
+      "query" : "我在精神病院学斩神",
+      "result" : "新笔趣阁:unavailable",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 2033,
+      "query" : "我在精神病院学斩神",
+      "result" : "爱下电子书:readable=2033,restricted=0,volumes=0",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "我在精神病院学斩神",
+      "result" : "爱下电子书:restricted",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 2040,
+      "query" : "我在精神病院学斩神",
+      "result" : "番茄小说:readable=2033,restricted=0,volumes=7",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "我在精神病院学斩神",
+      "result" : "番茄小说:unavailable",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 0,
+      "query" : "我在精神病院学斩神",
+      "result" : "万相书城:readable=0,restricted=0,volumes=0",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "我在精神病院学斩神",
+      "result" : "万相书城:missing-chapter",
+      "stage" : "candidate-failure"
+    },
+    {
+      "query" : "我在精神病院学斩神",
+      "result" : "小说狂人:invalid-response",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 6,
+      "query" : "我在精神病院学斩神",
+      "result" : "no-validated-three-chapter-run",
+      "stage" : "work-unavailable"
+    },
+    {
+      "count" : 544,
+      "query" : "诡秘之主",
+      "result" : "page-1-partial",
+      "stage" : "search"
+    },
+    {
+      "count" : 38,
+      "query" : "诡秘之主",
+      "result" : "AU文学,QQ阅读,七猫小说,万相书城,久久小说,书旗,二三中文,企鹅看书,全本,八零小说,台湾,夜伴书屋,寒武纪年,小说狂人,得奇,思兔,新笔趣阁,无忧书城,星星,晋江,江湖小说,淘小说,爱下电子书,番茄小说,疯读,百度,看书网,穿越小说,笔趣阁55,笔趣阁78,米读,茶马,西瓜小说,追书神器,速读谷,错层小说,阅友,阅读网",
+      "stage" : "available-providers"
+    },
+    {
+      "count" : 24,
+      "query" : "诡秘之主",
+      "result" : "全本:readable=24,restricted=0,volumes=0",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "诡秘之主",
+      "result" : "全本:restricted",
+      "stage" : "candidate-failure"
+    },
+    {
+      "query" : "诡秘之主",
+      "result" : "新笔趣阁:unavailable",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 1411,
+      "query" : "诡秘之主",
+      "result" : "书旗:readable=1402,restricted=0,volumes=9",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "诡秘之主",
+      "result" : "书旗:restricted",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 0,
+      "query" : "诡秘之主",
+      "result" : "万相书城:readable=0,restricted=0,volumes=0",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "诡秘之主",
+      "result" : "万相书城:missing-chapter",
+      "stage" : "candidate-failure"
+    },
+    {
+      "query" : "诡秘之主",
+      "result" : "小说狂人:invalid-response",
+      "stage" : "candidate-failure"
+    },
+    {
+      "query" : "诡秘之主",
+      "result" : "久久小说:invalid-response",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 6,
+      "query" : "诡秘之主",
+      "result" : "no-validated-three-chapter-run",
+      "stage" : "work-unavailable"
+    },
+    {
+      "result" : "invalid-response",
+      "stage" : "failure"
+    },
+    {
+      "result" : "search-allows-no-credential",
+      "stage" : "authentication-probe"
+    }
+  ],
+  "host" : "https:\/\/v1.vossc.com",
+  "requests" : [
+    {
+      "businessResult" : "partial-error-with-data",
+      "endpoint" : "search",
+      "httpStatus" : 200,
+      "method" : "GET",
+      "milliseconds" : 11479.925541672856,
+      "responseBytes" : 398813,
+      "shape" : "{other:number\/bool,data:[530:{author:…,book_url:…,cover:…,desc:…,other:…,source:…,tab:…,other:…,title:…,other:…}],error:string,other:number\/bool}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 1004.1377083398402,
+      "responseBytes" : 558,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,title:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 611.6648335009813,
+      "responseBytes" : 2299,
+      "shape" : "{code:number\/bool,data:[24:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 201,
+      "method" : "POST",
+      "milliseconds" : 367.65612475574017,
+      "responseBytes" : 126,
+      "shape" : "{data:{content:string},other:number\/bool};status=201;content-length=32;message-flags=会员;parameter-formats=cid:digits-1,url:opaque-40,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 404,
+      "method" : "POST",
+      "milliseconds" : 823.2429581694305,
+      "responseBytes" : 231,
+      "shape" : "null\/other"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 511.85216661542654,
+      "responseBytes" : 1115,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,other:string,title:string,other:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 1063.3077914826572,
+      "responseBytes" : 204780,
+      "shape" : "{code:number\/bool,data:[2033:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 201,
+      "method" : "POST",
+      "milliseconds" : 387.9418335855007,
+      "responseBytes" : 126,
+      "shape" : "{data:{content:string},other:number\/bool};status=201;content-length=32;message-flags=会员;parameter-formats=cid:digits-1,url:opaque-44,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 190.9105833619833,
+      "responseBytes" : 1946,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,bookid:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,other:string,title:string,other:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 275.49054147675633,
+      "responseBytes" : 450619,
+      "shape" : "{code:number\/bool,data:[2040:{cid:…,isPay:…,isVip:…,isVolume:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 503,
+      "method" : "POST",
+      "milliseconds" : 366.7484582401812,
+      "responseBytes" : 82,
+      "shape" : "{data:{content:string},other:number\/bool};status=503;content-length=16;message-flags=;parameter-formats=book_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 721.4760417118669,
+      "responseBytes" : 440,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,source:string,tab:string,title:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 788.9545001089573,
+      "responseBytes" : 42,
+      "shape" : "{code:number\/bool,data:[0:null\/other],message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 671.3562500663102,
+      "responseBytes" : 380,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,other:string,title:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 1419.0533333458006,
+      "responseBytes" : 204237,
+      "shape" : "{code:number\/bool,data:[2034:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "partial-error-with-data",
+      "endpoint" : "search",
+      "httpStatus" : 200,
+      "method" : "GET",
+      "milliseconds" : 10308.022041339427,
+      "responseBytes" : 444054,
+      "shape" : "{other:number\/bool,data:[598:{author:…,book_url:…,cover:…,desc:…,other:…,source:…,tab:…,other:…,title:…,other:…}],error:string,other:number\/bool}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 946.7360000126064,
+      "responseBytes" : 712,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,title:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 651.884916704148,
+      "responseBytes" : 2389,
+      "shape" : "{code:number\/bool,data:[24:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 201,
+      "method" : "POST",
+      "milliseconds" : 344.1411252133548,
+      "responseBytes" : 126,
+      "shape" : "{data:{content:string},other:number\/bool};status=201;content-length=32;message-flags=会员;parameter-formats=cid:digits-1,url:opaque-40,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 404,
+      "method" : "POST",
+      "milliseconds" : 563.9522918500006,
+      "responseBytes" : 231,
+      "shape" : "null\/other"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 1309.4658749178052,
+      "responseBytes" : 859,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,other:string,title:string,other:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 1554.359041620046,
+      "responseBytes" : 326284,
+      "shape" : "{code:number\/bool,data:[1411:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…,url:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 201,
+      "method" : "POST",
+      "milliseconds" : 422.13695822283626,
+      "responseBytes" : 126,
+      "shape" : "{data:{content:string},other:number\/bool};status=201;content-length=32;message-flags=会员;parameter-formats=cid:digits-1,url:opaque-64,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 693.3053750544786,
+      "responseBytes" : 364,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,source:string,tab:string,title:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 757.8543750569224,
+      "responseBytes" : 42,
+      "shape" : "{code:number\/bool,data:[0:null\/other],message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 482.2237500920892,
+      "responseBytes" : 366,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,other:string,title:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 1134.9281664006412,
+      "responseBytes" : 144714,
+      "shape" : "{code:number\/bool,data:[1449:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 837.6158331520855,
+      "responseBytes" : 790,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:number\/bool,other:string,source:string,tab:string,title:string,other:number\/bool},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 879.801666829735,
+      "responseBytes" : 154591,
+      "shape" : "{code:number\/bool,data:[1437:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "partial-error-with-data",
+      "endpoint" : "search",
+      "httpStatus" : 200,
+      "method" : "GET",
+      "milliseconds" : 10283.025833312422,
+      "responseBytes" : 470181,
+      "shape" : "{other:number\/bool,data:[650:{author:…,book_url:…,cover:…,desc:…,other:…,source:…,tab:…,other:…,title:…,other:…}],error:string,other:number\/bool}"
+    }
+  ],
+  "schemaVersion" : 1,
+  "sourceID" : "shushan",
+  "startedAt" : "2026-11-05T15:00:32Z",
+  "status" : "failed",
+  "works" : [
+
+  ]
+}

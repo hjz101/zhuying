@@ -39,6 +39,7 @@ struct ShushanCredential: Codable, Equatable, Sendable {
     let host: URL
     let apiKey: String
     let nickname: String
+    var deviceID: String? = nil
     var authenticationHeader: String { Data(apiKey.utf8).base64EncodedString() }
 }
 
@@ -69,7 +70,7 @@ struct ShushanClient: Sendable {
         return url
     }
 
-    func login(host: URL, email: String, password: String) async throws -> ShushanCredential {
+    func login(host: URL, email: String, password: String, deviceID: String? = nil) async throws -> ShushanCredential {
         let host = try Self.host(host.absoluteString)
         let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !email.isEmpty, !password.isEmpty else { throw ShushanAccountError.emptyFields }
@@ -83,6 +84,7 @@ struct ShushanClient: Sendable {
         request.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.setValue("SHUSAN_READ_2025", forHTTPHeaderField: "X-Novel-Token")
         request.setValue("ios", forHTTPHeaderField: "X-Device-Type")
+        if let deviceID { request.setValue(deviceID, forHTTPHeaderField: "X-Device-Id") }
         request.timeoutInterval = 15
         let (data, response) = try await transport.send(request)
         try Task.checkCancellation()
@@ -91,7 +93,7 @@ struct ShushanClient: Sendable {
               object["code"] as? Int == 200, object["error"] == nil,
               let result = object["data"] as? [String: Any], let user = result["user"] as? [String: Any],
               let key = user["api_key"] as? String, !key.isEmpty else { throw ShushanAccountError.rejected }
-        return .init(host: host, apiKey: key, nickname: user["nickname"] as? String ?? "已登录用户")
+        return .init(host: host, apiKey: key, nickname: user["nickname"] as? String ?? "已登录用户", deviceID: deviceID)
     }
 }
 
@@ -146,13 +148,23 @@ final class ShushanAccountStore: ObservableObject {
     private let client: ShushanClient
     private let vault: any ShushanCredentialStorage
     private let defaults: UserDefaults
+    let deviceID: String
     private var operation = 0
 
     init(defaults: UserDefaults = .standard, client: ShushanClient = .init(), vault: any ShushanCredentialStorage = ShushanKeychain()) {
         self.defaults = defaults; self.client = client; self.vault = vault
+        let savedID = defaults.string(forKey: "yueshan.shushan.installation-id")
+        deviceID = savedID.flatMap { UUID(uuidString: $0) }?.uuidString ?? UUID().uuidString
+        defaults.set(deviceID, forKey: "yueshan.shushan.installation-id")
         hostText = defaults.string(forKey: "yueshan.shushan.host") ?? ShushanClient.defaultHost
         do { credential = try vault.load(host: ShushanClient.host(hostText)) }
         catch { message = error.localizedDescription }
+    }
+
+    var credentialForRequests: ShushanCredential? {
+        guard var value = credential else { return nil }
+        if value.deviceID == nil { value.deviceID = deviceID }
+        return value
     }
 
     func login(email: String, password: String) async {
@@ -162,7 +174,7 @@ final class ShushanAccountStore: ObservableObject {
         defer { if operation == attempt { busy = false } }
         do {
             let host = try ShushanClient.host(hostText)
-            let result = try await client.login(host: host, email: email, password: password)
+            let result = try await client.login(host: host, email: email, password: password, deviceID: deviceID)
             try Task.checkCancellation()
             guard attempt == operation else { return }
             try vault.save(result)

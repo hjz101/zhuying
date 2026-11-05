@@ -184,8 +184,10 @@ protocol BookSource: Sendable {
     func document(for chapter: ChapterRecord, book: LibraryBookRecord) async throws -> ChapterDocument
 }
 
-protocol ChapterContentRepository: Sendable {
+protocol ChapterDocumentLoading: Sendable {
     func document(chapterID: String) async throws -> ChapterDocument?
+}
+protocol ChapterContentRepository: ChapterDocumentLoading {
     func save(_ document: ChapterDocument) async throws
 }
 

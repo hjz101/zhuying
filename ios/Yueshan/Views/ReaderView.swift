@@ -13,6 +13,14 @@ struct ReaderView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let book: Book
+    private let resume: Bool
+    @StateObject private var loading: ReadingSessionController
+    @State private var loaded: ChapterDocument?
+    @State private var rendered: ReaderDocument?
+    @State private var chapterTask: Task<Void, Never>?
+    @State private var requestedChapter: Int?
+    @State private var requestedResume = false
+    @State private var requestedAtEnd = false
     @State private var chapter: Int
     @State private var anchor = ReaderAnchor()
     @State private var restoreID = 0
@@ -31,8 +39,9 @@ struct ReaderView: View {
     @State private var initialized = false
     @State private var commentParagraph: Int?
 
-    init(book: Book, initialChapter: Int) {
-        self.book = book
+    init(book: Book, initialChapter: Int, resume: Bool = true, repository: (any ChapterDocumentLoading)? = nil) {
+        self.book = book; self.resume = resume
+        _loading = StateObject(wrappedValue: ReadingSessionController(repository: repository ?? EmbeddedChapterRepository(book: book)))
         _chapter = State(initialValue: initialChapter)
         _sliderValue = State(initialValue: Double(initialChapter))
     }
@@ -41,18 +50,18 @@ struct ReaderView: View {
     private var readerBackground: Color { Color(palette.background) }
     private var readerInk: Color { Color(palette.ink) }
     private var readerSecondary: Color { Color(palette.secondary) }
-    private var document: ReaderDocument { ReaderDocument(book: book, chapter: chapter, settings: store.settings) }
+    private var document: ReaderDocument { rendered ?? ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: [], isDemo: store.isDemo) }
 
     var body: some View {
         GeometryReader { geo in
             let key = layoutKey(geo.size)
             let layout = ReaderLayout(settings: store.settings, size: geo.size)
             ZStack(alignment: .topLeading) {
-                if store.settings.mode == .scroll {
-                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { commentParagraph = $0 })
+                if initialized && rendered != nil && store.settings.mode == .scroll {
+                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { if store.isDemo { commentParagraph = $0 } })
                         .frame(width: layout.scrollFrame.width, height: layout.scrollFrame.height)
                         .position(x: layout.scrollFrame.midX, y: layout.scrollFrame.midY)
-                } else if !ranges.isEmpty {
+                } else if initialized && !ranges.isEmpty {
                     if ranges.indices.contains(page) {
                         ZStack {
                             PagedReaderText(text: document.pageText(in: ranges[page]), onTap: handleTap, onSwipe: { flip(forward: $0) },
@@ -71,7 +80,7 @@ struct ReaderView: View {
                                     switch event {
                                     case .first(let tap):
                                         let point = CGPoint(x: tap.location.x - layout.textFrame.minX, y: tap.location.y - layout.textFrame.minY)
-                                        if let paragraph = ReaderDocument.comment(at: point, text: document.pageText(in: ranges[page]), size: layout.textFrame.size) {
+                                        if store.isDemo, let paragraph = ReaderDocument.comment(at: point, text: document.pageText(in: ranges[page]), size: layout.textFrame.size) {
                                             commentParagraph = paragraph
                                         } else { handleTap(tap.location.x / max(1, geo.size.width)) }
                                     case .second(let drag):
@@ -88,12 +97,24 @@ struct ReaderView: View {
             .overlay {
                 ReaderPageFurniture(settings: store.settings, book: book, chapter: chapter, page: page, pageCount: ranges.count, overallProgress: store.percent(book))
             }
+            .overlay {
+                if loading.phase == .loading || !initialized && loading.phase == .idle { ProgressView("正在打开章节").accessibilityIdentifier("chapterLoading") }
+                else if case let .failed(reason) = loading.phase {
+                    ContentUnavailableView {
+                        Label("章节暂时无法打开", systemImage: "doc.text.magnifyingglass")
+                    } description: { Text(reason) }
+                    actions: { Button("重试") { goChapter(requestedChapter ?? chapter, resume: requestedResume, atEnd: requestedAtEnd) }.accessibilityIdentifier("retryChapter") }
+                    .background(readerBackground.opacity(0.97))
+                }
+            }
             .task(id: key) {
-                guard initialized else { return }
+                guard initialized, let loaded else { return }
                 reflowing = true
+                let nextDocument = ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: loaded.paragraphs.map(\.text), isDemo: store.isDemo)
+                rendered = nextDocument
                 if store.settings.mode.isPaged {
-                    let newRanges = ReaderPaginator.ranges(document: document, size: layout.textFrame.size)
-                    let newPage = ReaderPaginator.page(containing: anchor, document: document, ranges: newRanges)
+                    let newRanges = ReaderPaginator.ranges(document: nextDocument, size: layout.textFrame.size)
+                    let newPage = ReaderPaginator.page(containing: anchor, document: nextDocument, ranges: newRanges)
                     ranges = newRanges
                     page = min(newPage, max(0, newRanges.count - 1))
                 }
@@ -119,21 +140,14 @@ struct ReaderView: View {
         .background(readerBackground.ignoresSafeArea())
         .foregroundStyle(readerInk)
         .preferredColorScheme((store.settings.preferences.colors?.dark ?? (theme == .dark)) ? .dark : .light)
-        .onAppear {
-            if let saved = store.progress[book.id], saved.chapter == chapter {
-                anchor = .init(paragraph: saved.paragraph, offset: saved.characterOffset)
-            }
-            initialized = true
-            restoreID += 1
-            showGestureGuide = !store.hasSeenReadingGuide
-        }
+        .task { await loadChapter(chapter, resume: resume, atEnd: false) }
         .onChange(of: page) { _, target in
             guard !reflowing, ranges.indices.contains(target) else { return }
             updateAnchor(document.anchor(at: ranges[target].location))
             haptic()
         }
         .onChange(of: scenePhase) { _, phase in if phase != .active { save() } }
-        .onDisappear { save(); Task { await store.flushPendingWrites() } }
+        .onDisappear { save(); chapterTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
         .sheet(isPresented: $showContents) {
             ContentsView(book: book, currentChapter: chapter) { target in goChapter(target); showContents = false }
         }
@@ -159,7 +173,7 @@ struct ReaderView: View {
                         Text("本地示例评论").font(.system(size: 23, weight: .medium, design: .serif))
                         Text("第 \((commentParagraph ?? 0) + 1) 段 · 本次只展示本地示例，不连接评论服务。")
                             .font(.system(size: 12)).foregroundStyle(Palette.muted)
-                        Text(book.content[chapter][min(commentParagraph ?? 0, book.content[chapter].count - 1)])
+                        Text(loaded?.paragraphs[safe: commentParagraph ?? 0]?.text ?? "")
                             .font(.system(size: 14)).lineSpacing(7)
                         AppSettingsCard("神人评论 · 示例", icon: "bubble.left") {
                             Text("这盏茶，怕不是等了整整一章。").font(.system(size: 14))
@@ -274,26 +288,36 @@ struct ReaderView: View {
     private func layoutKey(_ size: CGSize) -> String {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let preferences = (try? encoder.encode(store.settings.preferences)).map { String($0.hashValue) } ?? ""
-        return "\(chapter)-\(Int(size.width))-\(Int(size.height))-\(store.settings.fontSize)-\(store.settings.lineSpacing)-\(theme.rawValue)-\(store.settings.mode.rawValue)-\(preferences)-\(restoreID)-\(initialized)"
+        return "\(chapter)-\(Int(size.width))-\(Int(size.height))-\(store.settings.fontSize)-\(store.settings.lineSpacing)-\(theme.rawValue)-\(store.settings.mode.rawValue)-\(preferences)-\(restoreID)-\(initialized)-\(loaded?.version ?? "")"
     }
     private func updateAnchor(_ value: ReaderAnchor) {
-        guard initialized else { return }
+        guard initialized, !reflowing, loading.phase == .readable else { return }
         anchor = value; save()
     }
     private func save() {
-        guard initialized else { return }
+        guard initialized, loading.phase == .readable else { return }
         store.record(book, chapter: chapter, paragraph: anchor.paragraph, characterOffset: anchor.offset)
     }
-    private func goChapter(_ target: Int, atEnd: Bool = false) {
-        guard book.chapters.indices.contains(target) else { showMessage(target < 0 ? "已经是第一章" : "已读完全部示例章节"); return }
-        chapter = target
-        anchor = atEnd ? ReaderAnchor(paragraph: max(0, book.content[target].count - 1)) : .init()
-        sliderValue = Double(target)
-        reflowing = true; ranges = []; page = 0
-        restoreID += 1; save(); haptic()
+    private func goChapter(_ target: Int, resume: Bool = false, atEnd: Bool = false) {
+        guard book.chapters.indices.contains(target) else { showMessage(target < 0 ? "已经是第一章" : (store.isDemo ? "已读完全部示例章节" : "已经是最后一章")); return }
+        chapterTask?.cancel()
+        chapterTask = Task { await loadChapter(target, resume: resume, atEnd: atEnd) }
+    }
+    private func loadChapter(_ target: Int, resume: Bool, atEnd: Bool) async {
+        requestedChapter = target; requestedResume = resume; requestedAtEnd = atEnd
+        guard let request = try? store.chapterRequest(for: book, chapter: target, resume: resume, atEnd: atEnd) else { return }
+        guard await loading.load(request), let content = loading.document, let location = loading.confirmed else { return }
+        reflowing = true
+        loaded = content; chapter = target
+        anchor = .init(paragraph: location.paragraphIndex, offset: location.utf16Offset)
+        sliderValue = Double(target); ranges = []; page = 0
+        initialized = true; restoreID += 1; requestedChapter = nil
+        _ = store.confirmChapter(book, chapter: target, document: content, anchor: anchor)
+        showGestureGuide = !store.hasSeenReadingGuide
+        haptic()
     }
     private func flip(forward: Bool) {
-        if store.settings.mode == .scroll { goChapter(chapter + (forward ? 1 : -1)); return }
+        if store.settings.mode == .scroll { goChapter((requestedChapter ?? chapter) + (forward ? 1 : -1)); return }
         let target = page + (forward ? 1 : -1)
         if ranges.indices.contains(target) {
             page = target

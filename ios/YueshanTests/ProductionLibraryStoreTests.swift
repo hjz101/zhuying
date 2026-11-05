@@ -24,6 +24,13 @@ final class ProductionLibraryStoreTests: XCTestCase {
         return LibraryStore(books: [], defaults: defaults, importsURL: root.appendingPathComponent("legacy/books.json"), seedDemoData: false, productionPersistence: backend)
     }
     private func prepare() throws -> Book { try BookImporter.prepare(data: Data(text.utf8), name: "来信.txt").book }
+    private func confirm(_ library: LibraryStore, book: Book, chapter: Int) async throws {
+        let session = ReadingSessionController(repository: library.chapterRepository(for: book))
+        let accepted = await session.load(try library.chapterRequest(for: book, chapter: chapter))
+        XCTAssertTrue(accepted)
+        let document = try XCTUnwrap(session.document), anchor = try XCTUnwrap(session.confirmed)
+        XCTAssertTrue(library.confirmChapter(book, chapter: chapter, document: document, anchor: .init(paragraph: anchor.paragraphIndex, offset: anchor.utf16Offset)))
+    }
     private func execute(_ sql: String) throws {
         var database: OpaquePointer?
         let path = root.appendingPathComponent("database/library.sqlite").path
@@ -44,6 +51,7 @@ final class ProductionLibraryStoreTests: XCTestCase {
         let book = try XCTUnwrap(library.books.first)
         XCTAssertEqual(library.favorites, [book.id])
         library.read(book, chapter: 1)
+        try await confirm(library, book: book, chapter: 1)
         library.record(book, chapter: 1, characterOffset: 4)
         library.settings = .init(fontSize: 24, lineSpacing: 17, theme: .dark)
         library.sort = .title; library.shelfLayout = .spines
@@ -82,6 +90,8 @@ final class ProductionLibraryStoreTests: XCTestCase {
         XCTAssertNotNil(library.storageMessage)
         library.read(book, chapter: 1)
         XCTAssertEqual(library.reader?.chapter, 1)
+        XCTAssertTrue(library.unresolvedBookIDs.contains(book.id), "Pending chapter selection cannot replace history")
+        try await confirm(library, book: library.books[0], chapter: 1)
         XCTAssertFalse(library.unresolvedBookIDs.contains(book.id))
         let saved = await library.flushPendingWrites()
         XCTAssertTrue(saved)

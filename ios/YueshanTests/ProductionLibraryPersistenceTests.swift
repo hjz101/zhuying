@@ -46,7 +46,7 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         let raw = try JSONEncoder().encode(snapshot)
         let backend = try ProductionLibraryPersistence(directory: root)
         let loaded = try await backend.bootstrap(legacySnapshot: raw, archiveURL: archive)
-        XCTAssertEqual(Set(loaded.books), Set([first, second]))
+        XCTAssertEqual(Set(loaded.books), Set([first.metadataOnly(), second.metadataOnly()]))
         XCTAssertEqual(loaded.snapshot.favorites, [second.id, first.id])
         XCTAssertEqual(loaded.snapshot.settings, snapshot.settings)
         XCTAssertEqual(loaded.snapshot.sort, .added)
@@ -123,7 +123,7 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         XCTAssertFalse(duplicate)
         let reopened = try ProductionLibraryPersistence(directory: root)
         let loaded = try await reopened.bootstrap(legacySnapshot: nil, archiveURL: nil)
-        XCTAssertEqual(loaded.books, [book])
+        XCTAssertEqual(loaded.books, [book.metadataOnly()])
         XCTAssertEqual(loaded.snapshot.favorites, [book.id])
         XCTAssertEqual(loaded.snapshot.importedGroups, [book.id: "真实分组"])
     }
@@ -137,7 +137,7 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         do { _ = try await backend.importBook(addition, group: "新分组"); XCTFail("Metadata failure must be reported") } catch {}
         let reopened = try ProductionLibraryPersistence(directory: root)
         let loaded = try await reopened.bootstrap(legacySnapshot: nil, archiveURL: nil)
-        XCTAssertEqual(loaded.books, [original])
+        XCTAssertEqual(loaded.books, [original.metadataOnly()])
         XCTAssertEqual(loaded.snapshot.favorites, [original.id])
         let files = try FileChapterRepository(directory: root.appendingPathComponent("chapters"))
         let ids = await files.chapterIDs()
@@ -178,7 +178,7 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         let loaded = try await reopened.bootstrap(legacySnapshot: nil, archiveURL: nil)
         XCTAssertTrue(loaded.snapshot.favorites.isEmpty)
         XCTAssertEqual(loaded.snapshot.progress[book.id]?.chapter, 1)
-        XCTAssertEqual(loaded.books, [book])
+        XCTAssertEqual(loaded.books, [book.metadataOnly()])
     }
 
     func testConcurrentDuplicateImportsSerializeAndRecoverOrphanChapterFiles() async throws {
@@ -193,7 +193,7 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         try await files.save(.init(chapterID: "interrupted-import", paragraphs: ["未提交的临时正文"]))
         let reopened = try ProductionLibraryPersistence(directory: root)
         let loaded = try await reopened.bootstrap(legacySnapshot: nil, archiveURL: nil)
-        XCTAssertEqual(loaded.books, [book])
+        XCTAssertEqual(loaded.books, [book.metadataOnly()])
         let recoveredFiles = try FileChapterRepository(directory: root.appendingPathComponent("chapters"))
         let ids = await recoveredFiles.chapterIDs()
         XCTAssertFalse(ids.contains("interrupted-import"))

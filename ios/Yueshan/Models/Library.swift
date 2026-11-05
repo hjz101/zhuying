@@ -16,6 +16,11 @@ struct Book: Codable, Identifiable, Hashable {
     let chapters: [String]
     let content: [[String]]
 
+    func metadataOnly() -> Book {
+        .init(id: id, title: title, author: author, genre: genre, category: category, status: status, words: words,
+              color: color, subtitle: subtitle, intro: intro, tags: tags, chapters: chapters, content: Array(repeating: [], count: chapters.count))
+    }
+
     func chapterTitle(_ index: Int) -> String {
         guard chapters.indices.contains(index) else { return "章节不可用" }
         if id.hasPrefix("local-") { return chapters[index] }
@@ -140,6 +145,7 @@ struct ReaderSession: Identifiable {
     let id = UUID()
     let book: Book
     let chapter: Int
+    var resume = true
 }
 
 enum LibraryLoadState: Equatable { case ready, loading, failed }
@@ -188,6 +194,9 @@ final class LibraryStore: ObservableObject {
     private var lastWriteFailed = false
     private var lastWriteMessage: String?
     private var appearancePreparation: (() throws -> AppearanceMigrationInput)?
+    private var chapterCatalogs: [String: [ChapterRecord]] = [:]
+    private var stableProgress: [String: ReadingAnchor] = [:]
+    private var activeDocuments = ChapterMemoryCache()
 
     init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil, seedDemoData: Bool = true,
          productionPersistence: ProductionLibraryPersistence? = nil,
@@ -350,17 +359,24 @@ final class LibraryStore: ObservableObject {
 
     func percent(_ book: Book) -> Int {
         guard let value = progress[book.id], book.chapters.indices.contains(value.chapter), book.content.indices.contains(value.chapter) else { return 0 }
-        let count = max(1, book.content[value.chapter].count)
+        let count = max(1, prose(book, chapter: value.chapter).count)
         return min(99, Int((Double(value.chapter) + Double(value.paragraph) / Double(count)) / Double(book.chapters.count) * 100))
     }
 
     @discardableResult
     func record(_ book: Book, chapter: Int, paragraph: Int = 0, characterOffset: Int = 0, now: Date = Date()) -> Bool {
-        guard loadState == .ready, books.contains(where: { $0.id == book.id }), book.chapters.indices.contains(chapter), book.content.indices.contains(chapter), !book.content[chapter].isEmpty else { return false }
+        guard loadState == .ready, books.contains(where: { $0.id == book.id }), book.chapters.indices.contains(chapter) else { return false }
+        let paragraphs = prose(book, chapter: chapter)
+        guard !paragraphs.isEmpty else { return false }
         let changedChapter = progress[book.id]?.chapter != chapter
-        let paragraph = min(max(0, paragraph), max(0, book.content[chapter].count - 1))
-        let length = (book.content[chapter][paragraph] as NSString).length
-        progress[book.id] = .init(chapter: chapter, paragraph: paragraph, updatedAt: now, characterOffset: min(max(0, characterOffset), max(0, length - 1)))
+        let paragraph = min(max(0, paragraph), paragraphs.count - 1)
+        let offset = ReadingAnchor.safeOffset(characterOffset, in: paragraphs[paragraph] as NSString)
+        progress[book.id] = .init(chapter: chapter, paragraph: paragraph, updatedAt: now, characterOffset: offset)
+        if let record = chapterCatalogs[book.id]?[safe: chapter] {
+            let document = activeDocuments[record.id] ?? ChapterDocument(chapterID: record.id, paragraphs: paragraphs)
+            activeDocuments[record.id] = document
+            stableProgress[book.id] = try? ReadingAnchor(bookID: book.id, document: document, paragraph: paragraph, offset: offset, now: now)
+        }
         unresolvedBookIDs.remove(book.id)
         if var notice = updates[book.id], chapter >= notice.firstChapter {
             notice.readThrough = max(notice.readThrough, chapter)
@@ -372,12 +388,14 @@ final class LibraryStore: ObservableObject {
     }
 
     func read(_ book: Book, chapter: Int? = nil) {
+        guard loadState == .ready, books.contains(where: { $0.id == book.id }) else { return }
         if chapter == nil && unresolvedBookIDs.contains(book.id) {
             storageMessage = "原阅读章节已不可用，历史记录已保留。请从作品详情的章节目录重新选章。"
             return
         }
         let target = chapter ?? progress[book.id]?.chapter ?? 0
         guard book.chapters.indices.contains(target) else { return }
+        if usesProductionStorage { reader = ReaderSession(book: book, chapter: target, resume: chapter == nil); return }
         let paragraph = progress[book.id]?.chapter == target ? progress[book.id]?.paragraph ?? 0 : 0
         guard record(book, chapter: target, paragraph: paragraph, characterOffset: progress[book.id]?.chapter == target ? progress[book.id]?.characterOffset ?? 0 : 0) else { return }
         reader = ReaderSession(book: book, chapter: target)
@@ -458,6 +476,7 @@ final class LibraryStore: ObservableObject {
             themeLibrary = restored.themeLibrary
             unresolvedBookIDs = restored.unresolvedBookIDs
             bookmarks = restored.bookmarks
+            chapterCatalogs = restored.catalogs; stableProgress = restored.anchors
             suppressPersistence = false; loadState = .ready
             var messages = restored.warnings
             if !unresolvedBookIDs.intersection(Set(books.map(\.id))).isEmpty { messages.append("部分旧阅读位置无法定位，历史记录已保留，请从章节目录重新选章。") }
@@ -470,6 +489,36 @@ final class LibraryStore: ObservableObject {
     func updateThemeLibrary(_ value: ThemeLibrarySnapshot) {
         guard loadState == .ready, themeLibrary != value else { return }
         themeLibrary = value; persist()
+    }
+
+    private func prose(_ book: Book, chapter: Int) -> [String] {
+        if let record = chapterCatalogs[book.id]?[safe: chapter], let document = activeDocuments[record.id] { return document.paragraphs.map(\.text) }
+        return book.content.indices.contains(chapter) ? book.content[chapter] : []
+    }
+    func chapterRepository(for book: Book) -> any ChapterDocumentLoading {
+        if let backend = productionPersistence { return backend }
+        return EmbeddedChapterRepository(book: book)
+    }
+    func chapterRequest(for book: Book, chapter: Int, resume: Bool = false, atEnd: Bool = false) throws -> ReadingChapterRequest {
+        guard book.chapters.indices.contains(chapter) else { throw ContentFailure.missingChapter }
+        let record: ChapterRecord
+        if usesProductionStorage {
+            guard let saved = chapterCatalogs[book.id]?[safe: chapter] else { throw ContentFailure.missingChapter }
+            record = saved
+        } else { record = EmbeddedChapterRepository.chapter(book, index: chapter) }
+        var anchor: ReadingAnchor?
+        if resume, progress[book.id]?.chapter == chapter {
+            anchor = stableProgress[book.id]
+            if anchor == nil, !usesProductionStorage, let saved = progress[book.id] {
+                anchor = try? ReadingAnchor(bookID: book.id, document: .init(chapterID: record.id, paragraphs: prose(book, chapter: chapter)), paragraph: saved.paragraph, offset: saved.characterOffset, now: saved.updatedAt)
+            }
+        }
+        return .init(bookID: book.id, chapter: record, anchor: anchor, atEnd: atEnd)
+    }
+    @discardableResult func confirmChapter(_ book: Book, chapter: Int, document: ChapterDocument, anchor: ReaderAnchor) -> Bool {
+        guard let request = try? chapterRequest(for: book, chapter: chapter), request.chapter.id == document.chapterID else { return false }
+        activeDocuments[document.chapterID] = document
+        return record(book, chapter: chapter, paragraph: anchor.paragraph, characterOffset: anchor.offset)
     }
 
     func retryStorage() async {
@@ -494,8 +543,9 @@ final class LibraryStore: ObservableObject {
     @discardableResult
     func saveBookmark(_ book: Book, chapter: Int, paragraph: Int, offset: Int = 0, title: String) async throws -> LibraryBookmarkRecord {
         guard let backend = productionPersistence, loadState == .ready, books.contains(where: { $0.id == book.id }),
-              book.content.indices.contains(chapter) else { throw ContentFailure.missingChapter }
-        let document = ChapterDocument(chapterID: StableContentID.make(book.id, "local-v1", String(chapter)), paragraphs: book.content[chapter])
+              let record = chapterCatalogs[book.id]?[safe: chapter] else { throw ContentFailure.missingChapter }
+        let paragraphs = prose(book, chapter: chapter)
+        let document = ChapterDocument(chapterID: record.id, paragraphs: paragraphs)
         let bookmark = LibraryBookmarkRecord(title: title, anchor: try ReadingAnchor(bookID: book.id, document: document, paragraph: paragraph, offset: offset))
         let previous = writeTail
         let operation = Task { @MainActor in
@@ -530,6 +580,8 @@ final class LibraryStore: ObservableObject {
             self.favorites.removeAll { $0 == id }; self.progress.removeValue(forKey: id)
             self.importedGroups.removeValue(forKey: id); self.updates.removeValue(forKey: id)
             self.unresolvedBookIDs.remove(id); self.bookmarks.removeAll { $0.anchor.bookID == id }
+            for chapter in self.chapterCatalogs[id] ?? [] { self.activeDocuments.removeValue(forKey: chapter.id) }
+            self.chapterCatalogs.removeValue(forKey: id); self.stableProgress.removeValue(forKey: id)
             if self.reader?.book.id == id { self.reader = nil }
             if !cleaned { self.storageMessage = "作品记录已删除，部分文件将在下次打开书库时清理。" }
         }
@@ -549,7 +601,8 @@ final class LibraryStore: ObservableObject {
             guard !self.books.contains(where: { $0.id == book.id }) else { return false }
             let imported = try await backend.importBook(book, group: group)
             if imported {
-                self.books.append(book); self.importedBooks.append(book)
+                self.books.append(book.metadataOnly()); self.importedBooks.append(book.metadataOnly())
+                self.chapterCatalogs[book.id] = book.chapters.indices.map { EmbeddedChapterRepository.chapter(book, index: $0) }
                 self.favorites.insert(book.id, at: 0); self.importedGroups[book.id] = group
             }
             return imported

@@ -15,11 +15,11 @@ final class ReadingSessionController: ObservableObject {
     @Published private(set) var pending: ReadingChapterRequest?
     @Published private(set) var document: ChapterDocument?
     @Published private(set) var confirmed: ReadingAnchor?
-    private let repository: any ChapterContentRepository
+    private let repository: any ChapterDocumentLoading
     private var generation = 0
     private var operation: Task<ChapterDocument?, Error>?
 
-    init(repository: any ChapterContentRepository) { self.repository = repository }
+    init(repository: any ChapterDocumentLoading) { self.repository = repository }
 
     /// A requested chapter is never a reading location until its validated
     /// content arrives. Cancellation also invalidates adapters that return late.

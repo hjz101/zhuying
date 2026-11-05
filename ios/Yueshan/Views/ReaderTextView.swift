@@ -32,12 +32,16 @@ struct ContinuousReaderText: UIViewRepresentable {
         let coordinator = context.coordinator
         coordinator.parent = self
         view.textContainerInset = insets
-        if coordinator.layoutID != layoutID || coordinator.restoreID != restoreID {
+        if coordinator.layoutID != layoutID || coordinator.restoreID != restoreID || coordinator.displayedText !== document.text {
             coordinator.layoutID = layoutID
             coordinator.restoreID = restoreID
+            coordinator.displayedText = document.text
             coordinator.restoring = true
+            coordinator.textRevision += 1
+            let revision = coordinator.textRevision
             view.attributedText = document.text
             DispatchQueue.main.async {
+                guard coordinator.textRevision == revision else { return }
                 view.layoutIfNeeded()
                 let index = self.document.index(for: self.anchor)
                 let glyph = view.layoutManager.glyphIndexForCharacter(at: min(index, max(0, self.document.text.length - 1)))
@@ -69,6 +73,8 @@ struct ContinuousReaderText: UIViewRepresentable {
         var restoreID = -1
         var lastTurn = 0
         var restoring = false
+        var displayedText: NSAttributedString?
+        var textRevision = 0
         init(_ parent: ContinuousReaderText) { self.parent = parent }
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             guard !restoring, let view = scrollView as? UITextView, parent.document.text.length > 0 else { return }
@@ -79,8 +85,9 @@ struct ContinuousReaderText: UIViewRepresentable {
             let anchor = parent.document.anchor(at: index)
             let generation = layoutID
             let revision = restoreID
+            let textRevision = textRevision
             DispatchQueue.main.async { [weak self] in
-                guard let self, !self.restoring, self.layoutID == generation, self.restoreID == revision else { return }
+                guard let self, !self.restoring, self.layoutID == generation, self.restoreID == revision, self.textRevision == textRevision else { return }
                 self.parent.onAnchor(anchor)
             }
         }

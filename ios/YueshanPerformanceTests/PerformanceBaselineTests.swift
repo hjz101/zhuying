@@ -68,7 +68,10 @@ import Darwin
             let opening = ProcessInfo.processInfo.systemUptime
             let restored = try await reopened.bootstrap(legacySnapshot: nil, archiveURL: nil)
             record("library.open.ms", started: opening)
-            XCTAssertEqual(restored.books, [longBook])
+            XCTAssertEqual(restored.books, [longBook.metadataOnly()])
+            XCTAssertEqual(restored.catalogs[longBook.id]?.count, scale.longBookChapters)
+            let cachedCount = await reopened.cachedChapterCount()
+            XCTAssertEqual(cachedCount, 0, "Opening a shelf must not load every chapter")
             XCTAssertEqual(restored.snapshot.favorites, [longBook.id])
         }
         let records = try SQLiteLibraryRepository(url: root.appendingPathComponent("catalog.sqlite"))

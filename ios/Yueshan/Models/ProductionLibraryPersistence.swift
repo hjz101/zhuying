@@ -7,6 +7,8 @@ struct ProductionLibraryState {
     var themeLibrary: ThemeLibrarySnapshot? = nil
     var warnings: [String] = []
     var bookmarks: [LibraryBookmarkRecord] = []
+    var catalogs: [String: [ChapterRecord]] = [:]
+    var anchors: [String: ReadingAnchor] = [:]
 }
 
 struct AppearanceMigrationInput {
@@ -31,7 +33,7 @@ private struct LibraryViewPreferences: Codable {
 
 /// Coordinates immutable chapter files with the database commit. All public
 /// operations share one queue, including calls arriving while another awaits I/O.
-actor ProductionLibraryPersistence {
+actor ProductionLibraryPersistence: ChapterDocumentLoading {
     static let migrationKey = "migration.legacy-library.v1"
     static let legacySnapshotKey = "migration.legacy-library.original-snapshot"
     static let appearanceMigrationKey = "migration.appearance.v1"
@@ -42,7 +44,8 @@ actor ProductionLibraryPersistence {
     private let files: FileChapterRepository
     private let themes: ThemeLibraryRepository?
     private var tail: Task<Void, Never>?
-    private var documents: [String: ChapterDocument] = [:]
+    private var documents = ChapterMemoryCache()
+    private var savedAnchors: [String: ReadingAnchor] = [:]
     private var catalogs: [String: [ChapterRecord]] = [:]
 
     init(directory: URL, writer: any AtomicFileWriting = AtomicFileWriter()) throws {
@@ -85,9 +88,14 @@ actor ProductionLibraryPersistence {
         try await serialized { try await $0.performSave(snapshot, themeLibrary: themeLibrary) }
     }
 
+    func document(chapterID: String) async throws -> ChapterDocument? {
+        try await serialized { try await $0.cachedDocument(chapterID) }
+    }
+    func cachedChapterCount() -> Int { documents.count }
+
     func saveBookmark(_ bookmark: LibraryBookmarkRecord) async throws {
         try await serialized { backend in
-            let document = try await backend.document(bookmark.anchor.chapterID)
+            let document = try await backend.cachedDocument(bookmark.anchor.chapterID)
             guard case .exact = ReadingAnchorResolver.resolve(bookmark.anchor, in: document) else { throw ContentFailure.missingChapter }
             try await backend.records.save(bookmark: bookmark)
         }
@@ -111,7 +119,7 @@ actor ProductionLibraryPersistence {
         }
         unresolved.remove(id)
         try await records.deleteBook(id: id, preferences: [Self.unresolvedKey: try JSONEncoder().encode(unresolved.sorted())])
-        catalogs.removeValue(forKey: id)
+        catalogs.removeValue(forKey: id); savedAnchors.removeValue(forKey: id)
         for chapter in chapters { documents.removeValue(forKey: chapter.id) }
         do { try await files.removeBatch(Set(chapters.map(\.id))); return true }
         catch { return false }
@@ -223,7 +231,7 @@ actor ProductionLibraryPersistence {
         return result
     }
 
-    private func document(_ id: String) async throws -> ChapterDocument {
+    private func cachedDocument(_ id: String) async throws -> ChapterDocument {
         if let saved = documents[id] { return saved }
         guard let document = try await files.document(chapterID: id) else { throw ContentFailure.storageFailure }
         documents[id] = document
@@ -235,7 +243,11 @@ actor ProductionLibraryPersistence {
         for (bookID, value) in progress {
             let chapters = try await catalog(bookID)
             guard chapters.indices.contains(value.chapter) else { unresolved.insert(bookID); continue }
-            let content = try await document(chapters[value.chapter].id)
+            if let saved = savedAnchors[bookID], saved.chapterID == chapters[value.chapter].id,
+               saved.paragraphIndex == value.paragraph, saved.utf16Offset == value.characterOffset, saved.updatedAt == value.updatedAt {
+                result.append(saved); continue
+            }
+            let content = try await cachedDocument(chapters[value.chapter].id)
             guard content.paragraphs.indices.contains(value.paragraph) else { unresolved.insert(bookID); continue }
             result.append(try ReadingAnchor(bookID: bookID, document: content, paragraph: value.paragraph, offset: value.characterOffset, now: value.updatedAt))
         }
@@ -255,6 +267,7 @@ actor ProductionLibraryPersistence {
         if let staged { preferences[Self.themeLibraryKey] = staged.data }
         do {
             try await records.commitState(favorites: snapshot.favorites, groups: snapshot.importedGroups ?? [:], progress: progress, preferences: preferences)
+            for anchor in progress { savedAnchors[anchor.bookID] = anchor }
             if let staged { themes?.commit(staged) }
         } catch { if let staged { themes?.rollback(staged) }; throw error }
     }
@@ -264,12 +277,10 @@ actor ProductionLibraryPersistence {
         var books: [Book] = []
         for record in metadata {
             let chapters = try await catalog(record.id)
-            var content: [[String]] = []
-            for chapter in chapters { content.append(try await document(chapter.id).paragraphs.map(\.text)) }
             guard let display = record.display else { throw ContentFailure.storageFailure }
             books.append(Book(id: record.id, title: record.title, author: record.author, genre: display.genre, category: display.category,
                               status: display.status, words: display.words, color: display.color, subtitle: display.subtitle,
-                              intro: record.summary, tags: display.tags, chapters: chapters.map(\.title), content: content))
+                              intro: record.summary, tags: display.tags, chapters: chapters.map(\.title), content: Array(repeating: [], count: chapters.count)))
         }
         var snapshot = LibrarySnapshot(favorites: try await records.favoriteIDs(), progress: [:], importedGroups: try await records.groups())
         if let data = try await records.preference(key: Self.viewKey) {
@@ -281,20 +292,19 @@ actor ProductionLibraryPersistence {
         if let data = try await records.preference(key: Self.unresolvedKey) {
             unresolved = Set(try JSONDecoder().decode([String].self, from: data))
         }
-        for (id, anchor) in try await records.allProgress() {
+        savedAnchors = try await records.allProgress()
+        for (id, anchor) in savedAnchors {
             let chapters = try await catalog(id)
             guard let chapter = chapters.firstIndex(where: { $0.id == anchor.chapterID }) else { unresolved.insert(id); continue }
-            let content = try await document(anchor.chapterID)
-            let resolved = ReadingAnchorResolver.resolve(anchor, in: content)
-            switch resolved {
-            case let .exact(paragraph, offset), let .recovered(paragraph, offset):
-                snapshot.progress[id] = .init(chapter: chapter, paragraph: paragraph, updatedAt: anchor.updatedAt, characterOffset: offset)
-                unresolved.remove(id)
-            case .unresolved, .missingChapter: unresolved.insert(id)
-            }
+            // Resolve prose only when opening the chapter. Startup reads catalog
+            // and location metadata without loading an entire shelf's content.
+            snapshot.progress[id] = .init(chapter: chapter, paragraph: anchor.paragraphIndex,
+                                          updatedAt: anchor.updatedAt, characterOffset: anchor.utf16Offset)
+            unresolved.remove(id)
         }
         var state = ProductionLibraryState(books: books, snapshot: snapshot, unresolvedBookIDs: unresolved)
         state.bookmarks = try await records.allBookmarks()
+        state.catalogs = catalogs; state.anchors = savedAnchors
         if let data = try await records.preference(key: Self.themeLibraryKey) {
             guard let themes else { throw ContentFailure.storageFailure }
             let loaded = try themes.load(data)

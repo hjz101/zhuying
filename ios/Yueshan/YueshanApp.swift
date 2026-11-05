@@ -131,7 +131,7 @@ struct RootView: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showPlayer = false } } } }
         }
         .fullScreenCover(item: $store.reader) { session in
-            ReaderView(book: session.book, initialChapter: session.chapter).id(session.id).environmentObject(store)
+            ReaderView(book: session.book, initialChapter: session.chapter, resume: session.resume, repository: store.chapterRepository(for: session.book)).id(session.id).environmentObject(store)
         }
         .alert("本地记录提示", isPresented: Binding(get: { store.storageMessage != nil }, set: { if !$0 { store.storageMessage = nil } })) {
             if !store.isDemo { Button("重试") { Task { await store.retryStorage() } } }

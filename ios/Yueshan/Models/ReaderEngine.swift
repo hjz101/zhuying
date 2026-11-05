@@ -81,7 +81,7 @@ struct ReaderDocument {
     let text: NSAttributedString
     let paragraphRanges: [NSRange]
 
-    init(book: Book, chapter: Int, settings: ReadingSettings) {
+    init(book: Book, chapter: Int, settings: ReadingSettings, paragraphs: [String]? = nil, isDemo: Bool = true) {
         let text = NSMutableAttributedString(string: "")
         let preferences = settings.preferences
         let palette = ReaderPalette(settings: settings)
@@ -107,10 +107,11 @@ struct ReaderDocument {
         if title?.underline == true { headingAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
         text.append(NSAttributedString(string: book.chapterTitle(chapter) + "\n", attributes: headingAttributes))
         let meta = NSMutableParagraphStyle(); meta.paragraphSpacing = 32
-        text.append(NSAttributedString(string: "\(book.author) 著  ·  原创示例章节\n", attributes: [.font: UIFont.systemFont(ofSize: 10), .foregroundColor: palette.secondary, .paragraphStyle: meta]))
+        let attribution = isDemo ? "原创示例章节" : (book.subtitle == "PDF" ? "PDF 文字提取" : "本地正文")
+        text.append(NSAttributedString(string: "\(book.author) 著  ·  \(attribution)\n", attributes: [.font: UIFont.systemFont(ofSize: 10), .foregroundColor: palette.secondary, .paragraphStyle: meta]))
         var ranges: [NSRange] = []
         let font = ReaderTypography.font(settings: settings)
-        for (paragraphIndex, paragraph) in book.content[chapter].enumerated() {
+        for (paragraphIndex, paragraph) in (paragraphs ?? book.content[safe: chapter] ?? []).enumerated() {
             ranges.append(NSRange(location: text.length, length: (paragraph as NSString).length))
             let style = NSMutableParagraphStyle()
             style.lineSpacing = settings.lineSpacing
@@ -119,7 +120,7 @@ struct ReaderDocument {
             let body = NSMutableAttributedString(string: paragraph, attributes: [.font: font, .foregroundColor: palette.ink, .paragraphStyle: style, .kern: 0.6])
             ReaderTypography.applyRules(preferences.rules, to: body, paragraph: paragraphIndex, settings: settings)
             text.append(body)
-            if preferences.showCommentBubbles {
+            if isDemo && preferences.showCommentBubbles {
                 let attachment = ReaderResponsiveCommentAttachment()
                 attachment.image = ReaderCommentArtwork.bubble(settings: settings)
                 attachment.bounds = CGRect(x: 3, y: -3, width: 42, height: 22)
@@ -128,7 +129,7 @@ struct ReaderDocument {
                 text.append(badge)
             }
             text.append(NSAttributedString(string: "\n", attributes: [.font: font, .paragraphStyle: style]))
-            if preferences.showGodComments {
+            if isDemo && preferences.showGodComments {
                 let attachment = ReaderResponsiveCommentAttachment()
                 attachment.image = ReaderCommentArtwork.godComment(settings: settings)
                 attachment.bounds = CGRect(x: 0, y: -2, width: 180, height: 47)
@@ -146,14 +147,15 @@ struct ReaderDocument {
     func index(for anchor: ReaderAnchor) -> Int {
         guard !paragraphRanges.isEmpty else { return 0 }
         let range = paragraphRanges[min(max(0, anchor.paragraph), paragraphRanges.count - 1)]
-        return range.location + min(max(0, anchor.offset), max(0, range.length - 1))
+        return ReadingAnchor.safeOffset(range.location + min(max(0, anchor.offset), max(0, range.length - 1)), in: text.string as NSString)
     }
 
     func anchor(at index: Int) -> ReaderAnchor {
         guard !paragraphRanges.isEmpty else { return .init() }
         let paragraph = paragraphRanges.lastIndex { $0.location <= index } ?? 0
         let range = paragraphRanges[paragraph]
-        return ReaderAnchor(paragraph: paragraph, offset: min(max(0, index - range.location), max(0, range.length - 1)))
+        let bounded = range.location + min(max(0, index - range.location), max(0, range.length - 1))
+        return ReaderAnchor(paragraph: paragraph, offset: ReadingAnchor.safeOffset(bounded, in: text.string as NSString) - range.location)
     }
 
     func pageText(in range: NSRange) -> NSAttributedString {

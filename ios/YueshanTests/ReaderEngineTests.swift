@@ -66,4 +66,14 @@ final class ReaderEngineTests: XCTestCase {
         XCTAssertEqual(ReaderInteraction.action(at: 0.05, settings: settings), .next)
         XCTAssertEqual(ReaderInteraction.action(at: 0.95, settings: settings), .next)
     }
+    func testProductionUsesActualChapterProseWithoutDemoCommentsAndKeepsUnicodeOffsetsSafe() {
+        let text = "甲👩🏽‍🚀乙与真实正文。"
+        let document = ReaderDocument(book: book, chapter: 0, settings: .init(), paragraphs: [text], isDemo: false)
+        XCTAssertEqual(document.paragraphRanges.count, 1)
+        XCTAssertEqual(document.text.attributedSubstring(from: document.paragraphRanges[0]).string, text)
+        XCTAssertFalse(document.text.string.contains("原创示例"))
+        XCTAssertFalse(document.text.string.contains("\u{FFFC}"), "Production prose must not contain synthetic comment attachments")
+        let index = document.index(for: .init(paragraph: 0, offset: 4))
+        XCTAssertEqual(document.anchor(at: index), .init(paragraph: 0, offset: 1))
+    }
 }

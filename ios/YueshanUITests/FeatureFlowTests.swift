@@ -145,6 +145,37 @@ final class FeatureFlowTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["章节目录"].waitForExistence(timeout: 5))
     }
 
+    @MainActor func testThemeLibraryImportPreviewFiltersAndDetails() {
+        let app = launch()
+        open("themes", title: "主题管理", app: app)
+        XCTAssertTrue(app.staticTexts["当前使用"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["themeImport"].exists)
+        XCTAssertTrue(app.buttons["theme-filter-all"].exists)
+        XCTAssertTrue(app.buttons["theme-card-paper"].exists)
+        XCTAssertTrue(app.buttons["theme-card-night"].exists)
+        capture(app, name: "Themes-Library")
+        app.buttons["themeImport"].tap()
+        XCTAssertTrue(app.staticTexts["已扫描 4 个主题：新增 2 个 · 重复 1 个 · 无效 1 个"].waitForExistence(timeout: 5))
+        app.buttons["知道了"].tap()
+        app.buttons["theme-filter-dark"].tap()
+        XCTAssertTrue(app.buttons["theme-card-night"].exists)
+        XCTAssertFalse(app.buttons["theme-card-white"].exists)
+        app.buttons["theme-card-night"].tap()
+        XCTAssertTrue(app.navigationBars["主题预览"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["themeApply"].exists)
+        app.buttons["themeFavorite"].tap()
+        app.buttons["themeApply"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["夜读深林"].exists)
+        app.buttons["theme-filter-all"].tap()
+        app.buttons["themeManage"].tap()
+        XCTAssertTrue(app.buttons["theme-card-paper"].exists)
+        app.buttons["theme-card-mist"].tap()
+        XCTAssertTrue(app.buttons["删除"].exists)
+        app.buttons["删除"].tap()
+        XCTAssertFalse(app.buttons["theme-card-mist"].exists)
+    }
+
     @MainActor func testEveryFeaturePageIsReachable() {
         let app = launch()
         let routes = [

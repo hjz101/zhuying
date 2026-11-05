@@ -42,6 +42,30 @@ struct DemoOutcome {
     let detail: String
 }
 
+enum DemoThemeMode: String, CaseIterable {
+    case light, dark
+    var title: String { self == .light ? "浅色" : "深色" }
+}
+
+struct DemoTheme: Identifiable, Equatable {
+    let id: String
+    var name: String
+    var mode: DemoThemeMode
+    var background: UInt32
+    var ink: UInt32
+    var accent: UInt32
+    var summary: String
+    var source: String
+    var version: String
+    var favorite = false
+}
+
+struct ThemeImportResult: Equatable {
+    let added: Int
+    let duplicates: Int
+    let invalid: Int
+}
+
 @MainActor
 final class FeatureDemoStore: ObservableObject {
     @Published var values: [String: String] = [:]
@@ -64,6 +88,18 @@ final class FeatureDemoStore: ObservableObject {
     @Published var selectedCover = "changfeng"
     @Published var downloadProgress = 0.35
     @Published var downloadPaused = true
+    @Published var themes: [DemoTheme] = [
+        .init(id: "paper", name: "暖纸山林", mode: .light, background: 0xEDE8D9, ink: 0x354F40, accent: 0xB7815A, summary: "温暖纸色 · 森林绿", source: "内置主题", version: "1.0", favorite: true),
+        .init(id: "white", name: "纯白阅读", mode: .light, background: 0xFFFFFF, ink: 0x27352E, accent: 0x557A63, summary: "高对比 · 长文阅读", source: "内置主题", version: "1.0"),
+        .init(id: "night", name: "夜读深林", mode: .dark, background: 0x26382E, ink: 0xC5CCB5, accent: 0xD3A16F, summary: "深色背景 · 暖色强调", source: "内置主题", version: "1.0"),
+        .init(id: "mist", name: "雾蓝来信", mode: .light, background: 0xE6EEF0, ink: 0x2F4B57, accent: 0x6F9AA8, summary: "雾蓝 · 清透", source: "最近导入", version: "2.1", favorite: true),
+        .init(id: "plum", name: "暮色梅影", mode: .dark, background: 0x332C35, ink: 0xE5D7D9, accent: 0xD38B9B, summary: "梅紫 · 柔和夜读", source: "最近导入", version: "1.2"),
+        .init(id: "bamboo", name: "竹影青", mode: .light, background: 0xE8EFE3, ink: 0x365343, accent: 0x769B70, summary: "护眼绿 · 低饱和", source: "主题包", version: "1.0"),
+        .init(id: "sand", name: "沙丘旧书", mode: .light, background: 0xF0E4CC, ink: 0x594A35, accent: 0xB98552, summary: "复古纸张 · 棕金", source: "主题包", version: "3.0"),
+        .init(id: "ocean", name: "深海回声", mode: .dark, background: 0x1F2D3D, ink: 0xC5D9E8, accent: 0x72A7CC, summary: "深海蓝 · 冷色", source: "主题包", version: "1.1")
+    ]
+    @Published var activeThemeID = "paper"
+    @Published var themeImportMessage: String?
 
     func prepareSource(_ feature: DemoFeature, scope: String) {
         guard let source = sources.first(where: { $0.id == scope }), feature.id == "sourceEdit" else { return }
@@ -71,6 +107,34 @@ final class FeatureDemoStore: ObservableObject {
             let key = "\(feature.id):\(scope):\(id)"
             if values[key] == nil { values[key] = value }
         }
+    }
+
+    func applyTheme(_ id: String) {
+        guard themes.contains(where: { $0.id == id }) else { return }
+        activeThemeID = id
+    }
+    func toggleThemeFavorite(_ id: String) {
+        guard let index = themes.firstIndex(where: { $0.id == id }) else { return }
+        themes[index].favorite.toggle()
+    }
+    func removeThemes(_ ids: Set<String>) {
+        themes.removeAll { ids.contains($0.id) && $0.id != activeThemeID }
+    }
+    @discardableResult
+    func importDemoThemes() -> ThemeImportResult {
+        let incoming = [
+            DemoTheme(id: "mist", name: "雾蓝来信", mode: .light, background: 0xE6EEF0, ink: 0x2F4B57, accent: 0x6F9AA8, summary: "雾蓝 · 清透", source: "导入主题包", version: "2.1"),
+            DemoTheme(id: "cinnamon", name: "肉桂书页", mode: .light, background: 0xF0DED0, ink: 0x5F4038, accent: 0xB86F55, summary: "肉桂 · 温柔", source: "导入主题包", version: "1.0"),
+            DemoTheme(id: "aurora", name: "极光夜色", mode: .dark, background: 0x202B3D, ink: 0xD2E4D9, accent: 0x79BBA0, summary: "极光绿 · 深蓝", source: "导入主题包", version: "1.0"),
+            DemoTheme(id: "broken", name: "无效主题", mode: .light, background: 0, ink: 0, accent: 0, summary: "格式无法解析", source: "导入主题包", version: "?")
+        ]
+        let existing = Set(themes.map(\.id))
+        let valid = incoming.filter { $0.id != "broken" }
+        let additions = valid.filter { !existing.contains($0.id) }
+        themes.append(contentsOf: additions)
+        let result = ThemeImportResult(added: additions.count, duplicates: valid.count - additions.count, invalid: incoming.count - valid.count)
+        themeImportMessage = "已扫描 4 个主题：新增 \(result.added) 个 · 重复 \(result.duplicates) 个 · 无效 \(result.invalid) 个"
+        return result
     }
     func setSourceLogin(_ id: String, status: DemoLoginStatus) {
         guard let index = sources.firstIndex(where: { $0.id == id }) else { return }

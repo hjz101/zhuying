@@ -99,6 +99,189 @@ struct DemoSourceDetail: View {
     }
 }
 
+private enum ThemeFilter: String, CaseIterable {
+    case all, light, dark, favorites
+    var title: String {
+        switch self { case .all: "全部"; case .light: "浅色"; case .dark: "深色"; case .favorites: "收藏" }
+    }
+}
+
+struct ThemeLibraryView: View {
+    @EnvironmentObject private var demo: FeatureDemoStore
+    @State private var query = ""
+    @State private var filter: ThemeFilter = .all
+    @State private var managing = false
+    @State private var selection = Set<String>()
+    @State private var showImportResult = false
+
+    private var filteredThemes: [DemoTheme] {
+        demo.themes.filter { theme in
+            let matchesQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                theme.name.localizedCaseInsensitiveContains(query) || theme.summary.localizedCaseInsensitiveContains(query)
+            let matchesFilter = filter == .all || (filter == .light && theme.mode == .light) ||
+                (filter == .dark && theme.mode == .dark) || (filter == .favorites && theme.favorite)
+            return matchesQuery && matchesFilter
+        }
+    }
+    private var current: DemoTheme? { demo.themes.first { $0.id == demo.activeThemeID } }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Text("管理你的阅读气氛").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    Spacer()
+                    Button(managing ? "完成" : "管理") { managing.toggle(); selection.removeAll() }
+                        .font(.system(size: 12, weight: .medium)).accessibilityIdentifier("themeManage")
+                }
+                if let current { currentCard(current) }
+                HStack(spacing: 10) {
+                    Button { let result = demo.importDemoThemes(); showImportResult = result.added >= 0 } label: {
+                        Label("批量导入", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity, minHeight: 44)
+                    }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("themeImport")
+                    Button { filter = .favorites } label: {
+                        Label("我的收藏", systemImage: "heart").frame(maxWidth: .infinity, minHeight: 44)
+                    }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("themeFavorites")
+                }
+                if let message = demo.themeImportMessage {
+                    Text(message).font(.system(size: 11)).foregroundStyle(Palette.green)
+                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Palette.green.opacity(0.06), in: .rect(cornerRadius: 10))
+                        .accessibilityIdentifier("themeImportResult")
+                }
+                HStack(spacing: 8) {
+                    ForEach(ThemeFilter.allCases, id: \.self) { item in
+                        Button(item.title) { filter = item }.font(.system(size: 11))
+                            .padding(.horizontal, 13).frame(height: 34)
+                            .background(filter == item ? Palette.green : Palette.line.opacity(0.4), in: Capsule())
+                            .foregroundStyle(filter == item ? .white : Palette.muted)
+                            .accessibilityIdentifier("theme-filter-\(item.rawValue)")
+                    }
+                }
+                if filteredThemes.isEmpty {
+                    ContentUnavailableView("没有找到主题", systemImage: "paintpalette", description: Text("换个关键词或筛选条件试试。"))
+                } else {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 14) {
+                        ForEach(filteredThemes) { theme in
+                            ThemeCard(theme: theme, selected: selection.contains(theme.id), managing: managing) {
+                                if managing { if selection.contains(theme.id) { selection.remove(theme.id) } else { selection.insert(theme.id) } }
+                                else { demo.applyTheme(theme.id) }
+                            }
+                            .contextMenu {
+                                Button(theme.id == demo.activeThemeID ? "已应用" : "应用主题", systemImage: "checkmark.circle") { demo.applyTheme(theme.id) }
+                                Button(theme.favorite ? "取消收藏" : "收藏主题", systemImage: "heart") { demo.toggleThemeFavorite(theme.id) }
+                                Button("删除主题", systemImage: "trash", role: .destructive) { demo.removeThemes([theme.id]) }
+                            }
+                        }
+                    }
+                }
+            }.padding(22)
+        }.background(Palette.background)
+            .searchable(text: $query, prompt: "搜索主题名称或风格")
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if managing && !selection.isEmpty {
+                    HStack(spacing: 12) {
+                        Text("已选 \(selection.count) 个").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        Spacer()
+                        Button("收藏") { selection.forEach { id in if !(demo.themes.first { $0.id == id }?.favorite ?? false) { demo.toggleThemeFavorite(id) } } }
+                        Button("删除", role: .destructive) { demo.removeThemes(selection); selection.removeAll() }
+                    }.padding(.horizontal, 18).padding(.vertical, 10).background(.regularMaterial)
+                }
+            }
+            .alert("导入结果", isPresented: $showImportResult) {
+                Button("知道了", role: .cancel) {}
+            } message: { Text(demo.themeImportMessage ?? "") }
+    }
+
+    private func currentCard(_ theme: DemoTheme) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("当前使用", systemImage: "checkmark.circle.fill").font(.system(size: 13, weight: .medium))
+                Spacer(); Text(theme.name).font(.system(size: 12)).foregroundStyle(Palette.muted)
+            }
+            ThemePreview(theme: theme, compact: false)
+        }.foregroundStyle(Palette.green).padding(16).background(Palette.soft, in: .rect(cornerRadius: 16))
+            .accessibilityIdentifier("activeThemeCard")
+    }
+}
+
+private struct ThemeCard: View {
+    let theme: DemoTheme
+    let selected: Bool
+    let managing: Bool
+    let action: () -> Void
+    @EnvironmentObject private var demo: FeatureDemoStore
+    var body: some View {
+        Group {
+            if managing {
+                Button(action: action) { cardContent }
+            } else {
+                NavigationLink { ThemeDetailView(themeID: theme.id) } label: { cardContent }
+            }
+        }.buttonStyle(.plain).accessibilityIdentifier("theme-card-\(theme.id)")
+    }
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ZStack(alignment: .topTrailing) {
+                ThemePreview(theme: theme, compact: true)
+                if managing { Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.system(size: 21)).foregroundStyle(selected ? Palette.green : .white).padding(8).shadow(radius: 2) }
+            }
+            HStack {
+                Text(theme.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                Spacer(); if theme.favorite { Image(systemName: "heart.fill").font(.system(size: 11)).foregroundStyle(Palette.accent) }
+            }
+            Text("\(theme.mode.title) · \(theme.summary)").font(.system(size: 9)).foregroundStyle(Palette.muted).lineLimit(1)
+            HStack(spacing: 4) {
+                Circle().fill(Color(hex: theme.background)).frame(width: 10, height: 10)
+                Circle().fill(Color(hex: theme.ink)).frame(width: 10, height: 10)
+                Circle().fill(Color(hex: theme.accent)).frame(width: 10, height: 10)
+                Spacer(); Text(theme.id == demo.activeThemeID ? "使用中" : theme.source).font(.system(size: 9)).foregroundStyle(theme.id == demo.activeThemeID ? Palette.green : Palette.muted)
+            }
+        }.foregroundStyle(Palette.green).padding(10).background(.white.opacity(0.72), in: .rect(cornerRadius: 14))
+            .overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.id == demo.activeThemeID ? Palette.green : Palette.line, lineWidth: theme.id == demo.activeThemeID ? 1.5 : 0.5) }
+    }
+}
+
+private struct ThemePreview: View {
+    let theme: DemoTheme
+    let compact: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 7 : 13) {
+            Text("阅山 · 阅读预览").font(.system(size: compact ? 8 : 10)).foregroundStyle(Color(hex: theme.ink).opacity(0.6))
+            Text("第三章 山雨欲来").font(.system(size: compact ? 13 : 20, weight: .medium, design: .serif)).foregroundStyle(Color(hex: theme.ink))
+            Text("雨是在午后停的。山路上还留着潮湿的气息，风从远处吹来，把书页轻轻翻过一页。")
+                .font(.system(size: compact ? 9 : 13, design: .serif)).lineSpacing(compact ? 2 : 5).lineLimit(compact ? 3 : 4).foregroundStyle(Color(hex: theme.ink).opacity(0.85))
+            HStack(spacing: 8) { Text("继续阅读").font(.system(size: compact ? 8 : 10, weight: .medium)).foregroundStyle(Color(hex: theme.background)).padding(.horizontal, 8).padding(.vertical, 5).background(Color(hex: theme.accent), in: Capsule()); Spacer(); Text("第 3 章").font(.system(size: compact ? 8 : 10)).foregroundStyle(Color(hex: theme.ink).opacity(0.55)) }
+        }.padding(compact ? 10 : 15).frame(maxWidth: .infinity, alignment: .leading).frame(height: compact ? 150 : 150).background(Color(hex: theme.background), in: .rect(cornerRadius: 10))
+    }
+}
+
+private struct ThemeDetailView: View {
+    @EnvironmentObject private var demo: FeatureDemoStore
+    let themeID: String
+    var body: some View {
+        if let theme = demo.themes.first(where: { $0.id == themeID }) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    AppPageHeader(title: theme.name, subtitle: "\(theme.mode.title) · \(theme.summary)", icon: "paintpalette")
+                    ThemePreview(theme: theme, compact: false).frame(height: 250)
+                    HStack(spacing: 10) {
+                        Button(theme.id == demo.activeThemeID ? "已应用" : "应用主题") { demo.applyTheme(theme.id) }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("themeApply")
+                        Button { demo.toggleThemeFavorite(theme.id) } label: { Label(theme.favorite ? "已收藏" : "收藏", systemImage: theme.favorite ? "heart.fill" : "heart") }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("themeFavorite")
+                    }
+                    AppSettingsCard("主题信息", icon: "info.circle") {
+                        Text("来源：\(theme.source)")
+                        Text("版本：\(theme.version)")
+                        HStack { Text("背景"); Spacer(); Color(hex: theme.background).frame(width: 28, height: 20).clipShape(.rect(cornerRadius: 4)); Text(String(format: "#%06X", theme.background)).font(.system(size: 10)).foregroundStyle(Palette.muted) }
+                        HStack { Text("正文"); Spacer(); Color(hex: theme.ink).frame(width: 28, height: 20).clipShape(.rect(cornerRadius: 4)); Text(String(format: "#%06X", theme.ink)).font(.system(size: 10)).foregroundStyle(Palette.muted) }
+                        HStack { Text("强调"); Spacer(); Color(hex: theme.accent).frame(width: 28, height: 20).clipShape(.rect(cornerRadius: 4)); Text(String(format: "#%06X", theme.accent)).font(.system(size: 10)).foregroundStyle(Palette.muted) }
+                    }.font(.system(size: 12))
+                }.padding(22)
+            }.appPageStyle().navigationTitle("主题预览").navigationBarTitleDisplayMode(.inline)
+        } else { ContentUnavailableView("主题不存在", systemImage: "paintpalette") }
+    }
+}
+
 struct DemoPlayerCard: View {
     @EnvironmentObject private var demo: FeatureDemoStore
     var body: some View {

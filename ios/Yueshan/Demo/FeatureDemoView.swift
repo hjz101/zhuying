@@ -354,7 +354,7 @@ struct FeatureDemoView: View {
                 }
                 if demo.bookmarks.isEmpty { Text("暂无书签，可添加当前位置。").font(.system(size: 12)).foregroundStyle(Palette.muted) }
             }
-        case .paper: paperPreview
+        case .paper: feature.id == "themes" ? AnyView(ThemeLibraryView()) : AnyView(paperPreview)
         case .files:
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(demo.files) { file in

@@ -92,6 +92,30 @@ final class FeatureDemoTests: XCTestCase {
         XCTAssertEqual(library.favorites, favorites)
     }
 
+    func testThemeLibraryImportDeduplicatesAndKeepsActiveTheme() {
+        XCTAssertEqual(demo.themes.count, 8)
+        XCTAssertEqual(demo.activeThemeID, "paper")
+        let first = demo.importDemoThemes()
+        XCTAssertEqual(first, ThemeImportResult(added: 2, duplicates: 1, invalid: 1))
+        XCTAssertEqual(demo.themes.count, 10)
+        XCTAssertEqual(demo.themes.filter { $0.id == "mist" }.count, 1)
+        XCTAssertEqual(demo.activeThemeID, "paper")
+        let second = demo.importDemoThemes()
+        XCTAssertEqual(second, ThemeImportResult(added: 0, duplicates: 3, invalid: 1))
+        XCTAssertEqual(demo.themes.count, 10)
+    }
+
+    func testThemeActionsAreScopedAndCannotDeleteActiveTheme() {
+        demo.toggleThemeFavorite("white")
+        XCTAssertTrue(demo.themes.first { $0.id == "white" }!.favorite)
+        demo.applyTheme("night")
+        demo.removeThemes(["night", "white"])
+        XCTAssertTrue(demo.themes.contains { $0.id == "night" })
+        XCTAssertFalse(demo.themes.contains { $0.id == "white" })
+        demo.applyTheme("unknown")
+        XCTAssertEqual(demo.activeThemeID, "night")
+    }
+
     func testFieldsAreScopedToFeatureAndSource() {
         let feature = FeatureCatalog.feature("sourceEdit")
         let field = feature.fields.first { $0.id == "name" }!

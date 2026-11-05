@@ -44,10 +44,10 @@ struct UpdatesView: View {
                 VStack(alignment: .leading, spacing: 23) {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("追更小报", systemImage: "sparkles").font(.system(size: 26, weight: .medium, design: .serif)).foregroundStyle(Palette.green)
-                        Text("模拟更新提醒 · 展示连载作品的末尾样章，不访问网络，也不发送系统通知。").font(.system(size: 11)).lineSpacing(5).foregroundStyle(Palette.muted)
+                        Text(store.isDemo ? "模拟更新提醒 · 展示连载作品的末尾样章，不访问网络，也不发送系统通知。" : "查看连载作品的章节更新。").font(.system(size: 11)).lineSpacing(5).foregroundStyle(Palette.muted)
                     }
                     if store.updatedBooks.isEmpty {
-                        ContentUnavailableView("暂时没有待读更新", systemImage: "checkmark.circle", description: Text("可以模拟一次更新，看看追更的体验。"))
+                        ContentUnavailableView("暂时没有待读更新", systemImage: "checkmark.circle", description: Text(store.isDemo ? "可以模拟一次更新，看看追更的体验。" : "当前还没有可展示的章节更新。"))
                     }
                     ForEach(store.updatedBooks) { book in
                         VStack(alignment: .leading, spacing: 14) {
@@ -68,8 +68,8 @@ struct UpdatesView: View {
                             }
                         }.padding(17).background(.white.opacity(0.6), in: .rect(cornerRadius: 15))
                     }
-                    Button { store.simulateUpdates(); simulated = true } label: { Label("模拟一次更新", systemImage: "arrow.clockwise") }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("simulateUpdates")
-                    if simulated { Text("已重置连载作品末尾 3 章的演示更新标记。").font(.system(size: 10)).foregroundStyle(Palette.muted) }
+                    Button { if store.isDemo { store.simulateUpdates() }; simulated = true } label: { Label(store.isDemo ? "模拟一次更新" : "检查更新", systemImage: "arrow.clockwise") }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("simulateUpdates")
+                    if simulated { Text(store.isDemo ? "已重置连载作品末尾 3 章的演示更新标记。" : "当前版本暂不支持更新检查。").font(.system(size: 10)).foregroundStyle(Palette.muted) }
                 }.padding(23)
             }.background(Palette.background).navigationTitle("作品更新").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }

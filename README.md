@@ -6,6 +6,8 @@
 
 正式版的功能优先级、72 项任务、前置依赖、可并行工作线和阶段验收见 [完整开发流程与任务清单](docs/DEVELOPMENT-PLAN.md)。
 
+正式开发的当前状态与验证证据见 [实施记录](docs/IMPLEMENTATION-STATUS.md)，书山聚合的接口子集及待联调范围见 [接入记录](docs/SHUSHAN-INTEGRATION.md)。界面与交互一致性按 `AGENTS.md` 执行。
+
 ## 旧网页草稿启动
 
 需要 Node.js 18 或更新版本。在仓库目录运行：

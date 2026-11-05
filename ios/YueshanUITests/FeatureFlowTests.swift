@@ -22,7 +22,11 @@ final class FeatureFlowTests: XCTestCase {
         let route = app.buttons["feature-\(id)"]
         XCTAssertTrue(route.waitForExistence(timeout: 5), "Missing route: \(title)")
         route.tap()
-        XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+        // Tool catalog labels and the shared native preference page titles differ.
+        // Assert the existing Demo destination, including its actual page title.
+        let nativeTitles = ["pageStyle": "翻页与手势", "typography": "正文排版与边距",
+                            "highlight": "正文样式规则", "titleDesign": "章节标题", "comments": "段评与神人评论"]
+        XCTAssertTrue(app.navigationBars[nativeTitles[id] ?? title].waitForExistence(timeout: 5))
     }
     @MainActor private func reveal(_ element: XCUIElement, app: XCUIApplication) {
         for _ in 0..<12 { if element.isHittable { return }; app.swipeUp() }

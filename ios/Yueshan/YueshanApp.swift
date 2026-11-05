@@ -6,12 +6,15 @@ struct YueshanApp: App {
     @StateObject private var featureDemo: FeatureDemoStore
     @StateObject private var navigation: NavigationStore
     @StateObject private var toolbox: ToolboxStore
+    @StateObject private var shushan: ShushanAccountStore
     private let launchError: String?
 
     init() {
         let environment = AppEnvironment()
         let defaults = environment.defaults()
-        _featureDemo = StateObject(wrappedValue: FeatureDemoStore(defaults: defaults))
+        let credentialService = environment.isUITesting ? "com.yueshan.shushan.ui-tests" : "com.yueshan.shushan.\(environment.mode.rawValue)"
+        _shushan = StateObject(wrappedValue: ShushanAccountStore(defaults: defaults, vault: ShushanKeychain(service: credentialService)))
+        _featureDemo = StateObject(wrappedValue: FeatureDemoStore(defaults: defaults, seedDemoData: environment.isDemo))
         ReadingFontLibrary.shared.reload(reset: environment.resetsTestState)
         _navigation = StateObject(wrappedValue: NavigationStore(defaults: defaults))
         _toolbox = StateObject(wrappedValue: ToolboxStore(defaults: defaults))
@@ -47,7 +50,7 @@ struct YueshanApp: App {
             if let launchError {
                 ContentUnavailableView("暂时无法打开书库", systemImage: "books.vertical", description: Text(launchError))
             } else {
-                RootView().environmentObject(library).environmentObject(featureDemo).environmentObject(navigation).environmentObject(toolbox)
+                RootView().environmentObject(library).environmentObject(featureDemo).environmentObject(navigation).environmentObject(toolbox).environmentObject(shushan)
             }
         }
     }
@@ -57,12 +60,14 @@ struct RootView: View {
     @EnvironmentObject private var store: LibraryStore
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var navigation: NavigationStore
+    @EnvironmentObject private var shushan: ShushanAccountStore
     @State private var selectedTab = AppTab.shelf
     @State private var showPlayer = false
 
     var body: some View {
         navigationTabs
         .onAppear { demo.connectReader(store) }
+        .onReceive(shushan.$credential) { demo.updateShushanAccount($0, host: shushan.hostText) }
         .tint(Palette.green)
         .preferredColorScheme(.light)
         .onReceive(NotificationCenter.default.publisher(for: .showImportedShelf)) { _ in selectedTab = .shelf }

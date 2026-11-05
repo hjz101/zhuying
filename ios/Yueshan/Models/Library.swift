@@ -277,6 +277,7 @@ final class LibraryStore: ObservableObject {
         return max(0, book.chapters.count - max(notice.firstChapter, notice.readThrough + 1))
     }
     func simulateUpdates() {
+        guard isDemo else { return }
         for book in books where book.status == "连载中" {
             updates[book.id] = UpdateNotice(firstChapter: max(0, book.chapters.count - 3))
         }

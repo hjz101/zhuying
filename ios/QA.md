@@ -243,3 +243,13 @@ v0.2 验证结果：19 项单元测试通过，8 条界面流程全部通过，0
 - 正文规则支持模板／关键词／正则、增删排序、启停、导入和匹配测试，统一作用于全部书籍。段尾气泡与段下神人评论使用可自建／导入皮肤；评论数据仍为本地示例，首字下沉不提供多行环绕，液态玻璃为半透明绘图，标题 CSS 为文档列出的原生子集。
 - 验证：116 项 iOS 单元测试、14 条相关界面流程、40 项网页测试全部通过，网页语法及 diff 检查通过。界面覆盖新总览／排版／标题保存恢复、元素增删和拖动、规则及皮肤、上下翻页、工具箱六个真实设置入口，以及既有横向翻页、全屏、进度、帮助、主题库与个人页回归。运行设备为 iPhone 17 Pro 模拟器；未逐一验证第三方字体、主题文件提供商和真机。
 - 实际截图：`screenshots/reading-preferences-overview.png`、`screenshots/reading-preferences-typography.png`、`screenshots/reading-preferences-title.png`、`screenshots/reading-preferences-page-elements.png`、`screenshots/reading-preferences-comments.png`、`screenshots/reader-custom-page-header.png`。
+
+## 2026-11-05 · 正式版首批基础与 Demo 一致性
+
+- 按 AGENTS.md 保留 Demo 页面、导航和交互。新增正式模式及独立记录／文件命名空间，正式首次启动不预置收藏与阅读进度；书架、追更、来源分类／筛选／详情和登录入口沿用原组件。
+- 新增稳定作品／来源／章节与文字定位契约、GRDB 7.12.0 SQLite 仓库、带校验和提交回滚的章节文件仓库。仓库整合、旧数据迁移、读取会话和完整备份仍在后续任务中，不能据基础测试宣称已完成 G2／G3。
+- 书山聚合提供真实 HTTPS 表单登录与设备钥匙串管理，正式源列表不注入示例响应时间。固定原生四项适配器通过接口样本测试，实际登录和两书三章仍待用户登录后联调，未执行书源 JSON 内的脚本。
+- 验证：150 项 iOS 单元测试、7 条相关 UI 流程（含全部 47 个功能入口遍历）、52 项当前项目 Node 测试通过；网页语法、脚本语法和 diff 检查通过。正式空书架及登录路径追加复验再次通过。
+- 入口遍历修正 5 个陈旧标题断言，以现有原生 Demo 的“翻页与手势、正文排版与边距、正文样式规则、章节标题、段评与神人评论”为基准，页面未改名。原共享模拟器上的一次入口点击失败，改用专用新模拟器后同程序复验通过；最终使用 Yueshan Development QA、iPhone 17 Pro、iOS 26.5。
+- 钥匙串需要模拟器临时签名；关闭签名时出现 -34018，改用 `CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-` 后真实存取／更新／删除通过。此签名无需开发者证书，不代替真机签名及真机验收。
+- 登录截图：`screenshots/production-shushan-login.png`。实施状态及未完成范围见 `../docs/IMPLEMENTATION-STATUS.md`；本轮为开发阶段交付，全部功能尚未完成。

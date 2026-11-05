@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
 cd "$(dirname "$0")/../.."
 verification_mode="${1:-unit}"
 case "$verification_mode" in
@@ -13,4 +13,4 @@ npm test
 xcodebuild -project ios/Yueshan.xcodeproj -scheme Yueshan \
   -destination "${YUESHAN_TEST_DESTINATION:-platform=iOS Simulator,name=iPhone 17 Pro}" \
   -derivedDataPath "${YUESHAN_DERIVED_DATA:-/tmp/yueshan-development-derived}" \
-  "${test_targets[@]}" CODE_SIGNING_ALLOWED=NO test
+  "${test_targets[@]}" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test

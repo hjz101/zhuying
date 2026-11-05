@@ -1,6 +1,6 @@
 # 阅山 for iOS
 
-原生 SwiftUI 交互 Demo。最低系统 iOS 17，面向 iPhone；无账号后端、无第三方依赖。内置原创模拟书库，书架与阅读数据保存在设备；智能导入支持实际文件读取和用户主动发起的文件链接下载。
+原生 SwiftUI 应用，正式版正在按任务清单开发。最低系统 iOS 17，面向 iPhone；Demo 保留原创模拟书库，正式模式使用独立数据。现已加入 GRDB／SQLite 仓库基础；智能导入支持实际文件读取和用户主动发起的文件链接下载。
 
 ## 打开与运行
 
@@ -116,9 +116,13 @@
 ```sh
 xcodebuild -project ios/Yueshan.xcodeproj -scheme Yueshan \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  CODE_SIGNING_ALLOWED=NO test
+CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
 ```
 
 选择的模拟器名称需与本机实际安装的设备一致。`YueshanTests` 验证模型和持久化，`YueshanUITests` 验证原生 App 操作流程；界面测试使用独立测试数据，不重置正常运行的收藏。
+
+新增钥匙串集成测试需要模拟器的临时签名，`CODE_SIGN_IDENTITY=-` 无需开发者证书；不要关闭签名后将钥匙串失败当作通过。统一验证命令为 `bash ios/scripts/verify.sh unit`，`ui` 运行界面流程，`all` 运行全部；脚本目标为模拟器，真机签名在 Xcode 中配置。
+
+使用 `Yueshan Production` scheme 运行正式模式，或使用 `--production` 启动参数；`Yueshan` 的 Debug 启动保留 Demo。两者共用原有界面，数据独立。正式模式“我的 → 书源管理 → 书山聚合 → 登录”提供原生登录入口；在线阅读尚需完成后续接入与登录联调，不能据登录页面可用宣称正式版已完成。
 
 当前验收情况见 `QA.md`。真实书源、云同步、完整小说、付费及离线下载均未实现。

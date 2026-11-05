@@ -75,17 +75,15 @@ struct ShelfView: View {
                             if let recent = store.recent { continueCard(recent) }
                             else { welcomeCard }
                         }
-                        if store.isDemo {
-                          Button { showUpdates = true } label: {
+                        Button { showUpdates = true } label: {
                             HStack(spacing: 9) {
                                 Image(systemName: "sparkles")
                                 Text(store.updatedBooks.isEmpty ? "追更小报" : "\(store.updatedBooks.count) 本书有更新")
-                                Text("模拟").font(.system(size: 8)).padding(.horizontal, 5).padding(.vertical, 3).background(Palette.green.opacity(0.08), in: Capsule())
+                                Text(store.isDemo ? "模拟" : "待检查").font(.system(size: 8)).padding(.horizontal, 5).padding(.vertical, 3).background(Palette.green.opacity(0.08), in: Capsule())
                                 Spacer()
                                 Text("查看").font(.system(size: 10)); Image(systemName: "chevron.right").font(.system(size: 10))
                             }.font(.system(size: 12)).foregroundStyle(Palette.green).padding(15).background(Color(hex: 0xEEF0E6), in: .rect(cornerRadius: 12))
-                          }.accessibilityIdentifier("shelfUpdates")
-                        }
+                        }.accessibilityIdentifier("shelfUpdates")
                     } else if managing {
                         HStack {
                             Text("已选择 \(selection.count) 本").font(.system(size: 15, weight: .medium)).foregroundStyle(Palette.green)

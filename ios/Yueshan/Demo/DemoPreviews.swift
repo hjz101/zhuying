@@ -62,7 +62,7 @@ struct SourceManagementView: View {
                 ForEach(DemoSourceKind.allCases, id: \.self) { categoryButton($0) }
             }.padding(4).background(Palette.green.opacity(0.05), in: .rect(cornerRadius: 10))
             HStack {
-                Text(managing ? "已选 \(selection.count) / \(sources.count)" : "\(sources.count) 个书源 · 示例数据")
+                Text(managing ? "已选 \(selection.count) / \(sources.count)" : "\(sources.count) 个书源\(demo.isDemo ? " · 示例数据" : "")")
                     .font(.system(size: 11)).foregroundStyle(Palette.muted).accessibilityIdentifier("sourceCount")
                 Spacer()
                 if managing {
@@ -214,7 +214,7 @@ struct DemoSourceRows: View {
             .alert("删除“\(removal?.name ?? "")”？", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } })) {
                 Button("确认删除书源", role: .destructive) { if let removal { demo.removeSource(removal.id) }; removal = nil }
                 Button("取消", role: .cancel) { removal = nil }
-            } message: { Text("仅移除演示书源，书架与阅读进度保留。") }
+            } message: { Text(demo.isDemo ? "仅移除演示书源，书架与阅读进度保留。" : "移除书源后，书架与阅读进度保留。") }
     }
     private func rowLabel(_ source: DemoSource) -> some View {
         HStack(spacing: 12) {
@@ -245,11 +245,11 @@ struct DemoSourceDetail: View {
             if let source = demo.sources.first(where: { $0.id == sourceID }) {
                 VStack(alignment: .leading, spacing: 22) {
                     AppPageHeader(title: source.name, subtitle: source.url, icon: "externaldrive")
-                    DemoNotice()
+                    if demo.isDemo { DemoNotice() }
                     AppSettingsCard("书源信息", icon: "info.circle") {
                         Text(source.detail).font(.system(size: 12))
                         Text("分组：\(source.group)").font(.system(size: 12))
-                        Text("\(source.loginStatus.title) · 演示登录状态").font(.system(size: 12)).accessibilityIdentifier("sourceLoginStatus")
+                        Text("\(source.loginStatus.title)\(demo.isDemo ? " · 演示登录状态" : "")").font(.system(size: 12)).accessibilityIdentifier("sourceLoginStatus")
                         Toggle("启用书源", isOn: Binding(get: { demo.sources.first { $0.id == sourceID }?.enabled ?? false }, set: { value in
                             if let index = demo.sources.firstIndex(where: { $0.id == sourceID }) { demo.sources[index].enabled = value }
                         }))

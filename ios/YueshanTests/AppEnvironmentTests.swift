@@ -57,4 +57,38 @@ final class AppEnvironmentTests: XCTestCase {
         XCTAssertNotNil(store.storageMessage)
         XCTAssertEqual(defaults.data(forKey: LibraryStore.storageKey), damaged)
     }
+
+    func testProductionSourcesUseSharedDemoModelWithoutSeedingSimulatedResults() {
+        let domain = "com.yueshan.sources.production.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let production = FeatureDemoStore(defaults: defaults, seedDemoData: false)
+        XCTAssertFalse(production.isDemo)
+        XCTAssertEqual(production.sources.map(\.id), ["shushan"])
+        XCTAssertTrue(production.bookGroups.isEmpty)
+        XCTAssertTrue(production.bookmarks.isEmpty)
+        XCTAssertTrue(production.files.isEmpty)
+        XCTAssertTrue(production.backups.isEmpty)
+        XCTAssertTrue(production.cacheMB.values.allSatisfy { $0 == 0 })
+        production.setSourcesEnabled(["shushan"], enabled: false)
+        production.moveSources(["shushan"], group: "个人收藏")
+        production.toggleSourcePin("shushan")
+        let restored = FeatureDemoStore(defaults: defaults, seedDemoData: false)
+        XCTAssertEqual(restored.sources, production.sources)
+        let demo = FeatureDemoStore()
+        XCTAssertTrue(demo.isDemo)
+        XCTAssertEqual(demo.sources.count, 3)
+        XCTAssertFalse(demo.bookmarks.isEmpty)
+    }
+
+    func testProductionCannotGenerateSimulatedUpdates() throws {
+        let domain = "com.yueshan.production.updates.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let books = try Book.load(bundle: Bundle(for: LibraryStore.self))
+        let production = LibraryStore(books: books, defaults: defaults, seedDemoData: false)
+        production.simulateUpdates()
+        XCTAssertTrue(production.updates.isEmpty)
+        XCTAssertTrue(production.progress.isEmpty)
+    }
 }

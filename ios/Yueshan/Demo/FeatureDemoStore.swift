@@ -1,19 +1,19 @@
 import Foundation
 import Combine
 
-enum DemoLoginStatus: String {
+enum DemoLoginStatus: String, Codable {
     case signedOut, signedIn, expired
     var title: String { switch self { case .signedOut: "未登录"; case .signedIn: "已登录"; case .expired: "登录已过期" } }
     var action: String { switch self { case .signedOut: "登录"; case .signedIn: "管理登录"; case .expired: "重新登录" } }
 }
 
-enum DemoSourceKind: String, CaseIterable { case novel = "小说", comic = "漫画", audio = "听书" }
+enum DemoSourceKind: String, Codable, CaseIterable { case novel = "小说", comic = "漫画", audio = "听书" }
 enum SourceStatusFilter: String, CaseIterable {
     case all = "全部状态", enabled = "已启用", disabled = "已停用", expired = "登录过期", failed = "异常"
 }
 enum SourceSort: String, CaseIterable { case original = "默认顺序", response = "响应速度", name = "名称" }
 
-struct DemoSource: Identifiable, Equatable {
+struct DemoSource: Identifiable, Codable, Equatable {
     let id: String
     var name: String
     var group = "小说"
@@ -125,12 +125,14 @@ struct ThemeImportResult: Equatable {
 
 @MainActor
 final class FeatureDemoStore: ObservableObject {
+    let isDemo: Bool
+    private var sourceDefaults: UserDefaults?
     @Published var values: [String: String] = [:]
     @Published var sources = [
         DemoSource(id: "shanhai", name: "山海书库", detail: "143 ms · 搜索 / 详情 / 正文", responseMilliseconds: 143),
         DemoSource(id: "yunjian", name: "云间小说", detail: "216 ms · 章节更新及时", url: "https://yunjian.example", loginStatus: .expired, responseMilliseconds: 216),
         DemoSource(id: "paper", name: "纸上漫游", group: "漫画", detail: "超时 · 演示失败状态", url: "https://paper.example", loginStatus: .signedIn, kind: .comic, hasFailure: true),
-    ]
+    ] { didSet { persistProductionSources() } }
     @Published var groups = ["追更中", "待读", "已读完"]
     @Published var bookGroups: [String: String] = ["changfeng": "追更中", "stars": "追更中", "sunset": "已读完"]
     @Published var bookSources: [String: String] = [:]
@@ -166,7 +168,17 @@ final class FeatureDemoStore: ObservableObject {
     @Published var activeBubbleStyleID: String? = "paper:bubble:main" { didSet { persistThemeLibrary() } }
     @Published var themeImportMessage: String?
 
-    init(defaults: UserDefaults? = nil) {
+    init(defaults: UserDefaults? = nil, seedDemoData: Bool = true) {
+        isDemo = seedDemoData
+        if !seedDemoData {
+            sources = [.init(id: "shushan", name: "书山聚合", detail: "待登录", url: ShushanClient.defaultHost)]
+            bookGroups = [:]; bookmarks = []; files = []; backups = []
+            cacheMB = ["章节": 0, "图片": 0, "音频": 0]
+            selectedCover = ""; audioPosition = 0; downloadProgress = 0
+            sourceDefaults = defaults
+            if let data = defaults?.data(forKey: "yueshan.production.sources.v1"),
+               let saved = try? JSONDecoder().decode([DemoSource].self, from: data) { sources = saved }
+        }
         themeLibraryDefaults = defaults
         restoringThemeLibrary = true
         themeAssets = ThemeStyleSamples.assets(for: themes)
@@ -177,6 +189,18 @@ final class FeatureDemoStore: ObservableObject {
         }
         restoringThemeLibrary = false
         restoreThemeLibrary()
+    }
+
+    private func persistProductionSources() {
+        guard !isDemo, let sourceDefaults, let data = try? JSONEncoder().encode(sources) else { return }
+        sourceDefaults.set(data, forKey: "yueshan.production.sources.v1")
+    }
+
+    func updateShushanAccount(_ credential: ShushanCredential?, host: String) {
+        guard !isDemo, let index = sources.firstIndex(where: { $0.id == "shushan" }) else { return }
+        sources[index].loginStatus = credential == nil ? .signedOut : .signedIn
+        sources[index].url = credential?.host.absoluteString ?? host
+        sources[index].detail = credential == nil ? "待登录" : "\(credential!.nickname) · 登录状态已保存"
     }
 
     func prepareSource(_ feature: DemoFeature, scope: String) {

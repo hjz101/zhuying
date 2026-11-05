@@ -22,17 +22,23 @@
 		293A23D605E0D4F27FBA321D /* SQLiteLibraryRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5CDC4D351907709DC44CF9A /* SQLiteLibraryRepositoryTests.swift */; };
 		29B54EF5891CEA7BA6753AE2 /* AppEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4FA0B42C90AA93F7A9D202 /* AppEnvironmentTests.swift */; };
 		2BA4F9A1D917D40A98BA1CA1 /* FootprintsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECF86BCB8D312C360FA44C9 /* FootprintsView.swift */; };
+		2E7F084814C0EC7B99F3A5DA /* PerformanceBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE9990045A4184E32A6E7E9 /* PerformanceBaselineTests.swift */; };
+		2EA01AC98F340D2A22B81F54 /* PerformanceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701A9EEBDC3E68AA1D9F5536 /* PerformanceFixtures.swift */; };
 		317D31DD470B80A8AA812A18 /* ShushanAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46598064B5EC710B5F635799 /* ShushanAccountView.swift */; };
 		34F4562394A6E66DAEFA9AE1 /* FeatureCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D97378B55AE4C9E465960F /* FeatureCatalog.swift */; };
 		3A25CFEBEB800C2D925A1E75 /* SQLiteLibraryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3C0BBB1E21CD28AA819B0C /* SQLiteLibraryRepository.swift */; };
 		3B91DAFABDCC408961816DBE /* ReadingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 396383B77E22A0BE67940C65 /* ReadingHistoryView.swift */; };
+		43D4380E1111C45966AE5B3B /* PerformanceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701A9EEBDC3E68AA1D9F5536 /* PerformanceFixtures.swift */; };
 		46FDFEE0283EEDCCE9915546 /* ProductionLibraryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B095C4655905A7745628F3 /* ProductionLibraryStoreTests.swift */; };
 		48672C1B90E4CA45F5191947 /* ReaderPageFurniture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FA9DA18323FF6E8072A1FC /* ReaderPageFurniture.swift */; };
 		4A880317FC18D716B1034032 /* ThemeAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614D39F671D2FE7E3156C66A /* ThemeAssets.swift */; };
+		4B3ECA92C04C8D4912E2A1B9 /* performance-budget.json in Resources */ = {isa = PBXBuildFile; fileRef = 634B86415520603BBC9770FA /* performance-budget.json */; };
 		4E21693690676737CBD958D2 /* ProductionLibraryPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8998AB6E4362B4AC636B5852 /* ProductionLibraryPersistence.swift */; };
 		4EE406EB41072D55175CB10E /* ContentContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5952415F036408B24AB3331 /* ContentContracts.swift */; };
 		50AB09F7DAEE1A284BCA2426 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 1199E86BF8F6ADFEBB4ACD38 /* GRDB */; };
+		5CDDA9CB46EFC21EC6148269 /* SourceFeasibilityValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6DB2B8C0684EB07BA9753D /* SourceFeasibilityValidationTests.swift */; };
 		6828FC5D2BCAC22DA475D116 /* YueshanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1EF88112E9BCF2AA554A011 /* YueshanApp.swift */; };
+		682BFE220AF040D818A5208F /* ReaderTestFont.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ED4CF2F462D0FA6E8B985E32 /* ReaderTestFont.ttf */; };
 		68F12CE4F5958038634636A6 /* ThemeAssetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C7025F652BA826481690CB /* ThemeAssetsTests.swift */; };
 		690A8F41787DF45A129B8A35 /* ReaderPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 465462DCD26C9B2A0C186A8A /* ReaderPreferencesTests.swift */; };
 		7ADDA503928438F928A22F99 /* ReaderPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70047BBE5AD3E2E404A0980 /* ReaderPreferences.swift */; };
@@ -47,6 +53,7 @@
 		94F51BAFC94660F1F6338164 /* ShushanBookSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB190B3FBCAE05A66EE8F695 /* ShushanBookSource.swift */; };
 		99890759F83C4CCFD5ED14AF /* SmartImportFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7978B449D3E354BBEB6DAC84 /* SmartImportFlowTests.swift */; };
 		9A74CD16D9989025CD51B5BB /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9B7EE3953D8B799E5165D /* Components.swift */; };
+		9C08A8F6ACF95BA36B3EA268 /* LaunchBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB71C2D6D945E26C95C3E63 /* LaunchBaselineTests.swift */; };
 		9F07EC97E4C82487A255F572 /* ReaderTestFont.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ED4CF2F462D0FA6E8B985E32 /* ReaderTestFont.ttf */; };
 		A3ACB56F20B35859BCD5657C /* BookImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0943680C44CFFFCDFA095654 /* BookImportTests.swift */; };
 		A5884A70DF4CAEC5EC064994 /* ReaderEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027556BC0A07BD3D56FDC99D /* ReaderEngine.swift */; };
@@ -55,6 +62,7 @@
 		ADCD1FAECE022877649D43B0 /* FeatureDemoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30F39F13DDD0F6A1EF89B45 /* FeatureDemoTests.swift */; };
 		B0CFAD6BCD7104459C37394F /* LibrarySaveLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD17F5A745418D5B16C735E4 /* LibrarySaveLifecycle.swift */; };
 		BCC741C9043AFBA11339E6C2 /* ThemeLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26C7442D4A2C34BBD786686D /* ThemeLibraryView.swift */; };
+		C0DAC761363C671439EC9411 /* SourceFeasibilityValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3116934D537F699720A90F1B /* SourceFeasibilityValidation.swift */; };
 		C2A3754BF0C3196A2BD869BE /* ToolboxStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA60E5BC38F13DE9434A5251 /* ToolboxStoreTests.swift */; };
 		C2F5F072BA111E096F35530B /* ToolboxStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E07CB667F56C0A67C6EBC37 /* ToolboxStore.swift */; };
 		C38A4DDA0C3C5CE7BA98986F /* ThemeAssetsFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B07F192161553465B228444B /* ThemeAssetsFlowTests.swift */; };
@@ -66,6 +74,8 @@
 		CE80DDA60474E7B98A3803E4 /* SmartImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA7872CF25BF18BAC64CF1A /* SmartImportView.swift */; };
 		D5EBD59DB3540BD799DA5BE6 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C22BB76D713085FCECC0AB1 /* AppEnvironment.swift */; };
 		DC966159F0E132E8BF0CB24E /* ToolboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 953E753AFE9572C59BCF83CD /* ToolboxView.swift */; };
+		DECB9ADE30CB1107DB4B0E13 /* PerformanceFixtureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C129B3AB37E38CDF673C7A9 /* PerformanceFixtureTests.swift */; };
+		DF12D00FAA4EB92298FCA942 /* performance-budget.json in Resources */ = {isa = PBXBuildFile; fileRef = 634B86415520603BBC9770FA /* performance-budget.json */; };
 		E06C15D836B67C98B2BFBB65 /* NavigationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9D505E776887B5E27F88438 /* NavigationSettingsView.swift */; };
 		E25CF97C907D15D49E4AF8FD /* ShushanBookSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6561D8C4B99EAC563745EC1C /* ShushanBookSourceTests.swift */; };
 		E29AD2AE1AFB78611852B4CF /* ReadingPreferencesFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 212395DC60F102FEFF5DC879 /* ReadingPreferencesFlowTests.swift */; };
@@ -97,6 +107,20 @@
 			remoteGlobalIDString = 6982B206C6A0D6BF06406E0F;
 			remoteInfo = Yueshan;
 		};
+		5C082AC1CB5F5DF77E2B6445 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 65328ECE03CD12305027B8A7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6982B206C6A0D6BF06406E0F;
+			remoteInfo = Yueshan;
+		};
+		9EE1D959C492401FEF37555B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 65328ECE03CD12305027B8A7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6982B206C6A0D6BF06406E0F;
+			remoteInfo = Yueshan;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -104,14 +128,18 @@
 		0943680C44CFFFCDFA095654 /* BookImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookImportTests.swift; sourceTree = "<group>"; };
 		096FEB33678F7EF17D5A6BDB /* ReadingPageEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPageEditors.swift; sourceTree = "<group>"; };
 		098509FC532C9CCE9FB4BF40 /* ThemeStylePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeStylePreview.swift; sourceTree = "<group>"; };
+		0CEEAF89AD144B539660BF2F /* YueshanPerformanceTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = YueshanPerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		106E74C81D6D05AF006FCD60 /* NavigationStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationStoreTests.swift; sourceTree = "<group>"; };
 		151E092F112F6FB8DE8D6E67 /* Yueshan.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Yueshan.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		157DB7F47871493B1C150FCE /* ShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
+		1AB71C2D6D945E26C95C3E63 /* LaunchBaselineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchBaselineTests.swift; sourceTree = "<group>"; };
 		212395DC60F102FEFF5DC879 /* ReadingPreferencesFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPreferencesFlowTests.swift; sourceTree = "<group>"; };
+		227A9B43710387B6F0931973 /* YueshanPerformanceUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = YueshanPerformanceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		247515322E1A7895E1DCB1A2 /* ProductionLibraryPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionLibraryPersistenceTests.swift; sourceTree = "<group>"; };
 		26C7442D4A2C34BBD786686D /* ThemeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeLibraryView.swift; sourceTree = "<group>"; };
 		2BB825F2DC4C16BB99E6D89B /* ReaderTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTextView.swift; sourceTree = "<group>"; };
 		2C4FA0B42C90AA93F7A9D202 /* AppEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironmentTests.swift; sourceTree = "<group>"; };
+		3116934D537F699720A90F1B /* SourceFeasibilityValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFeasibilityValidation.swift; sourceTree = "<group>"; };
 		396383B77E22A0BE67940C65 /* ReadingHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingHistoryView.swift; sourceTree = "<group>"; };
 		3F3C0BBB1E21CD28AA819B0C /* SQLiteLibraryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteLibraryRepository.swift; sourceTree = "<group>"; };
 		3F6764EC735861B92FAF4920 /* FeatureFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureFlowTests.swift; sourceTree = "<group>"; };
@@ -124,8 +152,10 @@
 		5B86CE19E7DC0E86FFE45396 /* FileChapterRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChapterRepositoryTests.swift; sourceTree = "<group>"; };
 		5DA7872CF25BF18BAC64CF1A /* SmartImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartImportView.swift; sourceTree = "<group>"; };
 		614D39F671D2FE7E3156C66A /* ThemeAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeAssets.swift; sourceTree = "<group>"; };
+		634B86415520603BBC9770FA /* performance-budget.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "performance-budget.json"; sourceTree = "<group>"; };
 		6561D8C4B99EAC563745EC1C /* ShushanBookSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShushanBookSourceTests.swift; sourceTree = "<group>"; };
 		6B641452C1C28186DE2ECB09 /* ShushanAccount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShushanAccount.swift; sourceTree = "<group>"; };
+		701A9EEBDC3E68AA1D9F5536 /* PerformanceFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceFixtures.swift; sourceTree = "<group>"; };
 		72B095C4655905A7745628F3 /* ProductionLibraryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionLibraryStoreTests.swift; sourceTree = "<group>"; };
 		735EC622C2A99D6821698028 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		738DB7F443E1ADEBD189D4CB /* DemoPreviews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPreviews.swift; sourceTree = "<group>"; };
@@ -135,6 +165,8 @@
 		8721EE69DB294D9C5576C574 /* FeatureDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureDemoView.swift; sourceTree = "<group>"; };
 		892B85026BC6D1C1BC169E12 /* ProductionLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionLaunchTests.swift; sourceTree = "<group>"; };
 		8998AB6E4362B4AC636B5852 /* ProductionLibraryPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionLibraryPersistence.swift; sourceTree = "<group>"; };
+		8C129B3AB37E38CDF673C7A9 /* PerformanceFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceFixtureTests.swift; sourceTree = "<group>"; };
+		8DE9990045A4184E32A6E7E9 /* PerformanceBaselineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceBaselineTests.swift; sourceTree = "<group>"; };
 		8EA278C237A7EFCF44FB259A /* ReadingAppearanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingAppearanceView.swift; sourceTree = "<group>"; };
 		92D97378B55AE4C9E465960F /* FeatureCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureCatalog.swift; sourceTree = "<group>"; };
 		953E753AFE9572C59BCF83CD /* ToolboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolboxView.swift; sourceTree = "<group>"; };
@@ -160,6 +192,7 @@
 		D7199C143BF447E6184133C4 /* ReadingContentPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingContentPreferences.swift; sourceTree = "<group>"; };
 		D72A5825E5409A4D08860740 /* FeatureDemoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureDemoStore.swift; sourceTree = "<group>"; };
 		D9E9B7EE3953D8B799E5165D /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		DA6DB2B8C0684EB07BA9753D /* SourceFeasibilityValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFeasibilityValidationTests.swift; sourceTree = "<group>"; };
 		DF3A175E612EDEEB0E492CF3 /* ThemeReadingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeReadingBridge.swift; sourceTree = "<group>"; };
 		E028908BB149ACE0D9068E09 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		E1EF88112E9BCF2AA554A011 /* YueshanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YueshanApp.swift; sourceTree = "<group>"; };
@@ -194,10 +227,29 @@
 			isa = PBXGroup;
 			children = (
 				7F0F4C3ECC61A12B3627F6A1 /* Yueshan */,
+				7E9D225C5345CA5815AA5E20 /* YueshanPerformanceTests */,
+				3542319F15C0452051D42B9A /* YueshanPerformanceUITests */,
 				C0FD3E694346FFCF7990B38A /* YueshanTests */,
+				AA7E22A823FA2568E5709E09 /* YueshanTestSupport */,
 				A9874440E9D383B0743FA68D /* YueshanUITests */,
 				FE8977DF748FD4075F8B52A6 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		3542319F15C0452051D42B9A /* YueshanPerformanceUITests */ = {
+			isa = PBXGroup;
+			children = (
+				1AB71C2D6D945E26C95C3E63 /* LaunchBaselineTests.swift */,
+			);
+			path = YueshanPerformanceUITests;
+			sourceTree = "<group>";
+		};
+		3DCC53B7879A2310E3D5520C /* Diagnostics */ = {
+			isa = PBXGroup;
+			children = (
+				3116934D537F699720A90F1B /* SourceFeasibilityValidation.swift */,
+			);
+			path = Diagnostics;
 			sourceTree = "<group>";
 		};
 		4A77447F5C308C0900CAC317 /* Views */ = {
@@ -260,12 +312,21 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		7E9D225C5345CA5815AA5E20 /* YueshanPerformanceTests */ = {
+			isa = PBXGroup;
+			children = (
+				8DE9990045A4184E32A6E7E9 /* PerformanceBaselineTests.swift */,
+			);
+			path = YueshanPerformanceTests;
+			sourceTree = "<group>";
+		};
 		7F0F4C3ECC61A12B3627F6A1 /* Yueshan */ = {
 			isa = PBXGroup;
 			children = (
 				735EC622C2A99D6821698028 /* Info.plist */,
 				E1EF88112E9BCF2AA554A011 /* YueshanApp.swift */,
 				80FF93665461BCB824F47A30 /* Demo */,
+				3DCC53B7879A2310E3D5520C /* Diagnostics */,
 				6046D651312A268A180470F1 /* Models */,
 				773ED8A4BD344425926D1A22 /* Resources */,
 				4A77447F5C308C0900CAC317 /* Views */,
@@ -306,6 +367,15 @@
 			path = YueshanUITests;
 			sourceTree = "<group>";
 		};
+		AA7E22A823FA2568E5709E09 /* YueshanTestSupport */ = {
+			isa = PBXGroup;
+			children = (
+				634B86415520603BBC9770FA /* performance-budget.json */,
+				701A9EEBDC3E68AA1D9F5536 /* PerformanceFixtures.swift */,
+			);
+			path = YueshanTestSupport;
+			sourceTree = "<group>";
+		};
 		C0FD3E694346FFCF7990B38A /* YueshanTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -316,6 +386,7 @@
 				5B86CE19E7DC0E86FFE45396 /* FileChapterRepositoryTests.swift */,
 				C401D3B8BABD9D2346932CBA /* LibraryStoreTests.swift */,
 				106E74C81D6D05AF006FCD60 /* NavigationStoreTests.swift */,
+				8C129B3AB37E38CDF673C7A9 /* PerformanceFixtureTests.swift */,
 				247515322E1A7895E1DCB1A2 /* ProductionLibraryPersistenceTests.swift */,
 				72B095C4655905A7745628F3 /* ProductionLibraryStoreTests.swift */,
 				4D5D98B55E3E7B7E04A78C8D /* ReaderEngineTests.swift */,
@@ -326,6 +397,7 @@
 				A8999BE2109E84463B30E668 /* ReadingPreferencePresentationTests.swift */,
 				F1AEC098A00809288FBBADEA /* ShushanAccountTests.swift */,
 				6561D8C4B99EAC563745EC1C /* ShushanBookSourceTests.swift */,
+				DA6DB2B8C0684EB07BA9753D /* SourceFeasibilityValidationTests.swift */,
 				D5CDC4D351907709DC44CF9A /* SQLiteLibraryRepositoryTests.swift */,
 				B0C7025F652BA826481690CB /* ThemeAssetsTests.swift */,
 				EA60E5BC38F13DE9434A5251 /* ToolboxStoreTests.swift */,
@@ -338,6 +410,8 @@
 			isa = PBXGroup;
 			children = (
 				151E092F112F6FB8DE8D6E67 /* Yueshan.app */,
+				0CEEAF89AD144B539660BF2F /* YueshanPerformanceTests.xctest */,
+				227A9B43710387B6F0931973 /* YueshanPerformanceUITests.xctest */,
 				50ACA04140C18EF9CF50FB5F /* YueshanTests.xctest */,
 				7B7D68AC6B44F2527944461D /* YueshanUITests.xctest */,
 			);
@@ -363,6 +437,24 @@
 			);
 			productName = YueshanUITests;
 			productReference = 7B7D68AC6B44F2527944461D /* YueshanUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		2A616370E058DD37F0EB60E4 /* YueshanPerformanceUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 70313CCA4DE42FF93156F4AB /* Build configuration list for PBXNativeTarget "YueshanPerformanceUITests" */;
+			buildPhases = (
+				4F24FBC2EA340A6412E7A7F5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5567D83937E933C39CB41C7D /* PBXTargetDependency */,
+			);
+			name = YueshanPerformanceUITests;
+			packageProductDependencies = (
+			);
+			productName = YueshanPerformanceUITests;
+			productReference = 227A9B43710387B6F0931973 /* YueshanPerformanceUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		309B901A2EDEA372058CC879 /* YueshanTests */ = {
@@ -404,6 +496,25 @@
 			productReference = 151E092F112F6FB8DE8D6E67 /* Yueshan.app */;
 			productType = "com.apple.product-type.application";
 		};
+		7552774E7BDC2997B7A62278 /* YueshanPerformanceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CDF95D0A30AF2B08D844C0FF /* Build configuration list for PBXNativeTarget "YueshanPerformanceTests" */;
+			buildPhases = (
+				D52CDD27C3ABBD5E8C72D246 /* Sources */,
+				C95208935C516F1DB2015C26 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F62CDA1DEC6D2873B0DCBEAC /* PBXTargetDependency */,
+			);
+			name = YueshanPerformanceTests;
+			packageProductDependencies = (
+			);
+			productName = YueshanPerformanceTests;
+			productReference = 0CEEAF89AD144B539660BF2F /* YueshanPerformanceTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -418,11 +529,20 @@
 						ProvisioningStyle = Automatic;
 						TestTargetID = 6982B206C6A0D6BF06406E0F;
 					};
+					2A616370E058DD37F0EB60E4 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 6982B206C6A0D6BF06406E0F;
+					};
 					309B901A2EDEA372058CC879 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					6982B206C6A0D6BF06406E0F = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					7552774E7BDC2997B7A62278 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
@@ -448,6 +568,8 @@
 				6982B206C6A0D6BF06406E0F /* Yueshan */,
 				309B901A2EDEA372058CC879 /* YueshanTests */,
 				23063E7EF791E7B4A1984626 /* YueshanUITests */,
+				7552774E7BDC2997B7A62278 /* YueshanPerformanceTests */,
+				2A616370E058DD37F0EB60E4 /* YueshanPerformanceUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -458,6 +580,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9F07EC97E4C82487A255F572 /* ReaderTestFont.ttf in Resources */,
+				4B3ECA92C04C8D4912E2A1B9 /* performance-budget.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -466,6 +589,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				7C872E4094E6A69A900602E7 /* library.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C95208935C516F1DB2015C26 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				682BFE220AF040D818A5208F /* ReaderTestFont.ttf in Resources */,
+				DF12D00FAA4EB92298FCA942 /* performance-budget.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -512,6 +644,7 @@
 				317D31DD470B80A8AA812A18 /* ShushanAccountView.swift in Sources */,
 				94F51BAFC94660F1F6338164 /* ShushanBookSource.swift in Sources */,
 				CE80DDA60474E7B98A3803E4 /* SmartImportView.swift in Sources */,
+				C0DAC761363C671439EC9411 /* SourceFeasibilityValidation.swift in Sources */,
 				4A880317FC18D716B1034032 /* ThemeAssets.swift in Sources */,
 				BCC741C9043AFBA11339E6C2 /* ThemeLibraryView.swift in Sources */,
 				F49764FD6A09C5AD85AC7B65 /* ThemeReadingBridge.swift in Sources */,
@@ -536,6 +669,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F24FBC2EA340A6412E7A7F5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9C08A8F6ACF95BA36B3EA268 /* LaunchBaselineTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D52CDD27C3ABBD5E8C72D246 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2E7F084814C0EC7B99F3A5DA /* PerformanceBaselineTests.swift in Sources */,
+				2EA01AC98F340D2A22B81F54 /* PerformanceFixtures.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D92B0BA200EA857B1A5782B3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -547,6 +697,8 @@
 				1D60CC9F95F5863AF5EC292D /* FileChapterRepositoryTests.swift in Sources */,
 				F7F8BAC539D8E0EB142DE063 /* LibraryStoreTests.swift in Sources */,
 				20D769F622E25B37693ABA0E /* NavigationStoreTests.swift in Sources */,
+				DECB9ADE30CB1107DB4B0E13 /* PerformanceFixtureTests.swift in Sources */,
+				43D4380E1111C45966AE5B3B /* PerformanceFixtures.swift in Sources */,
 				80E0E9E5C71A942DA05F3D25 /* ProductionLibraryPersistenceTests.swift in Sources */,
 				46FDFEE0283EEDCCE9915546 /* ProductionLibraryStoreTests.swift in Sources */,
 				C400F65095FB008AFF7719BE /* ReaderEngineTests.swift in Sources */,
@@ -558,6 +710,7 @@
 				293A23D605E0D4F27FBA321D /* SQLiteLibraryRepositoryTests.swift in Sources */,
 				CC5B8A377026FACA17288562 /* ShushanAccountTests.swift in Sources */,
 				E25CF97C907D15D49E4AF8FD /* ShushanBookSourceTests.swift in Sources */,
+				5CDDA9CB46EFC21EC6148269 /* SourceFeasibilityValidationTests.swift in Sources */,
 				68F12CE4F5958038634636A6 /* ThemeAssetsTests.swift in Sources */,
 				C2A3754BF0C3196A2BD869BE /* ToolboxStoreTests.swift in Sources */,
 			);
@@ -571,10 +724,20 @@
 			target = 6982B206C6A0D6BF06406E0F /* Yueshan */;
 			targetProxy = 2DBE3BFC6AD28F06074B844D /* PBXContainerItemProxy */;
 		};
+		5567D83937E933C39CB41C7D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6982B206C6A0D6BF06406E0F /* Yueshan */;
+			targetProxy = 5C082AC1CB5F5DF77E2B6445 /* PBXContainerItemProxy */;
+		};
 		60841B8E50556582FBBD0E99 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 6982B206C6A0D6BF06406E0F /* Yueshan */;
 			targetProxy = 090FFA941F55B863F2277EA5 /* PBXContainerItemProxy */;
+		};
+		F62CDA1DEC6D2873B0DCBEAC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6982B206C6A0D6BF06406E0F /* Yueshan */;
+			targetProxy = 9EE1D959C492401FEF37555B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -657,6 +820,23 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.reader.demo;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		36328E5DF91A5EE0B217DC0C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.YueshanPerformanceUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Yueshan;
 			};
 			name = Debug;
 		};
@@ -777,6 +957,23 @@
 			};
 			name = Release;
 		};
+		8524AF64C8028837FC668C58 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.YueshanPerformanceTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Yueshan.app/Yueshan";
+			};
+			name = Debug;
+		};
 		A0805405E377B256BE1CF511 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -816,6 +1013,40 @@
 			};
 			name = Release;
 		};
+		C8A39CE5BC20049B1488000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.YueshanPerformanceTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Yueshan.app/Yueshan";
+			};
+			name = Release;
+		};
+		FDDA4F0DADB6C29862FCD30D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yueshan.YueshanPerformanceUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Yueshan;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -837,6 +1068,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		70313CCA4DE42FF93156F4AB /* Build configuration list for PBXNativeTarget "YueshanPerformanceUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36328E5DF91A5EE0B217DC0C /* Debug */,
+				FDDA4F0DADB6C29862FCD30D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		A5EB6B083D5EC08DD393C12A /* Build configuration list for PBXNativeTarget "YueshanUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -851,6 +1091,15 @@
 			buildConfigurations = (
 				1A8509358959077B697CD3FB /* Debug */,
 				ACEC92913886CBE1F29F67D2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CDF95D0A30AF2B08D844C0FF /* Build configuration list for PBXNativeTarget "YueshanPerformanceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8524AF64C8028837FC668C58 /* Debug */,
+				C8A39CE5BC20049B1488000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

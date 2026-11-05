@@ -47,7 +47,7 @@ struct ShushanBookSource: BookSource {
         guard let data = response["data"] as? [[String: Any]] else { throw ContentFailure.invalidResponse }
         var seen = Set<String>()
         return try data.enumerated().map { order, row in
-            guard let title = Self.text(row["name"]), !title.isEmpty else { throw ContentFailure.invalidResponse }
+            guard let title = Self.text(row["title"]) ?? Self.text(row["name"]), !title.isEmpty else { throw ContentFailure.invalidResponse }
             let isVolume = row["isVolume"] as? Bool == true
             let nativeID = Self.text(row["cid"]) ?? Self.text(row["url"]) ?? (isVolume ? "volume-\(order)-\(title)" : "")
             guard !nativeID.isEmpty else { throw ContentFailure.invalidResponse }
@@ -126,7 +126,7 @@ struct ShushanBookSource: BookSource {
         if response.statusCode == 401 || response.statusCode == 403 { throw ContentFailure.authenticationRequired }
         guard (200..<300).contains(response.statusCode), data.count <= 20 * 1024 * 1024,
               let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw ContentFailure.invalidResponse }
-        if let error = object["error"] as? String {
+        if let error = object["error"] as? String, !error.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw error.contains("登录") || error.contains("凭证") ? ContentFailure.authenticationRequired : ContentFailure.unavailable
         }
         if let code = object["code"] as? Int, code != 200 {

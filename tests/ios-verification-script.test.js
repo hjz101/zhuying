@@ -52,6 +52,14 @@ test('invalid iOS verification mode stops before running any build', () => {
   assert.match(result.stderr, /Usage:/);
 });
 
+test('performance verification selects its independent scheme without filtering out baseline targets', () => {
+  const result = invoke('performance');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.args[result.args.indexOf('-scheme') + 1], 'Yueshan Performance');
+  assert.ok(!result.args.some(arg => arg.startsWith('-only-testing:')));
+  assert.equal(result.args.at(-1), 'test');
+});
+
 test('npm test only discovers the active project tests and excludes saved Demo copies', () => {
   const directory = mkdtempSync(join(tmpdir(), 'yueshan-test-discovery-'));
   try {

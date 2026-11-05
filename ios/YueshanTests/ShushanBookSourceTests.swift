@@ -76,6 +76,17 @@ final class ShushanBookSourceTests: XCTestCase {
             catch { XCTAssertEqual(error as? ContentFailure, .authenticationRequired) }
         }
     }
+    func testEmptyErrorFieldIsSuccessAndCatalogAcceptsReferenceTitleField() async throws {
+        let transport = ShushanFixtureTransport(responses: [
+            "/search": try json(["data": [searchBook], "error": ""]),
+            "/catalog": try json(["data": [["title": "第一章 实际标题字段", "cid": "c1"]], "error": "  "])
+        ])
+        let source = ShushanBookSource(credential: try credential(), transport: transport)
+        let page = try await source.search(query: "测试", page: 1)
+        let book = try XCTUnwrap(page.books.first)
+        let catalog = try await source.chapters(for: book)
+        XCTAssertEqual(catalog.map(\.title), ["第一章 实际标题字段"])
+    }
     func testRestrictedChapterNeverSendsContentRequest() async throws {
         let (source, transport) = try setup()
         let page = try await source.search(query: "测试", page: 1)

@@ -40,6 +40,7 @@ targets:
     platform: iOS
     sources:
       - path: YueshanTests
+      - path: YueshanTestSupport
     dependencies:
       - target: Yueshan
     settings:
@@ -55,7 +56,37 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  YueshanPerformanceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: YueshanPerformanceTests
+      - path: YueshanTestSupport
+      - path: YueshanTests/Fixtures/ReaderTestFont.ttf
+    dependencies:
+      - target: Yueshan
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  YueshanPerformanceUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: YueshanPerformanceUITests
+    dependencies:
+      - target: Yueshan
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
+  Yueshan Performance:
+    build:
+      targets:
+        Yueshan: all
+    test:
+      targets:
+        - YueshanPerformanceTests
+        - YueshanPerformanceUITests
   Yueshan Production:
     build:
       targets:

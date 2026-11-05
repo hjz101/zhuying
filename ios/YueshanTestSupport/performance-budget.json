@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "frozenAt": "2026-11-05T22:16:00+08:00",
+  "profile": "simulator-debug-m4-ios26.5-v1",
+  "samples": 5,
+  "storageSamples": 3,
+  "scales": {
+    "shelfBooks": 1000,
+    "catalogChapters": 10000,
+    "longBookChapters": 1200,
+    "longBookParagraphsPerChapter": 8,
+    "longBookParagraphUTF16": 160,
+    "longChapterParagraphs": 360,
+    "longChapterParagraphUTF16": 280
+  },
+  "limits": {
+    "library.import.ms": 15000,
+    "library.open.ms": 3000,
+    "shelf.sort.ms": 150,
+    "catalog.load.ms": 250,
+    "chapter.load.ms": 100,
+    "reader.compose.ms": 200,
+    "reader.paginate.ms": 2000,
+    "reader.reflow.ms": 2000,
+    "process.peak-rss.mib": 256,
+    "app.empty-launch.ms": 3000
+  }
+}

@@ -99,7 +99,14 @@ struct RootView: View {
                 }
             }
         }
-        .task { await store.bootstrapProductionIfNeeded() }
+        .task {
+            await store.bootstrapProductionIfNeeded()
+            #if DEBUG
+            if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-step-zero-source") {
+                try? await SourceFeasibilityValidation.runDevelopmentProbe(credential: shushan.credential)
+            }
+            #endif
+        }
         .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store) } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.saveBeforeSuspending() } } }
         .onChange(of: store.reader?.id) { _, id in if id == nil { Task { await store.flushPendingWrites() } } }

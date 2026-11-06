@@ -37,7 +37,7 @@ struct ProductionNetworkView: View {
             .onDisappear { operation?.cancel() }
     }
     private func load() { guard let origin else { return }; do { profile = try library.networkProfiles.profile(sourceID:sourceID,origin:origin); message = nil } catch { message = "未加载配置，请恢复系统网络后重试。" } }
-    private func save() { guard let origin else { return }; do { try library.networkProfiles.save(profile,sourceID:sourceID,origin:origin); message = "此书源配置已保存。" } catch { message = error.localizedDescription } }
+    private func save() { guard let origin else { return }; do { if profile.mode != .system,try library.backendProfiles.profile(sourceID:sourceID,origin:origin).enabled { throw RemoteBackendError.conflictingRoute }; try library.networkProfiles.save(profile,sourceID:sourceID,origin:origin); message = "此书源配置已保存。" } catch { message = error.localizedDescription } }
     private func test() {
         guard let origin else { return }; let current = profile
         busy = true; message = nil

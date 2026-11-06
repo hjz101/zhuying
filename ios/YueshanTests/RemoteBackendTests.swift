@@ -70,4 +70,16 @@ final class RemoteBackendTests: XCTestCase {
         }
     }
 
+    @MainActor func testBackendAndSourceNetworkRoutingAreExclusiveAndSystemResetRestoresForwarding() throws {
+        let domain = UUID().uuidString,defaults = UserDefaults(suiteName:domain)!,vault = BackendTestVault(); defer { defaults.removePersistentDomain(forName:domain) }
+        let library = LibraryStore(books:[],defaults:defaults,seedDemoData:false),source = DemoSource(id:"route-test",name:"原创",detail:"",url:"https://source.test"),origin = URL(string:"https://source.test")!
+        library.backendProfiles = RemoteBackendProfiles(defaults:defaults,vault:vault)
+        try library.backendProfiles.save(.init(enabled:true,endpoint:"https://gateway.test"),key:"synthetic-backend-token",sourceID:source.id,origin:origin)
+        try library.networkProfiles.save(.init(mode:.fixedIP,server:"192.0.2.1"),sourceID:source.id,origin:origin)
+        XCTAssertThrowsError(try library.requestTransport(for:source)) { XCTAssertEqual($0 as? RemoteBackendError,.conflictingRoute) }
+        library.networkProfiles.reset(sourceID:source.id,origin:origin); XCTAssertTrue(try library.requestTransport(for:source) is RemoteBackendTransport)
+        try library.backendProfiles.save(.init(enabled:false),key:"",sourceID:source.id,origin:origin)
+        XCTAssertTrue(try library.requestTransport(for:source) is SourceNetworkTransport)
+    }
+
 }

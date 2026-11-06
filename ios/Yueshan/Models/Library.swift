@@ -738,6 +738,7 @@ final class LibraryStore: ObservableObject {
         }
         #endif
         let source = sources.first { $0.id == "shushan" && $0.enabled && $0.kind == .novel }
+        var configuredFailure: ContentFailure = source == nil ? .sourceDisabled : .authenticationRequired
         var providers: [any BookSource] = sources.filter { $0.enabled && $0.kind == .novel && $0.id != "shushan" }.compactMap { source -> (any BookSource)? in
             guard let rules = try? SourcePackages.rules(source) else { return nil }
             guard let transport = try? sourceTransport(for:source,maximumBytes:rules.extraction == nil ? 4 * 1024 * 1024 : 2 * 1024 * 1024) else { return nil }
@@ -746,8 +747,9 @@ final class LibraryStore: ObservableObject {
         }
         if let source, let credential, (try? ShushanClient.host(source.url)) == credential.host, !expired {
             if let transport = try? sourceTransport(for:source) { providers.append(ShushanBookSource(credential:credential,transport:ResilientSourceTransport(base:transport))) }
+            else { configuredFailure = .sourceDisabled }
         }
-        await service.configure(sources: providers, failure: source == nil ? .sourceDisabled : .authenticationRequired)
+        await service.configure(sources:providers,failure:configuredFailure)
         await service.prepareDownloads()
         onlineRevision += 1
     }

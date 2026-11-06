@@ -28,8 +28,11 @@ final class ReadingSessionController: ObservableObject {
         operation?.cancel(); generation += 1
         let revision = generation
         pending = request; phase = .loading
-        guard request.chapter.bookID == request.bookID, request.chapter.access == .readable else {
+        guard request.chapter.bookID == request.bookID else {
             phase = .failed(ContentFailure.missingChapter.localizedDescription); operation = nil; return false
+        }
+        guard request.chapter.access == .readable else {
+            phase = .failed(ContentFailure.restricted.localizedDescription); operation = nil; return false
         }
         let repository = repository
         let task = Task { try await repository.document(chapterID: request.chapter.id) }

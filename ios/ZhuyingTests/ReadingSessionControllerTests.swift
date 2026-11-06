@@ -63,4 +63,11 @@ private actor ControlledChapterRepository: ChapterContentRepository {
         await repository.complete("a", result: .success(.init(chapterID: "a", paragraphs: ["完全不同的内容，无法推断位置。"])))
         let accepted = await uncertain.value; XCTAssertFalse(accepted); XCTAssertEqual(session.confirmed, confirmed)
     }
+    func testRestrictedChapterShowsAccessFailureWithoutRequestingAMissingDocument() async {
+        let repository = ControlledChapterRepository(), session = ReadingSessionController(repository: repository)
+        let chapter = ChapterRecord(id: "paid", bookID: "b", nativeChapterID: "paid", title: "受限章节", order: 0, access: .restricted)
+        let accepted = await session.load(.init(bookID: "b", chapter: chapter))
+        XCTAssertFalse(accepted); XCTAssertEqual(session.phase, .failed(ContentFailure.restricted.localizedDescription))
+        let requested = await repository.isWaiting(chapter.id); XCTAssertFalse(requested)
+    }
 }

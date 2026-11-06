@@ -21,6 +21,25 @@ struct NativeSourceRules: Codable, Equatable, Sendable {
 }
 
 enum SourcePackages {
+    /// Legacy readers also use bookSourceUrl as an opaque source identifier.
+    /// Only runnable adapters require an HTTPS origin; retaining a legacy ID
+    /// must not turn it into a network origin or execute its imported scripts.
+    private static func identity(_ row: [String: Any]) -> String? {
+        guard let value = (row["bookSourceUrl"] ?? row["url"]) as? String else { return nil }
+        let address = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let host = try? ShushanClient.host(address) { return host.absoluteString }
+        guard row["adapter"] == nil,
+              ["searchUrl", "ruleSearch", "ruleToc", "ruleContent"].contains(where: { row[$0] != nil }),
+              !address.isEmpty, address.utf8.count <= 2048,
+              !address.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { return nil }
+        return address
+    }
+    static func hasValidIdentity(_ source: DemoSource) -> Bool {
+        if (try? ShushanClient.host(source.url)) != nil { return true }
+        guard source.id != "shushan", let data = source.configuration,
+              let row = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return false }
+        return identity(row) == source.url
+    }
     static func accountTitle(_ source: DemoSource,isDemo: Bool) -> String {
         if isDemo || source.id == "shushan" { return source.loginStatus.title }
         return (try? rules(source)) != nil ? "公开接口" : "规则未支持运行"
@@ -56,15 +75,15 @@ enum SourcePackages {
         else { throw ContentFailure.invalidResponse }
         guard rows.count <= 1000 else { throw SourceImportError.message("一次最多导入 1000 个书源。") }
         var result: [DemoSource] = [], invalid = 0, duplicates = 0
-        var seen = Set(existing.map { $0.url })
+        var seen = Set(existing.map { (try? ShushanClient.host($0.url).absoluteString) ?? $0.url.trimmingCharacters(in: .whitespacesAndNewlines) })
         for row in rows {
             guard let name = (row["bookSourceName"] ?? row["name"]) as? String,
-                  let address = (row["bookSourceUrl"] ?? row["url"]) as? String,
-                  let host = try? ShushanClient.host(address), !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 100 else { invalid += 1; continue }
-            guard seen.insert(host.absoluteString).inserted else { duplicates += 1; continue }
+                  let address = identity(row), !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 100 else { invalid += 1; continue }
+            guard seen.insert(address).inserted else { duplicates += 1; continue }
             let config = try JSONSerialization.data(withJSONObject: scrub(row), options: .sortedKeys)
             var source = DemoSource(id: row["adapter"] as? String == "shushan" && !existing.contains(where: { $0.id == "shushan" }) && !result.contains(where: { $0.id == "shushan" }) ? "shushan" : UUID().uuidString,
-                                    name: name, group: row["bookSourceGroup"] as? String ?? "导入书源", enabled: row["enabled"] as? Bool ?? true, detail: "已导入 · 规则未支持运行", url: host.absoluteString)
+                                    name: name.trimmingCharacters(in: .whitespacesAndNewlines), group: row["bookSourceGroup"] as? String ?? "导入书源", enabled: row["enabled"] as? Bool ?? true, detail: "已导入 · 规则未支持运行", url: address,
+                                    kind: (row["bookSourceType"] as? Int) == 2 ? .comic : (row["bookSourceType"] as? Int) == 1 ? .audio : .novel)
             source.configuration = config
             if source.id == "shushan" { source.detail = "固定原生适配器 · 需登录" }
             else if let rules = try? rules(source) { source.detail = rules.extraction == nil ? "原生 JSON v1 · 待实测" : "原生解析规则 v1 · 待实测" }

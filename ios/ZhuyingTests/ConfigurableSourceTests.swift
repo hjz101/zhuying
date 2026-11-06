@@ -35,6 +35,35 @@ private actor NativeJSONTransport: HTTPTransport {
 }
 
 final class ConfigurableSourceTests: XCTestCase {
+    func testLegacyOpaqueSourceIdentityImportsDeduplicatesAndRoundtripsWithoutRunningScripts() throws {
+        let row: [String: Any] = ["bookSourceName": "🍅大灰狼聚合5.9.30(vip完全版)", "bookSourceUrl": "大灰狼融合VIP5.0",
+                                  "bookSourceGroup": "大灰狼聚合", "bookSourceType": 0,
+                                  "searchUrl": "<js>source.getVariable()</js>", "ruleContent": ["content": "<js>java.ajax(result)</js>"],
+                                  "jsLib": "function originalRule() { return 'preserved'; }"]
+        let bytes = try JSONSerialization.data(withJSONObject: [row, row])
+        let preview = try SourcePackages.parse(bytes, existing: [])
+        XCTAssertEqual(preview.sources.count, 1); XCTAssertEqual(preview.invalid, 0); XCTAssertEqual(preview.duplicates, 1)
+        let source = try XCTUnwrap(preview.sources.first)
+        XCTAssertEqual(source.url, "大灰狼融合VIP5.0"); XCTAssertTrue(SourcePackages.hasValidIdentity(source))
+        XCTAssertThrowsError(try SourcePackages.rules(source)); XCTAssertThrowsError(try ConfigurableBookSource(source: source))
+        let restored = try XCTUnwrap(SourcePackages.parse(SourcePackages.export([source]), existing: []).sources.first)
+        let config = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(restored.configuration)) as? [String: Any])
+        XCTAssertEqual(config["jsLib"] as? String, row["jsLib"] as? String)
+        XCTAssertEqual(restored.url, source.url)
+        XCTAssertEqual(try SourcePackages.parse(bytes, existing: [source]).duplicates, 2)
+    }
+    func testOpaqueIdentitiesRequireLegacyRulesAndNeverBecomeRunnableOrigins() throws {
+        let rows: [[String: Any]] = [
+            ["bookSourceName": "原生源", "bookSourceUrl": "not-an-origin", "adapter": "json-v1", "searchUrl": "search"],
+            ["bookSourceName": "缺少规则", "bookSourceUrl": "not-an-origin"],
+            ["bookSourceName": "无效标识", "bookSourceUrl": "source\nidentifier", "ruleSearch": [:]],
+            ["bookSourceName": "旧规则路径", "bookSourceUrl": "https://legacy.test/api/reader", "ruleSearch": [:], "bookSourceType": 2]
+        ]
+        let preview = try SourcePackages.parse(JSONSerialization.data(withJSONObject: rows), existing: [])
+        XCTAssertEqual(preview.invalid, 3); XCTAssertEqual(preview.sources.count, 1)
+        XCTAssertEqual(preview.sources.first?.kind, .comic)
+        XCTAssertThrowsError(try SourcePackages.rules(XCTUnwrap(preview.sources.first)))
+    }
     private func source() throws -> DemoSource {
         let endpoints = try JSONSerialization.jsonObject(with: JSONEncoder().encode(NativeSourceRules.example))
         let row: [String:Any] = ["bookSourceName":"原创 JSON 源","bookSourceUrl":"https://reader.test","adapter":"json-v1","endpoints":endpoints]
@@ -107,5 +136,21 @@ final class ConfigurableSourceTests: XCTestCase {
         await reopened.bootstrapProductionIfNeeded()
         let restored = try XCTUnwrap(reopened.sources.first { $0.id == original.id })
         XCTAssertEqual(try SourcePackages.rules(restored),try SourcePackages.rules(original))
+    }
+    @MainActor func testLegacySourceIdentityPersistsAndBacksUpWithoutInventingNetworkHost() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString), domain = UUID().uuidString
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { try? FileManager.default.removeItem(at: root); defaults.removePersistentDomain(forName: domain) }
+        let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false, productionPersistence: try ProductionLibraryPersistence(directory: root))
+        await library.bootstrapProductionIfNeeded()
+        let preview = try SourcePackages.parse(Data("{\"bookSourceName\":\"旧版规则\",\"bookSourceUrl\":\"大灰狼融合VIP5.0\",\"ruleSearch\":{\"name\":\"$.name\"}}".utf8), existing: [])
+        let demo = FeatureDemoStore(seedDemoData: false); demo.connectReader(library)
+        XCTAssertEqual(demo.confirmSourceImport(preview), 1)
+        let saved = await library.flushPendingWrites(); XCTAssertTrue(saved)
+        let reopened = LibraryStore(books: [], defaults: defaults, seedDemoData: false, productionPersistence: try ProductionLibraryPersistence(directory: root))
+        await reopened.bootstrapProductionIfNeeded()
+        let restored = try XCTUnwrap(reopened.sources.first { $0.url == "大灰狼融合VIP5.0" })
+        XCTAssertTrue(SourcePackages.hasValidIdentity(restored)); XCTAssertThrowsError(try reopened.networkTransport(for: restored))
+        XCTAssertEqual(restored.configuration, preview.sources.first?.configuration)
     }
 }

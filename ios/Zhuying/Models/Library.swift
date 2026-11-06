@@ -481,8 +481,7 @@ final class LibraryStore: ObservableObject {
             storageMessage = "原阅读章节已不可用，历史记录已保留。请从作品详情的章节目录重新选章。"
             return
         }
-        let target = chapter ?? progress[book.id]?.chapter ?? 0
-        guard book.chapters.indices.contains(target) else { return }
+        guard let target = readableChapterIndex(for: book, startingAt: chapter ?? progress[book.id]?.chapter ?? 0) else { return }
         if usesProductionStorage { reader = ReaderSession(book: book, chapter: target, resume: chapter == nil); return }
         let paragraph = progress[book.id]?.chapter == target ? progress[book.id]?.paragraph ?? 0 : 0
         guard record(book, chapter: target, paragraph: paragraph, characterOffset: progress[book.id]?.chapter == target ? progress[book.id]?.characterOffset ?? 0 : 0) else { return }
@@ -633,6 +632,17 @@ final class LibraryStore: ObservableObject {
         return result
     }
     func chapterAccess(_ book: Book, chapter: Int) -> ChapterRecord.Access { chapterCatalogs[book.id]?[safe: chapter]?.access ?? .readable }
+    /// Volume headings are catalog separators, never documents. Restricted
+    /// chapters remain selectable here so the reader can explain their access.
+    func readableChapterIndex(for book: Book, startingAt index: Int, direction: Int = 1) -> Int? {
+        var candidate = index
+        let step = direction < 0 ? -1 : 1
+        while book.chapters.indices.contains(candidate) {
+            if chapterAccess(book, chapter: candidate) != .volume { return candidate }
+            candidate += step
+        }
+        return nil
+    }
     func remoteMetadata(_ id: String) -> LibraryBookRecord? { remoteBooks[id] }
     func chapterRecord(bookID: String,index: Int) -> ChapterRecord? { chapterCatalogs[bookID]?[safe:index] }
     func trackReading(_ bookID: String?, foreground: Bool? = nil, interacted: Bool = false,

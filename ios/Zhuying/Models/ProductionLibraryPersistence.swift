@@ -255,7 +255,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         try await records.savePreferences(values)
     }
     private static func validateSources(_ sources: [DemoSource]) throws {
-        guard Set(sources.map(\.id)).count == sources.count, sources.allSatisfy({ !$0.id.isEmpty && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (try? ShushanClient.host($0.url)) != nil }) else { throw ContentFailure.invalidResponse }
+        guard Set(sources.map(\.id)).count == sources.count, sources.allSatisfy({ !$0.id.isEmpty && !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && SourcePackages.hasValidIdentity($0) }) else { throw ContentFailure.invalidResponse }
     }
 
     func removeBookmark(id: String) async throws {

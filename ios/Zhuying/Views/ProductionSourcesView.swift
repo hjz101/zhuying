@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct ProductionSourceAccessView: View {
     var body: some View {
@@ -37,11 +38,23 @@ struct ProductionSourceImportView: View {
                     if method == "JSON 源码" { TextEditor(text: $json).frame(minHeight: 180).font(.system(size: 12, design: .monospaced)).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("sourcePackageJSON") }
                 }
                 if method == "JSON 文件" { Button("选择 JSON 文件") { choosing = true }.buttonStyle(PrimaryButtonStyle(filled: false)) }
+                if method != "URL" {
+                    Button("粘贴 JSON 导入", systemImage: "doc.on.clipboard") {
+                        guard let text = UIPasteboard.general.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                            message = "剪贴板中没有 JSON 文本。"; return
+                        }
+                        method = "JSON 源码"; json = text; load()
+                    }.buttonStyle(PrimaryButtonStyle(filled: false)).disabled(busy).accessibilityIdentifier("sourcePackagePaste")
+                }
                 Button("预览导入") { load() }.buttonStyle(PrimaryButtonStyle()).disabled(busy || method == "JSON 文件").accessibilityIdentifier("sourcePackagePreview")
                 if busy { ProgressView("正在读取书源文件"); Button("取消") { operation?.cancel(); busy = false } }
                 if let preview {
                     AppSettingsCard("导入预览", icon: "list.bullet") {
                         Text("可添加 \(preview.sources.count) · 重复 \(preview.duplicates) · 无效 \(preview.invalid)").font(.system(size: 12))
+                        if preview.sources.contains(where: { $0.id != "shushan" && (try? SourcePackages.rules($0)) == nil }) {
+                            Text("部分书源使用其他阅读器的脚本宿主：可以保存和导出原始规则，当前尚不能用于搜索或阅读。")
+                                .font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourcePackageCompatibility")
+                        }
                         ForEach(preview.sources) { source in VStack(alignment: .leading) { Text(source.name); Text(source.detail).font(.system(size: 11)).foregroundStyle(Palette.muted) } }
                     }
                     Button("确认导入") {
@@ -53,20 +66,18 @@ struct ProductionSourceImportView: View {
                 if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourcePackageMessage") }
             }.padding(22)
         }.appPageStyle().navigationTitle("书源导入导出").navigationBarTitleDisplayMode(.inline)
-            .fileImporter(isPresented: $choosing, allowedContentTypes: [.json]) { result in
+            .nativeFileImporter(isPresented: $choosing, allowedContentTypes: [.json]) { result in
                 if case .success(let url) = result {
                     operation?.cancel(); operation = Task {
                         do {
-                            let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-                            guard size <= 5 * 1024 * 1024 else { throw ContentFailure.invalidResponse }
-                            preview = try SourcePackages.parse(Data(contentsOf: url), existing: demo.sources)
+                            preview = nil; message = nil
+                            preview = try SourcePackages.parse(ImportedFileReader.read(url, maximumBytes: 5 * 1024 * 1024), existing: demo.sources)
                         } catch { if !Task.isCancelled { message = error.localizedDescription } }
                     }
-                }
+                } else if case .failure(let error) = result, (error as NSError).code != CocoaError.userCancelled.rawValue { message = error.localizedDescription }
             }
             .sheet(item: $export) { file in NativeFileExporter(file: file) { _ in export = nil } }
-            .onDisappear { operation?.cancel() }
+            .onDisappear { if !choosing { operation?.cancel() } }
     }
     private func load() {
         preview = nil; message = nil; busy = true; operation?.cancel()

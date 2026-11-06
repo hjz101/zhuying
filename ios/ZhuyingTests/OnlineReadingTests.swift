@@ -158,6 +158,35 @@ final class OnlineReadingTests: XCTestCase {
         for _ in 0..<2000 { if predicate() { return }; try await Task.sleep(for: .milliseconds(1)) }
         XCTFail("Operation did not finish")
     }
+    @MainActor func testOpeningOnlineBookSkipsLeadingVolumeAndChapterNavigationSkipsOnlyVolumes() async throws {
+        let root = try root(), domain = UUID().uuidString, defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let service = OnlineReadingService(cache: try RecentChapterCache(directory: root.appendingPathComponent("cache")))
+        await service.configure(source: OnlineFixtureSource())
+        let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
+                                   productionPersistence: try ProductionLibraryPersistence(directory: root.appendingPathComponent("db")), onlineService: service)
+        await library.bootstrapProductionIfNeeded()
+        let record = OnlineFixtureSource.book()
+        var catalog = OnlineFixtureSource.catalog(record)
+        catalog[0].access = .volume; catalog[2].access = .volume
+        let book = try await library.registerRemoteBook(record, chapters: catalog)
+        library.read(book)
+        XCTAssertEqual(library.reader?.chapter, 1, "A volume heading has no body to load")
+        let session = ReadingSessionController(repository: library.chapterRepository(for: book))
+        let accepted = await session.load(try library.chapterRequest(for: book, chapter: XCTUnwrap(library.reader?.chapter)))
+        XCTAssertTrue(accepted); XCTAssertEqual(session.document?.chapterID, catalog[1].id)
+        XCTAssertEqual(library.readableChapterIndex(for: book, startingAt: 2), 3)
+        XCTAssertEqual(library.readableChapterIndex(for: book, startingAt: 2, direction: -1), 1)
+        XCTAssertNil(library.readableChapterIndex(for: book, startingAt: 0, direction: -1))
+        XCTAssertEqual(library.readableChapterIndex(for: book, startingAt: 4), 4, "Restricted content must keep its access explanation")
+        _ = library.confirmChapter(book, chapter: 1, document: try XCTUnwrap(session.document), anchor: .init())
+        library.read(book); XCTAssertEqual(library.reader?.chapter, 1)
+        library.read(book, chapter: 0); XCTAssertEqual(library.reader?.chapter, 1)
+        library.reader = nil
+        catalog = catalog.map { var chapter = $0; chapter.access = .volume; return chapter }
+        let volumeOnly = try await library.registerRemoteBook(record, chapters: catalog)
+        library.read(volumeOnly, chapter: 0); XCTAssertNil(library.reader)
+    }
     @MainActor func testOnlineProgressUnfavoritedRestartCatalogInsertionAndSourceRemovalKeepHistory() async throws {
         let root = try root(), defaults = UserDefaults(suiteName: "online-tests-\(UUID().uuidString)")!
         let service = OnlineReadingService(cache: try RecentChapterCache(directory: root.appendingPathComponent("cache")))

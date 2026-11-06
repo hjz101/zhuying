@@ -8,6 +8,23 @@ final class SourcePackageFlowTests: XCTestCase {
     @MainActor private func openSources(_ app: XCUIApplication) {
         app.tabBars.buttons["我的"].tap(); let entry = app.buttons["profileSources"]; reveal(entry,app:app); entry.tap()
     }
+    @MainActor func testJSONFileTabOffersPasteAndLegacySourceTextShowsCompatibilityBeforeConfirming() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--production"]; app.launch(); openSources(app)
+        app.buttons["sourceAdd"].tap(); app.buttons["导入书源"].tap()
+        let picker = app.segmentedControls["sourcePackageMethod"]; XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        picker.buttons["JSON 文件"].tap()
+        XCTAssertTrue(app.buttons["sourcePackagePaste"].exists)
+        picker.buttons["JSON 源码"].tap()
+        let editor = app.textViews["sourcePackageJSON"]; XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap(); editor.typeText("{\"bookSourceName\":\"Legacy Fixture\",\"bookSourceUrl\":\"legacy-fixture\",\"ruleSearch\":{\"name\":\"$.name\"}}")
+        let preview = app.buttons["sourcePackagePreview"]; reveal(preview, app: app); preview.tap()
+        let warning = app.staticTexts["sourcePackageCompatibility"]
+        XCTAssertTrue(warning.waitForExistence(timeout: 5)); XCTAssertTrue(warning.label.contains("尚不能用于搜索或阅读"))
+        let confirm = app.buttons["sourcePackageConfirm"]; reveal(confirm, app: app); confirm.tap()
+        XCTAssertTrue(app.staticTexts["sourcePackageMessage"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["sourcePackageMessage"].label.contains("已保存 1 个书源"))
+    }
     @MainActor func testNativeJSONFilePreviewConfirmAndSourceRestart() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchArguments = ["--ui-testing","--production","--source-package-fixtures"]; app.launch(); openSources(app)

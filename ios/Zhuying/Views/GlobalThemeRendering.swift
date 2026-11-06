@@ -180,52 +180,97 @@ struct ThemePageStyle: ViewModifier {
     @Environment(\.themeAppearance) private var appearance
     var role: String
     func body(content: Content) -> some View {
-        content.background(ThemeSurface(role: role)).background(ThemeNavigationAppearance().frame(width: 0, height: 0)).foregroundStyle(appearance.palette.green)
+        content.background(ThemeSurface(role: role).ignoresSafeArea()).background(ThemeNavigationAppearance().frame(width: 0, height: 0)).foregroundStyle(appearance.palette.green)
             .tint(appearance.palette.primary)
-            .toolbarBackground(appearance.palette.background, for: .navigationBar)
+            .toolbarBackground(appearance.palette.background, for: .navigationBar, .tabBar)
+            .toolbarBackground(.visible, for: .navigationBar, .tabBar)
+            .toolbarColorScheme(appearance.bundle.document.app.dark ? .dark : .light, for: .navigationBar, .tabBar)
             .preferredColorScheme(appearance.bundle.document.app.dark ? .dark : .light)
     }
 }
 
-/// Adjust the existing navigation bar; native back actions and interactive pop remain intact.
+/// Native chrome shares the page palette, including scroll-edge and compact states.
+@MainActor
+enum ThemeNativeBarAppearance {
+    static func navigation(_ appearance: ThemeAppearanceContext, copying source: UINavigationBarAppearance? = nil) -> UINavigationBarAppearance {
+        let value = source?.copy() ?? UINavigationBarAppearance()
+        value.configureWithOpaqueBackground()
+        value.backgroundColor = UIColor(appearance.palette.background)
+        value.shadowColor = .clear
+        value.titleTextAttributes[.foregroundColor] = UIColor(appearance.palette.green)
+        value.largeTitleTextAttributes[.foregroundColor] = UIColor(appearance.palette.green)
+        for button in [value.buttonAppearance, value.doneButtonAppearance, value.backButtonAppearance] {
+            button.normal.titleTextAttributes[.foregroundColor] = UIColor(appearance.palette.green)
+            button.highlighted.titleTextAttributes[.foregroundColor] = UIColor(appearance.palette.primary)
+        }
+        let asset = appearance.bundle.document.app.icons["navigation.back"]
+        var image = asset?.path.flatMap { appearance.iconImage($0, scale: UIScreen.main.scale) } ?? asset?.symbol.flatMap { UIImage(systemName: $0) }
+        if asset?.path != nil { image = image?.withRenderingMode(asset?.template == false ? .alwaysOriginal : .alwaysTemplate) }
+        value.setBackIndicatorImage(image, transitionMaskImage: image)
+        return value
+    }
+    static func tab(_ appearance: ThemeAppearanceContext) -> UITabBarAppearance {
+        let value = UITabBarAppearance()
+        value.configureWithOpaqueBackground()
+        value.backgroundColor = UIColor(appearance.palette.background)
+        value.shadowColor = .clear
+        value.selectionIndicatorTintColor = UIColor(appearance.palette.soft)
+        for layout in [value.stackedLayoutAppearance, value.inlineLayoutAppearance, value.compactInlineLayoutAppearance] {
+            layout.normal.iconColor = UIColor(appearance.palette.green)
+            layout.normal.titleTextAttributes[.foregroundColor] = UIColor(appearance.palette.green)
+            layout.selected.iconColor = UIColor(appearance.palette.primary)
+            layout.selected.titleTextAttributes[.foregroundColor] = UIColor(appearance.palette.primary)
+            layout.disabled.iconColor = UIColor(appearance.palette.muted)
+            layout.disabled.titleTextAttributes[.foregroundColor] = UIColor(appearance.palette.muted)
+        }
+        return value
+    }
+}
+
+/// Style the existing native controllers; back gestures and the search tab stay native.
 struct ThemeNavigationAppearance: UIViewRepresentable {
     @Environment(\.themeAppearance) private var appearance
     final class Probe: UIView {
         var apply: ((UIView) -> Void)?
-        var signature: String?
         override func didMoveToWindow() { super.didMoveToWindow(); apply?(self) }
     }
     func makeUIView(context: Context) -> Probe { let view = Probe(); view.isUserInteractionEnabled = false; return view }
     func updateUIView(_ view: Probe, context: Context) {
-        view.apply = { [weak view] probe in
-            guard let view else { return }
+        view.apply = { probe in
             var responder: UIResponder? = probe
+            var navigation: UINavigationController?
+            var tabs: UITabBarController?
             while let current = responder {
-                if let controller = current as? UIViewController, let bar = controller.navigationController?.navigationBar {
-                    let asset = appearance.bundle.document.app.icons["navigation.back"]
-                    let signature = [appearance.bundle.id, appearance.bundle.document.app.colors["text.primary"] ?? "", appearance.bundle.document.app.colors["action.primary.background"] ?? "", asset?.path ?? "", asset?.symbol ?? ""].joined(separator: ":")
-                    guard view.signature != signature else { return }; view.signature = signature
-                    var image = asset?.path.flatMap { appearance.image($0) } ?? asset?.symbol.flatMap { UIImage(systemName: $0) }
-                    if let original = image, asset?.path != nil {
-                        image = UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20)).image { _ in original.draw(in: CGRect(x: 0, y: 0, width: 20, height: 20)) }.withRenderingMode(asset?.template == false ? .alwaysOriginal : .alwaysTemplate)
-                    }
-                    func styled(_ source: UINavigationBarAppearance) -> UINavigationBarAppearance {
-                        let value = source.copy()
-                        value.titleTextAttributes[.foregroundColor] = UIColor(appearance.palette.green)
-                        value.largeTitleTextAttributes[.foregroundColor] = UIColor(appearance.palette.green)
-                        value.setBackIndicatorImage(image, transitionMaskImage: image)
-                        return value
-                    }
-                    bar.standardAppearance = styled(bar.standardAppearance)
-                    bar.scrollEdgeAppearance = styled(bar.scrollEdgeAppearance ?? bar.standardAppearance)
-                    bar.compactAppearance = styled(bar.compactAppearance ?? bar.standardAppearance)
-                    bar.tintColor = UIColor(appearance.palette.primary)
-                    return
+                if let controller = current as? UIViewController {
+                    navigation = navigation ?? (controller as? UINavigationController) ?? controller.navigationController
+                    tabs = tabs ?? (controller as? UITabBarController) ?? controller.tabBarController
                 }
                 responder = current.next
             }
+            let style: UIUserInterfaceStyle = appearance.bundle.document.app.dark ? .dark : .light
+            if let bar = navigation?.navigationBar {
+                bar.overrideUserInterfaceStyle = style
+                bar.standardAppearance = ThemeNativeBarAppearance.navigation(appearance, copying: bar.standardAppearance)
+                bar.scrollEdgeAppearance = ThemeNativeBarAppearance.navigation(appearance, copying: bar.scrollEdgeAppearance)
+                bar.compactAppearance = ThemeNativeBarAppearance.navigation(appearance, copying: bar.compactAppearance)
+                bar.compactScrollEdgeAppearance = ThemeNativeBarAppearance.navigation(appearance, copying: bar.compactScrollEdgeAppearance)
+                bar.tintColor = UIColor(appearance.palette.primary)
+            }
+            if let bar = tabs?.tabBar {
+                bar.overrideUserInterfaceStyle = style
+                bar.standardAppearance = ThemeNativeBarAppearance.tab(appearance)
+                bar.scrollEdgeAppearance = ThemeNativeBarAppearance.tab(appearance)
+                bar.tintColor = UIColor(appearance.palette.primary)
+                bar.unselectedItemTintColor = UIColor(appearance.palette.green)
+                for item in bar.items ?? [] {
+                    item.standardAppearance = ThemeNativeBarAppearance.tab(appearance)
+                    item.scrollEdgeAppearance = ThemeNativeBarAppearance.tab(appearance)
+                }
+                // Keep book-cover colors from bleeding into the floating bar and home area.
+                bar.backgroundColor = UIColor(appearance.palette.background)
+            }
         }
-        DispatchQueue.main.async { view.apply?(view) }
+        DispatchQueue.main.async { [weak view] in guard let view else { return }; view.apply?(view) }
     }
 }
 struct ThemeButtonFeedbackStyle: ButtonStyle {

@@ -29,7 +29,7 @@ struct ReadingHistoryView: View {
                     Divider().overlay(appAppearance.palette.line)
                 }
             }.padding(23)
-        }.background(ThemeSurface()).navigationTitle("阅读历史").navigationBarTitleDisplayMode(.inline)
+        }.appPageStyle().navigationTitle("阅读历史").navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -73,7 +73,7 @@ struct UpdatesView: View {
                     Button { if store.isDemo { store.simulateUpdates() }; simulated = true } label: { ThemeLabel(store.isDemo ? "模拟一次更新" : "检查更新", systemImage: "arrow.clockwise") }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("simulateUpdates")
                     if simulated { Text(store.isDemo ? "已重置连载作品末尾 3 章的演示更新标记。" : "当前版本暂不支持更新检查。").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted) }
                 }.padding(23)
-            }.background(ThemeSurface()).navigationTitle("作品更新").navigationBarTitleDisplayMode(.inline)
+            }.appPageStyle().navigationTitle("作品更新").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
         }
         .appPageStyle().presentationBackground(appAppearance.palette.background).presentationDragIndicator(.visible).presentationCornerRadius(26)

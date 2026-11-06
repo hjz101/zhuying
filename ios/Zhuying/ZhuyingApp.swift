@@ -207,6 +207,7 @@ struct RootView: View {
     }
     var body: some View {
         presentedContent
+        .background(ThemeSurface().ignoresSafeArea())
         .environment(\.themeAppearance, .init(bundle: globalTheme.active))
         .buttonStyle(ThemeButtonFeedbackStyle())
         .progressViewStyle(ThemeProgressStyle())
@@ -254,7 +255,12 @@ struct RootView: View {
             case .profile: ProfileView(onShelf: { selectedTab = .shelf })
             case .search: DiscoverView(searchEntry: true)
             }
-        }.safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
+        }.background(ThemeSurface().ignoresSafeArea())
+            .background(ThemeNavigationAppearance().frame(width: 0, height: 0))
+            .toolbarBackground(AppThemePalette(appearance: globalTheme.active.document.app).background, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
+            .toolbarColorScheme(globalTheme.active.document.app.dark ? .dark : .light, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
     }
     @ViewBuilder private var miniPlayer: some View {
             if !store.isDemo && store.reader == nil { ProductionMiniPlayer(audio:store.audio,open:{showPlayer = true}) }

@@ -136,8 +136,6 @@ struct ShelfView: View {
                 }
                 .padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 24)
             }
-            .background(ThemeSurface(role: "shelf"))
-            .background(ThemeNavigationAppearance().frame(width: 0, height: 0))
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if managing {
                     HStack {
@@ -155,6 +153,7 @@ struct ShelfView: View {
                 }
             }
         }
+        .appPageStyle(role: "shelf")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 HStack(spacing: 7) {
@@ -178,7 +177,6 @@ struct ShelfView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(appAppearance.palette.background, for: .navigationBar)
         .navigationDestination(for: Book.self) { BookDetailView(book: $0) }
     }
 

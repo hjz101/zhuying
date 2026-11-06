@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class GlobalThemeFlowTests: XCTestCase {
     @MainActor private func launch(preserve: Bool = false, inkMountain: Bool = false) -> XCUIApplication {
@@ -32,6 +33,58 @@ final class GlobalThemeFlowTests: XCTestCase {
     }
     @MainActor private func capture(_ app: XCUIApplication, _ name: String) {
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
+    }
+    @MainActor private func assertChrome(_ app: XCUIApplication, background: UInt32, file: StaticString = #filePath, line: UInt = #line) {
+        // The native focused search page hides its navigation bar behind the search field.
+        guard app.navigationBars.firstMatch.exists else { return }
+        let cgImage = app.screenshot().image.cgImage!
+        let scale = CGFloat(cgImage.width) / app.frame.width
+        let bar = app.navigationBars.firstMatch.frame
+        var points = [CGPoint(x: app.frame.width / 2, y: bar.minY + 2), CGPoint(x: app.frame.width * 0.12, y: app.frame.height - 4)]
+        if app.keyboards.firstMatch.exists { points.removeLast() }
+        for (location, point) in points.enumerated() {
+            let rect = CGRect(x: floor(point.x * scale), y: floor(point.y * scale), width: 1, height: 1)
+            let pixel = cgImage.cropping(to: rect)!
+            var rgba = [UInt8](repeating: 0, count: 4)
+            let context = CGContext(data: &rgba, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            let expected = [UInt8((background >> 16) & 255), UInt8((background >> 8) & 255), UInt8(background & 255)]
+            // The native floating bar casts a shadow into the bottom safe area.
+            // Allow that dimming while requiring the theme's color balance.
+            let shade = location == 0 ? 1 : Double(rgba.prefix(3).max()!) / Double(expected.max()!)
+            XCTAssertGreaterThanOrEqual(shade, 0.55, file: file, line: line)
+            XCTAssertLessThanOrEqual(shade, 1.08, file: file, line: line)
+            for index in 0..<3 { XCTAssertEqual(Double(rgba[index]), Double(expected[index]) * shade, accuracy: 4, "主题边缘颜色不一致 at \(point): \(rgba)", file: file, line: line) }
+        }
+    }
+    @MainActor func testNativeBarsFollowLightDarkThemesAcrossTabsAndScroll() {
+        let app = launch(); openThemes(app)
+        capture(app, "竹影-顶部底部-竹影原色")
+        assertChrome(app, background: 0xF7F6F0)
+        for (id, name, color) in [("night", "幻想夜航", UInt32(0x151622)), ("green", "清透青绿", UInt32(0xF7FAF8))] {
+            let card = app.buttons["globalTheme-zhuying.builtin.\(id)"]; reveal(card, app: app); card.tap()
+            apply(app); backToManager(app)
+            XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, name)
+            assertChrome(app, background: color)
+            capture(app, "竹影-顶部底部-\(name)-主题库")
+            app.tabBars.buttons["书架"].tap()
+            XCTAssertTrue(app.buttons["shelfAddBook"].waitForExistence(timeout: 5))
+            assertChrome(app, background: color)
+            app.swipeUp(); app.swipeDown()
+            assertChrome(app, background: color)
+            XCTAssertEqual(app.tabBars.buttons.count, 4)
+            capture(app, "竹影-顶部底部-\(name)-书架")
+            app.tabBars.buttons["搜索"].tap()
+            XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 5))
+            assertChrome(app, background: color)
+            capture(app, "竹影-顶部底部-\(name)-搜索")
+            let closeSearch = app.buttons.matching(NSPredicate(format: "label IN %@", ["Close", "关闭", "Cancel", "取消"])).firstMatch
+            if closeSearch.exists { closeSearch.tap() }
+            if !app.tabBars.buttons["我的"].exists { app.tabBars.buttons["书架"].tap() }
+            XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 5))
+            app.tabBars.buttons["我的"].tap()
+            XCTAssertTrue(app.navigationBars["主题管理"].waitForExistence(timeout: 5))
+        }
     }
     @MainActor func testGlobalThemeAppliesAcrossOriginalNavigationPersistsAndRestores() {
         let app = launch(); openThemes(app)

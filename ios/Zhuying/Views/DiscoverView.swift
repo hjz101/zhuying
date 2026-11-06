@@ -57,7 +57,7 @@ struct DiscoverView: View {
                 }
             }.padding(.horizontal, 22).padding(.top, 19).padding(.bottom, 25)
         }
-        .background(ThemeSurface())
+        .appPageStyle()
         .navigationTitle(searchEntry ? "搜索" : "发现")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书名或作者")

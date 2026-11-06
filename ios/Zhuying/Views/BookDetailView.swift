@@ -62,7 +62,7 @@ struct BookDetailView: View {
                 }.padding(.horizontal, 24).padding(.bottom, 30)
             }
         }
-        .background(ThemeSurface())
+        .appPageStyle()
         .navigationTitle("作品详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) {

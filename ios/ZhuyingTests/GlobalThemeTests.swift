@@ -313,6 +313,44 @@ final class GlobalThemeTests: XCTestCase {
         XCTAssertEqual(green, 177.0 / 255, accuracy: 0.001)
         XCTAssertEqual(blue, 201.0 / 255, accuracy: 0.001)
     }
+    func testNativeNavigationAndTabBarsUseEveryThemePaletteInAllLayouts() throws {
+        for bundle in GlobalThemeBundle.originals {
+            let context = ThemeAppearanceContext(bundle: bundle)
+            let background = UIColor(context.palette.background), foreground = UIColor(context.palette.green)
+            let navigation = ThemeNativeBarAppearance.navigation(context)
+            XCTAssertEqual(navigation.backgroundColor, background)
+            XCTAssertNil(navigation.backgroundEffect)
+            XCTAssertEqual(navigation.titleTextAttributes[.foregroundColor] as? UIColor, foreground)
+            XCTAssertEqual(navigation.largeTitleTextAttributes[.foregroundColor] as? UIColor, foreground)
+            XCTAssertEqual(navigation.backButtonAppearance.normal.titleTextAttributes[.foregroundColor] as? UIColor, foreground)
+            let tab = ThemeNativeBarAppearance.tab(context)
+            XCTAssertEqual(tab.backgroundColor, background)
+            XCTAssertNil(tab.backgroundEffect)
+            XCTAssertEqual(tab.selectionIndicatorTintColor, UIColor(context.palette.soft))
+            for layout in [tab.stackedLayoutAppearance, tab.inlineLayoutAppearance, tab.compactInlineLayoutAppearance] {
+                XCTAssertEqual(layout.normal.iconColor, foreground)
+                XCTAssertEqual(layout.normal.titleTextAttributes[.foregroundColor] as? UIColor, foreground)
+                XCTAssertEqual(layout.selected.iconColor, UIColor(context.palette.primary))
+                XCTAssertEqual(layout.selected.titleTextAttributes[.foregroundColor] as? UIColor, UIColor(context.palette.primary))
+            }
+        }
+    }
+    func testNativeChromeReplacesPreviousThemeColorsWithoutLosingTitleTypography() throws {
+        let night = ThemeNativeBarAppearance.navigation(.init(bundle: GlobalThemeBundle.originals[2]))
+        let font = UIFont.systemFont(ofSize: 19, weight: .medium)
+        night.titleTextAttributes[.font] = font
+        var custom = GlobalThemeBundle.originals[1]
+        custom.document.app.colors["background.page"] = "#42513B"
+        custom.document.app.colors["text.primary"] = "#F5F0DF"
+        let updated = ThemeNativeBarAppearance.navigation(.init(bundle: custom), copying: night)
+        for (color, expected) in [(updated.backgroundColor, [66.0, 81.0, 59.0]), (updated.titleTextAttributes[.foregroundColor] as? UIColor, [245.0, 240.0, 223.0])] {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            XCTAssertTrue(try XCTUnwrap(color).getRed(&red, green: &green, blue: &blue, alpha: &alpha))
+            for (actual, value) in Swift.zip([red, green, blue], expected) { XCTAssertEqual(Double(actual), value / 255, accuracy: 0.0001) }
+        }
+        XCTAssertEqual(updated.titleTextAttributes[.font] as? UIFont, font)
+        XCTAssertEqual(ThemeNativeBarAppearance.tab(.init(bundle: custom)).backgroundColor, updated.backgroundColor)
+    }
     func testNativePreviewTaskIdentityIsStableAcrossRendersAndChangesWithAppearance() throws {
         var settings = try GlobalThemeStore.settings(for: bundle(), current: .init(), options: .init())
         let identities = Set((0..<100).map { _ in GlobalThemePreview.fingerprint(settings) })

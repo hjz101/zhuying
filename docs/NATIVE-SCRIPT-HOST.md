@@ -1,6 +1,8 @@
 # JavaScript 宿主 v1
 
-本页介绍手动运行的 Worker 工具。导入阅读 3.0 书源后，在搜索和阅读中运行的独立 QuickJS 兼容层见[阅读 3.0 基础兼容](LEGADO-COMPATIBILITY.md)；两个执行入口保留各自的接口与隔离规则。
+本页介绍手动运行的 Worker 工具。导入阅读 3.0 书源后，在搜索和阅读中运行的独立 QuickJS 兼容层见[阅读 3.0 端侧兼容（阶段三）](LEGADO-COMPATIBILITY.md)，实际覆盖范围见[阶段三验证记录](verification/2026-11-07-legado-stage-three.md)；两个执行入口保留各自的接口与隔离规则。
+
+QuickJS 的 96 MiB 配置预留总预算、操作租约、空闲回收，以及排除受控 HTTP 等待的 5 秒脚本执行预算均属于该兼容层。本页 Worker 工具继续采用下述 WebContent、网络与计时边界，不能套用 QuickJS 的限额或把它们解释为进程 RSS 保证。原书源调试中的结构化恢复和两书六章跨进程复核也不等于一次手动 Worker 脚本执行。
 
 入口为“书源兼容引擎 → JavaScript 宿主与兼容报告”，也可从书源调试进入。导入的其他阅读器脚本不会自动执行；用户填写函数体与 JSON 输入，点击运行后才执行。
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inflateSync } from 'node:zlib';
+import { assertOpaqueRGBPNG } from './helpers/png.js';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const assetPath = 'ios/Zhuying/Assets.xcassets/AppIcon.appiconset/';
@@ -18,30 +18,7 @@ test('the universal iOS app icon resolves to a valid opaque 1024-pixel RGB PNG',
   assert.equal(icon.size, '1024x1024');
   assert.match(icon.filename, /^zhuying-[a-z-]+\.png$/);
   const png = readFileSync(new URL(`../${assetPath}${icon.filename}`, import.meta.url));
-  assert.deepEqual(png.subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-  const chunks = [];
-  let offset = 8;
-  while (offset < png.length) {
-    assert.ok(offset + 12 <= png.length, 'PNG chunk header must be complete');
-    const length = png.readUInt32BE(offset);
-    assert.ok(offset + length + 12 <= png.length, 'PNG chunk data must be complete');
-    chunks.push({ type: png.toString('ascii', offset + 4, offset + 8), data: png.subarray(offset + 8, offset + 8 + length) });
-    offset += length + 12;
-  }
-  assert.equal(chunks[0].type, 'IHDR');
-  assert.equal(chunks.at(-1).type, 'IEND');
-  const header = chunks[0].data;
-  assert.equal(header.length, 13);
-  assert.equal(header.readUInt32BE(0), 1024);
-  assert.equal(header.readUInt32BE(4), 1024);
-  assert.equal(header[8], 8, 'icon uses 8-bit color');
-  assert.equal(header[9], 2, 'RGB avoids an alpha channel in the App Store icon');
-  assert.ok(!chunks.some(chunk => chunk.type === 'tRNS'), 'icon must not declare transparent RGB pixels');
-  assert.deepEqual([...header.subarray(10)], [0, 0, 0], 'standard compression, filtering and no interlacing');
-  const pixels = inflateSync(Buffer.concat(chunks.filter(chunk => chunk.type === 'IDAT').map(chunk => chunk.data)));
-  const stride = 1024 * 3 + 1;
-  assert.equal(pixels.length, 1024 * stride, 'all RGB scanlines must decode');
-  for (let row = 0; row < 1024; row++) assert.ok(pixels[row * stride] <= 4, `valid PNG filter on row ${row}`);
+  assertOpaqueRGBPNG(png);
 });
 
 test('Demo and Production archive the same target with the AppIcon catalog in its resources', () => {

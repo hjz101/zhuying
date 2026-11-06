@@ -9,34 +9,29 @@ struct SourceDiagnosticResult: Codable, Identifiable, Sendable {
     let count: Int
 }
 enum SourceDiagnostics {
-    enum Step: String, CaseIterable { case search = "搜索", details = "详情", catalog = "目录", content = "正文" }
+    enum Step: String, CaseIterable, Sendable { case search = "搜索", details = "详情", catalog = "目录", content = "正文" }
     static func run(source: any BookSource, query: String, through target: Step, timeout: Double = 15) async throws -> [SourceDiagnosticResult] {
-        try await withThrowingTaskGroup(of:[SourceDiagnosticResult].self) { group in
-            group.addTask { try await execute(source:source,query:query,through:target) }
-            group.addTask { try await Task.sleep(for:.seconds(max(1,min(60,timeout)))); throw ContentFailure.timedOut }
-            defer { group.cancelAll() }
-            guard let result = try await group.next() else { throw CancellationError() }; return result
-        }
+        try await execute(source:source,query:query,through:target,timeout:max(1,min(60,timeout)))
     }
-    private static func execute(source: any BookSource, query: String, through target: Step) async throws -> [SourceDiagnosticResult] {
+    private static func execute(source: any BookSource, query: String, through target: Step,timeout: Double) async throws -> [SourceDiagnosticResult] {
         var result: [SourceDiagnosticResult] = [], current = Step.search
         var start = ProcessInfo.processInfo.systemUptime
         func record(_ count: Int) {
             result.append(.init(sourceID:source.sourceID,step:current.rawValue,status:"成功",milliseconds:Int((ProcessInfo.processInfo.systemUptime - start) * 1000),count:count))
         }
         do {
-            let page = try await source.search(query:query,page:1); record(page.books.count)
+            let page = try await AsyncOperationDeadline.run(seconds:timeout) { try await source.search(query:query,page:1) }; record(page.books.count)
             if target == .search { return result }
             guard let book = page.books.first else { throw ContentFailure.invalidResponse }
             current = .details; start = ProcessInfo.processInfo.systemUptime
-            let details = try await source.details(for:book); record(1)
+            let details = try await AsyncOperationDeadline.run(seconds:timeout) { try await source.details(for:book) }; record(1)
             if target == .details { return result }
             current = .catalog; start = ProcessInfo.processInfo.systemUptime
-            let chapters = try await source.chapters(for:details); record(chapters.count)
+            let chapters = try await AsyncOperationDeadline.run(seconds:timeout) { try await source.chapters(for:details) }; record(chapters.count)
             if target == .catalog { return result }
             guard let chapter = chapters.first(where: { $0.access == .readable }) else { throw ContentFailure.restricted }
             current = .content; start = ProcessInfo.processInfo.systemUptime
-            let document = try await source.document(for:chapter,book:details); try Task.checkCancellation()
+            let document = try await AsyncOperationDeadline.run(seconds:timeout) { try await source.document(for:chapter,book:details) }; try Task.checkCancellation()
             record(document.paragraphs.reduce(0) { $0 + $1.text.utf16.count }); return result
         } catch is CancellationError { throw CancellationError() }
         catch {

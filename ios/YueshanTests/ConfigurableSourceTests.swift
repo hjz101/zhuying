@@ -46,11 +46,12 @@ final class ConfigurableSourceTests: XCTestCase {
         XCTAssertEqual(try SourcePackages.rules(source), try SourcePackages.rules(restored.sources[0]))
         XCTAssertEqual(try SourcePackages.parse(bytes, existing: [source]).duplicates,1)
         XCTAssertThrowsError(try SourcePackages.parse(Data("{\"format\":\"yueshan-sources\",\"version\":2,\"sources\":[]}".utf8), existing: []))
-        let legacy = Data("{\"bookSourceName\":\"旧规则\",\"bookSourceUrl\":\"https://legacy.test\",\"ruleSearch\":{\"name\":\".title\"},\"headers\":{\"Authorization\":\"secret\"}}".utf8)
+        let legacy = Data("{\"bookSourceName\":\"旧规则\",\"bookSourceUrl\":\"https://legacy.test\",\"ruleSearch\":{\"name\":\".title\",\"refresh-token\":\"nested-credential\"},\"X-Api-Key\":\"top-level-credential\",\"headers\":{\"Authorization\":\"secret\"}}".utf8)
         let unsupported = try SourcePackages.parse(legacy, existing: []).sources[0]
         XCTAssertThrowsError(try SourcePackages.rules(unsupported))
         let exported = String(decoding: try SourcePackages.export([unsupported]), as: UTF8.self)
         XCTAssertTrue(exported.contains("ruleSearch")); XCTAssertFalse(exported.contains("secret")); XCTAssertFalse(exported.contains("Authorization"))
+        XCTAssertFalse(exported.contains("credential")); XCTAssertFalse(exported.contains("X-Api-Key")); XCTAssertFalse(exported.contains("refresh-token"))
     }
     func testNativeJSONFourStepsEncodeQueryAndVerifyChapterIdentity() async throws {
         let transport = NativeJSONTransport(), adapter = try ConfigurableBookSource(source: source(), transport: transport)

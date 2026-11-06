@@ -54,7 +54,11 @@ struct ProductionDownloadView: View {
             }
     }
     private func status(_ value: OfflineDownloadTask.Status) -> String { switch value { case .queued:"等待下载"; case .running:"正在下载";case .paused:"已暂停";case .failed:"部分失败";case .completed:"已完成" } }
-    @MainActor private func refresh() async { tasks = await library.onlineService?.downloads?.list() ?? []; bytes = (try? await library.onlineService?.downloads?.usage()) ?? 0 }
+    @MainActor private func refresh() async {
+        tasks = await library.onlineService?.downloads?.list() ?? []; bytes = (try? await library.onlineService?.downloads?.usage()) ?? 0
+        if message == nil { message = await library.onlineService?.downloads?.warning }
+        if library.onlineService?.downloads == nil { message = "下载队列暂时无法打开，原下载文件保留；其他阅读功能仍可使用，请稍后重启重试。" }
+    }
     @MainActor private func perform(_ body: () async throws -> Void) async { do { try await body(); message = nil } catch { message = error.localizedDescription }; await refresh() }
 }
 
@@ -140,7 +144,7 @@ struct ProductionSourceDiagnosticsView: View {
                     if !batch { Picker("书源",selection:$selection) { ForEach(library.sources) { Text($0.name).tag($0.id) } }; Picker("调试步骤",selection:$step) { ForEach(SourceDiagnostics.Step.allCases,id:\.self) { Text($0.rawValue).tag($0) } } }
                     TextField("测试关键词",text:$query).accessibilityIdentifier("sourceDiagnosticQuery")
                     if batch { Picker("并发数量",selection:$concurrency) { ForEach([3,5,10],id:\.self) { Text("\($0)") } } }
-                    Slider(value:$timeout,in:5...60,step:1); Text("超时 \(Int(timeout)) 秒").font(.system(size:11))
+                    Slider(value:$timeout,in:5...60,step:1); Text("每步超时 \(Int(timeout)) 秒").font(.system(size:11))
                 }
                 Button(busy ? "正在运行" : "运行测试") { run() }.buttonStyle(PrimaryButtonStyle()).disabled(busy || query.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
                 if busy { ProgressView(); Button("取消测试") { operation?.cancel(); busy = false } }

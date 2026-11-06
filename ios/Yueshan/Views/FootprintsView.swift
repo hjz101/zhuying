@@ -70,6 +70,10 @@ struct FootprintsView: View {
                 Spacer()
                 Text("日均 \(ActivityReport.duration(data.seconds / Double(data.elapsedDays)))")
             }.font(.system(size: 10)).foregroundStyle(Palette.muted)
+            if !store.isDemo {
+                Text("本周期朗读：\(ActivityReport.duration(ActivityReport(sessions:store.activitySessions.filter { $0.kind == .listening },now:now,period:period,calendar:calendar).seconds))")
+                    .font(.system(size:11)).foregroundStyle(Palette.muted).accessibilityIdentifier("activityListeningTotal")
+            }
         }.foregroundStyle(Palette.green).padding(20).frame(maxWidth: .infinity, alignment: .leading)
             .background(Palette.soft, in: .rect(cornerRadius: 18))
     }

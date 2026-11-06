@@ -35,7 +35,8 @@ final class ProductionLaunchTests: XCTestCase {
         tools.tap()
         let search = app.searchFields.firstMatch; XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("系统朗读")
         app.buttons["feature-systemTTS"].tap()
-        XCTAssertTrue(app.staticTexts["当前版本暂不支持此功能。"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["还没有可朗读的作品"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["narrationPlay"].isEnabled)
         XCTAssertFalse(app.buttons["切换演示朗读"].exists)
         XCTAssertFalse(app.buttons["demo-action-systemTTS-开始朗读"].exists)
     }

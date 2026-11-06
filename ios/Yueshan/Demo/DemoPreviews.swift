@@ -189,14 +189,14 @@ struct DemoSourceRows: View {
                 rowLabel(source)
             }.buttonStyle(.plain).accessibilityIdentifier("source-row-\(source.id)")
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button { open("sourceLogin", source) } label: { Label(source.loginStatus.action, systemImage: "person.badge.key") }.tint(Palette.green)
+                    Button { open("sourceLogin", source) } label: { Label(demo.isDemo || source.id == "shushan" ? source.loginStatus.action : "访问说明", systemImage: "person.badge.key") }.tint(Palette.green)
                         .accessibilityIdentifier("source-login-\(source.id)")
                     Button { open("sourceEdit", source) } label: { Label("编辑", systemImage: "square.and.pencil") }.tint(Palette.accent)
                         .accessibilityIdentifier("source-edit-\(source.id)")
                 }
                 .contextMenu {
                     Button(source.pinned ? "取消置顶" : "置顶书源", systemImage: "pin") { demo.toggleSourcePin(source.id) }
-                    Button(source.loginStatus.action, systemImage: "person.badge.key") { open("sourceLogin", source) }
+                    Button(demo.isDemo || source.id == "shushan" ? source.loginStatus.action : "访问说明", systemImage: "person.badge.key") { open("sourceLogin", source) }
                     Button("编辑", systemImage: "square.and.pencil") { open("sourceEdit", source) }
                     Button("调试", systemImage: "ladybug") { open("sourceDebug", source) }
                     Button(source.enabled ? "停用书源" : "启用书源", systemImage: "power") {
@@ -224,7 +224,7 @@ struct DemoSourceRows: View {
                     if source.pinned { Image(systemName: "pin.fill").font(.system(size: 10)).accessibilityLabel("已置顶") }
                     Text(source.name).font(.system(size: 15, weight: .medium)).lineLimit(1)
                     Spacer(minLength: 4)
-                    Text(source.loginStatus.title).font(.system(size: 10))
+                    Text(SourcePackages.accountTitle(source,isDemo:demo.isDemo)).font(.system(size: 10))
                         .foregroundStyle(source.loginStatus == .expired ? Palette.accent : Palette.muted)
                 }
                 Text("\(source.detail) · \(source.enabled ? "已启用" : "已停用")")
@@ -249,13 +249,13 @@ struct DemoSourceDetail: View {
                     AppSettingsCard("书源信息", icon: "info.circle") {
                         Text(source.detail).font(.system(size: 12))
                         Text("分组：\(source.group)").font(.system(size: 12))
-                        Text("\(source.loginStatus.title)\(demo.isDemo ? " · 演示登录状态" : "")").font(.system(size: 12)).accessibilityIdentifier("sourceLoginStatus")
+                        Text("\(SourcePackages.accountTitle(source,isDemo:demo.isDemo))\(demo.isDemo ? " · 演示登录状态" : "")").font(.system(size: 12)).accessibilityIdentifier("sourceLoginStatus")
                         Toggle("启用书源", isOn: Binding(get: { demo.sources.first { $0.id == sourceID }?.enabled ?? false }, set: { value in
                             if let index = demo.sources.firstIndex(where: { $0.id == sourceID }) { demo.sources[index].enabled = value }
                         }))
                     }
                     NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("sourceLogin"), scope: sourceID) } label: {
-                        Label(source.loginStatus.action, systemImage: "person.badge.key").frame(maxWidth: .infinity, minHeight: 48)
+                        Label(demo.isDemo || source.id == "shushan" ? source.loginStatus.action : "访问说明", systemImage: "person.badge.key").frame(maxWidth: .infinity, minHeight: 48)
                             .foregroundStyle(.white).background(Palette.green, in: .rect(cornerRadius: 12))
                     }.buttonStyle(.plain).accessibilityIdentifier("sourceDetailLogin")
                     ForEach(["sourceEdit", "sourceDebug"], id: \.self) { id in

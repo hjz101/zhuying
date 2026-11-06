@@ -19,6 +19,10 @@ struct NativeSourceRules: Codable, Equatable, Sendable {
 }
 
 enum SourcePackages {
+    static func accountTitle(_ source: DemoSource,isDemo: Bool) -> String {
+        if isDemo || source.id == "shushan" { return source.loginStatus.title }
+        return (try? rules(source)) != nil ? "公开接口" : "规则未支持运行"
+    }
     static func rules(_ source: DemoSource) throws -> NativeSourceRules {
         guard let data = source.configuration, let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               object["adapter"] as? String == "json-v1", let value = object["endpoints"] else {
@@ -68,7 +72,8 @@ enum SourcePackages {
     private static func scrub(_ value: Any) -> Any {
         if let object = value as? [String:Any] {
             return object.filter { key, _ in
-                !["password","apikey","api_key","authorization","cookie","headers","token","access_token"].contains(key.lowercased())
+                let normalized = key.lowercased().filter { $0.isLetter || $0.isNumber }
+                return !["password","apikey","xapikey","authorization","cookie","cookies","headers","token","accesstoken","refreshtoken","secret","clientsecret"].contains(normalized)
             }.mapValues(scrub)
         }
         if let array = value as? [Any] { return array.map(scrub) }

@@ -27,6 +27,7 @@ struct ReaderView: View {
     @State private var chapter: Int
     @State private var anchor = ReaderAnchor()
     @State private var restoreID = 0
+    @State private var narrationRestoreID = 0
     @State private var showContents = false
     @State private var showSettings = false
     @State private var showGestureGuide = false
@@ -62,7 +63,7 @@ struct ReaderView: View {
             let layout = ReaderLayout(settings: store.settings, size: geo.size)
             ZStack(alignment: .topLeading) {
                 if initialized && rendered != nil && store.settings.mode == .scroll {
-                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { if store.isDemo { commentParagraph = $0 } })
+                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID + narrationRestoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { if store.isDemo { commentParagraph = $0 } })
                         .frame(width: layout.scrollFrame.width, height: layout.scrollFrame.height)
                         .position(x: layout.scrollFrame.midX, y: layout.scrollFrame.midY)
                 } else if initialized && !ranges.isEmpty {
@@ -128,6 +129,14 @@ struct ReaderView: View {
             haptic()
         }
         .onChange(of: scenePhase) { _, phase in store.readingHeartbeat(foreground: phase == .active); if phase != .active { save() } }
+        .onChange(of:store.followingNarrationAnchor) { _,location in
+            guard let location,location.bookID == book.id,let index = store.chapterIndex(bookID:book.id,chapterID:location.chapterID) else { return }
+            if index != chapter { if requestedChapter != index { goChapter(index,location:location) }; return }
+            guard loaded?.version == location.contentVersion,initialized else { return }
+            let target = ReaderAnchor(paragraph:location.paragraphIndex,offset:location.utf16Offset)
+            if store.settings.mode.isPaged { page = ReaderPaginator.page(containing:target,document:document,ranges:ranges) }
+            else if target.paragraph != anchor.paragraph || abs(target.offset - anchor.offset) > 120 { anchor = target; narrationRestoreID += 1; save() }
+        }
         .onDisappear { store.trackReading(nil); save(); chapterTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
         .onChange(of: showSettings || showContents || showGestureGuide || showBookmarks || demoFeature != nil) { _, covered in
             store.trackReading(covered ? nil : (initialized ? book.id : nil),interacted:!covered)

@@ -143,6 +143,8 @@ struct LibrarySnapshot: Codable {
     var groupNames: [String]? = nil
     var activitySessions: [ActivitySession]? = nil
     var subscribedSourceIDs: [String]? = nil
+    var narrationSettings: NarrationSettings? = nil
+    var narrationAnchor: ReadingAnchor? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -187,9 +189,18 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var groupNames: [String] = []
     @Published private(set) var activitySessions: [ActivitySession] = []
     @Published private(set) var subscribedSourceIDs: Set<String> = []
+    @Published var narrationSettings = NarrationSettings() { didSet { if oldValue != narrationSettings { audioCoordinator?.updateSettings(); persist() } } }
+    var narrationAnchor: ReadingAnchor? { didSet { if oldValue != narrationAnchor { persist() } } }
+    @Published private(set) var followingNarrationAnchor: ReadingAnchor?
+    private var audioCoordinator: LibraryAudioCoordinator?
+    var audio: LibraryAudioCoordinator {
+        if let audioCoordinator { return audioCoordinator }
+        let value = LibraryAudioCoordinator(library:self); audioCoordinator = value; return value
+    }
     private var readingActivityClock = ReadingActivityClock()
     private var activityBookID: String?
     private var activityForeground = true
+    private var narrationIsPlaying = false
     private var textIndex: TextSearchIndex?
     private(set) var onlineService: OnlineReadingService?
     private(set) var workspace: LibraryWorkspace?
@@ -257,6 +268,7 @@ final class LibraryStore: ObservableObject {
             guard snapshot.version == 1 else { throw CocoaError(.coderReadCorrupt) }
             hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
             activitySessions = snapshot.activitySessions ?? []
+            narrationSettings = snapshot.narrationSettings ?? .init(); narrationAnchor = snapshot.narrationAnchor
             var seen = Set<String>()
             let ids = Set(books.map(\.id))
             importedGroups = (snapshot.importedGroups ?? [:]).filter { ids.contains($0.key) }
@@ -473,7 +485,7 @@ final class LibraryStore: ObservableObject {
 
     private var snapshot: LibrarySnapshot {
         .init(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates,
-              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted())
+              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted(),narrationSettings:narrationSettings,narrationAnchor:narrationAnchor)
     }
 
     func bootstrapProductionIfNeeded(prepareAppearance: (() throws -> AppearanceMigrationInput)? = nil, forceReload: Bool = false) async {
@@ -503,6 +515,7 @@ final class LibraryStore: ObservableObject {
             shelfLayout = ShelfLayout(rawValue: restored.snapshot.shelfLayout ?? "") ?? .standard
             hasSeenReadingGuide = restored.snapshot.hasSeenReadingGuide ?? false
             activitySessions = restored.snapshot.activitySessions ?? []
+            narrationSettings = restored.snapshot.narrationSettings ?? .init(); narrationAnchor = restored.snapshot.narrationAnchor
             subscribedSourceIDs = Set(restored.snapshot.subscribedSourceIDs ?? [])
             updates = restored.snapshot.updates ?? [:]
             themeLibrary = restored.themeLibrary
@@ -566,17 +579,26 @@ final class LibraryStore: ObservableObject {
                       now: Date = Date(), uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         guard !isDemo else { return }
         if let foreground { activityForeground = foreground }
-        let session = readingActivityClock.advance(bookID: bookID, active: activityForeground && bookID != nil,
+        let session = readingActivityClock.advance(bookID: bookID, active: activityForeground && bookID != nil && !narrationIsPlaying,
                                                   interacted: interacted, wall: now, uptime: uptime)
         activityBookID = bookID
         guard let session else { return }
+        appendActivity(session)
+    }
+    func appendActivity(_ session: ActivitySession) {
+        guard !isDemo,session.seconds > 0,session.seconds <= 900 else { return }
         if let last = activitySessions.last, last.bookID == session.bookID, last.kind == session.kind,
            abs(last.end.timeIntervalSince(session.start)) < 0.01, last.seconds + session.seconds <= 900 {
             activitySessions[activitySessions.count - 1] = .init(bookID: last.bookID, start: last.start, seconds: last.seconds + session.seconds, kind: last.kind)
         } else { activitySessions.append(session) }
         persist()
     }
+    func followNarration(_ anchor: ReadingAnchor) { followingNarrationAnchor = anchor }
     func readingHeartbeat(foreground: Bool? = nil) { trackReading(activityBookID, foreground: foreground) }
+    func narrationPlaybackChanged(_ playing: Bool,now: Date = Date(),uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        guard narrationIsPlaying != playing else { return }; narrationIsPlaying = playing
+        trackReading(activityBookID,now:now,uptime:uptime)
+    }
     struct SearchResult { let hits: [TextSearchHit]; let indexed: Int; let uncached: Int }
     func searchText(_ query: String, bookID: String? = nil) async throws -> SearchResult {
         var indexed: [IndexedChapter] = [], missing = 0
@@ -651,7 +673,7 @@ final class LibraryStore: ObservableObject {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--ui-testing") && arguments.contains("--online-fixtures") {
-            await service.configure(source: OnlineDevelopmentFixtures()); onlineRevision += 1; return
+            await service.configure(source: OnlineDevelopmentFixtures()); await service.prepareDownloads(); onlineRevision += 1; return
         }
         #endif
         let source = sources.first { $0.id == "shushan" && $0.enabled && $0.kind == .novel }
@@ -664,7 +686,8 @@ final class LibraryStore: ObservableObject {
         onlineRevision += 1
     }
     func enqueueDownload(bookID: String, count: Int?, wifiOnly: Bool) async throws {
-        guard let book = remoteBooks[bookID], let catalog = chapterCatalogs[bookID], let downloads = await onlineService?.downloads else { throw ContentFailure.sourceDisabled }
+        guard let book = remoteBooks[bookID], let catalog = chapterCatalogs[bookID] else { throw ContentFailure.sourceDisabled }
+        guard let downloads = onlineService?.downloads else { throw ContentFailure.storageFailure }
         let start = min(catalog.count, (progress[bookID]?.chapter ?? -1) + 1)
         let selected = count.map { Array(catalog.dropFirst(start).prefix($0)) } ?? catalog
         _ = try await downloads.enqueue(book:book,chapters:selected.filter { $0.access == .readable },wifiOnly:wifiOnly)
@@ -720,14 +743,20 @@ final class LibraryStore: ObservableObject {
         }
     }
     func restoreBackup(_ backup: LibraryBackup) async throws {
-        guard let workspace, productionFactory != nil, await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        guard let workspace, productionFactory != nil else { throw ContentFailure.storageFailure }
+        audioCoordinator?.stop(); await onlineService?.downloads?.pauseForBackground()
+        guard await flushPendingWrites() else {
+            if activityForeground { await onlineService?.downloads?.returnToForeground() }
+            throw ContentFailure.storageFailure
+        }
         loadState = .loading
         do { try await workspace.restore(backup) }
-        catch { loadState = .ready; throw error }
+        catch { loadState = .ready; if activityForeground { await onlineService?.downloads?.returnToForeground() }; throw error }
         reader = nil; productionPersistence = nil; bootstrapStarted = false
         activeDocuments = ChapterMemoryCache(); stableProgress = [:]; remoteBooks = [:]; chapterCatalogs = [:]
         hasPendingChanges = false; lastWriteFailed = false
         await bootstrapProductionIfNeeded()
+        if activityForeground { await onlineService?.downloads?.returnToForeground() }
         guard loadState == .ready else { throw ContentFailure.storageFailure }
     }
 
@@ -809,6 +838,7 @@ final class LibraryStore: ObservableObject {
     }
 
     func permanentlyDeleteBook(id: String) async throws {
+        if audioCoordinator?.state.bookID == id { audioCoordinator?.stop() }
         guard let backend = productionPersistence, loadState == .ready, await flushPendingWrites() else { throw ContentFailure.storageFailure }
         let previous = writeTail
         let operation = Task { @MainActor in
@@ -821,6 +851,9 @@ final class LibraryStore: ObservableObject {
             for chapter in self.chapterCatalogs[id] ?? [] { self.activeDocuments.removeValue(forKey: chapter.id) }
             self.chapterCatalogs.removeValue(forKey: id); self.stableProgress.removeValue(forKey: id)
             self.remoteBooks.removeValue(forKey: id)
+            self.activitySessions.removeAll { $0.bookID == id }
+            if self.narrationAnchor?.bookID == id { self.narrationAnchor = nil }
+            if self.followingNarrationAnchor?.bookID == id { self.followingNarrationAnchor = nil }
             if self.reader?.book.id == id { self.reader = nil }
             if !cleaned { self.storageMessage = "作品记录已删除，部分文件将在下次打开书库时清理。" }
         }

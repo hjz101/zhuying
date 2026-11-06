@@ -44,4 +44,13 @@ final class EPUBBookParserTests: XCTestCase {
         XCTAssertThrowsError(try EPUBBookParser.resolve("../../outside", relativeTo: "OPS/chapter.xhtml"))
         XCTAssertThrowsError(try EPUBBookParser.resolve("https://tracking.example/image.png", relativeTo: "OPS/a.xhtml"))
     }
+    func testSecondLongReflowEPUBPreservesCDATAUnicodeAndUsesReaderPagination() throws {
+        let book = try BookImporter.prepare(data:bytes("reflow-long"),name:"长文.epub").book
+        XCTAssertEqual(book.title,"长夜与星光"); XCTAssertEqual(book.author,"阅山原创长文")
+        XCTAssertEqual(book.content[0].count,601)
+        XCTAssertTrue(book.content[0][1].contains("👩🏽‍🚀 é & < >"))
+        let document = ReaderDocument(book:book,chapter:0,settings:.init(),isDemo:false)
+        XCTAssertGreaterThan(document.text.length,20000)
+        XCTAssertFalse(document.text.string.contains("color:red"))
+    }
 }

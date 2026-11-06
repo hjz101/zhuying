@@ -19,23 +19,26 @@ private final class HTTPSImportRedirectDelegate: NSObject, URLSessionTaskDelegat
 /// Stream a bounded response. Cancelling parsing also cancels its network
 /// session; no unbounded download or abandoned temporary file is left behind.
 struct BoundedBookDownloader: BookImportDownloading {
+    enum Format: Sendable { case book, sourceJSON }
     let maximumBytes: Int
+    let format: Format
     let configuration: @Sendable () -> URLSessionConfiguration
-    init(maximumBytes: Int = BookImporter.maximumBytes, configuration: @escaping @Sendable () -> URLSessionConfiguration = { .ephemeral }) {
-        self.maximumBytes = maximumBytes; self.configuration = configuration
+    init(maximumBytes: Int? = nil,format: Format = .book, configuration: @escaping @Sendable () -> URLSessionConfiguration = { .ephemeral }) {
+        self.maximumBytes = maximumBytes ?? (format == .sourceJSON ? 5 * 1024 * 1024 : BookImporter.maximumBytes); self.format = format; self.configuration = configuration
     }
+    private var acceptedTypes: [String] { (format == .sourceJSON ? ["application/json","text/json","text/plain"] : ["text/plain","text/txt","application/pdf","application/epub+zip"]) + ["application/octet-stream","binary/octet-stream"] }
     func fetch(_ url: URL) async throws -> DownloadedBookFile {
         _ = try BookImporter.remoteURL(url.absoluteString)
         try Task.checkCancellation()
         let session = URLSession(configuration: configuration(), delegate: HTTPSImportRedirectDelegate(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
-        request.setValue("text/plain, application/pdf", forHTTPHeaderField: "Accept")
+        request.setValue(acceptedTypes.joined(separator:", "), forHTTPHeaderField: "Accept")
         let (bytes, rawResponse) = try await session.bytes(for: request)
         guard let response = rawResponse as? HTTPURLResponse, response.url?.scheme?.lowercased() == "https",
               (200..<300).contains(response.statusCode) else { throw BookImportError.message("下载失败，请检查链接后重试。") }
-        if let mime = response.mimeType?.lowercased(), !["text/plain", "text/txt", "application/pdf", "application/octet-stream", "binary/octet-stream"].contains(mime) {
-            throw BookImportError.message("链接未返回 TXT 或 PDF 文件，请使用文件直链。")
+        if let mime = response.mimeType?.lowercased(), !acceptedTypes.contains(mime) {
+            throw BookImportError.message("链接未返回支持的文件格式，请使用文件直链。")
         }
         guard response.expectedContentLength <= maximumBytes else { throw sizeError }
         var data = Data()

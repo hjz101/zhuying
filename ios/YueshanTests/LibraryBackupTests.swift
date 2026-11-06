@@ -23,6 +23,24 @@ import XCTest
     private func library(_ workspace: LibraryWorkspace) -> LibraryStore {
         .init(books: [], defaults: defaults, seedDemoData: false, productionFactory: { try ProductionLibraryPersistence(directory: workspace.databaseDirectory()) }, workspace: workspace)
     }
+    func testRestoreStopsOldWorkButLeavesForegroundDownloadsReadyForNewRequests() async throws {
+        let workspace = workspace(), downloads = try OfflineDownloadStore(directory:root.appendingPathComponent("downloads"))
+        let service = OnlineReadingService(cache:try RecentChapterCache(directory:root.appendingPathComponent("cache")),downloads:downloads)
+        let library = LibraryStore(books:[],defaults:defaults,seedDemoData:false,productionFactory:{ try ProductionLibraryPersistence(directory:workspace.databaseDirectory()) },onlineService:service,workspace:workspace)
+        await library.bootstrapProductionIfNeeded()
+        let backup = try LibraryBackup.decode(await library.createBackup())
+        await downloads.configure { _,chapter in .init(chapterID:chapter.id,paragraphs:["恢复后的原创下载正文。"]) }
+        try await library.restoreBackup(backup)
+        let book = LibraryBookRecord(id:"after-restore",title:"恢复下载测试",author:"原创",summary:"",source:.init(sourceID:"test",nativeBookID:"test",provider:"测试",bookURL:"https://test.invalid"),addedAt:Date())
+        let chapter = ChapterRecord(id:"after-restore-chapter",bookID:book.id,nativeChapterID:"one",title:"第一章",order:0,access:.readable)
+        _ = try await downloads.enqueue(book:book,chapters:[chapter],wifiOnly:false)
+        for _ in 0..<200 {
+            await downloads.connectivity(connected:true,wifi:true)
+            if await downloads.list().first?.status == .completed { return }
+            try await Task.sleep(for:.milliseconds(5))
+        }
+        XCTFail("Foreground downloads must remain usable after backup restore")
+    }
     private func appearance(_ fonts: ReadingFontLibrary, workspace: LibraryWorkspace) throws -> AppearanceMigrationInput {
         fonts.useDirectory(try workspace.fontDirectory())
         return .init(fallbackThemeLibrary: FeatureDemoStore(seedDemoData: false).themeSnapshot, originalFontManifest: try fonts.prepareManagedStorage(), fontHashes: fonts.recordedHashes)

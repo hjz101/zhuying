@@ -24,7 +24,7 @@ def source_digest(root: Path) -> str:
         path = root / name
         if path.is_file(): paths.append(path)
     for folder in ['Yueshan', 'YueshanTests', 'YueshanUITests', 'YueshanPerformanceTests', 'YueshanPerformanceUITests', 'YueshanTestSupport']:
-        paths += [p for p in (root / 'ios' / folder).rglob('*') if p.is_file() and p.suffix in {'.swift', '.json', '.plist', '.ttf'}]
+        paths += [p for p in (root / 'ios' / folder).rglob('*') if p.is_file() and p.suffix in {'.swift', '.json', '.plist', '.ttf', '.epub'}]
     digest = hashlib.sha256()
     for path in sorted(paths):
         for value in [path.relative_to(root).as_posix().encode(), path.read_bytes()]:

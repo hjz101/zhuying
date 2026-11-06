@@ -8,6 +8,8 @@
 
 正式开发的当前状态与验证证据见 [实施记录](docs/IMPLEMENTATION-STATUS.md)，书山聚合的接口子集及待联调范围见 [接入记录](docs/SHUSHAN-INTEGRATION.md)。界面与交互一致性按 `AGENTS.md` 执行。
 
+步骤五、六的 0.6.0 开发版本新增 EPUB、多源与下载工具、真实全文搜索／统计、系统朗读及用户自配在线／AI 服务；范围与待验收条件见 [候选说明](docs/release/2026-11-06-stage-five-six.md)。服务在 App 内配置，密钥不经聊天。
+
 ## 冻结 Demo
 
 原 Demo 的完整源码、截图和保存清单位于 [保存分支](https://github.com/hjz101/zhuying/tree/codex/saved-demo-2026-11-05)，固定提交为 `ea3b91c9b6cfcdbc411567ac4c7a7c0ae70a70e4`。主分支通过 `阅山Demo-2026-11-05/` 子模块引用该版本，保留独立历史。

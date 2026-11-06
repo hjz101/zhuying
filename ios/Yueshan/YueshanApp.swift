@@ -60,9 +60,18 @@ struct YueshanApp: App {
                 try ThemeStyleSamples.importData.write(to: documents.appendingPathComponent("阅读套装.json"))
             }
             var rejectFirstOpen = testing && ProcessInfo.processInfo.arguments.contains("--storage-retry-fixture")
+            #if DEBUG
+            if testing && ProcessInfo.processInfo.arguments.contains("--source-package-fixtures") {
+                let documents = manager.urls(for:.documentDirectory,in:.userDomainMask)[0]
+                try manager.createDirectory(at:documents,withIntermediateDirectories:true)
+                let endpoints = try JSONSerialization.jsonObject(with:JSONEncoder().encode(NativeSourceRules.example))
+                let source = DemoSource(id:"original-source-fixture",name:"原创 JSON 书源",detail:"测试配置，不替代真实来源验收",url:"https://fixture-source.invalid",configuration:try JSONSerialization.data(withJSONObject:["adapter":"json-v1","endpoints":endpoints]))
+                try SourcePackages.export([source]).write(to:documents.appendingPathComponent("原创书源测试.json"))
+            }
+            #endif
             let cacheRoot = manager.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent(environment.databaseComponent + "/RecentChapters")
             if environment.resetsTestState { try? manager.removeItem(at: cacheRoot) }
-            let online = environment.isDemo ? nil : OnlineReadingService(cache: try RecentChapterCache(directory: cacheRoot), downloads: try OfflineDownloadStore(directory: databaseDirectory.appendingPathComponent("OfflineDownloads")))
+            let online = environment.isDemo ? nil : OnlineReadingService(cache: try RecentChapterCache(directory: cacheRoot), downloads: try? OfflineDownloadStore(directory: databaseDirectory.appendingPathComponent("OfflineDownloads")))
             _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo,
                 productionFactory: environment.isDemo ? nil : {
                     if rejectFirstOpen { rejectFirstOpen = false; throw CocoaError(.fileWriteNoPermission) }
@@ -121,6 +130,11 @@ struct RootView: View {
                              fontHashes: fonts.recordedHashes, warnings: fonts.message.map { [$0] } ?? [])
             })
             #if DEBUG
+            if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--narration-fixtures") && store.books.isEmpty {
+                let prose = "第一章 星光\n" + String(repeating:"这是一段原创朗读测试正文，读者在山间看见星光。\n",count:80) + "第二章 回声\n回声来自远方。"
+                if let prepared = try? BookImporter.prepare(data:Data(prose.utf8),name:"原创朗读测试.txt") { _ = try? await store.importBookDurably(prepared.book); store.completeReadingGuide() }
+            }
+            if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-native-narration") { try? await NativeNarrationValidation.run() }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--measure-native-performance") {
                 let readyMS = (ProcessInfo.processInfo.systemUptime - NativePerformanceValidation.processStarted) * 1000
                 try? NativePerformanceValidation.writeReport(readyMS: readyMS)
@@ -203,6 +217,7 @@ struct RootView: View {
         }.safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
     }
     @ViewBuilder private var miniPlayer: some View {
+            if !store.isDemo { ProductionMiniPlayer(audio:store.audio,open:{showPlayer = true}) }
             if store.isDemo && demo.playerVisible {
                 HStack(spacing: 15) {
                     Button { showPlayer = true } label: { Label("长风渡山海 · 演示朗读", systemImage: "waveform").font(.system(size: 11)).frame(maxWidth: .infinity, alignment: .leading) }

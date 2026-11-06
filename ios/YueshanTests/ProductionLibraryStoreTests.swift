@@ -259,6 +259,11 @@ final class ProductionLibraryStoreTests: XCTestCase {
         XCTAssertEqual(Set(restored.importedGroups.values), ["收藏"])
         try await restored.removeBookmark(id: mark.id)
         restored.removeGroup("收藏")
+        let activityStart = Date()
+        restored.trackReading(first.id,interacted:true,now:activityStart,uptime:0)
+        restored.trackReading(nil,now:activityStart.addingTimeInterval(5),uptime:5)
+        XCTAssertFalse(restored.activitySessions.isEmpty)
+        restored.narrationAnchor = mark.anchor
         try await restored.permanentlyDeleteBook(id: first.id)
         restored.undoRemoval(removal) // A stale undo cannot resurrect a deleted book.
         _ = await restored.flushPendingWrites()
@@ -266,6 +271,7 @@ final class ProductionLibraryStoreTests: XCTestCase {
         XCTAssertEqual(final.books.map(\.id), [second.id])
         XCTAssertEqual(final.favorites, [second.id])
         XCTAssertNil(final.progress[first.id]); XCTAssertNil(final.importedGroups[first.id])
+        XCTAssertTrue(final.activitySessions.isEmpty); XCTAssertNil(final.narrationAnchor)
         XCTAssertEqual(final.importedGroups[second.id], "未分组")
         XCTAssertEqual(final.bookmarks.map { $0.anchor.bookID }, [second.id])
     }

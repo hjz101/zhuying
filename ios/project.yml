@@ -16,8 +16,8 @@ settings:
     TARGETED_DEVICE_FAMILY: '1'
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ''
-    MARKETING_VERSION: '0.4.0'
-    CURRENT_PROJECT_VERSION: '4'
+    MARKETING_VERSION: '0.6.0'
+    CURRENT_PROJECT_VERSION: '6'
     YUESHAN_SOURCE_REVISION: unrecorded
 targets:
   Yueshan:
@@ -34,6 +34,7 @@ targets:
         YueshanSourceRevision: $(YUESHAN_SOURCE_REVISION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        UIBackgroundModes: [audio]
     sources:
       - path: Yueshan
     settings:

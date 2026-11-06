@@ -9,6 +9,14 @@ private struct DownloadObjectFailure: AtomicFileWriting {
     }
 }
 final class OnlineToolsTests: XCTestCase {
+    func testPublicSourceAccessCaptionPreservesDemoAndShushanLoginStates() throws {
+        let bytes = Data("{\"name\":\"原创源\",\"url\":\"https://source.test\",\"adapter\":\"json-v1\",\"endpoints\":{\"version\":1,\"search\":\"search?q={query}\",\"details\":\"books/{bookID}\",\"catalog\":\"books/{bookID}/chapters\",\"content\":\"chapters/{chapterID}\"}}".utf8)
+        let source = try XCTUnwrap(SourcePackages.parse(bytes,existing:[]).sources.first)
+        XCTAssertEqual(SourcePackages.accountTitle(source,isDemo:false),"公开接口")
+        XCTAssertEqual(SourcePackages.accountTitle(source,isDemo:true),"未登录")
+        let shushan = DemoSource(id:"shushan",name:"书山",detail:"",loginStatus:.expired)
+        XCTAssertEqual(SourcePackages.accountTitle(shushan,isDemo:false),"登录已过期")
+    }
     private func book(_ id: String = "book") -> LibraryBookRecord {
         .init(id:id,title:"原创下载作品",author:"阅山测试",summary:"",source:.init(sourceID:"source-" + id,nativeBookID:id,provider:"来源",bookURL:"https://source.test"),addedAt:Date())
     }
@@ -111,5 +119,29 @@ final class OnlineToolsTests: XCTestCase {
         try await repository.commitSourceSwitch(from:old.id,book:new,chapters:newCatalog,anchor:newAnchor)
         let switched = try await repository.favoriteIDs(), retained = try await repository.progress(bookID:old.id)
         XCTAssertEqual(switched,[new.id]); XCTAssertEqual(retained,oldAnchor)
+        let reopened = try SQLiteLibraryRepository(url:url)
+        let reopenedFavorites = try await reopened.favoriteIDs(), reopenedOld = try await reopened.progress(bookID:old.id), reopenedNew = try await reopened.progress(bookID:new.id)
+        XCTAssertEqual(reopenedFavorites,[new.id]); XCTAssertEqual(reopenedOld,oldAnchor); XCTAssertEqual(reopenedNew,newAnchor)
+    }
+    func testDamagedDownloadManifestIsQuarantinedWithoutPreventingOtherReading() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at:root); if let siblings = try? FileManager.default.contentsOfDirectory(at:root.deletingLastPathComponent(),includingPropertiesForKeys:nil) { for path in siblings where path.lastPathComponent.hasPrefix(root.lastPathComponent + ".damaged-") { try? FileManager.default.removeItem(at:path) } } }
+        let store = try OfflineDownloadStore(directory:root)
+        _ = try await store.enqueue(book:book(),chapters:catalog(book()),wifiOnly:true)
+        try Data("damaged queue".utf8).write(to:root.appendingPathComponent("tasks.json"))
+        let reopened = try OfflineDownloadStore(directory:root), tasks = await reopened.list(), warning = await reopened.warning
+        XCTAssertTrue(tasks.isEmpty); XCTAssertNotNil(warning)
+        let preserved = try FileManager.default.contentsOfDirectory(at:root.deletingLastPathComponent(),includingPropertiesForKeys:nil).first { $0.lastPathComponent.hasPrefix(root.lastPathComponent + ".damaged-") }
+        XCTAssertNotNil(preserved); XCTAssertEqual(try Data(contentsOf:preserved!.appendingPathComponent("tasks.json")),Data("damaged queue".utf8))
+    }
+    func testChangingOriginKeepsBothEditionsAndTheirBindings() async throws {
+        let repository = try SQLiteLibraryRepository()
+        let a = SourceBookReference(sourceID:"same-source",nativeBookID:"same-native",provider:"来源",bookURL:"https://a.test",origin:"https://a.test")
+        let b = SourceBookReference(sourceID:"same-source",nativeBookID:"same-native",provider:"来源",bookURL:"https://b.test",origin:"https://b.test")
+        for source in [a,b] {
+            let record = LibraryBookRecord(id:source.id,title:"作品",author:"作者",summary:"",source:source,addedAt:Date())
+            try await repository.save(book:record,chapters:[])
+        }
+        let records = try await repository.books(); XCTAssertEqual(records.count,2); XCTAssertNotEqual(records[0].id,records[1].id)
     }
 }

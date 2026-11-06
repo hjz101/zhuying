@@ -63,6 +63,15 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
         migrator.registerMigration("v2-shelf-order") { db in
             try db.alter(table: "shelf_entries") { $0.add(column: "position", .integer) }
         }
+        migrator.registerMigration("v3-source-origin-identity") { db in
+            // The binding's stable primary ID already includes its origin.
+            // A host change must allow both editions to retain their history.
+            try db.execute(sql:"CREATE TABLE source_bindings_v3 (id TEXT PRIMARY KEY NOT NULL, bookID TEXT NOT NULL REFERENCES book_records(id) ON DELETE CASCADE, sourceID TEXT NOT NULL, nativeBookID TEXT NOT NULL)")
+            try db.execute(sql:"INSERT INTO source_bindings_v3(id,bookID,sourceID,nativeBookID) SELECT id,bookID,sourceID,nativeBookID FROM source_bindings")
+            try db.execute(sql:"DROP TABLE source_bindings")
+            try db.execute(sql:"ALTER TABLE source_bindings_v3 RENAME TO source_bindings")
+            try db.execute(sql:"CREATE INDEX source_binding_lookup ON source_bindings(sourceID,nativeBookID)")
+        }
         try migrator.migrate(queue)
         database = queue
     }

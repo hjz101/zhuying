@@ -5,8 +5,10 @@ struct ProductionCacheView: View {
     @EnvironmentObject private var library: LibraryStore
     @State private var bytes = 0
     @State private var chapters = 0
+    @State private var audioBytes = 0
     @State private var message: String?
     @State private var confirming = false
+    @State private var clearingAudio = false
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 23) {
@@ -15,23 +17,29 @@ struct ProductionCacheView: View {
                     HStack { Label("章节", systemImage: "doc.text"); Spacer(); Text(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) }.accessibilityIdentifier("actualCacheUsage")
                     HStack { Text("已缓存章节"); Spacer(); Text("\(chapters)") }
                     HStack { Label("图片", systemImage: "photo"); Spacer(); Text("未缓存") }
-                    HStack { Label("音频", systemImage: "waveform"); Spacer(); Text("暂不支持") }
+                    HStack { Label("音频", systemImage: "waveform"); Spacer(); Text(ByteCountFormatter.string(fromByteCount:Int64(audioBytes),countStyle:.file)) }.accessibilityIdentifier("actualAudioCacheUsage")
                 }.font(.system(size: 12))
                 Text("近期缓存最多 60 章、32 MiB；联网时超过 24 小时尝试更新，断网仍可读已缓存正文。当前章优先，预取失败不阻塞阅读。清理近期缓存会保留主动下载、导入正文、进度、收藏、书签、字体和主题。")
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
                 NavigationLink { ProductionDownloadView(bookID:bookID) } label: { Label("管理主动下载",systemImage:"arrow.down.circle") }.font(.system(size:13))
-                Button(bookID == nil ? "清理近期章节缓存" : "清理当前作品缓存") { confirming = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("clearRecentCache")
+                Button(bookID == nil ? "清理近期章节缓存" : "清理当前作品缓存") { clearingAudio = false; confirming = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("clearRecentCache")
+                Button("停止朗读并清理音频缓存") { clearingAudio = true; confirming = true }.buttonStyle(PrimaryButtonStyle(filled:false)).accessibilityIdentifier("clearAudioCache")
                 if let message { Text(message).font(.system(size: 12)).accessibilityIdentifier("cacheMessage") }
             }.padding(22)
         }.appPageStyle().navigationTitle("缓存管理").navigationBarTitleDisplayMode(.inline)
             .task { await refresh() }
             .confirmationDialog("确认清理？", isPresented: $confirming, titleVisibility: .visible) {
-                Button("只清理网络章节缓存", role: .destructive) { Task { do { try await library.onlineService?.clearCache(bookID: bookID); await refresh(); message = "缓存已清理，阅读记录和导入正文保留。" } catch { message = "清理未完成：\(error.localizedDescription)" } } }
+                if clearingAudio {
+                    Button("停止并清理音频",role:.destructive) { Task { do { try await library.audio.clearCache(); await refresh(); message = "音频缓存已清理，阅读、主动下载和角色设置保留。" } catch { message = "清理未完成：\(error.localizedDescription)" } } }
+                } else {
+                    Button("只清理网络章节缓存", role: .destructive) { Task { do { try await library.onlineService?.clearCache(bookID: bookID); await refresh(); message = "缓存已清理，阅读记录和导入正文保留。" } catch { message = "清理未完成：\(error.localizedDescription)" } } }
+                }
                 Button("取消", role: .cancel) {}
             }
     }
     @MainActor private func refresh() async {
         let usage = await library.onlineService?.cacheUsage(); bytes = usage?.bytes ?? 0; chapters = usage?.chapters ?? 0
+        audioBytes = (try? await library.audio.cacheBytes()) ?? 0
     }
 }
 

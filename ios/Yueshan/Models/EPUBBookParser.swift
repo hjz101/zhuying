@@ -123,6 +123,10 @@ private final class EPUBXML: NSObject, XMLParserDelegate {
         if !capture.isEmpty { metadataText += string }
         if skip == 0 { text += string }
     }
+    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+        guard let string = String(data:CDATABlock,encoding:.utf8) else { parser.abortParsing(); return }
+        self.parser(parser,foundCharacters:string)
+    }
     func parser(_ parser: XMLParser, didEndElement raw: String, namespaceURI: String?, qualifiedName: String?) {
         let name = raw.split(separator: ":").last.map(String.init) ?? raw
         if name == "title", capture == "title" { title = metadataText.trimmingCharacters(in: .whitespacesAndNewlines); capture = "" }

@@ -50,6 +50,9 @@ struct FeatureDemoView: View {
             if feature.id == "import" || (!library.isDemo && ["epub", "txt"].contains(feature.id)) { SmartImportView() }
             else if !library.isDemo && feature.id == "fulltext" { ProductionTextSearchView(bookID: bookID, onRead: onRead) }
             else if !library.isDemo && feature.id == "statistics" { FootprintsView(title: feature.title) }
+            else if !library.isDemo && feature.id == "aiConfig" { ProductionAudioServiceView() }
+            else if !library.isDemo && feature.id == "aiRoles" { ProductionRolesView(bookID:bookID) }
+            else if !library.isDemo && ["systemTTS","onlineTTS","backgroundAudio"].contains(feature.id) { ProductionNarrationView(bookID:bookID,mode:feature.id == "backgroundAudio" ? nil : feature.id == "onlineTTS" ? .online : .system,title:feature.title) }
             else if feature.id == "themes" { ThemeLibraryView() }
             else if feature.id == "fonts" { ReadingFontManagerView() }
             else if feature.id == "typography" { ReadingTypographyPreferencesView().navigationTitle(feature.title) }
@@ -58,6 +61,7 @@ struct FeatureDemoView: View {
             else if feature.id == "highlight" { ReadingStyleRulesView().navigationTitle(feature.title) }
             else if feature.id == "comments" { ReadingCommentsPreferencesView().navigationTitle(feature.title) }
             else if !library.isDemo && feature.id == "sourceLogin" && scope == "shushan" { ShushanLoginView() }
+            else if !library.isDemo && feature.id == "sourceLogin" { ProductionSourceAccessView() }
             else if !library.isDemo && feature.id == "sourceEdit" && (scope == "shushan" || (scope == "main" && library.sources.first?.id == "shushan")) { SourceConfigurationView(sourceID:"shushan") }
             else if !library.isDemo && feature.id == "sourceEdit" { ProductionSourceRuleEditor(sourceID: scope == "main" ? library.sources.first?.id ?? scope : scope) }
             else if !library.isDemo && feature.id == "sourceImport" { ProductionSourceImportView() }

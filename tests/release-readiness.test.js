@@ -49,6 +49,7 @@ with tempfile.TemporaryDirectory() as root:
  app=p/'ios/Yueshan/App.swift';app.write_text('struct App {}');before=m.source_digest(p);assert m.source_digest(p)==before
  app.write_text('struct Changed {}');after=m.source_digest(p);assert after!=before
  test=p/'ios/YueshanTests/Test.swift';test.write_text('func testOne() {}');assert m.source_digest(p)!=after;assert m.inventory(p)['unitTests']==1
+ before=m.source_digest(p);epub=p/'ios/YueshanTests/original.epub';epub.write_bytes(b'original EPUB fixture');assert m.source_digest(p)!=before
 `;
   assert.doesNotThrow(() => execFileSync('python3', ['-c', script], { stdio: 'pipe' }));
 });

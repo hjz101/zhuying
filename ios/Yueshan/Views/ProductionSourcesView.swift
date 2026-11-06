@@ -1,6 +1,20 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct ProductionSourceAccessView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment:.leading,spacing:23) {
+                AppPageHeader(title:"访问说明",subtitle:"自定义书源 · 原生 JSON v1",icon:"person.badge.key")
+                AppSettingsCard("公开访问",icon:"info.circle") {
+                    Text("原生 JSON v1 书源使用公开 HTTPS 接口，无需登录。当前不运行导入规则中的脚本、Cookie 或请求头；需要账号的站点请使用已有书山登录入口。")
+                        .font(.system(size:13)).lineSpacing(6)
+                }
+            }.padding(22)
+        }.appPageStyle().navigationTitle("访问说明").navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 struct ProductionSourceImportView: View {
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var library: LibraryStore
@@ -18,9 +32,9 @@ struct ProductionSourceImportView: View {
             VStack(alignment: .leading, spacing: 23) {
                 AppPageHeader(title: "书源导入导出", subtitle: "预览确认 · 版本校验 · 未支持规则保留但不执行", icon: "arrow.up.arrow.down.circle")
                 AppSettingsCard("配置与选项", icon: "slider.horizontal.3") {
-                    Picker("导入方式", selection: $method) { ForEach(["URL","JSON 文件","JSON 源码"], id: \.self) { Text($0) } }.pickerStyle(.segmented)
+                    Picker("导入方式", selection: $method) { ForEach(["URL","JSON 文件","JSON 源码"], id: \.self) { Text($0) } }.pickerStyle(.segmented).accessibilityIdentifier("sourcePackageMethod")
                     if method == "URL" { TextField("HTTPS 书源文件链接", text: $address).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("sourcePackageURL") }
-                    if method == "JSON 源码" { TextEditor(text: $json).frame(minHeight: 180).font(.system(size: 12, design: .monospaced)).accessibilityIdentifier("sourcePackageJSON") }
+                    if method == "JSON 源码" { TextEditor(text: $json).frame(minHeight: 180).font(.system(size: 12, design: .monospaced)).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("sourcePackageJSON") }
                 }
                 if method == "JSON 文件" { Button("选择 JSON 文件") { choosing = true }.buttonStyle(PrimaryButtonStyle(filled: false)) }
                 Button("预览导入") { load() }.buttonStyle(PrimaryButtonStyle()).disabled(busy || method == "JSON 文件").accessibilityIdentifier("sourcePackagePreview")
@@ -61,7 +75,7 @@ struct ProductionSourceImportView: View {
             do {
                 let bytes: Data
                 if method == "JSON 源码" { bytes = Data(json.utf8) }
-                else { bytes = try await BoundedBookDownloader().fetch(BookImporter.remoteURL(address)).data }
+                else { bytes = try await BoundedBookDownloader(format:.sourceJSON).fetch(BookImporter.remoteURL(address)).data }
                 try Task.checkCancellation(); preview = try SourcePackages.parse(bytes, existing: demo.sources)
             } catch { if !Task.isCancelled { message = error.localizedDescription } }
         }

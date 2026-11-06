@@ -28,24 +28,47 @@ actor OfflineDownloadStore {
     private var wifi = false
     private var changingTasks = false
     private var foreground = true
+    private(set) var warning: String? = nil
     init(directory: URL, quota: Int = 256 * 1024 * 1024, writer: any AtomicFileWriting = AtomicFileWriter()) throws {
         root = directory; self.writer = writer; self.quota = quota
-        try FileManager.default.createDirectory(at: directory,withIntermediateDirectories:true)
-        files = try FileChapterRepository(directory:directory.appendingPathComponent("chapters"),writer:writer)
-        let url = directory.appendingPathComponent("tasks.json")
-        if FileManager.default.fileExists(atPath:url.path) {
-            tasks = try JSONDecoder().decode([OfflineDownloadTask].self,from:Data(contentsOf:url))
-            guard tasks.count <= 100, Set(tasks.map(\.id)).count == tasks.count,
-                  tasks.allSatisfy({ task in task.book.source != nil && !task.chapters.isEmpty && task.chapters.count <= 10000 &&
-                      task.chapters.allSatisfy { $0.bookID == task.book.id && $0.access == .readable } &&
-                      Set(task.chapters.map(\.id)).count == task.chapters.count && task.completed.isSubset(of: Set(task.chapters.map(\.id))) }) else { throw ContentFailure.storageFailure }
-            for index in tasks.indices where tasks[index].status == .running || tasks[index].status == .queued {
-                tasks[index].status = .paused; tasks[index].message = "上次退出，已保留已下载章节；点击继续。"
+        let manager = FileManager.default
+        try manager.createDirectory(at:directory,withIntermediateDirectories:true)
+        var loaded: [OfflineDownloadTask] = []
+        let manifestURL = directory.appendingPathComponent("tasks.json")
+        if manager.fileExists(atPath:manifestURL.path) {
+            do {
+                let size = try manifestURL.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0
+                guard size <= 16 * 1024 * 1024 else { throw ContentFailure.storageFailure }
+                loaded = try JSONDecoder().decode([OfflineDownloadTask].self,from:Data(contentsOf:manifestURL))
+                guard loaded.count <= 100,Set(loaded.map(\.id)).count == loaded.count,loaded.reduce(0,{ $0 + $1.chapters.count }) <= 50000,
+                      loaded.allSatisfy({ task in task.book.source != nil && !task.chapters.isEmpty && task.chapters.count <= 10000 &&
+                          task.chapters.allSatisfy { $0.bookID == task.book.id && $0.access == .readable } &&
+                          Set(task.chapters.map(\.id)).count == task.chapters.count && task.completed.isSubset(of:Set(task.chapters.map(\.id))) }) else { throw ContentFailure.storageFailure }
+            } catch {
+                try manager.moveItem(at:directory,to:directory.appendingPathExtension("damaged-" + UUID().uuidString))
+                try manager.createDirectory(at:directory,withIntermediateDirectories:true)
+                loaded = []; warning = "下载队列无法读取，原任务和文件已保留在恢复目录；可以重新建立下载任务。"
             }
-        } else { tasks = [] }
+        }
+        let contentDirectory = directory.appendingPathComponent("chapters")
+        do { files = try FileChapterRepository(directory:contentDirectory,writer:writer) }
+        catch {
+            if manager.fileExists(atPath:contentDirectory.path) { try manager.moveItem(at:contentDirectory,to:contentDirectory.appendingPathExtension("damaged-" + UUID().uuidString)) }
+            files = try FileChapterRepository(directory:contentDirectory,writer:writer)
+            for index in loaded.indices { loaded[index].completed = []; loaded[index].status = .failed; loaded[index].message = "下载文件缺失或损坏，原文件已保留，请重试下载。" }
+            warning = "部分下载文件缺失或损坏，导入正文和阅读记录不受影响。"
+        }
+        for index in loaded.indices where loaded[index].status == .running || loaded[index].status == .queued {
+            loaded[index].status = .paused; loaded[index].message = "上次退出，已保留已下载章节；点击继续。"
+        }
+        tasks = loaded
     }
+
     private func save(_ next: [OfflineDownloadTask]) throws {
-        try writer.write(JSONEncoder().encode(next),to:root.appendingPathComponent("tasks.json")); tasks = next
+        guard next.reduce(0,{ $0 + $1.chapters.count }) <= 50000 else { throw ContentFailure.storageFailure }
+        let bytes = try JSONEncoder().encode(next)
+        guard bytes.count <= 16 * 1024 * 1024 else { throw ContentFailure.storageFailure }
+        try writer.write(bytes,to:root.appendingPathComponent("tasks.json")); tasks = next
     }
     func list() -> [OfflineDownloadTask] { tasks }
     func connectivity(connected: Bool, wifi: Bool) async {
@@ -96,7 +119,12 @@ actor OfflineDownloadStore {
     }
     func document(book: LibraryBookRecord, chapter: ChapterRecord) async throws -> ChapterDocument? {
         guard tasks.contains(where: { task in task.book.id == book.id && task.book.source == book.source && task.completed.contains(chapter.id) && task.chapters.contains(where: { $0 == chapter }) }) else { return nil }
-        return try await files.document(chapterID:chapter.id)
+        do { return try await files.document(chapterID:chapter.id) }
+        catch {
+            var next = tasks
+            for index in next.indices where next[index].completed.contains(chapter.id) { next[index].completed.remove(chapter.id); next[index].status = .failed; next[index].message = "下载文件损坏，请重试修复；阅读位置保留。" }
+            try save(next); return nil
+        }
     }
     private func start() throws {
         guard foreground, !changingTasks, operation == nil, connected, let fetch, let task = tasks.first(where: { $0.status == .queued && (!$0.wifiOnly || wifi) }) else { return }

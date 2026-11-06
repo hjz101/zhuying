@@ -29,6 +29,8 @@ private struct LibraryViewPreferences: Codable {
     var activitySessions: [ActivitySession]? = nil
     var subscribedSourceIDs: [String]? = nil
     var updates: [String:UpdateNotice]? = nil
+    var narrationSettings: NarrationSettings? = nil
+    var narrationAnchor: ReadingAnchor? = nil
     init(_ snapshot: LibrarySnapshot) {
         settings = snapshot.settings; sort = snapshot.sort
         if settings.preferences.bubbleSVG != nil { settings.preferences.bubbleImageData = nil }
@@ -37,6 +39,7 @@ private struct LibraryViewPreferences: Codable {
         groupNames = snapshot.groupNames
         activitySessions = snapshot.activitySessions
         subscribedSourceIDs = snapshot.subscribedSourceIDs; updates = snapshot.updates
+        narrationSettings = snapshot.narrationSettings; narrationAnchor = snapshot.narrationAnchor
     }
 }
 
@@ -401,6 +404,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             snapshot.groupNames = view.groupNames
             snapshot.activitySessions = view.activitySessions
             snapshot.subscribedSourceIDs = view.subscribedSourceIDs; snapshot.updates = view.updates
+            snapshot.narrationSettings = view.narrationSettings; snapshot.narrationAnchor = view.narrationAnchor
         }
         var unresolved = Set<String>()
         if let data = try await records.preference(key: Self.unresolvedKey) {

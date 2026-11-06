@@ -12,13 +12,13 @@ struct FootprintsView: View {
     @State private var showAll = false
     private var calendar: Calendar { .current }
     private var report: ActivityReport {
-        ActivityReport(sessions: ActivitySession.demo(books: store.books, now: now, calendar: calendar), now: now, period: period, calendar: calendar)
+        ActivityReport(sessions: store.isDemo ? ActivitySession.demo(books: store.books, now: now, calendar: calendar) : [], now: now, period: period, calendar: calendar)
     }
     var body: some View {
         let data = report
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                AppPageHeader(title: "每一页，都有足迹。", subtitle: "阅读统计 · 示例数据，非实际计时", icon: "calendar")
+                AppPageHeader(title: "每一页，都有足迹。", subtitle: store.isDemo ? "阅读统计 · 示例数据，非实际计时" : "阅读计时暂未启用 · 不生成模拟统计", icon: "calendar")
                 Picker("统计周期", selection: $period) {
                     ForEach(ActivityPeriod.allCases, id: \.self) { Text($0.title).tag($0) }
                 }.pickerStyle(.segmented).accessibilityIdentifier("activityPeriod")

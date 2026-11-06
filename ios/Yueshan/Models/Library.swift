@@ -139,6 +139,7 @@ struct LibrarySnapshot: Codable {
     var hasSeenReadingGuide: Bool? = nil
     var shelfLayout: String? = nil
     var importedGroups: [String: String]? = nil
+    var groupNames: [String]? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -146,6 +147,7 @@ struct ReaderSession: Identifiable {
     let book: Book
     let chapter: Int
     var resume = true
+    var anchor: ReadingAnchor? = nil
 }
 
 enum LibraryLoadState: Equatable { case ready, loading, failed }
@@ -179,7 +181,9 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var bookmarks: [LibraryBookmarkRecord] = []
     @Published private(set) var sources: [DemoSource] = []
     @Published private(set) var onlineRevision = 0
+    @Published private(set) var groupNames: [String] = []
     private(set) var onlineService: OnlineReadingService?
+    private(set) var workspace: LibraryWorkspace?
     private var remoteBooks: [String: LibraryBookRecord] = [:]
     private let defaults: UserDefaults
     private let importsURL: URL?
@@ -204,10 +208,11 @@ final class LibraryStore: ObservableObject {
 
     init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil, seedDemoData: Bool = true,
          productionPersistence: ProductionLibraryPersistence? = nil,
-         productionFactory: (() throws -> ProductionLibraryPersistence)? = nil, onlineService: OnlineReadingService? = nil) {
+         productionFactory: (() throws -> ProductionLibraryPersistence)? = nil, onlineService: OnlineReadingService? = nil, workspace: LibraryWorkspace? = nil) {
         self.productionPersistence = productionPersistence
         self.productionFactory = productionFactory
         self.onlineService = onlineService
+        self.workspace = workspace
         self.isDemo = seedDemoData
         self.books = books
         self.defaults = defaults
@@ -454,7 +459,7 @@ final class LibraryStore: ObservableObject {
 
     private var snapshot: LibrarySnapshot {
         .init(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates,
-              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups)
+              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames)
     }
 
     func bootstrapProductionIfNeeded(prepareAppearance: (() throws -> AppearanceMigrationInput)? = nil, forceReload: Bool = false) async {
@@ -475,6 +480,7 @@ final class LibraryStore: ObservableObject {
             books = restored.books; importedBooks = restored.books
             favorites = restored.snapshot.favorites; progress = restored.snapshot.progress
             importedGroups = restored.snapshot.importedGroups ?? [:]
+            groupNames = Array(Set((restored.snapshot.groupNames ?? []) + Array(importedGroups.values))).sorted()
             settings = restored.snapshot.settings
             settings.fontSize = ReaderPreferenceBounds.clamp(settings.fontSize, 14...30, fallback: 20)
             settings.lineSpacing = ReaderPreferenceBounds.clamp(settings.lineSpacing, 0...24, fallback: 12)
@@ -545,6 +551,12 @@ final class LibraryStore: ObservableObject {
     }
     func configureOnline(credential: ShushanCredential?, expired: Bool = false) async {
         guard let service = onlineService else { return }
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--ui-testing") && arguments.contains("--online-fixtures") {
+            await service.configure(source: OnlineDevelopmentFixtures()); onlineRevision += 1; return
+        }
+        #endif
         let source = sources.first { $0.id == "shushan" && $0.enabled && $0.kind == .novel }
         if let source, let credential, (try? ShushanClient.host(source.url)) == credential.host, !expired {
             await service.configure(source: ShushanBookSource(credential: credential))
@@ -580,6 +592,38 @@ final class LibraryStore: ObservableObject {
         else if hasPendingChanges { _ = await flushPendingWrites() }
         else { await bootstrapProductionIfNeeded(forceReload: true) }
     }
+    func createBackup() async throws -> Data {
+        guard let backend = productionPersistence, let workspace, await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        return try await backend.backup(fontDirectory: workspace.fontDirectory()).encoded()
+    }
+    func localFiles() async throws -> [LocalBookFile] {
+        guard let backend = productionPersistence else { throw ContentFailure.storageFailure }
+        return try await backend.localFiles()
+    }
+    func exportLocalText(id: String) async throws -> Data {
+        guard let backend = productionPersistence else { throw ContentFailure.storageFailure }
+        return try await backend.exportText(bookID: id)
+    }
+    func renameLocalBook(id: String, title: String) async throws {
+        guard let backend = productionPersistence, remoteBooks[id] == nil, await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        try await backend.renameBook(id: id, title: title)
+        if let index = books.firstIndex(where: { $0.id == id }) {
+            let book = books[index]
+            books[index] = .init(id: id, title: title, author: book.author, genre: book.genre, category: book.category, status: book.status, words: book.words, color: book.color, subtitle: book.subtitle, intro: book.intro, tags: book.tags, chapters: book.chapters, content: book.content)
+        }
+    }
+    func restoreBackup(_ backup: LibraryBackup) async throws {
+        guard let workspace, productionFactory != nil, await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        loadState = .loading
+        do { try await workspace.restore(backup) }
+        catch { loadState = .ready; throw error }
+        reader = nil; productionPersistence = nil; bootstrapStarted = false
+        activeDocuments = ChapterMemoryCache(); stableProgress = [:]; remoteBooks = [:]; chapterCatalogs = [:]
+        hasPendingChanges = false; lastWriteFailed = false
+        await bootstrapProductionIfNeeded()
+        guard loadState == .ready else { throw ContentFailure.storageFailure }
+    }
 
     func moveBooks(_ ids: Set<String>, toGroup name: String) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -587,11 +631,45 @@ final class LibraryStore: ObservableObject {
         for book in books where ids.contains(book.id) { importedGroups[book.id] = name }
         persist()
     }
-    func renameGroup(_ oldName: String, to newName: String) {
+    @discardableResult func renameGroup(_ oldName: String, to newName: String) -> Bool {
+        let newName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let names = Set(groupNames + Array(importedGroups.values))
+        guard loadState == .ready, names.contains(oldName), !["全部", "未分组"].contains(oldName),
+              !newName.isEmpty, newName.count <= 100, !["全部", "未分组"].contains(newName),
+              oldName == newName || !names.contains(newName) else { return false }
         moveBooks(Set(importedGroups.filter { $0.value == oldName }.keys), toGroup: newName)
+        groupNames.removeAll { $0 == oldName }; if !groupNames.contains(newName) { groupNames.append(newName) }; persist()
+        return true
     }
     func removeGroup(_ name: String) {
         moveBooks(Set(importedGroups.filter { $0.value == name }.keys), toGroup: "未分组")
+        groupNames.removeAll { $0 == name }; persist()
+    }
+    @discardableResult func createGroup(_ value: String) -> Bool {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard loadState == .ready, !value.isEmpty, value.count <= 100, !["全部", "未分组"].contains(value),
+              !groupNames.contains(value), !importedGroups.values.contains(value) else { return false }
+        groupNames.append(value); persist()
+        return true
+    }
+    func chapterIndex(bookID: String, chapterID: String) -> Int? { chapterCatalogs[bookID]?.firstIndex { $0.id == chapterID } }
+    func openBookmark(_ mark: LibraryBookmarkRecord) {
+        guard let book = books.first(where: { $0.id == mark.anchor.bookID }), let index = chapterIndex(bookID: book.id, chapterID: mark.anchor.chapterID) else {
+            storageMessage = "书签原章节已不可用，书签和历史已保留。"; return
+        }
+        reader = .init(book: book, chapter: index, resume: false, anchor: mark.anchor)
+    }
+    func saveCurrentBookmark(_ book: Book, progress value: ReadingProgress) async throws {
+        let request = try chapterRequest(for: book, chapter: value.chapter, resume: true)
+        guard let document = try await chapterRepository(for: book).document(chapterID: request.chapter.id) else { throw ContentFailure.missingChapter }
+        if let saved = request.anchor {
+            switch ReadingAnchorResolver.resolve(saved, in: document) {
+            case let .exact(p, o), let .recovered(p, o):
+                activeDocuments[document.chapterID] = document
+                _ = try await saveBookmark(book, chapter: value.chapter, paragraph: p, offset: o, title: book.chapterTitle(value.chapter))
+            default: throw ContentFailure.missingChapter
+            }
+        } else { throw ContentFailure.missingChapter }
     }
 
     @discardableResult

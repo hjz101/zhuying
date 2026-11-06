@@ -58,6 +58,9 @@ final class ThemeLibraryRepository {
     }
     func commit(_ staged: Staged) { previous = staged.references }
     func rollback(_ staged: Staged) { files.discard(staged.created) }
+    func backupResources() throws -> [LibraryBackup.File] {
+        try Set(previous.values).map { reference in .init(path: "themes/" + reference.filename, data: try files.read(reference)) }
+    }
     func load(_ data: Data) throws -> Loaded {
         let archive = try JSONDecoder().decode(Archive.self, from: data)
         guard archive.version == 1, !archive.themes.isEmpty, Set(archive.themes.map(\.id)).count == archive.themes.count,

@@ -60,6 +60,15 @@ actor FileChapterRepository: ChapterContentRepository {
     }
 
     func chapterIDs() -> Set<String> { Set(manifest.entries.keys) }
+    func byteCount(chapterIDs: Set<String>) throws -> Int {
+        var names = Set<String>(), total = 0
+        for id in chapterIDs {
+            guard let name = manifest.entries[id], names.insert(name).inserted else { continue }
+            let url = try Self.objectURL(name, root: root)
+            total += try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        }
+        return total
+    }
 
     func saveBatch(_ documents: [ChapterDocument]) throws {
         guard Set(documents.map(\.chapterID)).count == documents.count else { throw ContentFailure.invalidResponse }

@@ -107,7 +107,7 @@ struct ReaderDocument {
         if title?.underline == true { headingAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
         text.append(NSAttributedString(string: book.chapterTitle(chapter) + "\n", attributes: headingAttributes))
         let meta = NSMutableParagraphStyle(); meta.paragraphSpacing = 32
-        let attribution = isDemo ? "原创示例章节" : (book.subtitle == "PDF" ? "PDF 文字提取" : "本地正文")
+        let attribution = isDemo ? "原创示例章节" : (book.id.hasPrefix("remote-") ? "网络正文" : book.subtitle == "PDF" ? "PDF 文字提取" : "本地正文")
         text.append(NSAttributedString(string: "\(book.author) 著  ·  \(attribution)\n", attributes: [.font: UIFont.systemFont(ofSize: 10), .foregroundColor: palette.secondary, .paragraphStyle: meta]))
         var ranges: [NSRange] = []
         let font = ReaderTypography.font(settings: settings)

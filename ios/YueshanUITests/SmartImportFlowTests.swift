@@ -29,7 +29,8 @@ final class SmartImportFlowTests: XCTestCase {
             _ = tapAny(app, labels: ["Browse", "浏览"])
             _ = tapAny(app, labels: ["Browse", "浏览"])
             _ = tapAny(app, labels: ["On My iPhone", "我的iPhone", "我的 iPhone"])
-            _ = tapAny(app, labels: ["阅山", "Yueshan"])
+            let folder = app.collectionViews["File View"].cells.matching(NSPredicate(format: "identifier IN %@", ["阅山, Container", "Yueshan, Container"])).firstMatch
+            if folder.waitForExistence(timeout: 5) { folder.tap() }
         }
         XCTAssertTrue(file.waitForExistence(timeout: 8), app.debugDescription)
         file.tap()

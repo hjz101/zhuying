@@ -25,11 +25,13 @@ private struct LibraryViewPreferences: Codable {
     var sort: ShelfSort
     var shelfLayout: String?
     var hasSeenReadingGuide: Bool
+    var groupNames: [String]? = nil
     init(_ snapshot: LibrarySnapshot) {
         settings = snapshot.settings; sort = snapshot.sort
         if settings.preferences.bubbleSVG != nil { settings.preferences.bubbleImageData = nil }
         if settings.preferences.customBubbleSVG != nil { settings.preferences.customBubbleImageData = nil }
         shelfLayout = snapshot.shelfLayout; hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
+        groupNames = snapshot.groupNames
     }
 }
 
@@ -113,6 +115,55 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         savedAnchors[anchor.bookID] = anchor; remoteDocuments[document.chapterID] = document
     }
     func cachedChapterCount() -> Int { documents.count }
+    func localFiles() async throws -> [LocalBookFile] {
+        try await serialized { backend in try await backend.performLocalFiles() }
+    }
+    private func performLocalFiles() async throws -> [LocalBookFile] {
+        var result: [LocalBookFile] = []
+        for book in try await records.books() where book.source == nil {
+            let catalog = try await catalog(book.id)
+            result.append(.init(id: book.id, name: book.title, bytes: try await files.byteCount(chapterIDs: Set(catalog.map(\.id))), chapters: catalog.count))
+        }
+        return result
+    }
+    func exportText(bookID: String) async throws -> Data {
+        try await serialized { backend in try await backend.performExportText(bookID: bookID) }
+    }
+    private func performExportText(bookID: String) async throws -> Data {
+        guard let book = try await records.books().first(where: { $0.id == bookID }), book.source == nil else { throw ContentFailure.invalidResponse }
+        var text: [String] = []
+        for chapter in try await catalog(bookID) { text.append(chapter.title); text.append(contentsOf: try await cachedDocument(chapter.id).paragraphs.map(\.text)); text.append("") }
+        return Data(text.joined(separator: "\n").utf8)
+    }
+    func renameBook(id: String, title: String) async throws {
+        try await serialized { try await $0.records.renameBook(id: id, title: title) }
+    }
+    func backup(fontDirectory: URL) async throws -> LibraryBackup {
+        try await serialized { backend in try await backend.performBackup(fontDirectory: fontDirectory) }
+    }
+    private func performBackup(fontDirectory: URL) async throws -> LibraryBackup {
+        let archive = try await records.backupArchive()
+        let localIDs = Set(archive.books.filter { $0.source == nil }.map(\.id))
+        var content: [ChapterDocument] = []
+        for chapter in archive.chapters where localIDs.contains(chapter.bookID) { content.append(try await cachedDocument(chapter.id)) }
+        var resources = try themes?.backupResources() ?? []
+        let manifestURL = fontDirectory.appendingPathComponent("fonts.json")
+        if FileManager.default.fileExists(atPath: manifestURL.path) {
+            let data = try Data(contentsOf: manifestURL)
+            let manifest = try JSONDecoder().decode(FontLibraryManifest.self, from: data)
+            guard manifest.version == 2 else { throw ContentFailure.storageFailure }
+            resources.append(.init(path: "fonts/fonts.json", data: data))
+            var copied = Set<String>()
+            for entry in manifest.entries where copied.insert(entry.filename).inserted {
+                guard URL(fileURLWithPath: entry.filename).lastPathComponent == entry.filename else { throw ContentFailure.storageFailure }
+                let url = fontDirectory.appendingPathComponent(entry.filename)
+                if FileManager.default.fileExists(atPath: url.path) { resources.append(.init(path: "fonts/" + entry.filename, data: try Data(contentsOf: url))) }
+                else if entry.resource != nil { throw ContentFailure.storageFailure }
+            }
+        }
+        let result = LibraryBackup(createdAt: Date(), database: archive, documents: content, resources: resources)
+        try result.validate(); return result
+    }
 
     func saveBookmark(_ bookmark: LibraryBookmarkRecord, document supplied: ChapterDocument? = nil) async throws {
         try await serialized { backend in
@@ -334,6 +385,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             let view = try JSONDecoder().decode(LibraryViewPreferences.self, from: data)
             snapshot.settings = view.settings; snapshot.sort = view.sort
             snapshot.shelfLayout = view.shelfLayout; snapshot.hasSeenReadingGuide = view.hasSeenReadingGuide
+            snapshot.groupNames = view.groupNames
         }
         var unresolved = Set<String>()
         if let data = try await records.preference(key: Self.unresolvedKey) {

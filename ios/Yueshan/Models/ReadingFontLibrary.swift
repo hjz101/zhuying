@@ -21,7 +21,12 @@ final class ReadingFontLibrary: ObservableObject {
     static let shared = ReadingFontLibrary()
     @Published private(set) var entries: [ReadingFontEntry] = []
     @Published var message: String?
-    let directory: URL
+    private(set) var directory: URL
+    func useDirectory(_ value: URL) {
+        guard value.standardizedFileURL != directory.standardizedFileURL else { return }
+        for entry in entries { _ = CTFontManagerUnregisterFontsForURL(directory.appendingPathComponent(entry.filename) as CFURL, .process, nil) }
+        directory = value; reload()
+    }
     private(set) var managed: Bool
     private let writer: any AtomicFileWriting
     init(directory: URL? = nil, managed: Bool = false, writer: any AtomicFileWriting = AtomicFileWriter()) {

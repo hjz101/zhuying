@@ -31,7 +31,7 @@ struct ProfileView: View {
                     sectionRule("那些翻过书页的日子", label: "HABITS / 02")
                     HStack(alignment: .top, spacing: 12) {
                         NavigationLink { FootprintsView() } label: {
-                            metric("\(Int(todaySeconds / 60))", unit: "分钟", caption: "今天读了 · 示例")
+                            metric(store.isDemo ? "\(Int(todaySeconds / 60))" : "—", unit: "分钟", caption: store.isDemo ? "今天读了 · 示例" : "计时暂不可用")
                         }.accessibilityIdentifier("profileActivity")
                         Button(action: onShelf) { metric("\(store.favorites.count)", unit: "本", caption: "收藏的故事") }
                             .accessibilityIdentifier("profileFavorites")
@@ -177,15 +177,22 @@ private struct ProfileSettingsView: View {
 }
 
 private struct DemoAboutView: View {
+    @EnvironmentObject private var store: LibraryStore
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 AppPageHeader(title: "阅山", subtitle: "一个安静的私人阅读角落。", icon: "leaf")
-                AppSettingsCard("关于这个 Demo", icon: "info.circle") {
+                AppSettingsCard(store.isDemo ? "关于这个 Demo" : "关于阅山", icon: "info.circle") {
+                    if store.isDemo {
                     Text("这是 iOS 原生界面预览。8 本原创模拟小说，可体验搜索、收藏、选章、阅读和进度恢复。")
                     Text("阅读数据保存在当前设备，不连接真实书源。演示章节包含复用段落，书籍字数与状态仅用于界面展示。")
                         .foregroundStyle(Palette.muted)
                     Text("YUESHAN FOR iOS · DESIGN PREVIEW 0.3").font(.system(size: 9)).foregroundStyle(Palette.muted)
+                    } else {
+                        Text("原生文字阅读器，支持 TXT／文字 PDF、书山聚合固定接口、书架与稳定位置、本地备份。")
+                        Text("在线可读性取决于书源；朗读、统计计时、云同步及未接入扩展功能明确显示暂不可用。")
+                        Text("YUESHAN FOR iOS · DEVELOPMENT CANDIDATE").font(.system(size: 9)).foregroundStyle(Palette.muted)
+                    }
                 }.font(.system(size: 12)).lineSpacing(6)
             }.padding(22)
         }.appPageStyle().navigationTitle("关于阅山").navigationBarTitleDisplayMode(.inline)

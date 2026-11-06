@@ -218,6 +218,46 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
         }
     }
 
+    func backupArchive() throws -> LibraryDatabaseArchive {
+        let bookRecords = try books()
+        let chapterRecords = try bookRecords.flatMap { try chapters(bookID: $0.id) }
+        var preferences: [String: Data] = [:]
+        for key in LibraryBackup.allowedPreferenceKeys { preferences[key] = try preference(key: key) }
+        if let data = preferences[ProductionLibraryPersistence.sourcesKey] {
+            var sources = try JSONDecoder().decode([DemoSource].self, from: data)
+            for index in sources.indices { sources[index].loginStatus = .signedOut; sources[index].detail = "恢复后需重新登录"; sources[index].responseMilliseconds = nil }
+            preferences[ProductionLibraryPersistence.sourcesKey] = try JSONEncoder().encode(sources)
+        }
+        return .init(books: bookRecords, chapters: chapterRecords, progress: Array(try allProgress().values), bookmarks: try allBookmarks(), favorites: try favoriteIDs(), groups: try groups(), preferences: preferences)
+    }
+    func renameBook(id: String, title: String) throws {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, title.count <= 200 else { throw ContentFailure.invalidResponse }
+        try database.write { db in
+            guard let data = try Data.fetchOne(db, sql: "SELECT payload FROM book_records WHERE id=?", arguments: [id]) else { throw ContentFailure.missingChapter }
+            var book = try JSONDecoder().decode(LibraryBookRecord.self, from: data); book.title = title
+            try db.execute(sql: "UPDATE book_records SET payload=? WHERE id=?", arguments: [try JSONEncoder().encode(book), id])
+        }
+    }
+    /// Only used for a validated, inactive restore generation.
+    func restoreBackup(_ value: LibraryDatabaseArchive) throws {
+        try database.write { db in
+            guard try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM book_records") == 0 else { throw ContentFailure.storageFailure }
+            for book in value.books {
+                try db.execute(sql: "INSERT INTO book_records(id,payload) VALUES (?,?)", arguments: [book.id, try JSONEncoder().encode(book)])
+                if let source = book.source {
+                    try db.execute(sql: "INSERT INTO source_bindings(id,bookID,sourceID,nativeBookID) VALUES (?,?,?,?)", arguments: [source.id, book.id, source.sourceID, source.nativeBookID])
+                }
+            }
+            for chapter in value.chapters { try db.execute(sql: "INSERT INTO chapter_records(id,bookID,position,payload) VALUES (?,?,?,?)", arguments: [chapter.id, chapter.bookID, chapter.order, try JSONEncoder().encode(chapter)]) }
+            for anchor in value.progress { try db.execute(sql: "INSERT INTO reading_progress(bookID,payload) VALUES (?,?)", arguments: [anchor.bookID, try JSONEncoder().encode(anchor)]) }
+            for mark in value.bookmarks { try db.execute(sql: "INSERT INTO bookmarks(id,bookID,payload) VALUES (?,?,?)", arguments: [mark.id, mark.anchor.bookID, try JSONEncoder().encode(mark)]) }
+            for (index, id) in value.favorites.enumerated() { try db.execute(sql: "INSERT INTO shelf_entries(bookID,addedAt,position) VALUES (?,?,?)", arguments: [id, Date(), index]) }
+            for (id, name) in value.groups { try db.execute(sql: "INSERT INTO book_groups(bookID,name) VALUES (?,?)", arguments: [id, name]) }
+            for (key, data) in value.preferences { try db.execute(sql: "INSERT INTO preferences(key,payload) VALUES (?,?)", arguments: [key, data]) }
+        }
+    }
+
     /// One commit point for settings, shelf order, groups and confirmed locations.
     /// Missing locations are retained rather than interpreted as a deletion.
     func commitState(favorites: [String], groups: [String: String], progress: [ReadingAnchor], preferences: [String: Data]) throws {

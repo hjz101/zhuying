@@ -597,7 +597,8 @@ final class ReaderFlowTests: XCTestCase {
             app.buttons[entry].tap()
             for choice in choices { XCTAssertTrue(app.buttons[choice].waitForExistence(timeout: 5)) }
             app.buttons[target].tap()
-            XCTAssertTrue(app.navigationBars[target].waitForExistence(timeout: 5))
+            let nativeTitle = target == "段评与皮肤" ? "段评与神人评论" : target
+            XCTAssertTrue(app.navigationBars[nativeTitle].waitForExistence(timeout: 5))
             app.navigationBars.buttons["完成"].tap()
             XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 5))
             XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)

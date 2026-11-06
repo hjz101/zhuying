@@ -10,6 +10,9 @@ struct YueshanApp: App {
     private let launchError: String?
 
     init() {
+        #if DEBUG
+        _ = NativePerformanceValidation.processStarted
+        #endif
         let environment = AppEnvironment()
         let defaults = environment.defaults()
         let credentialService = environment.isUITesting ? "com.yueshan.shushan.ui-tests" : "com.yueshan.shushan.\(environment.mode.rawValue)"
@@ -29,6 +32,8 @@ struct YueshanApp: App {
                 .appendingPathComponent(environment.databaseComponent)
             if environment.resetsTestState { try? manager.removeItem(at: archive) }
             if environment.resetsTestState { try? manager.removeItem(at: databaseDirectory) }
+            let workspace = LibraryWorkspace(root: databaseDirectory, legacyFonts: ReadingFontLibrary.shared.directory)
+            if !environment.isDemo { ReadingFontLibrary.shared.useDirectory(try workspace.fontDirectory()) }
             if testing && ProcessInfo.processInfo.arguments.contains("--import-fixtures") {
                 let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 try manager.createDirectory(at: documents, withIntermediateDirectories: true)
@@ -61,8 +66,8 @@ struct YueshanApp: App {
             _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo,
                 productionFactory: environment.isDemo ? nil : {
                     if rejectFirstOpen { rejectFirstOpen = false; throw CocoaError(.fileWriteNoPermission) }
-                    return try ProductionLibraryPersistence(directory: databaseDirectory)
-                }, onlineService: online))
+                    return try ProductionLibraryPersistence(directory: workspace.databaseDirectory())
+                }, onlineService: online, workspace: environment.isDemo ? nil : workspace))
             launchError = nil
         } catch {
             _library = StateObject(wrappedValue: LibraryStore(books: [], defaults: defaults, seedDemoData: environment.isDemo))
@@ -110,17 +115,22 @@ struct RootView: View {
         .task {
             await store.bootstrapProductionIfNeeded(prepareAppearance: {
                 let fonts = ReadingFontLibrary.shared
+                if let workspace = store.workspace { fonts.useDirectory(try workspace.fontDirectory()) }
                 let original = try fonts.prepareManagedStorage()
                 return .init(fallbackThemeLibrary: demo.themeSnapshot, originalFontManifest: original,
                              fontHashes: fonts.recordedHashes, warnings: fonts.message.map { [$0] } ?? [])
             })
             #if DEBUG
+            if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--measure-native-performance") {
+                let readyMS = (ProcessInfo.processInfo.systemUptime - NativePerformanceValidation.processStarted) * 1000
+                try? NativePerformanceValidation.writeReport(readyMS: readyMS)
+            }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-step-zero-source") {
                 try? await SourceFeasibilityValidation.runDevelopmentProbe(credential: shushan.credentialForRequests)
             }
             #endif
         }
-        .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store); configureSource() } }
+        .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store); demo.updateShushanAccount(shushan.credential, host: shushan.hostText); configureSource() } }
         .onChange(of: store.sources) { _, _ in configureSource() }
         .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.saveBeforeSuspending() } } }
         .onChange(of: store.reader?.id) { _, id in if id == nil { Task { await store.flushPendingWrites() } } }
@@ -136,7 +146,7 @@ struct RootView: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showPlayer = false } } } }
         }
         .fullScreenCover(item: $store.reader) { session in
-            ReaderView(book: session.book, initialChapter: session.chapter, resume: session.resume, repository: store.chapterRepository(for: session.book)).id(session.id).environmentObject(store)
+            ReaderView(book: session.book, initialChapter: session.chapter, resume: session.resume, startingAnchor: session.anchor, repository: store.chapterRepository(for: session.book)).id(session.id).environmentObject(store)
         }
         .alert("本地记录提示", isPresented: Binding(get: { store.storageMessage != nil }, set: { if !$0 { store.storageMessage = nil } })) {
             if !store.isDemo { Button("重试") { Task { await store.retryStorage() } } }
@@ -188,7 +198,7 @@ struct RootView: View {
         }.safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
     }
     @ViewBuilder private var miniPlayer: some View {
-            if demo.playerVisible {
+            if store.isDemo && demo.playerVisible {
                 HStack(spacing: 15) {
                     Button { showPlayer = true } label: { Label("长风渡山海 · 演示朗读", systemImage: "waveform").font(.system(size: 11)).frame(maxWidth: .infinity, alignment: .leading) }
                     Button { demo.isPlaying.toggle() } label: { Image(systemName: demo.isPlaying ? "pause.fill" : "play.fill").frame(width: 40, height: 40) }.accessibilityLabel("切换演示朗读")

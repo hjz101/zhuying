@@ -46,13 +46,19 @@ actor OnlineReadingService {
         prefetch?.cancel(); prefetch = nil
         guard chapter.bookID == book.id, chapter.access == .readable else { throw ContentFailure.restricted }
         let key = RecentChapterCache.fingerprint(book: book, chapter: chapter)
-        if let document = try await cache.document(bookID: book.id, chapterID: chapter.id, fingerprint: key) { return document }
+        if let document = try await cache.document(bookID: book.id, chapterID: chapter.id, fingerprint: key, allowStale: source == nil) { return document }
         guard let source else { throw failure }
         guard book.source?.sourceID == source.sourceID else { throw ContentFailure.sourceDisabled }
         let revision = generation
         let document: ChapterDocument
         do { document = try await source.document(for: chapter, book: book) }
-        catch { await recordFailure(error, revision: revision); throw error }
+        catch {
+            await recordFailure(error, revision: revision)
+            if revision == generation, let failure = error as? ContentFailure,
+               [.offline, .timedOut, .unavailable, .rateLimited].contains(failure),
+               let cached = try await cache.document(bookID: book.id, chapterID: chapter.id, fingerprint: key, allowStale: true) { return cached }
+            throw error
+        }
         try Task.checkCancellation(); guard revision == generation else { throw CancellationError() }
         guard document.chapterID == chapter.id else { throw ContentFailure.invalidResponse }
         // Content may still be shown if disposable cache storage is unavailable.

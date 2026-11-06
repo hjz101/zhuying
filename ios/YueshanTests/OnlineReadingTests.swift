@@ -32,6 +32,55 @@ private actor OnlineFixtureSource: BookSource {
 }
 
 final class OnlineReadingTests: XCTestCase {
+    private final class CacheClock: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = Date(timeIntervalSince1970: 1000)
+        func now() -> Date { lock.lock(); defer { lock.unlock() }; return value }
+        func advance() { lock.lock(); defer { lock.unlock() }; value.addTimeInterval(2) }
+    }
+    func testExpiredCacheRefreshesChangedContentButRemainsReadableDuringNetworkFailureAndLogout() async throws {
+        let clock = CacheClock(), cache = try RecentChapterCache(directory: root(), maximumAge: 1, now: { clock.now() })
+        let source = OnlineFixtureSource(), service = OnlineReadingService(cache: cache)
+        let book = OnlineFixtureSource.book(), chapter = OnlineFixtureSource.catalog(book)[0]
+        let old = ChapterDocument(chapterID: chapter.id, paragraphs: ["上次缓存的旧版本正文。"])
+        let key = RecentChapterCache.fingerprint(book: book, chapter: chapter)
+        _ = try await cache.save(old, bookID: book.id, fingerprint: key, protecting: chapter.id)
+        await service.configure(source: source)
+        let freshHit = try await service.document(book: book, chapter: chapter); XCTAssertEqual(freshHit, old)
+        clock.advance(); await source.fail(true)
+        let offline = try await service.document(book: book, chapter: chapter); XCTAssertEqual(offline, old)
+        await source.fail(false)
+        let refreshed = try await service.document(book: book, chapter: chapter); XCTAssertNotEqual(refreshed.version, old.version)
+        clock.advance(); await service.configure(source: nil, failure: .sourceDisabled)
+        let signedOut = try await service.document(book: book, chapter: chapter); XCTAssertEqual(signedOut, refreshed)
+        var changed = chapter; changed.requestParameters["revision"] = "different"
+        do { _ = try await service.document(book: book, chapter: changed); XCTFail("Different request identity cannot reuse stale text") } catch {}
+    }
+    private final class FailingCacheWriter: AtomicFileWriting, @unchecked Sendable {
+        var rejectManifest = false
+        func write(_ data: Data, to url: URL) throws {
+            if rejectManifest && url.lastPathComponent == "cache.json" { throw CocoaError(.fileWriteOutOfSpace) }
+            try data.write(to: url, options: .atomic)
+        }
+    }
+    func testCacheFailedCommitAndClearKeepOfflineChapterAndUsageCountsActualOrphanBytes() async throws {
+        let root = try root(), writer = FailingCacheWriter(), cache = try RecentChapterCache(directory: root, writer: writer)
+        let first = ChapterDocument(chapterID: "first", paragraphs: ["已提交正文必须保留。"])
+        _ = try await cache.save(first, bookID: "book", fingerprint: "v1", protecting: "first")
+        let baseline = await cache.usage()
+        writer.rejectManifest = true
+        do { _ = try await cache.save(.init(chapterID: "second", paragraphs: ["未提交正文"]), bookID: "book", fingerprint: "v1", protecting: "first"); XCTFail("Injected manifest failure") } catch {}
+        do { try await cache.clear(); XCTFail("Failed clear cannot claim success") } catch {}
+        let retained = try await cache.document(bookID: "book", chapterID: "first", fingerprint: "v1")
+        XCTAssertEqual(retained, first)
+        let unchanged = await cache.usage(); XCTAssertEqual(unchanged.bytes, baseline.bytes); XCTAssertEqual(unchanged.chapters, 1)
+        let orphan = Data("interrupted staging".utf8)
+        try orphan.write(to: root.appendingPathComponent(FileResourceStore.digest(orphan) + ".json"))
+        let actual = await cache.usage(); XCTAssertEqual(actual.bytes, baseline.bytes + orphan.count)
+        writer.rejectManifest = false
+        try await cache.clear()
+        let cleared = await cache.usage(); XCTAssertEqual(cleared.bytes, 0); XCTAssertEqual(cleared.chapters, 0)
+    }
     @MainActor func testAuthenticationExpirationInvalidatesSourceAndCallsLoginRecovery() async throws {
         let source = OnlineFixtureSource(), service = OnlineReadingService(cache: try RecentChapterCache(directory: root()))
         var expired = false

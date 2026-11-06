@@ -13,6 +13,9 @@ settings:
     TARGETED_DEVICE_FAMILY: '1'
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ''
+    MARKETING_VERSION: '0.4.0'
+    CURRENT_PROJECT_VERSION: '4'
+    YUESHAN_SOURCE_REVISION: unrecorded
 targets:
   Yueshan:
     type: application
@@ -22,6 +25,9 @@ targets:
     info:
       path: Yueshan/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        YueshanSourceRevision: $(YUESHAN_SOURCE_REVISION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
     sources:

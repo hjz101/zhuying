@@ -1,6 +1,44 @@
 import XCTest
 
 final class ProductionLaunchTests: XCTestCase {
+    @MainActor func testProductionSourceBasicEditAndDisableSurviveRestart() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--production"]; app.launch()
+        func openSources() {
+            app.tabBars.buttons["我的"].tap()
+            let source = app.buttons["profileSources"]
+            for _ in 0..<8 { if source.isHittable { break }; app.swipeUp() }
+            source.tap(); XCTAssertTrue(app.buttons["source-row-shushan"].waitForExistence(timeout: 5))
+        }
+        openSources(); app.buttons["source-row-shushan"].tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "书源编辑")).firstMatch.tap()
+        let name = app.textFields["sourceConfigName"]; XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap()
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4) + "我的书山")
+        app.switches["启用书源"].tap(); app.buttons["sourceConfigSave"].tap()
+        XCTAssertTrue(app.staticTexts["已保存书源基本信息。"].waitForExistence(timeout: 5))
+        app.terminate(); app.launchArguments = ["--ui-testing", "--production", "--preserve-ui-test-state"]; app.launch()
+        openSources()
+        XCTAssertTrue(app.buttons["source-row-shushan"].label.contains("我的书山"))
+        XCTAssertTrue(app.buttons["source-row-shushan"].label.contains("已停用"))
+    }
+    @MainActor func testProductionStatisticsAndAudioEntriesKeepTruthfulEmptyStates() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--production"]; app.launch()
+        XCTAssertTrue(app.staticTexts["这里还没有故事"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["足迹"].tap()
+        XCTAssertTrue(app.staticTexts["阅读计时暂未启用 · 不生成模拟统计"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["activityTotal"].label, "0 分钟")
+        app.tabBars.buttons["我的"].tap()
+        XCTAssertTrue(app.staticTexts["计时暂不可用"].waitForExistence(timeout: 5))
+        let tools = app.buttons["allTools"]
+        for _ in 0..<8 { if tools.isHittable { break }; app.swipeUp() }
+        tools.tap()
+        let search = app.searchFields.firstMatch; XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("系统朗读")
+        app.buttons["feature-systemTTS"].tap()
+        XCTAssertTrue(app.staticTexts["当前版本暂不支持此功能。"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["切换演示朗读"].exists)
+        XCTAssertFalse(app.buttons["demo-action-systemTTS-开始朗读"].exists)
+    }
     @MainActor private func assertReaderText(_ value: String, app: XCUIApplication) {
         let rendered = expectation(for: NSPredicate(format: "value CONTAINS %@", value), evaluatedWith: app.textViews["continuousText"])
         wait(for: [rendered], timeout: 5)
@@ -83,7 +121,7 @@ final class ProductionLaunchTests: XCTestCase {
         let groups = app.buttons["shelf-feature-shelf"]
         XCTAssertTrue(groups.waitForExistence(timeout: 10))
         groups.tap()
-        XCTAssertTrue(app.staticTexts["当前版本暂不支持此功能。"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["createShelfGroup"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.tabBars.buttons["我的"].tap()
         let sources = app.buttons["profileSources"]

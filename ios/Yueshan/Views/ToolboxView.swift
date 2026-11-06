@@ -198,8 +198,9 @@ private struct ToolEntryRow: View {
 
 private struct ToolCapabilityBadge: View {
     let feature: DemoFeature
+    @EnvironmentObject private var library: LibraryStore
     var body: some View {
-        if let badge = feature.capabilityBadge {
+        if let badge = library.isDemo ? feature.capabilityBadge : ProductionCapabilities.badge(for: feature.id) {
             Text(badge).font(.system(size: 8)).foregroundStyle(Palette.accent)
                 .padding(.horizontal, 5).padding(.vertical, 3).background(Palette.accent.opacity(0.08), in: Capsule())
                 .accessibilityIdentifier("tool-status-\(feature.id)")

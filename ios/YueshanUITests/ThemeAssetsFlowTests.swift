@@ -74,12 +74,14 @@ final class ThemeAssetsFlowTests: XCTestCase {
         app.buttons["themeImport"].tap(); app.buttons["选择套装文件"].tap()
         let file = app.collectionViews["File View"].descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "阅读套装")).firstMatch
         if !file.waitForExistence(timeout: 3) {
-            for labels in [["Browse", "浏览"], ["Browse", "浏览"], ["On My iPhone", "我的iPhone", "我的 iPhone"], ["阅山", "Yueshan"]] {
+            for labels in [["Browse", "浏览"], ["Browse", "浏览"], ["On My iPhone", "我的iPhone", "我的 iPhone"]] {
                 for label in labels {
                     let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label)).firstMatch
                     if item.exists && item.isHittable { item.tap(); break }
                 }
             }
+            let folder = app.collectionViews["File View"].cells.matching(NSPredicate(format: "identifier IN %@", ["阅山, Container", "Yueshan, Container"])).firstMatch
+            if folder.waitForExistence(timeout: 5) { folder.tap() }
         }
         XCTAssertTrue(file.waitForExistence(timeout: 8), app.debugDescription); file.tap()
         if app.buttons["Open"].waitForExistence(timeout: 1) { app.buttons["Open"].tap() }

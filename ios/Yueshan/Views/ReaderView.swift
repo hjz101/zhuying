@@ -14,6 +14,8 @@ struct ReaderView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let book: Book
     private let resume: Bool
+    private let startingAnchor: ReadingAnchor?
+    @State private var showBookmarks = false
     @StateObject private var loading: ReadingSessionController
     @State private var loaded: ChapterDocument?
     @State private var rendered: ReaderDocument?
@@ -21,6 +23,7 @@ struct ReaderView: View {
     @State private var requestedChapter: Int?
     @State private var requestedResume = false
     @State private var requestedAtEnd = false
+    @State private var requestedLocation: ReadingAnchor?
     @State private var chapter: Int
     @State private var anchor = ReaderAnchor()
     @State private var restoreID = 0
@@ -39,8 +42,9 @@ struct ReaderView: View {
     @State private var initialized = false
     @State private var commentParagraph: Int?
 
-    init(book: Book, initialChapter: Int, resume: Bool = true, repository: (any ChapterDocumentLoading)? = nil) {
+    init(book: Book, initialChapter: Int, resume: Bool = true, startingAnchor: ReadingAnchor? = nil, repository: (any ChapterDocumentLoading)? = nil) {
         self.book = book; self.resume = resume
+        self.startingAnchor = startingAnchor
         _loading = StateObject(wrappedValue: ReadingSessionController(repository: repository ?? EmbeddedChapterRepository(book: book)))
         _chapter = State(initialValue: initialChapter)
         _sliderValue = State(initialValue: Double(initialChapter))
@@ -80,7 +84,7 @@ struct ReaderView: View {
                     ContentUnavailableView {
                         Label("章节暂时无法打开", systemImage: "doc.text.magnifyingglass")
                     } description: { Text(reason) }
-                    actions: { Button("重试") { goChapter(requestedChapter ?? chapter, resume: requestedResume, atEnd: requestedAtEnd) }.accessibilityIdentifier("retryChapter") }
+                    actions: { Button("重试") { goChapter(requestedChapter ?? chapter, resume: requestedResume, atEnd: requestedAtEnd, location: requestedLocation) }.accessibilityIdentifier("retryChapter") }
                     .background(readerBackground.opacity(0.97))
                 }
             }
@@ -117,7 +121,7 @@ struct ReaderView: View {
         .background(readerBackground.ignoresSafeArea())
         .foregroundStyle(readerInk)
         .preferredColorScheme((store.settings.preferences.colors?.dark ?? (theme == .dark)) ? .dark : .light)
-        .task { await loadChapter(chapter, resume: resume, atEnd: false) }
+        .task { await loadChapter(chapter, resume: resume, atEnd: false, location: startingAnchor) }
         .onChange(of: page) { _, target in
             guard !reflowing, ranges.indices.contains(target) else { return }
             updateAnchor(document.anchor(at: ranges[target].location))
@@ -129,6 +133,14 @@ struct ReaderView: View {
             ContentsView(book: book, currentChapter: chapter) { target in goChapter(target); showContents = false }
         }
         .sheet(isPresented: $showSettings, onDismiss: { restoreID += 1 }) { ReadingSettingsView() }
+        .sheet(isPresented: $showBookmarks) {
+            NavigationStack {
+                ProductionBookmarksView(bookID: book.id) { mark in
+                    guard let index = store.chapterIndex(bookID: book.id, chapterID: mark.anchor.chapterID) else { return }
+                    showBookmarks = false; goChapter(index, location: mark.anchor)
+                }.toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showBookmarks = false } } }
+            }
+        }
         .sheet(item: $demoFeature) { feature in
             NavigationStack {
                 FeatureDemoView(feature: feature, bookID: book.id) { item, chapter, paragraph, offset in
@@ -255,7 +267,9 @@ struct ReaderView: View {
         }.frame(width: 55, height: 48).foregroundStyle(readerInk.opacity(0.9))
     }
     private func openFeature(_ id: String) {
-        save(); demoFeature = FeatureCatalog.feature(id)
+        save()
+        if !store.isDemo && id == "bookmarks" { showBookmarks = true }
+        else { demoFeature = FeatureCatalog.feature(id) }
     }
     private func layoutKey(_ size: CGSize) -> String {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
@@ -270,14 +284,16 @@ struct ReaderView: View {
         guard initialized, loading.phase == .readable else { return }
         store.record(book, chapter: chapter, paragraph: anchor.paragraph, characterOffset: anchor.offset)
     }
-    private func goChapter(_ target: Int, resume: Bool = false, atEnd: Bool = false) {
+    private func goChapter(_ target: Int, resume: Bool = false, atEnd: Bool = false, location: ReadingAnchor? = nil) {
         guard book.chapters.indices.contains(target) else { showMessage(target < 0 ? "已经是第一章" : (store.isDemo ? "已读完全部示例章节" : "已经是最后一章")); return }
         chapterTask?.cancel()
-        chapterTask = Task { await loadChapter(target, resume: resume, atEnd: atEnd) }
+        chapterTask = Task { await loadChapter(target, resume: resume, atEnd: atEnd, location: location) }
     }
-    private func loadChapter(_ target: Int, resume: Bool, atEnd: Bool) async {
+    private func loadChapter(_ target: Int, resume: Bool, atEnd: Bool, location: ReadingAnchor? = nil) async {
         requestedChapter = target; requestedResume = resume; requestedAtEnd = atEnd
-        guard let request = try? store.chapterRequest(for: book, chapter: target, resume: resume, atEnd: atEnd) else { return }
+        requestedLocation = location
+        guard var request = try? store.chapterRequest(for: book, chapter: target, resume: resume, atEnd: atEnd) else { return }
+        if let location { request.anchor = location }
         guard await loading.load(request), let content = loading.document, let location = loading.confirmed else { return }
         reflowing = true
         loaded = content; chapter = target

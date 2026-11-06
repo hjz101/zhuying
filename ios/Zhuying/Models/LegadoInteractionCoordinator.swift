@@ -22,18 +22,19 @@ struct LegadoBrowserRequest: Identifiable, Sendable {
     let id: UUID
     let sourceID: String
     let accountID: String
+    let libraryProfile: String
     let url: URL
     let title: String
     let html: String?
     let javaScript: String?
     let allowedOrigins: [URL]
     let timeoutSeconds: TimeInterval
-    init(id: UUID = UUID(), sourceID: String, accountID: String = "default", url: URL, title: String = "书源网页登录", html: String? = nil,
+    init(id: UUID = UUID(), sourceID: String, accountID: String = "default", libraryProfile: String = "production", url: URL, title: String = "书源网页登录", html: String? = nil,
          javaScript: String? = nil, allowedOrigins: [URL] = [], timeoutSeconds: TimeInterval = 300) {
-        self.id = id; self.sourceID = sourceID; self.accountID = accountID; self.url = url; self.title = title
+        self.id = id; self.sourceID = sourceID; self.accountID = accountID; self.libraryProfile = libraryProfile; self.url = url; self.title = title
         self.html = html; self.javaScript = javaScript; self.allowedOrigins = allowedOrigins; self.timeoutSeconds = timeoutSeconds
     }
-    var browserScopeID: String { SourceBrowserSessions.accountScope(sourceID: sourceID, accountID: accountID) }
+    var browserScopeID: String { SourceBrowserSessions.legadoScope(sourceID: sourceID, accountID: accountID, libraryProfile: libraryProfile) }
     var isOffline: Bool { url.absoluteString == "about:blank" && html != nil }
     static func origin(_ url: URL) throws -> URL {
         guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), parts.scheme == "https", parts.host != nil,
@@ -43,7 +44,7 @@ struct LegadoBrowserRequest: Identifiable, Sendable {
     }
     func validate() throws {
         if !isOffline { _ = try Self.origin(url) }
-        guard !sourceID.isEmpty, !accountID.isEmpty, sourceID.utf8.count <= 512, accountID.utf8.count <= 512,
+        guard !sourceID.isEmpty, !accountID.isEmpty, !libraryProfile.isEmpty, sourceID.utf8.count <= 512, accountID.utf8.count <= 512, libraryProfile.utf8.count <= 512,
               title.utf8.count <= 1024, url.absoluteString.utf8.count <= 32 * 1024,
               (html?.utf8.count ?? 0) <= 2 * 1024 * 1024, (javaScript?.utf8.count ?? 0) <= 256 * 1024,
               timeoutSeconds.isFinite, (0.01...900).contains(timeoutSeconds), allowedOrigins.count <= 128 else { throw LegadoInteractionError.invalidRequest }
@@ -94,8 +95,9 @@ struct LegadoBrowserResult: @unchecked Sendable {
         continuation.resume(with: result)
     }
     func dismiss(id: UUID) { complete(id: id, result: .failure(LegadoInteractionError.closed)) }
-    func cancel(sourceID: String, accountID: String? = nil, reason: LegadoInteractionError = .cancelled) {
-        guard let request, request.sourceID == sourceID, accountID == nil || accountID == request.accountID else { return }
+    func cancel(sourceID: String, accountID: String? = nil, libraryProfile: String? = nil, reason: LegadoInteractionError = .cancelled) {
+        guard let request, request.sourceID == sourceID, accountID == nil || accountID == request.accountID,
+              libraryProfile == nil || libraryProfile == request.libraryProfile else { return }
         complete(id: request.id, result: .failure(reason))
     }
 }

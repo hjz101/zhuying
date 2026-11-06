@@ -114,7 +114,7 @@ struct LegadoLoginActionResult: Sendable {
         cancel()
         do {
             try state.logout()
-            LegadoInteractionCoordinator.shared.cancel(sourceID: source.id, accountID: state.scope.accountID, reason: .loggedOut)
+            LegadoInteractionCoordinator.shared.cancel(sourceID: source.id, accountID: state.scope.accountID, libraryProfile: state.scope.libraryProfile, reason: .loggedOut)
             refresh()
             guard let clearBrowserState else { message = "此书源的本地登录信息与 Cookie 已清除。"; return }
             let token = UUID(); revision = token; busy = true; message = "正在清除网页登录会话…"
@@ -132,13 +132,13 @@ struct LegadoLoginActionResult: Sendable {
     func useBrowserCleanup(_ action: @escaping @Sendable () async throws -> Void) { clearBrowserState = action }
     func disappeared() {
         let browser = LegadoInteractionCoordinator.shared.request
-        if busy, browser?.sourceID != source.id || browser?.accountID != state.scope.accountID { cancel() }
+        if busy, browser?.sourceID != source.id || browser?.accountID != state.scope.accountID || browser?.libraryProfile != state.scope.libraryProfile { cancel() }
     }
     func refreshStatus() {
         let next = state.authStatus
         if next != status, next == .expired {
             cancel()
-            LegadoInteractionCoordinator.shared.cancel(sourceID: source.id, accountID: state.scope.accountID, reason: .expired)
+            LegadoInteractionCoordinator.shared.cancel(sourceID: source.id, accountID: state.scope.accountID, libraryProfile: state.scope.libraryProfile, reason: .expired)
         }
         status = next
     }

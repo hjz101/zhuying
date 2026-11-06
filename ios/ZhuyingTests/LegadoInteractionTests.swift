@@ -165,8 +165,9 @@ private final class LoginMemoryVault: LegadoSecretVault {
         var source = try source(); source.configuration = try LegadoDevelopmentFixtures.package(scripted: false)
         let origin = URL(string: "https://legado-html.fixture/")!, url = origin.appendingPathComponent("login")
         func cookie(_ value: String) throws -> HTTPCookie { try XCTUnwrap(HTTPCookie(properties: [.domain: "legado-html.fixture", .path: "/", .name: "sid", .value: value, .secure: "TRUE"])) }
-        let first = library.browserSessions.store(sourceID: source.id, origin: origin)
-        let otherScope = SourceBrowserSessions.accountScope(sourceID: source.id, accountID: "other")
+        let firstScope = SourceBrowserSessions.legadoScope(sourceID: source.id, accountID: state.scope.accountID, libraryProfile: state.scope.libraryProfile)
+        let first = library.browserSessions.store(sourceID: firstScope, origin: origin)
+        let otherScope = SourceBrowserSessions.legadoScope(sourceID: source.id, accountID: "other", libraryProfile: state.scope.libraryProfile)
         let other = library.browserSessions.store(sourceID: otherScope, origin: origin)
         await first.httpCookieStore.setCookie(try cookie("stale")); await other.httpCookieStore.setCookie(try cookie("unrelated"))
         try state.setCookies([cookie("fresh")], for: url)
@@ -177,5 +178,26 @@ private final class LoginMemoryVault: LegadoSecretVault {
         let removed = await first.httpCookieStore.allCookies(), retained = await other.httpCookieStore.allCookies()
         XCTAssertTrue(removed.isEmpty); XCTAssertEqual(retained.first { $0.name == "sid" }?.value, "unrelated")
         await library.browserSessions.clear(sourceID: otherScope, origin: origin)
+    }
+
+    func testWebKitStoreAndInteractionCancellationAlsoSeparateLibraryProfiles() async throws {
+        let domain = UUID().uuidString, defaults = UserDefaults(suiteName: domain)!, origin = URL(string: "https://source.test/")!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let sessions = SourceBrowserSessions(defaults: defaults)
+        let first = LegadoBrowserRequest(sourceID: "A", accountID: "reader", libraryProfile: "library-one", url: origin)
+        let second = LegadoBrowserRequest(sourceID: "A", accountID: "reader", libraryProfile: "library-two", url: origin)
+        XCTAssertNotEqual(first.browserScopeID, second.browserScopeID)
+        let storeOne = sessions.store(sourceID: first.browserScopeID, origin: origin), storeTwo = sessions.store(sourceID: second.browserScopeID, origin: origin)
+        XCTAssertNotEqual(storeOne.identifier, storeTwo.identifier)
+        let cookie = try XCTUnwrap(HTTPCookie(properties: [.domain: "source.test", .path: "/", .name: "sid", .value: "private-library-one", .secure: "TRUE"]))
+        await storeOne.httpCookieStore.setCookie(cookie)
+        let isolated = await storeTwo.httpCookieStore.allCookies(); XCTAssertTrue(isolated.isEmpty)
+        let coordinator = LegadoInteractionCoordinator(), operation = Task { try await coordinator.requestBrowser(first) }
+        try await waitUntil { coordinator.request != nil }
+        coordinator.cancel(sourceID: "A", accountID: "reader", libraryProfile: "library-two", reason: .loggedOut)
+        XCTAssertEqual(coordinator.request?.id, first.id)
+        coordinator.cancel(sourceID: "A", accountID: "reader", libraryProfile: "library-one", reason: .loggedOut)
+        do { _ = try await operation.value; XCTFail() } catch { XCTAssertEqual(error as? LegadoInteractionError, .loggedOut) }
+        await sessions.clear(sourceID: first.browserScopeID, origin: origin); await sessions.clear(sourceID: second.browserScopeID, origin: origin)
     }
 }

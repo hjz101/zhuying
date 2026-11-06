@@ -48,6 +48,9 @@ struct LegadoBrowserInteractionView: View {
         opening?.cancel(); message = nil
         opening = Task { @MainActor in
             do {
+                guard var source = library.sources.first(where: { $0.id == request.sourceID }) else { throw ContentFailure.sourceDisabled }
+                let state = try library.legadoLoginState(for: source)
+                guard state.scope.accountID == request.accountID, state.scope.libraryProfile == request.libraryProfile else { throw LegadoInteractionError.invalidRequest }
                 if request.isOffline, url.absoluteString == "about:blank", let html = request.html {
                     browser.configure(sourceID: request.browserScopeID, origin: nil, sessions: library.browserSessions, javascript: true, allowedOrigins: request.allowedOrigins, restrictToDeclaredOrigins: true)
                     loadedInitialHTML = true; try browser.openHTML(html, baseURL: url)
@@ -57,8 +60,6 @@ struct LegadoBrowserInteractionView: View {
                 let permitted = [request.url] + request.allowedOrigins
                 guard permitted.contains(where: { SourceBrowserSessions.sameOrigin(url, $0) }) else { throw LegadoInteractionError.invalidRequest }
                 browser.configure(sourceID: request.browserScopeID, origin: origin, sessions: library.browserSessions, javascript: true, allowedOrigins: permitted)
-                guard var source = library.sources.first(where: { $0.id == request.sourceID }) else { throw ContentFailure.sourceDisabled }
-                let state = try library.legadoLoginState(for: source)
                 try await library.seedLegadoBrowserCookies(source: source, state: state, url: url)
                 source.url = origin.absoluteString
                 try await browser.applyNetwork(library.networkTransport(for: source))

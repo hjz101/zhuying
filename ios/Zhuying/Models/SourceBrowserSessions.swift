@@ -9,6 +9,9 @@ import WebKit
     nonisolated static func accountScope(sourceID: String, accountID: String = "default") -> String {
         accountID.isEmpty || accountID == "default" ? sourceID : sourceID + ".account." + StableContentID.make(accountID)
     }
+    nonisolated static func legadoScope(sourceID: String, accountID: String, libraryProfile: String) -> String {
+        "legado." + StableContentID.make(libraryProfile, sourceID, accountID)
+    }
     static func scope(sourceID: String,origin: URL) -> String { StableContentID.make("browser-v1",sourceID,origin.absoluteString) }
     func store(sourceID: String,origin: URL) -> WKWebsiteDataStore {
         let originsKey = "browser.origins." + StableContentID.make(sourceID)

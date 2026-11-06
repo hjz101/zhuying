@@ -4,7 +4,7 @@ import WebKit
 @MainActor extension LibraryStore {
     func seedLegadoBrowserCookies(source: DemoSource, state: LegadoPersistentState, url: URL) async throws {
         let origin = try LegadoSourcePolicy.canonicalOrigin(url)
-        let scope = SourceBrowserSessions.accountScope(sourceID: source.id, accountID: state.scope.accountID)
+        let scope = SourceBrowserSessions.legadoScope(sourceID: source.id, accountID: state.scope.accountID, libraryProfile: state.scope.libraryProfile)
         let store = browserSessions.store(sourceID: scope, origin: origin).httpCookieStore
         // The protected source state is authoritative. Never resurrect an old
         // WebKit login after logout or an account switch.
@@ -20,7 +20,7 @@ import WebKit
         try Task.checkCancellation()
     }
     func clearLegadoBrowserSessions(source: DemoSource, state: LegadoPersistentState) async throws {
-        let scope = SourceBrowserSessions.accountScope(sourceID: source.id, accountID: state.scope.accountID)
+        let scope = SourceBrowserSessions.legadoScope(sourceID: source.id, accountID: state.scope.accountID, libraryProfile: state.scope.libraryProfile)
         let declared = try LegadoSourceDefinition.decode(source).policy.allowedOrigins
         let origins = Set(try declared + state.allowedOrigins() + browserSessions.knownOrigins(sourceID: scope))
         for origin in origins { await browserSessions.clear(sourceID: scope, origin: origin); try Task.checkCancellation() }

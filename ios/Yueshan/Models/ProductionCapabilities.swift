@@ -6,6 +6,7 @@ enum ProductionCapabilities {
         if id == "icloud" { return "需 iCloud 权限" }
         if id == "comments" { return "书山·番茄只读" }
         if id == "engine" { return "原生 v1 子集" }
+        if id == "purify" { return nil }
         if ["systemTTS","backgroundAudio","aiConfig","links","pdf","comic","archive","covers"].contains(id) { return nil }
         if live.contains(id) { return nil }
         if ["sources", "sourceEdit", "sourceLogin", "search"].contains(id) { return "固定书源" }

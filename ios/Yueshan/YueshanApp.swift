@@ -156,6 +156,7 @@ struct RootView: View {
         }
         .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store); demo.updateShushanAccount(shushan.credential, host: shushan.hostText); configureSource() } }
         .onChange(of: store.sources) { _, _ in configureSource() }
+        .onReceive(NotificationCenter.default.publisher(for:.contentProcessingChanged)) { _ in if !store.isDemo { store.audio.stop() } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.onlineService?.downloads?.pauseForBackground(); await store.saveBeforeSuspending() } } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await store.onlineService?.downloads?.returnToForeground() } } }
         .onChange(of: store.reader?.id) { _, id in if id == nil { Task { await store.flushPendingWrites() } } }

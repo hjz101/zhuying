@@ -57,10 +57,12 @@ struct LibraryBackup: Codable, Sendable {
               documents.allSatisfy({ !$0.paragraphs.isEmpty && $0 == ChapterDocument(chapterID: $0.chapterID, paragraphs: $0.paragraphs.map(\.text)) }) else { throw ContentFailure.invalidResponse }
         for file in resources {
             let components = file.path.split(separator: "/", omittingEmptySubsequences: false)
-            guard components.count == 2, ["fonts", "themes","media"].contains(components[0]),
+            guard components.count == 2, ["fonts", "themes","media","processing"].contains(components[0]),
                   !components[1].contains(".."), !components[1].contains("\\"), !file.data.isEmpty,
                   FileResourceStore.digest(file.data) == file.digest else { throw ContentFailure.invalidResponse }
-            if components[0] == "fonts" && components[1] == "fonts.json" {
+            if components[0] == "processing" {
+                guard components[1] == "rules.json" else { throw ContentFailure.invalidResponse }; _ = try ContentProcessingStore.decode(file.data)
+            } else if components[0] == "fonts" && components[1] == "fonts.json" {
                 let manifest = try JSONDecoder().decode(FontLibraryManifest.self, from: file.data)
                 var names = Set<String>()
                 guard manifest.version == 2, manifest.entries.allSatisfy({

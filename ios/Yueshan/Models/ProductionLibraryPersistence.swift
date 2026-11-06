@@ -53,6 +53,7 @@ struct LibraryViewPreferences: Codable {
 /// Coordinates immutable chapter files with the database commit. All public
 /// operations share one queue, including calls arriving while another awaits I/O.
 actor ProductionLibraryPersistence: ChapterDocumentLoading {
+    nonisolated let storageDirectory: URL?
     static let migrationKey = "migration.legacy-library.v1"
     static let legacySnapshotKey = "migration.legacy-library.original-snapshot"
     static let appearanceMigrationKey = "migration.appearance.v1"
@@ -71,6 +72,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
     private var remoteDocuments = ChapterMemoryCache()
 
     init(directory: URL, writer: any AtomicFileWriting = AtomicFileWriter()) throws {
+        storageDirectory = directory
         records = try SQLiteLibraryRepository(url: directory.appendingPathComponent("library.sqlite"))
         files = try FileChapterRepository(directory: directory.appendingPathComponent("chapters"), writer: writer)
         themes = ThemeLibraryRepository(directory: directory.appendingPathComponent("resources/themes"), writer: writer)
@@ -79,6 +81,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
 
     // Dependency injection also permits testing a failed metadata commit after files stage.
     init(records: SQLiteLibraryRepository, files: FileChapterRepository) {
+        storageDirectory = nil
         self.records = records; self.files = files; themes = nil
     }
 
@@ -206,6 +209,14 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         var content: [ChapterDocument] = []
         for chapter in archive.chapters where localIDs.contains(chapter.bookID) { content.append(try await cachedDocument(chapter.id)) }
         var resources = try themes?.backupResources() ?? []
+        if let storageDirectory {
+            let url = storageDirectory.appendingPathComponent("resources/processing/rules.json")
+            if FileManager.default.fileExists(atPath:url.path) {
+                let values = try url.resourceValues(forKeys:[.fileSizeKey,.isSymbolicLinkKey])
+                guard values.isSymbolicLink != true,(values.fileSize ?? Int.max) <= 512 * 1024 else { throw ContentFailure.storageFailure }
+                let bytes = try Data(contentsOf:url); _ = try ContentProcessingStore.decode(bytes); resources.append(.init(path:"processing/rules.json",data:bytes))
+            }
+        }
         let mediaReferences = Set(archive.books.flatMap { ($0.media?.resources ?? []) + [$0.cover].compactMap{$0} })
         if !mediaReferences.isEmpty { guard let media else { throw ContentFailure.storageFailure }; resources.append(contentsOf:try media.backup(mediaReferences)) }
         let manifestURL = fontDirectory.appendingPathComponent("fonts.json")

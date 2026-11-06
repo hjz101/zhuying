@@ -1,9 +1,9 @@
 import XCTest
 
 final class ExtensionToolsFlowTests: XCTestCase {
-    @MainActor private func open(_ id: String,title: String) -> XCUIApplication {
+    @MainActor private func open(_ id: String,title: String,fixtures: [String] = []) -> XCUIApplication {
         continueAfterFailure = false
-        let app = XCUIApplication(); app.launchArguments = ["--ui-testing","--production"]; app.launch()
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing","--production"] + fixtures; app.launch()
         app.tabBars.buttons["我的"].tap()
         let tools = app.buttons["allTools"]
         for _ in 0..<8 { if tools.isHittable { break }; app.swipeUp() }
@@ -48,5 +48,22 @@ final class ExtensionToolsFlowTests: XCTestCase {
         let program = app.textViews["scriptProgram"]; XCTAssertTrue(program.waitForExistence(timeout:5)); program.tap(); program.typeText("return 1 + 2;")
         let run = app.buttons["scriptRun"]; for _ in 0..<5 { if run.isHittable { break }; app.swipeUp() }; run.tap()
         XCTAssertTrue(app.staticTexts["scriptOutput"].waitForExistence(timeout:10)); XCTAssertEqual(app.staticTexts["scriptOutput"].label,"3")
+    }
+    @MainActor func testPurificationPersistsAndReaderReanchorsWithoutChangingOriginal() {
+        let app = open("purify",title:"正文净化",fixtures:["--legacy-library-fixtures"])
+        app.buttons["purifyAdd"].tap()
+        let pattern = app.textViews["purifyPattern"]; XCTAssertTrue(pattern.waitForExistence(timeout:5)); pattern.tap(); pattern.typeText("真实")
+        let replacement = app.textFields["purifyReplacement"]
+        for _ in 0..<5 { if replacement.isHittable { break }; app.swipeUp() }; replacement.tap(); replacement.typeText("处理")
+        let enabled = app.switches["purifyEnabled"]; for _ in 0..<5 { if enabled.isHittable { break }; app.swipeUp() }; enabled.tap()
+        let save = app.buttons["purifySave"]; for _ in 0..<7 { if save.isHittable { break }; app.swipeUp() }; save.tap()
+        XCTAssertTrue(app.staticTexts["purifyMessage"].waitForExistence(timeout:10))
+        app.navigationBars.buttons.element(boundBy:0).tap(); app.navigationBars.buttons.element(boundBy:0).tap(); app.tabBars.buttons["书架"].tap()
+        XCTAssertTrue(app.buttons["continueReading"].waitForExistence(timeout:10)); app.buttons["continueReading"].tap()
+        if app.buttons["从本章开头打开"].waitForExistence(timeout:3) { app.buttons["从本章开头打开"].tap() }
+        if app.buttons["dismissGestureGuide"].waitForExistence(timeout:2) { app.buttons["dismissGestureGuide"].tap() }
+        let rendered = expectation(for:NSPredicate(format:"value CONTAINS '处理段落'"),evaluatedWith:app.textViews["continuousText"]); wait(for:[rendered],timeout:10)
+        app.buttons["返回书架"].tap(); app.terminate(); app.launchArguments = ["--ui-testing","--production","--preserve-ui-test-state"]; app.launch(); app.buttons["continueReading"].tap()
+        let restored = expectation(for:NSPredicate(format:"value CONTAINS '处理段落'"),evaluatedWith:app.textViews["continuousText"]); wait(for:[restored],timeout:10)
     }
 }

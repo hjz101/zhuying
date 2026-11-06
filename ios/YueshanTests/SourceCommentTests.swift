@@ -75,4 +75,16 @@ final class SourceCommentTests: XCTestCase {
         XCTAssertEqual(real.anchor(at:real.index(for:.init(paragraph:1,offset:3))),.init(paragraph:1,offset:3))
         XCTAssertFalse(real.text.string.contains("这盏茶")); XCTAssertNotNil(ReaderCommentArtwork.bubble(settings:settings,count:300))
     }
+    @MainActor func testPurifiedBodyCommentsRemainBoundToOriginalParagraphAndQuote() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); defer { try? FileManager.default.removeItem(at:root) }
+        let book = book(),chapter = ChapterRecord(id:"c",bookID:book.id,nativeChapterID:"native",title:"章",order:0,access:.readable,requestParameters:["item_id":"901"]),context = try XCTUnwrap(ShushanCommentContext(book:book,chapter:chapter))
+        let raw = ChapterDocument(chapterID:"c",paragraphs:["广告正文。","原始正文。"]),processor = ContentProcessingStore(directory:root)
+        try await processor.save([.init(name:"删除",pattern:"^广告.*$",enabled:true),.init(name:"处理",pattern:"原始",replacement:"处理",enabled:true)])
+        let processed = try await processor.process(raw,bookID:book.id,sourceID:"shushan"),model = ReaderCommentsModel()
+        await model.load(client:.init(credential:credential,transport:CommentTransportProbe()),context:context,document:raw,cache:.init(directory:root.appendingPathComponent("comments")))
+        model.remap(processed.origins)
+        XCTAssertEqual(processed.document.paragraphs.first?.text,"处理正文。")
+        let id = try XCTUnwrap(processed.document.paragraphs.first?.id)
+        XCTAssertEqual(model.counts[id]?.nativeID,"1"); XCTAssertEqual(model.counts[id]?.count,2); XCTAssertEqual(model.originalTexts[id],"原始正文。")
+    }
 }

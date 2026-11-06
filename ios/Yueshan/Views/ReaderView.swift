@@ -61,7 +61,7 @@ struct ReaderView: View {
     private var commentContext: ShushanCommentContext? {
         guard !store.isDemo,let metadata = store.remoteMetadata(book.id),let record = store.chapterRecord(bookID:book.id,index:chapter),let context = ShushanCommentContext(book:metadata,chapter:record),context.source == "fq" else { return nil }; return context
     }
-    private var commentTaskID: String { StableContentID.make(loaded?.chapterID ?? "",loaded?.version ?? "",shushan.credentialForRequests.map{ShushanCommentsClient(credential:$0).cacheScope} ?? "signed-out",String(store.settings.preferences.showCommentBubbles)) }
+    private var commentTaskID: String { StableContentID.make(loaded?.chapterID ?? "",loaded?.version ?? "",loaded?.originVersion ?? "",String(restoreID),shushan.credentialForRequests.map{ShushanCommentsClient(credential:$0).cacheScope} ?? "signed-out",String(store.settings.preferences.showCommentBubbles)) }
     private var paragraphCounts: [Int:Int] {
         guard let loaded else { return [:] }
         return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap { index,paragraph in guard let count = comments.counts[paragraph.id]?.count,count > 0 else { return nil }; return (index,count) })
@@ -86,6 +86,7 @@ struct ReaderView: View {
                     }
                 }
             }
+            .frame(width:geo.size.width,height:geo.size.height,alignment:.topLeading)
             .overlay {
                 ReaderPageFurniture(settings: store.settings, book: book, chapter: chapter, page: page, pageCount: ranges.count, overallProgress: store.percent(book))
             }
@@ -95,7 +96,10 @@ struct ReaderView: View {
                     ContentUnavailableView {
                         Label("章节暂时无法打开", systemImage: "doc.text.magnifyingglass")
                     } description: { Text(reason) }
-                    actions: { Button("重试") { goChapter(requestedChapter ?? chapter, resume: requestedResume, atEnd: requestedAtEnd, location: requestedLocation) }.accessibilityIdentifier("retryChapter") }
+                    actions: {
+                        Button("重试") { goChapter(requestedChapter ?? chapter, resume: requestedResume, atEnd: requestedAtEnd, location: requestedLocation) }.accessibilityIdentifier("retryChapter")
+                        if !store.isDemo { Button("从本章开头打开") { goChapter(requestedChapter ?? chapter,resume:false) } }
+                    }
                     .background(readerBackground.opacity(0.97))
                 }
             }
@@ -148,6 +152,14 @@ struct ReaderView: View {
             else if target.paragraph != anchor.paragraph || abs(target.offset - anchor.offset) > 120 { anchor = target; narrationRestoreID += 1; save() }
         }
         .onDisappear { store.trackReading(nil); save(); chapterTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
+        .onReceive(NotificationCenter.default.publisher(for:.contentProcessingChanged)) { _ in
+            guard !store.isDemo,let loaded else { return }
+            let location = try? ReadingAnchor(bookID:book.id,document:loaded,paragraph:anchor.paragraph,offset:anchor.offset)
+            goChapter(chapter,location:location)
+        }
+        .onReceive(NotificationCenter.default.publisher(for:.contentProcessingFailed)) { event in
+            if event.userInfo?["bookID"] as? String == book.id { showMessage("净化处理未完成，已保留有效正文。") }
+        }
         .onChange(of: showSettings || showContents || showGestureGuide || showBookmarks || demoFeature != nil) { _, covered in
             store.trackReading(covered ? nil : (initialized ? book.id : nil),interacted:!covered)
         }
@@ -186,13 +198,16 @@ struct ReaderView: View {
         .task(id:commentTaskID) {
             comments.reset()
             if store.settings.preferences.showCommentBubbles,let credential = shushan.credentialForRequests,let context = commentContext,let loaded {
-                await comments.load(client:ShushanCommentsClient(credential:credential),context:context,document:loaded)
+                let processed = await store.contentProcessor.context(bookID:book.id,document:loaded)
+                if loaded.originVersion != nil && processed == nil { return }
+                await comments.load(client:ShushanCommentsClient(credential:credential),context:context,document:processed?.raw ?? loaded)
+                if !Task.isCancelled,let processed { comments.remap(processed.origins) }
             }
         }
         .sheet(isPresented: Binding(get: { commentParagraph != nil }, set: { if !$0 { commentParagraph = nil } })) {
             NavigationStack {
                 if !store.isDemo,let credential = shushan.credentialForRequests,let context = commentContext,let loaded,let paragraph = loaded.paragraphs[safe:commentParagraph ?? -1],let count = comments.counts[paragraph.id] {
-                    ProductionCommentsView(client:ShushanCommentsClient(credential:credential),context:context,paragraph:count,documentVersion:loaded.version,originalText:paragraph.text)
+                    ProductionCommentsView(client:ShushanCommentsClient(credential:credential),context:context,paragraph:count,documentVersion:loaded.originVersion ?? loaded.version,originalText:comments.originalTexts[paragraph.id] ?? paragraph.text)
                         .id(commentTaskID + paragraph.id)
                         .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("完成") { commentParagraph = nil } } }
                 } else if store.isDemo {

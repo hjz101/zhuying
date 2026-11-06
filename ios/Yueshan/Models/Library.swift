@@ -215,7 +215,14 @@ final class LibraryStore: ObservableObject {
     private(set) var workspace: LibraryWorkspace?
     private var remoteBooks: [String: LibraryBookRecord] = [:]
     private let defaults: UserDefaults
-    lazy var cloudSync = RecordSyncController(library:self,directory:(workspace?.root ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent(AppEnvironment().databaseComponent)).appendingPathComponent("CloudSync-v1"),defaults:defaults)
+    private var managedSettingsDirectory: URL { workspace?.root ?? productionPersistence?.storageDirectory ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent(AppEnvironment().databaseComponent) }
+    lazy var cloudSync = RecordSyncController(library:self,directory:managedSettingsDirectory.appendingPathComponent("CloudSync-v1"),defaults:defaults)
+    private var processingStore: ContentProcessingStore?
+    var contentProcessor: ContentProcessingStore {
+        if let processingStore { return processingStore }
+        let root = productionPersistence?.storageDirectory ?? managedSettingsDirectory
+        let store = ContentProcessingStore(directory:root.appendingPathComponent("resources/processing")); processingStore = store; return store
+    }
     private let importsURL: URL?
     private var importedBooks: [Book] = []
     private var productionPersistence: ProductionLibraryPersistence?
@@ -565,6 +572,11 @@ final class LibraryStore: ObservableObject {
         return book.content.indices.contains(chapter) ? book.content[chapter] : []
     }
     func chapterRepository(for book: Book) -> any ChapterDocumentLoading {
+        let repository = rawChapterRepository(for:book)
+        guard !isDemo,book.media == nil else { return repository }
+        return ProcessedChapterRepository(base:repository,processor:contentProcessor,bookID:book.id,sourceID:remoteBooks[book.id]?.source?.sourceID)
+    }
+    private func rawChapterRepository(for book: Book) -> any ChapterDocumentLoading {
         if let remote = remoteBooks[book.id], let service = onlineService {
             return OnlineChapterRepository(service: service, book: remote, catalog: chapterCatalogs[book.id] ?? [])
         }
@@ -625,6 +637,7 @@ final class LibraryStore: ObservableObject {
     }
     struct SearchResult { let hits: [TextSearchHit]; let indexed: Int; let uncached: Int }
     func searchText(_ query: String, bookID: String? = nil) async throws -> SearchResult {
+        let processingVersion = isDemo ? "demo" : (try? await contentProcessor.revision()) ?? "invalid"
         var indexed: [IndexedChapter] = [], missing = 0
         for book in books where book.media == nil && (bookID == nil || book.id == bookID) {
             for chapter in book.chapters.indices {
@@ -632,11 +645,14 @@ final class LibraryStore: ObservableObject {
                 let request = try chapterRequest(for: book, chapter: chapter)
                 guard request.chapter.access == .readable else { continue }
                 let document: ChapterDocument?
-                if let remote = remoteBooks[book.id] { document = try await onlineService?.cachedDocument(book: remote, chapter: request.chapter) }
+                if let remote = remoteBooks[book.id] {
+                    if let raw = try await onlineService?.cachedDocument(book:remote,chapter:request.chapter) { document = try await contentProcessor.process(raw,bookID:book.id,sourceID:remote.source?.sourceID).document } else { document = nil }
+                }
                 else { document = try await chapterRepository(for: book).document(chapterID: request.chapter.id) }
                 if let document { indexed.append(.init(bookID: book.id, document: document)) } else { missing += 1 }
             }
         }
+        if !isDemo { let current = (try? await contentProcessor.revision()) ?? "invalid"; guard current == processingVersion else { throw ContentFailure.unavailable } }
         if textIndex == nil { textIndex = try TextSearchIndex(url: workspace?.root.appendingPathComponent("ContentIndex.sqlite")) }
         guard let textIndex else { throw ContentFailure.storageFailure }
         try await textIndex.replace(indexed)
@@ -797,7 +813,7 @@ final class LibraryStore: ObservableObject {
         loadState = .loading
         do { try await workspace.restore(backup) }
         catch { loadState = .ready; if activityForeground { await onlineService?.downloads?.returnToForeground() }; throw error }
-        reader = nil; productionPersistence = nil; bootstrapStarted = false
+        reader = nil; productionPersistence = nil; processingStore = nil; bootstrapStarted = false
         activeDocuments = ChapterMemoryCache(); stableProgress = [:]; remoteBooks = [:]; chapterCatalogs = [:]
         hasPendingChanges = false; lastWriteFailed = false
         await bootstrapProductionIfNeeded()

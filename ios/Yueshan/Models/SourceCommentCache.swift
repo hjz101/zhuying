@@ -42,8 +42,14 @@ actor SourceCommentCache {
 @MainActor final class ReaderCommentsModel: ObservableObject {
     @Published private(set) var counts: [String:SourceParagraphCount] = [:]
     @Published private(set) var stale = false
+    private(set) var originalTexts: [String:String] = [:]
     private var generation = UUID()
-    func reset() { generation = UUID(); counts = [:]; stale = false }
+    func reset() { generation = UUID(); counts = [:]; originalTexts = [:]; stale = false }
+    func remap(_ origins: [String:String]) {
+        let original = counts,text = originalTexts
+        counts = Dictionary(uniqueKeysWithValues:origins.compactMap{ id,raw in original[raw].map{(id,$0)} })
+        originalTexts = Dictionary(uniqueKeysWithValues:origins.compactMap{ id,raw in text[raw].map{(id,$0)} })
+    }
     func load(client: ShushanCommentsClient,context: ShushanCommentContext,document: ChapterDocument,cache: SourceCommentCache = .shared) async {
         reset(); let ticket = generation,key = SourceCommentCache.key(client:client,context:context,version:document.version)
         do {
@@ -52,9 +58,11 @@ actor SourceCommentCache {
             else { rows = try await client.counts(context); try? await cache.write(rows,key:key) }
             try Task.checkCancellation(); guard ticket == generation else { return }
             counts = ShushanCommentsClient.map(rows,context:context,document:document)
+            originalTexts = Dictionary(uniqueKeysWithValues:document.paragraphs.map{($0.id,$0.text)})
         } catch {
             guard !Task.isCancelled,ticket == generation,let saved = await cache.read([SourceParagraphCount].self,key:key,maximumAge:7 * 86400),!Task.isCancelled,ticket == generation else { return }
             counts = ShushanCommentsClient.map(saved,context:context,document:document); stale = true
+            originalTexts = Dictionary(uniqueKeysWithValues:document.paragraphs.map{($0.id,$0.text)})
         }
     }
 }

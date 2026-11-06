@@ -37,3 +37,7 @@ iCloud Drive 传输与备份／记录合并基础已加入，尚未接入完整�
 ## JavaScript 宿主
 
 真实 Web Worker 宿主、受限网络／缓存桥接、编码／哈希和解析器已实现。无限循环能超时终止，取消后新任务可正常运行。不自动执行其他阅读器导入脚本，不宣称 legado／jsoup 完整兼容。范围见 `docs/NATIVE-SCRIPT-HOST.md`。`/tmp/yueshan-script-host-feature.log` 中 332 项单元测试与 1 项应用内实际脚本执行界面流程通过，默认网络关闭。
+
+## 正文净化与原文定位
+
+正则／受限 JS 的版本化净化、顺序和作用域、真实配置界面及导入导出已接阅读、朗读、全文搜索。原文不改写，规则随完整备份保存；处理结果含来源版本与段落对应，段评继续核对原文。`/tmp/yueshan-purification-feature.log` 的 338 项单元测试通过；界面测试发现首次打开章节失败时空 ZStack 导致错误按钮零宽，补齐阅读容器尺寸后，`/tmp/yueshan-purification-ui-retest.log` 的编辑／启用／显式重定位／重启续读流程通过。支持与边界见 `docs/CONTENT-PROCESSING.md`。

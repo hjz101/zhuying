@@ -104,9 +104,11 @@ struct ChapterDocument: Codable, Equatable, Sendable {
     let chapterID: String
     let version: String
     let paragraphs: [ContentParagraph]
+    let originVersion: String?
 
-    init(chapterID: String, paragraphs texts: [String]) {
+    init(chapterID: String, paragraphs texts: [String],originVersion: String? = nil) {
         self.chapterID = chapterID
+        self.originVersion = originVersion
         version = StableContentID.list(texts)
         var occurrences: [String: Int] = [:]
         paragraphs = texts.map { text in

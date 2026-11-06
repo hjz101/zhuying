@@ -17,8 +17,9 @@ import XCTest
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let domain = UUID().uuidString, defaults = UserDefaults(suiteName: domain)!
         defer { try? FileManager.default.removeItem(at: directory); defaults.removePersistentDomain(forName: domain) }
+        let service = OnlineReadingService(cache: try RecentChapterCache(directory: directory.appendingPathComponent("cache")))
         let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
-            productionPersistence: try ProductionLibraryPersistence(directory: directory))
+            productionPersistence: try ProductionLibraryPersistence(directory: directory), onlineService: service)
         await library.bootstrapProductionIfNeeded()
         let source = try source(); library.updateSources([source])
         let state = try library.legadoLoginState(for: source)

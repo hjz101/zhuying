@@ -9,7 +9,13 @@ actor SourceDiagnosticHTTPTransport: HTTPTransport {
     func failureSnapshot() -> [String: String]? { failure }
     func recordFailure(_ error: Error, operation: String) {
         var tags = ["operation": operation]
-        if let wrapped = error as? LegadoRuleExecutionError { tags["field"] = wrapped.field.rawValue }
+        if let wrapped = error as? LegadoRuleExecutionError {
+            tags["field"] = wrapped.field.rawValue
+            if let input = wrapped.inputSummary {
+                tags["serializedInputType"] = input.root.rawValue; tags["abstractType"] = input.abstract.rawValue
+                tags["dataType"] = input.data.rawValue; tags["hasCode"] = input.hasCode ? "true" : "false"
+            }
+        }
         if let summary = SourceDiagnosticJavaScriptSummary.from(error) {
             tags["jsKind"] = summary.kind.rawValue; tags["reason"] = summary.reason.rawValue
             tags["missingGlobal"] = summary.missingGlobal

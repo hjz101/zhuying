@@ -18,7 +18,10 @@ struct LegadoRuleExecutionError: Error, LocalizedError {
     }
     let field: Field
     let cause: any Error
-    init(field: Field, cause: any Error) { self.field = field; self.cause = cause }
+    let inputSummary: LegadoRuleInputSummary?
+    init(field: Field, cause: any Error, inputSummary: LegadoRuleInputSummary? = nil) {
+        self.field = field; self.cause = cause; self.inputSummary = inputSummary
+    }
     var errorDescription: String? { "书源规则执行失败（\(field.rawValue)）。" }
     static func unwrapped(_ error: any Error) -> any Error {
         var current = error

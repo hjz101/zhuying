@@ -11,6 +11,10 @@ import XCTest
         XCTAssertThrowsError(try LegadoLiveSourceProbe.Input.parse(prefix + ["\n"]))
         let input = try XCTUnwrap(LegadoLiveSourceProbe.Input.parse(prefix + ["原创小说"]))
         XCTAssertEqual(input.sourceID, "original-source"); XCTAssertEqual(input.query, "原创小说")
+        XCTAssertFalse(input.fullAcceptance); XCTAssertFalse(input.verifyRestart)
+        XCTAssertThrowsError(try LegadoLiveSourceProbe.Input.parse(prefix + ["原创", "--legado-verify-restart"]))
+        let acceptance = try XCTUnwrap(LegadoLiveSourceProbe.Input.parse(prefix + ["原创", "--legado-full-acceptance", "--legado-verify-restart"]))
+        XCTAssertTrue(acceptance.fullAcceptance); XCTAssertTrue(acceptance.verifyRestart)
     }
     func testMissingSourceProducesOnlyRedactedConfigurationEvidence() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

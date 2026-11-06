@@ -29,6 +29,16 @@ private actor StageThreeTransport: HTTPTransport {
     }
 }
 
+private actor StageThreeGateTransport: HTTPTransport {
+    private var gate: CheckedContinuation<Void, Never>?
+    private var released = false
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        if !released { await withCheckedContinuation { gate = $0 } }
+        return try await StageThreeTransport().send(request)
+    }
+    func release() { released = true; gate?.resume(); gate = nil }
+}
+
 final class LegadoStageThreeIntegrationTests: XCTestCase {
     private func source(id: String = "stage-three", search: String = "/search", content: String = "$.text") throws -> DemoSource {
         let configuration: [String: Any] = [
@@ -45,6 +55,27 @@ final class LegadoStageThreeIntegrationTests: XCTestCase {
         return source
     }
 
+    func testQueuedLoginCannotRestoreAnAccountAfterLogout() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let configured = try source(), state = try LegadoPersistentState(sourceID: configured.id, directory: root, vault: StageThreeVault())
+        try state.setLoginInfo(["账号": "old-original-reader"])
+        let transport = StageThreeGateTransport()
+        let adapter = try LegadoBookSource(source: configured, transport: transport, state: state)
+        let searching = Task { try await adapter.search(query: "原创", page: 1) }
+        let start = ProcessInfo.processInfo.systemUptime
+        while adapter.pendingOperationCount < 1 && ProcessInfo.processInfo.systemUptime - start < 2 { await Task.yield() }
+        let login = Task { try await adapter.login(action: "@js:source.put('attempt', 'old')", values: ["账号": "old-original-reader"]) }
+        while adapter.pendingOperationCount < 2 && ProcessInfo.processInfo.systemUptime - start < 2 { await Task.yield() }
+        XCTAssertEqual(adapter.pendingOperationCount, 2)
+        try state.logout()
+        await transport.release()
+        do { _ = try await login.value; XCTFail("Queued login must not rebase to the logged-out epoch") } catch { XCTAssertTrue(error is CancellationError) }
+        _ = try? await searching.value
+        XCTAssertEqual(state.authStatus, .signedOut); XCTAssertEqual(try state.getLoginInfo(), "")
+        XCTAssertEqual(try state.getVariable("attempt"), "")
+    }
+
     func testLegitimateLargeSearchCanEvaluateAnOriginalURLScriptForEveryResult() async throws {
         var configured = try source(search: "/many")
         var raw = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(configured.configuration)) as? [String: Any])
@@ -54,6 +85,18 @@ final class LegadoStageThreeIntegrationTests: XCTestCase {
         let page = try await adapter.search(query: "原创", page: 1)
         XCTAssertEqual(page.books.count, 240)
         XCTAssertEqual(Set(page.books.map(\.id)).count, 240)
+    }
+
+    func testDetailsInitializationPreservesObjectBindingsForOriginalStyleDestructuring() async throws {
+        var configured = try source()
+        var raw = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(configured.configuration)) as? [String: Any])
+        raw["ruleBookInfo"] = ["init": "@js:JSON.parse(result)", "name": "@js:result.name", "tocUrl": "$.toc", "intro": "@js:const {intro}=result; intro.split('。').join('。')"]
+        configured.configuration = try JSONSerialization.data(withJSONObject: raw)
+        let adapter = try LegadoBookSource(source: configured, transport: StageThreeTransport())
+        let page = try await adapter.search(query: "原创", page: 1)
+        let detail = try await adapter.details(for: XCTUnwrap(page.books.first))
+        XCTAssertEqual(detail.title, "原创作品A"); XCTAssertEqual(detail.summary, "独立原创介绍")
+        XCTAssertFalse(detail.source?.remoteBookID.isEmpty ?? true)
     }
 
     func testUncaughtJavaScriptFailureRecordsOnlySchemaFieldAndSafeKind() async throws {
@@ -68,10 +111,10 @@ final class LegadoStageThreeIntegrationTests: XCTestCase {
         do { _ = try await adapter.details(for: XCTUnwrap(page.books.first)); XCTFail("Failure must retain its schema location") }
         catch {
             XCTAssertEqual((error as? LegadoRuleExecutionError)?.field, .bookInfoIntro)
-            XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .unsupportedHost)
+            XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .scriptFailure)
         }
         let tags = await recorder.failureSnapshot()
-        XCTAssertEqual(tags, ["operation": "details", "category": "javascript", "field": "ruleBookInfo.intro", "jsKind": "TypeError", "reason": "notFunction"])
+        XCTAssertEqual(tags, ["operation": "details", "category": "javascript", "field": "ruleBookInfo.intro", "jsKind": "TypeError", "reason": "notFunction", "serializedInputType": "object", "abstractType": "missing", "dataType": "missing", "hasCode": "false"])
         XCTAssertFalse(String(decoding: try JSONEncoder().encode(tags), as: UTF8.self).contains("private-fixture-token"))
     }
 
@@ -118,6 +161,17 @@ final class LegadoStageThreeIntegrationTests: XCTestCase {
         let configured = try source(search: "@js:java.ajax('https://'+'blocked.fixture/private')")
         let adapter = try LegadoBookSource(source: configured, transport: StageThreeTransport())
         do { _ = try await adapter.search(query: "原创", page: 1); XCTFail("An undeclared host must be rejected") }
+        catch { XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .hostNotAllowed) }
+    }
+
+    func testCaughtHostFailureFollowedByNewJavaScriptErrorKeepsTheActualCause() async throws {
+        let adapter = try LegadoBookSource(source: source(search: "@js:try{java.ajax('https://'+'blocked.fixture/private')}catch(caught){};throw new TypeError('original-fixture-not-callable')"), transport: StageThreeTransport())
+        do { _ = try await adapter.search(query: "原创", page: 1); XCTFail("New script failure must be reported") }
+        catch { XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .scriptFailure) }
+    }
+    func testRethrowingTheSameNativeHostErrorRetainsRecoveryClassification() async throws {
+        let adapter = try LegadoBookSource(source: source(search: "@js:try{java.ajax('https://'+'blocked.fixture/private')}catch(caught){throw caught}"), transport: StageThreeTransport())
+        do { _ = try await adapter.search(query: "原创", page: 1); XCTFail("Original host failure must be reported") }
         catch { XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .hostNotAllowed) }
     }
 

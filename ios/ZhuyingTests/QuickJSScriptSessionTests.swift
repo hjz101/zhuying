@@ -324,4 +324,26 @@ final class QuickJSScriptSessionTests: XCTestCase {
             catch QuickJSScriptError.javascript(let message) { XCTAssertTrue(message.contains("Unsupported JavaImporter")) }
         }
     }
+
+    func testReplaceRuleSetterUpdatesCurrentBookDataOnlyAfterNativeSuccess() async throws {
+        let value = try await Task.detached {
+            var enabled = true
+            return try QuickJSScriptSession().evaluate("var before=book.readConfig.useReplaceRule;book.setUseReplaceRule(false);var after=book.readConfig.useReplaceRule;book.setUseReplaceRule(true);[before,after,book.getUseReplaceRule(),book.readConfig.useReplaceRule]",
+                                                      bindings: ["book": ["readConfig": ["useReplaceRule": true]]]) { method,args in
+                switch method {
+                case "book.setUseReplaceRule": enabled = args[0] as! Bool; return NSNull()
+                case "book.getUseReplaceRule": return enabled
+                default: throw QuickJSScriptError.invalidInput
+                }
+            }
+        }.value as? [Bool]
+        XCTAssertEqual(value, [true,false,true,true])
+        let failed = try await Task.detached {
+            try QuickJSScriptSession().evaluate("try{book.setUseReplaceRule(false)}catch(e){};book.readConfig.useReplaceRule",
+                                                bindings: ["book": ["readConfig": ["useReplaceRule": true]]]) { _,_ in
+                throw NSError(domain: "Zhuying.QuickJS.Test", code: 1)
+            }
+        }.value as? Bool
+        XCTAssertEqual(failed, true)
+    }
 }

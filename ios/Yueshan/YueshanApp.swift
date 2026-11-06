@@ -17,7 +17,7 @@ struct YueshanApp: App {
         let environment = AppEnvironment()
         let defaults = environment.defaults()
         let credentialService = environment.isUITesting ? "com.yueshan.shushan.ui-tests" : "com.yueshan.shushan.\(environment.mode.rawValue)"
-        _shushan = StateObject(wrappedValue: ShushanAccountStore(defaults:defaults,client:ShushanClient(transport:ProfiledAccountTransport(profiles:SourceNetworkProfiles(defaults:defaults))),vault:ShushanKeychain(service:credentialService)))
+        _shushan = StateObject(wrappedValue: ShushanAccountStore(defaults:environment.isLiveValidation ? UserDefaults(suiteName:"com.yueshan.production")! : defaults,client:ShushanClient(transport:ProfiledAccountTransport(profiles:SourceNetworkProfiles(defaults:defaults))),vault:ShushanKeychain(service:credentialService)))
         _featureDemo = StateObject(wrappedValue: FeatureDemoStore(defaults: defaults, seedDemoData: environment.isDemo))
         ReadingFontLibrary.shared.useManagedStorage(!environment.isDemo)
         ReadingFontLibrary.shared.reload(reset: environment.resetsTestState)

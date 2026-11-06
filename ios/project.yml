@@ -80,6 +80,16 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  YueshanLiveAcceptanceUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: YueshanLiveAcceptanceUITests
+    dependencies:
+      - target: Yueshan
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
   YueshanPerformanceTests:
     type: bundle.unit-test
     platform: iOS
@@ -103,6 +113,13 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
 schemes:
+  Yueshan Live Acceptance:
+    build:
+      targets:
+        Yueshan: all
+    test:
+      targets:
+        - YueshanLiveAcceptanceUITests
   Yueshan Performance:
     build:
       targets:

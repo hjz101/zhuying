@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "sampleKind": "live-app",
+  "normalUserLibraryMutated": false,
+  "interfaceTest": "YueshanLiveAcceptanceUITests.LiveSourceAcceptanceTests",
+  "books": [
+    {
+      "id": "remote-32fe3df0eaa17ff1837f319502776102960e22faa055508da070e33900f66268",
+      "title": "西游记",
+      "provider": "番茄小说",
+      "searched": true,
+      "detailsShown": true,
+      "catalogShown": true,
+      "restartResumed": true,
+      "renderedTextEqualAfterRestart": true,
+      "withoutFavorite": true,
+      "chapters": [
+        {
+          "id": "61fc6f5675f7700db82aaeb59bc2eff7a6f4f54443a24406b65e49ae605a0374",
+          "title": "第一回 灵根育孕源流出 心性修持大道生",
+          "order": 3,
+          "utf16Count": 7569,
+          "contentHash": "99ecbb1be49abaa188a025ce9db823303adc728f02c86a718a9f3030dfac47bc"
+        },
+        {
+          "id": "6cd64e3d2b909b416f6ebba0fcb539e9878b3b6c13ad1f151e9b21b793f26c34",
+          "title": "第二回 悟彻菩提真妙理 断魔归本合元神",
+          "order": 4,
+          "utf16Count": 6987,
+          "contentHash": "826c45af7f93443139180e9064c2a89a4ff0216ce9df567f8604766444af286c"
+        },
+        {
+          "id": "e5a40c739960164fe6bff1e0d92d51196ae817295524e1d7d6cd1cc8fd5e508b",
+          "title": "第三回 四海千山皆拱伏 九幽十类尽除名",
+          "order": 5,
+          "utf16Count": 8192,
+          "contentHash": "4da0e1a6a1d87b189fb2a5c3940b17f6825b3197859d99c86f223681426ea2cd"
+        }
+      ]
+    },
+    {
+      "id": "remote-d782254cdc9d46d9117fa6e1855af0d4e2663b81210f94f2e06f4c7aab4ce2e8",
+      "title": "红楼梦",
+      "provider": "番茄小说",
+      "searched": true,
+      "detailsShown": true,
+      "catalogShown": true,
+      "restartResumed": true,
+      "renderedTextEqualAfterRestart": true,
+      "withoutFavorite": true,
+      "chapters": [
+        {
+          "id": "df06f7d838794b4541ee3ddb86ccf0a9ca2c9d4c4069486de57fd96660713742",
+          "title": "第一回 甄士隐梦幻识通灵 贾雨村风尘怀闺秀",
+          "order": 4,
+          "utf16Count": 8281,
+          "contentHash": "33ceeda993356602efc5f6a4a3250b689f39a799b538f9230f40c3f4e5d0b3c3"
+        },
+        {
+          "id": "ee48e420cba6bd336b38d97edbf09b75fed752d8a739dc0e09dc21479700a147",
+          "title": "第二回 贾夫人仙逝扬州城 冷子兴演说荣国府",
+          "order": 5,
+          "utf16Count": 6069,
+          "contentHash": "a87a13138f6f581dda8e42f27ad6a76ea04c745737a32e60371cd8cd8db28360"
+        },
+        {
+          "id": "39db22f10472888030e525ba3c9f36aa06d7c499f5ec56b30b79dedc5e6e24ef",
+          "title": "第三回 贾雨村夤缘复旧职 林黛玉抛父进京都",
+          "order": 6,
+          "utf16Count": 8704,
+          "contentHash": "20568da8802a30dc54f4b61513cf5d7aaaabb886d03d46fe5e136cc866afdff6"
+        }
+      ]
+    }
+  ],
+  "rawProseIncluded": false,
+  "credentialsIncluded": false
+}

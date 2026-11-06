@@ -6,10 +6,16 @@ struct AppEnvironment: Equatable {
     let mode: Mode
     let isUITesting: Bool
     let preservesTestState: Bool
+    let isLiveValidation: Bool
 
     init(arguments: [String] = ProcessInfo.processInfo.arguments) {
         isUITesting = arguments.contains("--ui-testing")
         preservesTestState = arguments.contains("--preserve-ui-test-state")
+        #if DEBUG
+        isLiveValidation = arguments.contains("--live-source-acceptance") && arguments.contains("--production") && !isUITesting
+        #else
+        isLiveValidation = false
+        #endif
         if arguments.contains("--production") { mode = .production }
         else if arguments.contains("--demo") || isUITesting { mode = .demo }
         else {
@@ -23,18 +29,22 @@ struct AppEnvironment: Equatable {
     var isDemo: Bool { mode == .demo }
     var resetsTestState: Bool { isUITesting && !preservesTestState }
     var defaultsDomain: String? {
+        if isLiveValidation { return "com.yueshan.live-acceptance" }
         if isUITesting { return isDemo ? "com.yueshan.ui-tests" : "com.yueshan.production.ui-tests" }
         return isDemo ? nil : "com.yueshan.production"
     }
     var importsComponent: String {
+        if isLiveValidation { return "LiveAcceptance/ImportedBooks" }
         if isUITesting { return isDemo ? "UITestImports" : "ProductionUITestImports" }
         return isDemo ? "ImportedBooks" : "Production/ImportedBooks"
     }
     var fontsComponent: String {
+        if isLiveValidation { return "LiveAcceptance/ReadingFonts" }
         if isUITesting { return isDemo ? "UITestReadingFonts" : "ProductionUITestReadingFonts" }
         return isDemo ? "ReadingFonts" : "Production/ReadingFonts"
     }
     var databaseComponent: String {
+        if isLiveValidation { return "LiveAcceptance/Database" }
         if isUITesting { return isDemo ? "UITestDatabase" : "ProductionUITestDatabase" }
         return isDemo ? "DemoDatabase" : "Production/Database"
     }

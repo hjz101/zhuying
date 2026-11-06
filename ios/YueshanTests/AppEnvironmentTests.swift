@@ -91,4 +91,15 @@ final class AppEnvironmentTests: XCTestCase {
         XCTAssertTrue(production.updates.isEmpty)
         XCTAssertTrue(production.progress.isEmpty)
     }
+    func testLiveAcceptanceOnlyUsesDedicatedStorageAndCannotActivateInsideRegularUITests() {
+        let live = AppEnvironment(arguments:["--production","--live-source-acceptance"]),normal = AppEnvironment(arguments:["--production"])
+        #if DEBUG
+        XCTAssertTrue(live.isLiveValidation); XCTAssertFalse(live.isUITesting); XCTAssertFalse(live.isDemo)
+        XCTAssertNotEqual(live.databaseComponent,normal.databaseComponent); XCTAssertNotEqual(live.importsComponent,normal.importsComponent); XCTAssertNotEqual(live.defaultsDomain,normal.defaultsDomain)
+        #else
+        XCTAssertFalse(live.isLiveValidation)
+        #endif
+        XCTAssertFalse(AppEnvironment(arguments:["--production","--ui-testing","--live-source-acceptance"]).isLiveValidation)
+    }
+
 }

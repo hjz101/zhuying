@@ -43,8 +43,8 @@ struct ProductionBackendView: View {
         guard let source,let origin else { return }; busy = true; message = nil
         operation = Task { defer { if !Task.isCancelled { busy = false } }; do {
             let saved = try library.backendProfiles.profile(sourceID:sourceID,origin:origin); guard saved.enabled else { throw RemoteBackendError.invalid }
-            let transport = try library.requestTransport(for:source,maximumBytes:4 * 1024 * 1024)
-            let (_,response) = try await transport.send(URLRequest(url:origin)); try Task.checkCancellation(); message = "转发协议已通过，上游返回 HTTP \(response.statusCode)。具体书源接口仍需书源调试验证。"
+            guard let transport = try library.requestTransport(for:source,maximumBytes:4 * 1024 * 1024) as? RemoteBackendTransport else { throw RemoteBackendError.invalid }
+            try await transport.checkConnection(); try Task.checkCancellation(); message = "后端协议、认证和书源主机绑定已通过。具体书源接口请继续用书源调试验证。"
         } catch { if !Task.isCancelled { message = error.localizedDescription } } }
     }
 }

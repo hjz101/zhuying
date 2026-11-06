@@ -40,11 +40,14 @@ export function createGateway({ token, sources, fetchImpl = fetch, timeoutMS = 1
     const timer = setTimeout(() => { timedOut = true; controller.abort(); if (!request.complete) request.destroy(); }, timeoutMS);
     response.on('close', () => { if (!response.writableFinished) controller.abort(); });
     try {
-      if (request.method !== 'POST' || request.url !== '/v1/forward') throw new GatewayError(404, 'not_found');
+      if (request.method !== 'POST' || !['/v1/forward', '/v1/status'].includes(request.url)) throw new GatewayError(404, 'not_found');
       if (!authorize(request.headers.authorization, token)) throw new GatewayError(401, 'unauthorized');
       if (!/^application\/json(?:;|$)/i.test(request.headers['content-type'] || '')) invalid();
       const value = await body(request), source = configured.get(value.sourceID);
       if (!source) throw new GatewayError(403, 'source_not_allowed');
+      let requestedOrigin; try { requestedOrigin = new URL(value.sourceOrigin); } catch { invalid(); }
+      if (requestedOrigin.origin !== source.origin || requestedOrigin.username || requestedOrigin.password || requestedOrigin.pathname !== '/' || requestedOrigin.search || requestedOrigin.hash) throw new GatewayError(403, 'source_origin_mismatch');
+      if (request.url === '/v1/status') { reply(200, { version: 1, ready: true, sourceID: value.sourceID, sourceOrigin: source.origin }); return; }
       if (typeof value.path !== 'string' || value.path.length > 8192 || !value.path.startsWith('/') || value.path.startsWith('//') || /[\\\r\n#]/.test(value.path)) invalid();
       const target = new URL(value.path, source.origin);
       if (target.origin !== source.origin || !source.paths.some(p => p.endsWith('/') ? target.pathname.startsWith(p) : target.pathname === p)) throw new GatewayError(403, 'path_not_allowed');

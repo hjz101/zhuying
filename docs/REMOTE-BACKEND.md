@@ -10,7 +10,7 @@ Node 22及以上，无第三方运行依赖：
 
 ```sh
 export YUESHAN_GATEWAY_TOKEN='<在服务器私下设置至少16字符的令牌>'
-export YUESHAN_GATEWAY_SOURCES='{"shushan":{"origin":"https://v1.vossc.com","paths":["/search","/book","/catalog","/content","/para","/idea_comment"]}}'
+export YUESHAN_GATEWAY_SOURCES='{"shushan":{"origin":"https://v1.vossc.com","paths":["/search","/details","/catalog","/content","/para","/idea_comment"]}}'
 node backend/reader-gateway.mjs
 ```
 
@@ -18,7 +18,7 @@ node backend/reader-gateway.mjs
 
 ## 协议与边界
 
-`POST /v1/forward`，`Authorization: Bearer <backend key>`，JSON `{sourceID,path,method,headers,bodyBase64?}`。服务端通过自身配置确定固定 HTTPS 源，精确路径或显式以`/`结尾的子树白名单；客户端不能指定任意源。返回`{version:1,status,headers,bodyBase64}`，恢复原始书源 URL 与 HTTP 状态。错误响应不回显正文、令牌或源查询。
+`POST /v1/forward`，`Authorization: Bearer <backend key>`，JSON `{sourceID,sourceOrigin,path,method,headers,bodyBase64?}`。`POST /v1/status`使用同样认证与`{sourceID,sourceOrigin}`做连接探测，核对绑定而不访问上游、不要求开放根路径。服务端通过自身配置确定固定HTTPS源并要求与客户端原始主机一致，精确路径或显式以`/`结尾的子树白名单；客户端不能指定任意源。返回`{version:1,status,headers,bodyBase64}`，恢复原始书源 URL 与 HTTP 状态。错误响应不回显正文、令牌或源查询。
 
 只支持GET／POST、请求1MiB（原POST体512KiB）、上游体4MiB、8个在途请求、15秒上游超时。重定向全部拒绝，保留系统TLS验证；不支持流式/WebSocket。响应只带Content-Type/Retry-After，不传Set-Cookie。服务器不记录请求内容；部署时反向代理日志也应避免敏感查询。
 

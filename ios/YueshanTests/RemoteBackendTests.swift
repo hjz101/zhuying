@@ -31,7 +31,7 @@ final class RemoteBackendTests: XCTestCase {
         let mock = BackendMockTransport { request in
             XCTAssertEqual(request.url?.absoluteString,"https://gateway.test/v1/forward"); XCTAssertEqual(request.value(forHTTPHeaderField:"Authorization"),"Bearer backend-token")
             let object = try JSONSerialization.jsonObject(with:XCTUnwrap(request.httpBody)) as! [String:Any]
-            XCTAssertEqual(object["sourceID"] as? String,"original"); XCTAssertEqual(object["path"] as? String,"/search?q=%E4%B8%AD%E6%96%87")
+            XCTAssertEqual(object["sourceID"] as? String,"original"); XCTAssertEqual(object["sourceOrigin"] as? String,"https://source.test"); XCTAssertEqual(object["path"] as? String,"/search?q=%E4%B8%AD%E6%96%87")
             XCTAssertEqual((object["headers"] as? [String:String])?["x-api-key"],"source-token"); XCTAssertFalse((object["headers"] as! [String:String]).values.contains("backend-token"))
             return (try JSONSerialization.data(withJSONObject:["version":1,"status":429,"headers":["content-type":"text/plain"],"bodyBase64":Data("限流".utf8).base64EncodedString()]),HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
         }
@@ -57,4 +57,17 @@ final class RemoteBackendTests: XCTestCase {
         let noTrustBypass = RemoteBackendTransport(sourceID:"A",origin:origin,profile:.init(enabled:true,endpoint:"https://gateway.test",directFallback:true),key:"token",transport:tls,direct:direct)
         do { _ = try await noTrustBypass.send(request); XCTFail("TLS must never fall back") } catch RemoteBackendError.unavailable {}
     }
+    func testBackendConnectionProbeUsesDedicatedEndpointAndVerifiesSourceBinding() async throws {
+        let origin = URL(string:"https://source.test")!
+        for returnedOrigin in ["https://source.test","https://other.test"] {
+            let mock = BackendMockTransport { request in
+                XCTAssertEqual(request.url?.path,"/v1/status"); XCTAssertEqual(request.value(forHTTPHeaderField:"Authorization"),"Bearer backend-token")
+                return (try JSONSerialization.data(withJSONObject:["version":1,"ready":true,"sourceID":"original","sourceOrigin":returnedOrigin]),HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:nil,headerFields:nil)!)
+            }
+            let transport = RemoteBackendTransport(sourceID:"original",origin:origin,profile:.init(enabled:true,endpoint:"https://gateway.test"),key:"backend-token",transport:mock)
+            do { try await transport.checkConnection(); XCTAssertEqual(returnedOrigin,origin.absoluteString) }
+            catch { XCTAssertNotEqual(returnedOrigin,origin.absoluteString) }
+        }
+    }
+
 }

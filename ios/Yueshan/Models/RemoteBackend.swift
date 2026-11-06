@@ -61,8 +61,16 @@ struct RemoteBackendTransport: HTTPTransport {
     var transport: any HTTPTransport = SourceHTTPTransport(maximumResponseBytes:6 * 1024 * 1024)
     var direct: any HTTPTransport = SourceHTTPTransport(maximumResponseBytes:4 * 1024 * 1024)
     private static let headers: Set<String> = ["accept","content-type","authorization","cookie","x-api-key","x-device-id","x-novel-token","x-device-type","user-agent"]
-    private struct Forward: Encodable { let sourceID: String; let path: String; let method: String; let headers: [String:String]; let bodyBase64: String? }
+    private struct Forward: Encodable { let sourceID: String; let sourceOrigin: String; let path: String; let method: String; let headers: [String:String]; let bodyBase64: String? }
     private struct Response: Decodable { let version: Int; let status: Int; let headers: [String:String]; let bodyBase64: String }
+    func checkConnection() async throws {
+        var request = URLRequest(url:try profile.validatedURL().appendingPathComponent("v1/status")); request.httpMethod = "POST"; request.timeoutInterval = 20
+        request.setValue("application/json",forHTTPHeaderField:"Content-Type"); request.setValue("Bearer " + key,forHTTPHeaderField:"Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject:["sourceID":sourceID,"sourceOrigin":origin.absoluteString])
+        let (data,response) = try await transport.send(request); try Task.checkCancellation()
+        guard response.statusCode == 200 else { throw [401,403].contains(response.statusCode) ? RemoteBackendError.rejected : RemoteBackendError.unavailable }
+        guard data.count <= 4096,let object = try JSONSerialization.jsonObject(with:data) as? [String:Any],object["version"] as? Int == 1,object["ready"] as? Bool == true,object["sourceID"] as? String == sourceID,let text = object["sourceOrigin"] as? String,let returned = URL(string:text),SourceBrowserSessions.sameOrigin(returned,origin) else { throw RemoteBackendError.response }
+    }
     func send(_ request: URLRequest) async throws -> (Data,HTTPURLResponse) {
         guard let url = request.url,SourceBrowserSessions.sameOrigin(url,origin),request.httpBodyStream == nil,["GET","POST"].contains(request.httpMethod ?? "GET"),(request.httpBody?.count ?? 0) <= 512 * 1024 else { throw RemoteBackendError.invalid }
         let endpoint = try profile.validatedURL().appendingPathComponent("v1/forward")
@@ -73,7 +81,7 @@ struct RemoteBackendTransport: HTTPTransport {
         var parts = URLComponents(url:url,resolvingAgainstBaseURL:false)!
         parts.scheme = nil; parts.host = nil; parts.port = nil; parts.user = nil; parts.password = nil; parts.fragment = nil
         let path = parts.string.flatMap{$0.isEmpty ? nil : $0} ?? "/"
-        let payload = Forward(sourceID:sourceID,path:path,method:request.httpMethod ?? "GET",headers:headers,bodyBase64:request.httpBody?.base64EncodedString())
+        let payload = Forward(sourceID:sourceID,sourceOrigin:origin.absoluteString,path:path,method:request.httpMethod ?? "GET",headers:headers,bodyBase64:request.httpBody?.base64EncodedString())
         var forwarded = URLRequest(url:endpoint); forwarded.httpMethod = "POST"; forwarded.timeoutInterval = 20; forwarded.httpBody = try JSONEncoder().encode(payload)
         guard forwarded.httpBody!.count <= 1024 * 1024 else { throw RemoteBackendError.invalid }
         forwarded.setValue("application/json",forHTTPHeaderField:"Content-Type"); forwarded.setValue("Bearer " + key,forHTTPHeaderField:"Authorization")

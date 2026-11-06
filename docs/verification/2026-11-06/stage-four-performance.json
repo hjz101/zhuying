@@ -1,0 +1,148 @@
+{
+  "budgetSHA256" : "269f789b9de7889d7f56fc76caabe0775752727ba105475b60871af67dffc28e",
+  "configuration" : "Debug simulator; reopen may use OS file cache",
+  "measuredAt" : "2026-11-06T00:41:20Z",
+  "measurements" : [
+    {
+      "id" : "catalog.load.ms",
+      "limit" : 250,
+      "maximum" : 40.95425037667155,
+      "median" : 38.85579155758023,
+      "samples" : [
+        40.95425037667155,
+        39.42199982702732,
+        38.85579155758023,
+        38.805166725069284,
+        38.14854146912694
+      ],
+      "withinTarget" : true
+    },
+    {
+      "id" : "chapter.load.ms",
+      "limit" : 100,
+      "maximum" : 1.0859165340662003,
+      "median" : 0.27629174292087555,
+      "samples" : [
+        1.0859165340662003,
+        0.27858372777700424,
+        0.2614995464682579,
+        0.2592913806438446,
+        0.27629174292087555
+      ],
+      "withinTarget" : true
+    },
+    {
+      "id" : "library.import.ms",
+      "limit" : 15000,
+      "maximum" : 676.6125420108438,
+      "median" : 668.2339585386217,
+      "samples" : [
+        676.6125420108438,
+        665.3010831214488,
+        668.2339585386217
+      ],
+      "withinTarget" : true
+    },
+    {
+      "id" : "library.open.ms",
+      "limit" : 3000,
+      "maximum" : 6.284875329583883,
+      "median" : 6.240000016987324,
+      "samples" : [
+        6.240000016987324,
+        5.957041867077351,
+        6.284875329583883
+      ],
+      "withinTarget" : true
+    },
+    {
+      "id" : "process.peak-rss.mib",
+      "limit" : 256,
+      "maximum" : 387.5625,
+      "median" : 387.5625,
+      "samples" : [
+        387.5625
+      ],
+      "withinTarget" : false
+    },
+    {
+      "id" : "reader.compose.ms",
+      "limit" : 200,
+      "maximum" : 1.6347914934158325,
+      "median" : 1.2401663698256016,
+      "samples" : [
+        1.6347914934158325,
+        1.2717079371213913,
+        1.2401663698256016,
+        1.2255418114364147,
+        1.2232917360961437
+      ],
+      "withinTarget" : true
+    },
+    {
+      "id" : "reader.paginate.ms",
+      "limit" : 2000,
+      "maximum" : 459.54866660758853,
+      "median" : 453.8671253249049,
+      "samples" : [
+        456.17449982091784,
+        459.54866660758853,
+        453.8671253249049,
+        452.75212498381734,
+        453.1873753294349
+      ],
+      "withinTarget" : true
+    },
+    {
+      "id" : "reader.reflow.ms",
+      "limit" : 2000,
+      "maximum" : 501.2064999900758,
+      "median" : 500.2466249279678,
+      "samples" : [
+        501.2064999900758,
+        500.6787502206862,
+        499.9383334070444,
+        499.67087525874376,
+        500.2466249279678
+      ],
+      "withinTarget" : true
+    },
+    {
+      "id" : "shelf.sort.ms",
+      "limit" : 150,
+      "maximum" : 108.43379143625498,
+      "median" : 60.057375114411116,
+      "samples" : [
+        61.017374973744154,
+        60.67808344960213,
+        59.80620859190822,
+        60.057375114411116,
+        59.79179171845317,
+        106.6309162415564,
+        108.43379143625498,
+        106.18995875120163,
+        107.29654133319855,
+        107.24866669625044,
+        58.72862506657839,
+        58.78962483257055,
+        58.861208613961935,
+        58.72154189273715,
+        58.865958359092474
+      ],
+      "withinTarget" : true
+    }
+  ],
+  "model" : "iPhone18,1",
+  "os" : "Version 26.5 (Build 23F77)",
+  "profile" : "simulator-debug-m4-ios26.5-v1",
+  "scales" : {
+    "catalogChapters" : 10000,
+    "longBookChapters" : 1200,
+    "longBookParagraphUTF16" : 160,
+    "longBookParagraphsPerChapter" : 8,
+    "longChapterParagraphUTF16" : 280,
+    "longChapterParagraphs" : 360,
+    "shelfBooks" : 1000
+  },
+  "schemaVersion" : 1
+}

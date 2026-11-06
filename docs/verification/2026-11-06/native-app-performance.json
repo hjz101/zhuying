@@ -1,0 +1,12 @@
+{
+  "appInitializationToReadyMS" : 279.9769164994359,
+  "contentPreserved" : true,
+  "measuredAt" : "2026-11-06T00:43:55Z",
+  "method" : "Debug simulator App process without XCTest injection; initialization-to-ready excludes dyld; complements but does not replace frozen XCTest criteria",
+  "pages" : 164,
+  "paginateMS" : 462.5555002130568,
+  "peakRSSMiB" : 283.625,
+  "reflowMS" : 487.81695822253823,
+  "schemaVersion" : 1,
+  "utf16Units" : 117997
+}

@@ -99,6 +99,12 @@ struct LibraryBackup: Codable, Sendable {
         if let data = database.preferences[ProductionLibraryPersistence.viewKey], let selection = try JSONDecoder().decode(LibraryViewPreferences.self, from: data).globalThemeSelection {
             guard [selection.appID, selection.previous?.appID].compactMap({ $0 }).allSatisfy(globalAppIDs.contains),
                   [selection.readerID, selection.previous?.readerID].compactMap({ $0 }).allSatisfy(globalReaderIDs.contains) else { throw ContentFailure.invalidResponse }
+            for parts in [selection.parts, selection.previous?.parts].compactMap({ $0 }) {
+                for (key, id) in parts {
+                    guard let part = ThemePart(rawValue: key),
+                          ([ThemePart.appColors, .appBackgrounds, .appIcons].contains(part) ? globalAppIDs : globalReaderIDs).contains(id) else { throw ContentFailure.invalidResponse }
+                }
+            }
         }
         let requiredMedia = Set(database.books.flatMap { ($0.media?.resources ?? []) + [$0.cover].compactMap{$0} })
         guard Set(resources.filter{$0.path.hasPrefix("media/")}.map(\.path)) == Set(requiredMedia.map{"media/" + $0.filename}) else { throw ContentFailure.invalidResponse }

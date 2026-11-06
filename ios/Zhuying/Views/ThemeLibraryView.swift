@@ -16,6 +16,7 @@ struct ThemeLibraryView: View {
     @State private var showingFiles = false
     @State private var importMessage: String?
     @State private var previewReady: [String: Bool] = [:]
+    init(readingAssets: Bool = false) { _tab = State(initialValue: readingAssets ? .bundles : .themes) }
     private var current: DemoTheme? {
         demo.themes.first { $0.id == demo.activeThemeID && $0.name == store.settings.preferences.colors?.name && $0.background == store.settings.preferences.colors?.background }
     }
@@ -36,16 +37,16 @@ struct ThemeLibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("主题内容", selection: $tab) {
-                ForEach(ThemeLibraryTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            if tab != .themes { Picker("主题内容", selection: $tab) {
+                ForEach([ThemeLibraryTab.bundles, .titles, .bubbles], id: \.self) { Text($0.rawValue).tag($0) }
             }.pickerStyle(.segmented).accessibilityIdentifier("themeLibraryTabs")
-                .padding(.horizontal, 22).padding(.vertical, 10)
+                .padding(.horizontal, 22).padding(.vertical, 10) }
             if tab == .themes {
                 GlobalThemeManagerView { summary in
                     tab = .bundles; importMessage = summary
                 }
             } else { readingLibrary }
-        }.appPageStyle().navigationTitle("主题管理").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
+        }.appPageStyle().navigationTitle(tab == .themes ? "主题管理" : "阅读样式库").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
             .onChange(of: tab) { _, _ in filter = .all; selection.removeAll(); managing = false }
             .onChange(of: filter) { _, _ in selection.removeAll() }
             .onChange(of: query) { _, _ in selection.removeAll() }

@@ -187,6 +187,7 @@ enum ReadingPreferencePresentation {
 
 struct ReadingSettingsPreview: View {
     let settings: ReadingSettings
+    var themeBackground: GlobalThemeBundle? = nil
     var showChrome = true
     private var prefs: ReaderPreferences { settings.preferences }
     private var ink: Color { Color(ReaderPalette(settings: settings).ink) }
@@ -207,7 +208,21 @@ struct ReadingSettingsPreview: View {
             if showChrome && prefs.footerEnabled { ReaderPageRegionPreview(settings: settings, zone: "footer").padding(.top, prefs.footerGap) }
         }.foregroundStyle(ink).padding(.leading, prefs.leftMargin).padding(.trailing, prefs.rightMargin)
             .padding(.top, prefs.topMargin).padding(.bottom, prefs.bottomMargin)
-            .frame(maxWidth: .infinity, alignment: .leading).background(paper, in: .rect(cornerRadius: 13))
+            .frame(maxWidth: .infinity, alignment: .leading).background {
+                ZStack {
+                    paper
+                    if let bundle = themeBackground, let style = bundle.document.reader?.background, let image = ThemeAppearanceContext(bundle: bundle).image(style.path) {
+                        GeometryReader { geometry in
+                            Group {
+                                if style.mode == "tile" { Image(uiImage: image).resizable(resizingMode: .tile) }
+                                else if style.mode == "fit" { Image(uiImage: image).resizable().scaledToFit() }
+                                else { Image(uiImage: image).resizable().scaledToFill() }
+                            }.frame(width: geometry.size.width, height: geometry.size.height).clipped().opacity(style.opacity)
+                        }
+                        paper.opacity(style.overlayOpacity)
+                    }
+                }.allowsHitTesting(false).accessibilityHidden(true)
+            }.clipShape(.rect(cornerRadius: 13))
             .accessibilityElement(children: .contain).accessibilityIdentifier("readingStylePreview")
             .accessibilityValue("字号 \(Int(settings.fontSize))，行距 \(Int(settings.lineSpacing))，段距 \(Int(prefs.paragraphSpacing))")
     }

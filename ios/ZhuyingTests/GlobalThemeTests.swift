@@ -248,12 +248,31 @@ final class GlobalThemeTests: XCTestCase {
         XCTAssertEqual(themes.readerBundle?.resources, imported.resources)
         XCTAssertEqual(library.settings.fontSize, 24)
     }
+    func testBackupValidatesAllMixedComponentSourcesEvenWhenAppAndBackgroundAreBuiltIn() async throws {
+        let root = directory.appendingPathComponent("mixed-production")
+        let workspace = LibraryWorkspace(root: root, legacyFonts: directory.appendingPathComponent("fonts"))
+        let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false, productionFactory: { try ProductionLibraryPersistence(directory: root) }, workspace: workspace)
+        await library.bootstrapProductionIfNeeded()
+        let themes = store(); themes.attach(library)
+        let imported = try themes.importPackage(GlobalThemePackage.encode(bundle()))
+        try await themes.apply(imported, options: .scopes([.bubble]))
+        let backup = try LibraryBackup.decode(await library.createBackup())
+        XCTAssertNoThrow(try backup.validate())
+        let missing = LibraryBackup(createdAt: backup.createdAt, database: backup.database, documents: backup.documents, resources: backup.resources.filter { !$0.path.hasPrefix("global-themes/") })
+        XCTAssertThrowsError(try missing.validate())
+        try await library.restoreBackup(backup)
+        themes.attach(library)
+        XCTAssertTrue(themes.isInUse(imported))
+        XCTAssertEqual(themes.active.id, GlobalThemeBundle.originals[0].id)
+        XCTAssertNotNil(library.settings.preferences.bubbleSVG)
+    }
     func testClearingRestorePointAllowsDeletingOnlyUnusedThemeResources() async throws {
         let store = store(); let library = library(); store.attach(library)
         let imported = try store.importPackage(GlobalThemePackage.encode(bundle()))
         try await store.apply(imported, options: .interfaceOnly)
         try await store.apply(GlobalThemeBundle.originals[1], options: .interfaceOnly)
         XCTAssertThrowsError(try store.remove(imported))
+        XCTAssertTrue(store.deletionSummary([imported.id]).contains("恢复点"))
         try await store.clearRestorePoint()
         XCTAssertNil(library.globalThemeSelection?.previous)
         XCTAssertNoThrow(try store.remove(imported))
@@ -278,6 +297,10 @@ final class GlobalThemeTests: XCTestCase {
         XCTAssertEqual(library.settings.preferences.fontResourceHash, FileResourceStore.digest(bytes))
         let installed = try XCTUnwrap(fonts.entries.first { $0.postScriptName == face.postScriptName })
         XCTAssertEqual(try Data(contentsOf: fonts.directory.appendingPathComponent(installed.filename)), bytes)
+        let sharedAgain = try GlobalThemePackage.decode(store.exportCurrent(name: "再次分享已授权字体"))
+        let sharedBinding = try XCTUnwrap(sharedAgain.document.fontBindings["reader.body"])
+        XCTAssertEqual(sharedAgain.resources[sharedBinding.path], bytes)
+        XCTAssertEqual(sharedAgain.resources[sharedBinding.licensePath], imported.resources[imported.document.fontBindings["reader.body"]!.licensePath])
     }
     func testNightAccentAndLegacySecondaryTextRemainReadable() {
         let palette = AppThemePalette(appearance: .night)
@@ -296,6 +319,169 @@ final class GlobalThemeTests: XCTestCase {
         XCTAssertEqual(identities.count, 1, "State updates must not restart SVG rendering indefinitely")
         settings.preferences.colors?.accent = 0x123456
         XCTAssertFalse(identities.contains(GlobalThemePreview.fingerprint(settings)))
+    }
+
+    func testBubbleOnlyDoesNotChangeTitleLayoutColorsBackgroundOrComments() async throws {
+        let store = store(), library = library(); store.attach(library)
+        library.settings.preferences.titleCSS = ".chapter-title { text-align:right; }"
+        library.settings.preferences.godStyle = "液态玻璃"
+        library.settings.fontSize = 19
+        let before = library.settings
+        let value = try store.importPackage(GlobalThemePackage.encode(bundle()))
+        try await store.apply(value, options: .scopes([.bubble]))
+        XCTAssertEqual(library.settings.fontSize, before.fontSize)
+        XCTAssertEqual(library.settings.preferences.colors, before.preferences.colors)
+        XCTAssertEqual(library.settings.preferences.titleCSS, before.preferences.titleCSS)
+        XCTAssertEqual(library.settings.preferences.godStyle, before.preferences.godStyle)
+        XCTAssertNotNil(library.settings.preferences.bubbleSVG)
+        XCTAssertNil(store.readerBundle)
+        XCTAssertEqual(store.active.id, GlobalThemeBundle.originals[0].id)
+        XCTAssertTrue(store.isInUse(value))
+        XCTAssertTrue(store.isMixed)
+        let reloaded = self.store(), reopened = self.library(); reloaded.attach(reopened)
+        XCTAssertEqual(reopened.settings, library.settings)
+        XCTAssertTrue(reloaded.isInUse(value))
+        try await reloaded.restore()
+        XCTAssertEqual(reopened.settings, before)
+        XCTAssertFalse(reloaded.isInUse(value))
+    }
+    func testEveryQuickScopePreservesUnselectedReaderPreferences() throws {
+        var before = ReadingSettings(fontSize: 17, lineSpacing: 7)
+        before.preferences.titleCSS = ".chapter-title { font-size:18pt; }"
+        before.preferences.godStyle = "液态玻璃"; before.preferences.bubbleRadius = 3
+        for scope in ThemeApplicationScope.allCases {
+            let after = try GlobalThemeStore.settings(for: bundle(), current: before, options: .scopes([scope]))
+            if scope != .layout { XCTAssertEqual(after.fontSize, before.fontSize); XCTAssertEqual(after.lineSpacing, before.lineSpacing) }
+            if scope != .title { XCTAssertEqual(after.preferences.titleCSS, before.preferences.titleCSS) }
+            if scope != .bubble { XCTAssertEqual(after.preferences.bubbleRadius, before.preferences.bubbleRadius) }
+            if scope != .comments { XCTAssertEqual(after.preferences.godStyle, before.preferences.godStyle) }
+            if scope != .colors { XCTAssertEqual(after.preferences.colors, before.preferences.colors) }
+            XCTAssertEqual(after.mode, before.mode); XCTAssertEqual(after.haptics, before.haptics)
+        }
+    }
+    func testAppPartsComposeWithoutPathCollisionsAndExportAsPortableSnapshot() async throws {
+        let store = store(), library = library(); store.attach(library)
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10)).pngData { context in
+            UIColor.red.setFill(); context.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
+        }
+        var original = bundle()
+        original.document.app.backgrounds["page"] = .init(path: "assets/shared.png")
+        original.resources["assets/shared.png"] = image
+        original.document.reader?.background = .init(path: "assets/shared.png")
+        let background = try store.importPackage(GlobalThemePackage.encode(original))
+        var second = original
+        second.manifest.themeID = "zhuying.tests.icons"
+        second.resources["assets/shared.png"] = UIGraphicsImageRenderer(size: CGSize(width: 10, height: 10)).pngData { context in
+            UIColor.blue.setFill(); context.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
+        }
+        second.document.app.icons["navigation.shelf"] = .init(path: "assets/shared.png", template: false)
+        let icons = try store.importPackage(GlobalThemePackage.encode(second))
+        try await store.apply(background, options: .scopes([.background]))
+        try await store.apply(icons, options: .scopes([.icons, .title]))
+        XCTAssertEqual(store.active.document.app.colors, AppThemeAppearance.original.colors)
+        let bg = try XCTUnwrap(store.active.document.app.backgrounds["page"]?.path)
+        let icon = try XCTUnwrap(store.active.document.app.icons["navigation.shelf"]?.path)
+        XCTAssertNotEqual(bg, icon)
+        XCTAssertEqual(store.active.resources[bg], image)
+        XCTAssertEqual(store.active.resources[icon], second.resources["assets/shared.png"])
+        XCTAssertEqual(store.readerBundle?.id, background.id)
+        let snapshot = try GlobalThemePackage.decode(store.exportCurrent(name: "混搭快照"))
+        XCTAssertEqual(snapshot.resources[snapshot.document.app.backgrounds["page"]!.path], image)
+        XCTAssertEqual(snapshot.resources[snapshot.document.app.icons["navigation.shelf"]!.path!], second.resources["assets/shared.png"])
+        let reopened = self.store(), reopenedLibrary = self.library(); reopened.attach(reopenedLibrary)
+        XCTAssertEqual(reopened.active.document.app, store.active.document.app)
+    }
+    func testSharingAnyOriginalAndDuplicatingNeverChangesCurrentSelection() async throws {
+        let store = store(), library = library(); store.attach(library)
+        let input = try GlobalThemePackage.encode(bundle())
+        let imported = try store.importPackage(input)
+        let before = library.settings, selection = library.globalThemeSelection
+        XCTAssertEqual(try store.exportPackage(imported), input, "Share the original bytes, including fonts and licenses")
+        for builtin in GlobalThemeBundle.originals {
+            let decoded = try GlobalThemePackage.decode(store.exportPackage(builtin))
+            XCTAssertEqual(try store.importPackage(GlobalThemePackage.encode(decoded)).id, builtin.id)
+        }
+        let copy = try store.duplicate(imported)
+        XCTAssertNotEqual(copy.id, imported.id)
+        XCTAssertEqual(copy.document, imported.document); XCTAssertEqual(copy.resources, imported.resources)
+        XCTAssertEqual(library.settings, before); XCTAssertEqual(library.globalThemeSelection, selection)
+    }
+    func testDeletingActiveMixedThemeResetsOnlyAffectedPartsAndPersistsCatalog() async throws {
+        let store = store(), library = library(); store.attach(library)
+        let imported = try store.importPackage(GlobalThemePackage.encode(bundle()))
+        try await store.apply(GlobalThemeBundle.originals[1], options: .interfaceOnly)
+        library.settings.fontSize = 18
+        library.settings.preferences.titleCSS = ".chapter-title { text-align:right; }"
+        try await store.apply(imported, options: .scopes([.bubble]))
+        XCTAssertTrue(store.deletionSummary([imported.id]).contains("气泡"))
+        try await store.remove([imported.id, GlobalThemeBundle.originals[1].id])
+        XCTAssertEqual(store.active.id, GlobalThemeBundle.originals[1].id)
+        XCTAssertEqual(library.settings.fontSize, 18)
+        XCTAssertEqual(library.settings.preferences.titleCSS, ".chapter-title { text-align:right; }")
+        XCTAssertNil(library.settings.preferences.bubbleSVG)
+        XCTAssertFalse(store.bundles.contains { $0.id == imported.id })
+        XCTAssertEqual(store.bundles.count, 3)
+        let reloaded = self.store(), reopened = self.library(); reloaded.attach(reopened)
+        XCTAssertFalse(reloaded.bundles.contains { $0.id == imported.id })
+        XCTAssertEqual(reopened.settings, library.settings)
+        if let previous = reopened.globalThemeSelection?.previous { XCTAssertFalse(previous.parts?.values.contains(imported.id) == true) }
+    }
+    func testDeletingFullActiveThemeClearsAffectedRestorePointAndKeepsReadingBehavior() async throws {
+        let store = store(), library = library(); store.attach(library)
+        let imported = try store.importPackage(GlobalThemePackage.encode(bundle()))
+        try await store.apply(imported)
+        try await store.apply(GlobalThemeBundle.originals[1], options: .interfaceOnly)
+        let mode = library.settings.mode
+        XCTAssertTrue(store.deletionSummary([imported.id]).contains("恢复点"))
+        try await store.remove([imported.id])
+        XCTAssertNil(library.globalThemeSelection?.previous)
+        XCTAssertEqual(store.active.id, GlobalThemeBundle.originals[1].id)
+        XCTAssertEqual(library.settings.fontSize, ReadingSettings().fontSize)
+        XCTAssertEqual(library.settings.mode, mode)
+    }
+    func testFailedDeleteCatalogWriteDoesNotChangeAppearanceOrRemoveResources() async throws {
+        final class Writer: AtomicFileWriting, @unchecked Sendable {
+            var fail = false
+            func write(_ data: Data, to url: URL) throws {
+                if fail { throw CocoaError(.fileWriteNoPermission) }
+                try AtomicFileWriter().write(data, to: url)
+            }
+        }
+        let writer = Writer(), store = store(writer: writer), library = library(); store.attach(library)
+        let imported = try store.importPackage(GlobalThemePackage.encode(bundle()))
+        try await store.apply(imported)
+        let before = library.settings, selection = library.globalThemeSelection
+        writer.fail = true
+        do { try await store.remove([imported.id]); XCTFail("Must report failed deletion") } catch { }
+        XCTAssertEqual(library.settings, before); XCTAssertEqual(library.globalThemeSelection, selection)
+        XCTAssertTrue(store.bundles.contains { $0.id == imported.id })
+        XCTAssertNoThrow(try store.exportPackage(imported))
+    }
+    func testFinalDeleteCatalogFailureRestoresThePreviousMixedSelection() async throws {
+        final class Writer: AtomicFileWriting, @unchecked Sendable {
+            var failCatalog = false
+            func write(_ data: Data, to url: URL) throws {
+                if failCatalog && url.lastPathComponent == "catalog.json" { throw CocoaError(.fileWriteNoPermission) }
+                try AtomicFileWriter().write(data, to: url)
+            }
+        }
+        let writer = Writer(), store = store(writer: writer), library = library(); store.attach(library)
+        let imported = try store.importPackage(GlobalThemePackage.encode(bundle()))
+        try await store.apply(imported, options: .scopes([.bubble]))
+        let before = library.settings, selection = library.globalThemeSelection
+        writer.failCatalog = true
+        do { try await store.remove([imported.id]); XCTFail("Must report failed catalog replacement") } catch { }
+        XCTAssertEqual(library.settings, before)
+        XCTAssertEqual(library.globalThemeSelection, selection)
+        XCTAssertTrue(store.isInUse(imported))
+        XCTAssertNoThrow(try store.exportPackage(imported))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("catalog.pending.json").path))
+    }
+    func testLegacySelectionDecodesWithoutPartMapAndRetainsOriginalMeaning() throws {
+        let data = Data("{\"appID\":\"zhuying.builtin.night@1.0.0\"}".utf8)
+        let selection = try JSONDecoder().decode(GlobalThemeSelection.self, from: data)
+        XCTAssertNil(selection.parts)
+        XCTAssertEqual(store().composedAppearance(selection).document.app, .night)
     }
 
     private func inkMountainPackage(_ mode: String) throws -> Data {

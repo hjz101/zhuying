@@ -2,6 +2,15 @@ import Foundation
 import CryptoKit
 import Fuzi
 
+private struct LegadoMetadataBudget {
+    private var bytes = 0
+    mutating func add<Value: Encodable>(_ value: Value) throws {
+        let encoded = try JSONEncoder().encode(value)
+        guard encoded.count <= 2 * 1024 * 1024 - bytes else { throw LegadoRequestError.limit }
+        bytes += encoded.count
+    }
+}
+
 private final class LegadoCompletion<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Value, Error>?
@@ -19,8 +28,10 @@ private final class LegadoSourceSession: @unchecked Sendable {
     private var valueBytes = 0
     private var catalogs: [String: Set<String>] = [:]
     private var catalogOrder: [String] = []
+    private var catalogBytes: [String: Int] = [:]
     private var searchPages: [String: [Int: String]] = [:]
     private var searchOrder: [String] = []
+    private var searchPageBytes = 0
     func get(_ key: String) -> String { lock.lock(); defer { lock.unlock() }; return values[key] ?? "" }
     func set(_ key: String, _ value: String) throws {
         guard key.utf8.count <= 512, value.utf8.count <= 128 * 1024 else { throw LegadoRequestError.limit }
@@ -31,26 +42,39 @@ private final class LegadoSourceSession: @unchecked Sendable {
         guard nextSize <= 512 * 1024 else { throw LegadoRequestError.limit }
         values[key] = value; valueBytes = nextSize
     }
-    func catalog(_ urls: Set<String>, bookID: String) {
+    func catalog(_ urls: Set<String>, bookID: String) throws {
+        let size = bookID.utf8.count + urls.reduce(0, { $0 + $1.utf8.count })
+        guard size <= 4 * 1024 * 1024 else { throw LegadoRequestError.limit }
         lock.lock(); defer { lock.unlock() }
         catalogs[bookID] = urls; catalogOrder.removeAll { $0 == bookID }; catalogOrder.append(bookID)
-        while catalogOrder.count > 32 { catalogs.removeValue(forKey: catalogOrder.removeFirst()) }
+        catalogBytes[bookID] = size
+        while catalogOrder.count > 32 || catalogBytes.values.reduce(0, +) > 4 * 1024 * 1024 {
+            let oldest = catalogOrder.removeFirst(); catalogs[oldest] = nil; catalogBytes[oldest] = nil
+        }
     }
     func catalog(bookID: String) -> Set<String> { lock.lock(); defer { lock.unlock() }; return catalogs[bookID] ?? [] }
     func resetSearch(_ query: String) {
         lock.lock(); defer { lock.unlock() }
+        searchPageBytes -= searchPages[query]?.values.reduce(0, { $0 + $1.utf8.count }) ?? 0
         searchPages[query] = [:]; searchOrder.removeAll { $0 == query }; searchOrder.append(query)
-        while searchOrder.count > 8 { searchPages.removeValue(forKey: searchOrder.removeFirst()) }
+        while searchOrder.count > 8 {
+            let oldest = searchOrder.removeFirst()
+            searchPageBytes -= searchPages.removeValue(forKey: oldest)?.values.reduce(0, { $0 + $1.utf8.count }) ?? 0
+        }
     }
     func searchURL(_ query: String, page: Int) -> String? { lock.lock(); defer { lock.unlock() }; return searchPages[query]?[page] }
     func rememberSearchURL(_ url: String, query: String, page: Int) throws {
         lock.lock(); defer { lock.unlock() }
         guard searchPages[query] != nil else { throw ContentFailure.invalidResponse }
+        let nextBytes = searchPageBytes - (searchPages[query]?[page]?.utf8.count ?? 0) + url.utf8.count
+        guard nextBytes <= 512 * 1024 else { throw LegadoRequestError.limit }
         while searchPages.values.reduce(0, { $0 + $1.count }) >= 100, let first = searchOrder.first, first != query {
-            searchPages.removeValue(forKey: searchOrder.removeFirst())
+            searchPageBytes -= searchPages.removeValue(forKey: searchOrder.removeFirst())?.values.reduce(0, { $0 + $1.utf8.count }) ?? 0
         }
         guard searchPages.values.reduce(0, { $0 + $1.count }) < 100 || searchPages[query]?[page] != nil else { throw LegadoRequestError.limit }
+        searchPageBytes -= searchPages[query]?[page]?.utf8.count ?? 0
         searchPages[query]?[page] = url
+        searchPageBytes += url.utf8.count
     }
 }
 
@@ -124,7 +148,9 @@ private final class LegadoSourceWorker {
 
     init(sourceID: String, definition: LegadoSourceDefinition, http: LegadoHTTPExecutor, shared: LegadoSourceSession, maximumPages: Int) {
         self.sourceID = sourceID; self.definition = definition; self.http = http; self.shared = shared; self.maximumPages = maximumPages
-        currentURL = http.origin
+        if let sourceURL = URL(string: definition.sourceURL), sourceURL.user == nil, sourceURL.password == nil,
+           LegadoHTTPExecutor.sameOrigin(sourceURL, http.origin) { currentURL = sourceURL }
+        else { currentURL = http.origin }
         bindings = ["source": definition.raw, "key": "", "page": 1, "book": [:], "chapter": [:]]
         context.bindings = bindings
         context.evaluateJS = { [weak self] script, values in
@@ -242,7 +268,7 @@ private final class LegadoSourceWorker {
         let rowRule = rules["bookList"] ?? ""
         let rows = rowRule.isEmpty ? [response.text] : try engine.elements(rowRule, in: response.text, baseURL: response.url)
         guard rows.count <= 500 else { throw LegadoRequestError.limit }
-        var books: [LibraryBookRecord] = [], seen = Set<String>()
+        var books: [LibraryBookRecord] = [], seen = Set<String>(), budget = LegadoMetadataBudget()
         for row in rows {
             let title = try field(rules["name"], in: row, baseURL: response.url, structured: true)
             let address = try field(rules["bookUrl"], in: row, baseURL: response.url, structured: true)
@@ -251,8 +277,9 @@ private final class LegadoSourceWorker {
             let reference = SourceBookReference(sourceID: sourceID, nativeBookID: bookURL, provider: definition.name, bookURL: bookURL, origin: http.origin.absoluteString)
             guard seen.insert(reference.id).inserted else { continue }
             let cover = try field(rules["coverUrl"], in: row, baseURL: response.url, structured: true)
-            books.append(.init(id: "remote-" + reference.id, title: title, author: try field(rules["author"], in: row, baseURL: response.url, structured: true),
-                               summary: try field(rules["intro"], in: row, baseURL: response.url, structured: true), coverURL: cover.isEmpty ? nil : try url(cover, baseURL: response.url), source: reference, addedAt: Date()))
+            let book = LibraryBookRecord(id: "remote-" + reference.id, title: title, author: try field(rules["author"], in: row, baseURL: response.url, structured: true),
+                                         summary: try field(rules["intro"], in: row, baseURL: response.url, structured: true), coverURL: cover.isEmpty ? nil : try url(cover, baseURL: response.url), source: reference, addedAt: Date())
+            try budget.add(book); books.append(book)
         }
         let next = try field(rules["nextPageUrl"], in: response.text, baseURL: response.url)
         var nextPage: Int?
@@ -294,7 +321,7 @@ private final class LegadoSourceWorker {
         let reference = try reference(book)
         try configure(book: book)
         var pending = [reference.remoteBookID.isEmpty ? reference.bookURL : reference.remoteBookID], visited = Set<String>()
-        var chapters: [ChapterRecord] = [], seen = Set<String>()
+        var chapters: [ChapterRecord] = [], seen = Set<String>(), initialBudget = LegadoMetadataBudget()
         var rowsRule = definition.toc["chapterList"] ?? ""
         let reversed = rowsRule.hasPrefix("-")
         if reversed { rowsRule.removeFirst() }
@@ -314,8 +341,9 @@ private final class LegadoSourceWorker {
                 let chapterURL = isVolume && address.isEmpty ? response.url.absoluteString + "#volume-" + StableContentID.make(title) : try url(address, baseURL: response.url)
                 guard seen.insert(chapterURL).inserted else { continue }
                 let restricted = yes(try field(definition.toc["isVip"] ?? definition.toc["isPay"], in: row, baseURL: response.url, structured: true))
-                chapters.append(.init(id: StableContentID.make(book.id, chapterURL), bookID: book.id, nativeChapterID: chapterURL, title: title, order: chapters.count,
-                                      access: isVolume ? .volume : restricted ? .restricted : .readable))
+                let chapter = ChapterRecord(id: StableContentID.make(book.id, chapterURL), bookID: book.id, nativeChapterID: chapterURL, title: title, order: chapters.count,
+                                            access: isVolume ? .volume : restricted ? .restricted : .readable)
+                try initialBudget.add(chapter); chapters.append(chapter)
                 guard chapters.count <= 50_000 else { throw LegadoRequestError.limit }
             }
             if let nextRule = definition.toc["nextTocUrl"], !nextRule.isEmpty {
@@ -337,7 +365,9 @@ private final class LegadoSourceWorker {
             chapters[index].requestParameters["legado.nextChapterURL"] = nextURL
             if chapters[index].access != .volume { nextURL = chapters[index].nativeChapterID }
         }
-        shared.catalog(Set(chapters.filter { $0.access != .volume }.map(\.nativeChapterID)), bookID: book.id)
+        var finalBudget = LegadoMetadataBudget()
+        for chapter in chapters { try finalBudget.add(chapter) }
+        try shared.catalog(Set(chapters.filter { $0.access != .volume }.map(\.nativeChapterID)), bookID: book.id)
         guard !chapters.isEmpty else { throw ContentFailure.missingChapter }
         return chapters
     }

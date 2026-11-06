@@ -30,7 +30,7 @@ private actor LegadoFixtureTransport: HTTPTransport {
             }
         } else {
             switch path {
-            case "/search":
+            case "/search", "/books/search":
                 headers["Set-Cookie"] = "sid=fixture-session; Path=/; Secure; HttpOnly"
                 body = "<html><div class='book'><a href='/book/1'><span class='name'>山海原稿</span></a><span class='author'>原创作者</span><img src='/cover.png'/></div>" + (searchNextLink ? "<a class='next' href='/more?cursor=two'>下一页</a>" : "") + "</html>"
             case "/more": body = "<html><div class='book'><a href='/book/2'><span class='name'>山海续稿</span></a><span class='author'>原创作者</span></div></html>"
@@ -61,6 +61,26 @@ private actor LegadoWaitingTransport: HTTPTransport {
         started = true
         try await Task.sleep(for: .seconds(20))
         throw ContentFailure.unavailable
+    }
+}
+
+private actor LegadoGeneratedMetadataTransport: HTTPTransport {
+    enum Mode: Equatable { case search, catalog, cursor }
+    let mode: Mode
+    init(_ mode: Mode) { self.mode = mode }
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let url = request.url!, object: [String: Any]
+        if url.path == "/book/1" { object = ["name": "原创容量测试", "author": "竹影", "toc": "/toc/1"] }
+        else if url.path == "/toc/1" {
+            object = ["chapters": (0..<80).map { ["name": "第\($0)章", "index": $0] as [String: Any] }]
+        } else if mode == .cursor {
+            let page = Int(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "number" }?.value ?? "1") ?? 1
+            object = ["books": [["name": "page-\(page)", "url": "/book/1"]],
+                      "next": "https://fixture.test/page?number=\(page + 1)&cursor=" + String(repeating: "x", count: 30_000)]
+        } else {
+            object = ["books": (0..<(mode == .search ? 80 : 1)).map { ["name": "原创\($0)", "url": "/book/1", "index": $0] as [String: Any] }]
+        }
+        return (try JSONSerialization.data(withJSONObject: object), HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json; charset=utf-8"])!)
     }
 }
 
@@ -320,5 +340,53 @@ final class LegadoBookSourceTests: XCTestCase {
         XCTAssertEqual(requests.compactMap { $0.url?.path }, ["/search", "/more"])
         do { _ = try await adapter.search(query: "different", page: 2); XCTFail("A different keyword must never reuse another query's cursor") }
         catch { XCTAssertEqual(error as? LegadoRequestError, .unsupported("没有该关键词的下一页地址，请重新搜索")) }
+    }
+
+    func testGeneratedLongURLsCannotExceedSearchOrCatalogMetadataBudgets() async throws {
+        for mode in [LegadoGeneratedMetadataTransport.Mode.search, .catalog] {
+            var configured = try source(json: true)
+            var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
+            package["ruleSearch"] = ["bookList": "$.books[*]", "name": "$.name", "bookUrl": mode == .search ? "@js:'/book/'+'x'.repeat(30000)+result.index" : "$.url"]
+            package["ruleToc"] = ["chapterList": "$.chapters[*]", "chapterName": "$.name", "chapterUrl": "@js:'/chapter/'+'x'.repeat(30000)+result.index"]
+            configured.configuration = try JSONSerialization.data(withJSONObject: package)
+            let adapter = try LegadoBookSource(source: configured, transport: LegadoGeneratedMetadataTransport(mode))
+            do {
+                let result = try await adapter.search(query: "metadata", page: 1)
+                if mode == .catalog {
+                    let book = try await adapter.details(for: XCTUnwrap(result.books.first))
+                    _ = try await adapter.chapters(for: book)
+                }
+                XCTFail("Generated metadata over 2 MiB must be rejected before it is returned or cached")
+            } catch { XCTAssertEqual(error as? LegadoRequestError, .limit) }
+        }
+    }
+
+    func testSearchCursorByteQuotaRejectsNewPagesWithoutDestroyingExistingCursors() async throws {
+        var configured = try source(json: true, searchURL: "/search?key={{key}}")
+        var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
+        package["ruleSearch"] = ["bookList": "$.books[*]", "name": "$.name", "bookUrl": "$.url", "nextPageUrl": "$.next"]
+        configured.configuration = try JSONSerialization.data(withJSONObject: package)
+        let adapter = try LegadoBookSource(source: configured, transport: LegadoGeneratedMetadataTransport(.cursor))
+        var reachedLimit = false
+        for page in 1...30 {
+            do { _ = try await adapter.search(query: "cursor quota", page: page) }
+            catch { XCTAssertEqual(error as? LegadoRequestError, .limit); reachedLimit = true; break }
+        }
+        XCTAssertTrue(reachedLimit, "Session cursor URLs must have a 512 KiB aggregate budget")
+        let saved = try await adapter.search(query: "cursor quota", page: 2)
+        XCTAssertEqual(saved.books.first?.title, "page-2", "A failed new cursor must leave previously accepted cursor URLs intact")
+    }
+
+    func testRelativeSearchURLResolvesAgainstSourcePathWhileRequestsStayInsideOrigin() async throws {
+        var configured = try source(searchURL: "search?key={{key}}")
+        var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
+        package["bookSourceUrl"] = "https://fixture.test/books/"
+        configured.configuration = try JSONSerialization.data(withJSONObject: package)
+        let transport = LegadoFixtureTransport(), adapter = try LegadoBookSource(source: configured, transport: transport)
+        let result = try await adapter.search(query: "relative", page: 1)
+        XCTAssertEqual(result.books.first?.title, "竹影·山海原稿")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.first?.url?.path, "/books/search")
+        XCTAssertEqual(result.books.first?.source?.origin, "https://fixture.test/")
     }
 }

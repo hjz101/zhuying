@@ -1,5 +1,20 @@
 # 本地 IPA 导出
 
+## 未签名 IPA
+
+使用关闭签名的真机 Release 构建，通过 `--unsigned` 打包。不读取或使用证书、密码、描述文件，不修改应用标识。不能使用模拟器 App。
+
+```sh
+python3 ios/scripts/export-ipa.py \
+  --app /path/to/Release-iphoneos/Zhuying.app \
+  --unsigned \
+  --output artifacts/0.8.0/ipa/竹影-0.8.0-build10-unsigned.ipa
+```
+
+此模式检查主 Info.plist、arm64 可执行文件与权限、ZIP 本地文件头和 CRC，并拒绝残留的描述文件、签名资源和主程序 Mach-O 签名命令。生成的同名 JSON 明确记录 `kind: unsigned-device`、`codeSigned: false`、源码提交、构建号与 SHA-256。未签名包可交给用户选择的签名工具处理，不是可直接安装的签名版本。
+
+## 使用本地材料签名
+
 `ios/scripts/export-ipa.py`将已有iPhoneOS App打包为`Payload/Zhuying.app`结构并签名。输入为本机私有目录中的`identity.p12`、`profile.mobileprovision`和`password`三个文件；不要将证书、私钥、密码、描述文件提交Git。提供目录前需在本地安全地从证书包读取材料，不执行压缩包内的指令。
 
 导出前要求输入 App 的显示名为“竹影”，产品名和可执行文件名均为 `Zhuying`；旧名称的构建会被拒绝，不能仅改 IPA 文件名。

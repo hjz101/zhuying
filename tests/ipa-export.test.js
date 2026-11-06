@@ -2,6 +2,46 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 
+test('Unsigned IPA keeps device metadata and rejects residual profiles, signature resources and Mach-O signatures', () => {
+  const code = String.raw`
+import importlib.util, tempfile, pathlib, plistlib, zipfile, struct, json
+s=importlib.util.spec_from_file_location('ipa','ios/scripts/export-ipa.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+with tempfile.TemporaryDirectory() as tmp:
+ root=pathlib.Path(tmp);app=root/'Zhuying.app';app.mkdir()
+ info={'CFBundleIdentifier':'com.zhuying.reader.demo','CFBundleName':'Zhuying','CFBundleDisplayName':'竹影','CFBundleExecutable':'Zhuying','CFBundlePackageType':'APPL','CFBundleSupportedPlatforms':['iPhoneOS'],'CFBundleShortVersionString':'0.8.0','CFBundleVersion':'10','MinimumOSVersion':'17.0','ZhuyingSourceRevision':'a'*40}
+ (app/'Info.plist').write_bytes(m.device_info_bytes(info))
+ executable=struct.pack('<8I',0xfeedfacf,0x0100000c,0,2,0,0,0,0)
+ (app/'Zhuying').write_bytes(executable);(app/'Zhuying').chmod(0o755)
+ output=root/'竹影-unsigned.ipa'
+ m.export_unsigned(app,output,info,m.application_brand(info),'b'*40)
+ report=json.loads(output.with_suffix('.json').read_text())
+ assert report['kind']=='unsigned-device' and report['codeSigned'] is False and report['provisioningProfileIncluded'] is False
+ assert report['appSourceRevision']=='a'*40 and report['exporterRevision']=='b'*40
+ assert report['archiveValidation']['signatureRequired'] is False
+ assert m.validate_ipa(output,require_signature=False)['zipCRCVerified']
+ try:m.validate_ipa(output)
+ except ValueError:pass
+ else:raise AssertionError('Unsigned archive reported as signed')
+ with zipfile.ZipFile(output) as z:
+  assert plistlib.loads(z.read('Payload/Zhuying.app/Info.plist'))==info
+  assert not any('embedded.mobileprovision' in n or '_CodeSignature' in n for n in z.namelist())
+ payload=root/'Payload';payload.mkdir();app.rename(payload/'Zhuying.app');app=payload/'Zhuying.app'
+ def reject(name):
+  target=root/(name+'.ipa')
+  try:m.archive_payload(payload,target,require_signature=False)
+  except ValueError:pass
+  else:raise AssertionError('Residual signature or invalid bundle accepted: '+name)
+  assert not target.exists()
+ profile=app/'embedded.mobileprovision';profile.write_bytes(b'profile');reject('profile');profile.unlink()
+ signature=app/'_CodeSignature';signature.mkdir();(signature/'CodeResources').write_bytes(b'signature');reject('resources');(signature/'CodeResources').unlink();signature.rmdir()
+ (app/'Zhuying').write_bytes(struct.pack('<8I',0xfeedfacf,0x0100000c,0,2,1,16,0,0)+struct.pack('<4I',0x1d,16,48,0));reject('macho-signature')
+ (app/'Zhuying').write_bytes(executable)
+ simulator=dict(info);simulator['CFBundleSupportedPlatforms']=['iPhoneSimulator'];(app/'Info.plist').write_bytes(m.device_info_bytes(simulator));reject('simulator')
+ (app/'Info.plist').unlink();reject('missing-plist')
+`;
+  assert.doesNotThrow(() => execFileSync('python3', ['-c', code], { stdio: 'pipe' }));
+});
+
 test('IPA export validates application branding, profile scope, expiry and certificate binding', () => {
   const code = String.raw`
 import importlib.util,datetime as d,tempfile,pathlib,plistlib,zipfile

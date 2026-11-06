@@ -407,7 +407,7 @@ private final class LegadoSourceWorker {
     func discover(category: String, page: Int) throws -> BookSearchPage {
         let request: String
         if category.isEmpty || category == "全部" {
-            guard let first = try discoveryCategories().first else { return .init(books: [], nextPage: nil) }
+            guard let first = try discoveryCategories().first(where: \.readable) else { return .init(books: [], nextPage: nil) }
             request = first.request
         } else { request = category }
         return try listing(query: "explore:" + request, page: page, request: request,

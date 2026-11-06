@@ -7,6 +7,8 @@ struct SourceDiscoveryCategory: Identifiable, Equatable, Sendable {
     let title: String
     let request: String
     var id: String { StableContentID.make(title, request) }
+    var isHeader: Bool { request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    var readable: Bool { !isHeader }
 
     static func parse(_ text: String) throws -> [Self] {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -15,27 +17,36 @@ struct SourceDiscoveryCategory: Identifiable, Equatable, Sendable {
         let rows: [Self]
         if value.hasPrefix("[") {
             guard let array = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [[String: Any]], array.count <= 512 else { throw LegadoCompatibilityError.invalid("exploreUrl 分类列表") }
-            rows = try array.compactMap { row in
-                guard let title = row["title"] as? String, let request = row["url"] as? String else { throw LegadoCompatibilityError.invalid("exploreUrl 分类名称或地址") }
-                return request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .init(title: title, request: request)
+            rows = try array.map { row in
+                // Original ExploreKind permits a missing/null URL for a group
+                // heading. A heading is display text, never an inferred route.
+                func string(_ key: String) throws -> String {
+                    guard let field = row[key], !(field is NSNull) else { return "" }
+                    guard let text = field as? String else { throw LegadoCompatibilityError.invalid("exploreUrl 分类名称或地址") }
+                    return text
+                }
+                return .init(title: try string("title"), request: try string("url"))
             }
         } else {
             let parts = value.components(separatedBy: .newlines).flatMap { $0.components(separatedBy: "&&") }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
             guard parts.count <= 512 else { throw LegadoCompatibilityError.limit }
-            rows = parts.compactMap { part in
-                guard let separator = part.range(of: "::") else { return nil }
+            rows = parts.map { part in
+                // Retain the existing direct HTTP(S) endpoint shorthand while
+                // leaving ordinary title-only lines as inert headings.
+                if ["http://", "https://"].contains(where: { part.lowercased().hasPrefix($0) }), let url = URL(string: part),
+                   url.host?.isEmpty == false, url.user == nil, url.password == nil {
+                    return .init(title: "全部", request: part)
+                }
+                guard let separator = part.range(of: "::") else { return .init(title: part, request: "") }
                 return .init(title: String(part[..<separator.lowerBound]), request: String(part[separator.upperBound...]))
-            }
-            if rows.isEmpty {
-                guard value.utf8.count <= 64 * 1024 else { throw LegadoCompatibilityError.limit }
-                return [.init(title: "全部", request: value)]
             }
         }
         var seen = Set<String>()
         return try rows.compactMap { row in
             let title = row.title.trimmingCharacters(in: .whitespacesAndNewlines), request = row.request.trimmingCharacters(in: .whitespacesAndNewlines)
             guard title.utf8.count <= 2048, request.utf8.count <= 64 * 1024 else { throw LegadoCompatibilityError.limit }
-            guard !title.isEmpty, !request.isEmpty, seen.insert(StableContentID.make(title, request)).inserted else { return nil }
+            guard !title.isEmpty, seen.insert(StableContentID.make(title, request)).inserted else { return nil }
             return .init(title: title, request: request)
         }
     }
@@ -75,8 +86,8 @@ enum BookSearchMatching {
                 let categories = try await service.discoveryCategories(sourceID: sourceID)
                 try Task.checkCancellation(); guard let self, self.generation == revision else { return }
                 self.categories = categories; self.busy = false
-                if let first = categories.first(where: { $0 == previous }) ?? categories.first { self.select(first, service: service) }
-                else { self.message = "此书源暂未返回发现分类，请登录后刷新。" }
+                if let first = categories.first(where: { $0 == previous && $0.readable }) ?? categories.first(where: \.readable) { self.select(first, service: service) }
+                else { self.message = categories.isEmpty ? "此书源暂未返回发现分类，请登录后刷新。" : "此书源仅提供分类说明，暂未提供可打开的分类。" }
             } catch {
                 guard let self, self.generation == revision, !Task.isCancelled else { return }
                 self.message = error.localizedDescription; self.busy = false
@@ -84,6 +95,7 @@ enum BookSearchMatching {
         }
     }
     func select(_ category: SourceDiscoveryCategory, service: OnlineReadingService) {
+        guard category.readable else { return }
         cancel(); selected = category; books = []; nextPage = nil; partial = false
         load(page: 1, category: category, service: service)
     }

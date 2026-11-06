@@ -60,9 +60,87 @@ final class DiscoveryAndSearchTests: XCTestCase {
         XCTAssertEqual(staticRows[0].request, "/rank?page={{page}}")
         XCTAssertEqual(try SourceDiscoveryCategory.parse(" 榜单 :: /rank &&榜单::/rank").count, 1)
         let json = "[{\"title\":\"分组\",\"url\":\"\"},{\"title\":\"热门\",\"url\":\"/hot,{\\\"method\\\":\\\"POST\\\"}\"}]"
-        XCTAssertEqual(try SourceDiscoveryCategory.parse(json).first?.request, "/hot,{\"method\":\"POST\"}")
-        XCTAssertThrowsError(try SourceDiscoveryCategory.parse("[{\"title\":\"缺少地址\"}]"))
+        XCTAssertEqual(try SourceDiscoveryCategory.parse(json).first(where: \.readable)?.request, "/hot,{\"method\":\"POST\"}")
+        XCTAssertTrue(try XCTUnwrap(SourceDiscoveryCategory.parse("[{\"title\":\"分类说明\"}]").first).isHeader)
         XCTAssertThrowsError(try SourceDiscoveryCategory.parse(String(repeating: "x", count: 512 * 1024 + 1)))
+    }
+    func testJSONHeadingsAllowMissingNullAndBlankURLsWithoutDiscardingRoutableCategories() throws {
+        let rows: [[String: Any]] = [
+            [:], ["style": ["layout_flexBasisPercent": 1]], ["title": NSNull(), "style": NSNull()],
+            ["title": "小说分组", "style": ["layout_wrapBefore": true]],
+            ["title": "分类说明", "url": NSNull()], ["title": "排行榜说明", "url": " \n"],
+            ["title": "有效榜单", "url": "/rank?page={{page}}", "style": ["layout_flexGrow": 1]]
+        ]
+        let categories = try SourceDiscoveryCategory.parse(String(decoding: JSONSerialization.data(withJSONObject: rows), as: UTF8.self))
+        XCTAssertEqual(categories.map(\.title), ["小说分组", "分类说明", "排行榜说明", "有效榜单"])
+        XCTAssertEqual(categories.map(\.isHeader), [true, true, true, false])
+        XCTAssertEqual(categories.filter(\.readable).map(\.request), ["/rank?page={{page}}"])
+    }
+    func testExploreCategoryPrimitiveErrorsAnd512EntryBoundaryRemainControlled() throws {
+        for invalid in ["[1]", "[{\"title\":7}]", "[{\"title\":{}}]", "[{\"title\":\"标题\",\"url\":false}]", "[{\"title\":\"标题\",\"url\":{}}]"] {
+            XCTAssertThrowsError(try SourceDiscoveryCategory.parse(invalid))
+        }
+        let rows = (0..<512).map { ["title": "分类说明\($0)"] }
+        let atLimit = try JSONSerialization.data(withJSONObject: rows)
+        XCTAssertEqual(try SourceDiscoveryCategory.parse(String(decoding: atLimit, as: UTF8.self)).count, 512)
+        let beyondLimit = try JSONSerialization.data(withJSONObject: rows + [["title": "超出限制"]])
+        XCTAssertThrowsError(try SourceDiscoveryCategory.parse(String(decoding: beyondLimit, as: UTF8.self)))
+        XCTAssertThrowsError(try SourceDiscoveryCategory.parse(String(repeating: "x", count: 2049)))
+        XCTAssertThrowsError(try SourceDiscoveryCategory.parse("https://fixture.test/" + String(repeating: "x", count: 64 * 1024)))
+    }
+    func testPlainTextHeadingsNeverBecomeRelativeURLsAndDirectHTTPSEndpointsRemainCompatible() throws {
+        let single = try XCTUnwrap(SourceDiscoveryCategory.parse("仅为分类说明").first)
+        XCTAssertTrue(single.isHeader); XCTAssertFalse(single.readable); XCTAssertEqual(single.request, "")
+        let categories = try SourceDiscoveryCategory.parse("分组标题&&空栏目:: \n榜单::/rank?page={{page}}")
+        XCTAssertEqual(categories.map(\.isHeader), [true, true, false])
+        XCTAssertEqual(categories.first(where: \.readable)?.title, "榜单")
+        for endpoint in ["https://fixture.test/rank?page={{page}}", "http://fixture.test/rank"] {
+            let category = try XCTUnwrap(SourceDiscoveryCategory.parse(endpoint).first)
+            XCTAssertEqual(category.title, "全部"); XCTAssertEqual(category.request, endpoint); XCTAssertTrue(category.readable)
+        }
+    }
+    @MainActor func testDynamicMixedHeadingsSelectFirstRouteAndSelectingHeaderMakesNoRequest() async throws {
+        let transport = DiscoveryFixtureTransport()
+        let script = "@js:JSON.stringify([{}, {style:{layout_flexBasisPercent:1}}, {title:'小说分组'}, {title:'分类说明',url:null}, {title:'空栏目',url:' '}, {title:'有效榜单',url:'/rank?page={{page}}'}])"
+        let adapter = try LegadoBookSource(source: source(explore: script), transport: transport)
+        let (service, root) = try await makeService([adapter]); defer { try? FileManager.default.removeItem(at: root) }
+        let store = OnlineDiscoveryStore(); store.open(sourceID: adapter.sourceID, service: service)
+        try await wait { !store.busy }
+        XCTAssertEqual(store.categories.map(\.title), ["小说分组", "分类说明", "空栏目", "有效榜单"])
+        XCTAssertEqual(store.selected?.title, "有效榜单"); XCTAssertEqual(store.books.first?.title, "榜单作品1")
+        XCTAssertNil(store.message)
+        store.select(try XCTUnwrap(store.categories.first), service: service)
+        XCTAssertEqual(store.selected?.title, "有效榜单"); XCTAssertEqual(store.books.first?.title, "榜单作品1"); XCTAssertFalse(store.busy)
+        let requests = await transport.requests; XCTAssertEqual(requests.map { $0.url?.path }, ["/rank"])
+        for category in ["", "全部"] {
+            let page = try await adapter.discover(category: category, page: 1)
+            XCTAssertEqual(page.books.first?.title, "榜单作品1")
+        }
+        let allRequests = await transport.requests; XCTAssertTrue(allRequests.allSatisfy { $0.url?.path == "/rank" })
+    }
+    @MainActor func testAllHeadingsShowExplanationAndNeitherDefaultDiscoveryNorHeaderSelectionRequestsHTTP() async throws {
+        let transport = DiscoveryFixtureTransport()
+        let adapter = try LegadoBookSource(source: source(explore: "@js:JSON.stringify([{title:'小说分组'}, {title:'分类说明',url:null}, {title:'空栏目',url:''}])"), transport: transport)
+        let (service, root) = try await makeService([adapter]); defer { try? FileManager.default.removeItem(at: root) }
+        let store = OnlineDiscoveryStore(); store.open(sourceID: adapter.sourceID, service: service)
+        try await wait { !store.busy }
+        XCTAssertEqual(store.categories.count, 3); XCTAssertNil(store.selected); XCTAssertTrue(store.books.isEmpty)
+        XCTAssertTrue(store.message?.contains("分类说明") == true)
+        store.select(try XCTUnwrap(store.categories.first), service: service)
+        XCTAssertNil(store.selected); XCTAssertFalse(store.busy)
+        for category in ["", "全部"] {
+            let page = try await adapter.discover(category: category, page: 1)
+            XCTAssertTrue(page.books.isEmpty); XCTAssertNil(page.nextPage)
+        }
+        let plainTextAdapter = try LegadoBookSource(source: source(explore: "只有分类说明，没有请求地址"), transport: transport)
+        let plainTextPage = try await plainTextAdapter.discover(category: "全部", page: 1)
+        XCTAssertTrue(plainTextPage.books.isEmpty)
+        await service.configure(sources: [plainTextAdapter])
+        store.open(sourceID: plainTextAdapter.sourceID, service: service)
+        try await wait { !store.busy }
+        XCTAssertEqual(store.categories.first?.title, "只有分类说明，没有请求地址")
+        XCTAssertNil(store.selected); XCTAssertTrue(store.books.isEmpty)
+        let requests = await transport.requests; XCTAssertTrue(requests.isEmpty)
     }
     func testDynamicExploreRunsQuickJSAndHTTPThenParsesRealRuleExploreAcrossPages() async throws {
         let transport = DiscoveryFixtureTransport()

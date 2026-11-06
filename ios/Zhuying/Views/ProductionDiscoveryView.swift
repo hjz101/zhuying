@@ -93,12 +93,20 @@ struct RichDiscoverySection: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 9) {
                     ForEach(model.categories) { category in
-                        Button { if let service = library.onlineService { model.select(category, service: service) } } label: {
-                            Text(category.title).font(.system(size: 13, weight: model.selected == category ? .semibold : .regular))
+                        if category.isHeader {
+                            Text(category.title).font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(appAppearance.palette.muted)
                                 .padding(.horizontal, 17).frame(minHeight: 44)
-                                .background(appAppearance.palette.primary.opacity(model.selected == category ? 0.17 : 0.06), in: Capsule())
-                        }.accessibilityAddTraits(model.selected == category ? .isSelected : [])
-                            .accessibilityIdentifier("discovery-category-" + category.title)
+                                .accessibilityAddTraits(.isHeader)
+                                .accessibilityIdentifier("discovery-header-" + category.title)
+                        } else {
+                            Button { if let service = library.onlineService { model.select(category, service: service) } } label: {
+                                Text(category.title).font(.system(size: 13, weight: model.selected == category ? .semibold : .regular))
+                                    .padding(.horizontal, 17).frame(minHeight: 44)
+                                    .background(appAppearance.palette.primary.opacity(model.selected == category ? 0.17 : 0.06), in: Capsule())
+                            }.accessibilityAddTraits(model.selected == category ? .isSelected : [])
+                                .accessibilityIdentifier("discovery-category-" + category.title)
+                        }
                     }
                 }
             }

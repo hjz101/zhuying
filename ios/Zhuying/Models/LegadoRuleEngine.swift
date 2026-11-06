@@ -142,10 +142,18 @@ struct LegadoRuleEngine {
         return try list(rule, in: content, baseURL: baseURL).joined(separator: "\n")
     }
     func list(_ rule: String, in content: String, baseURL: URL? = nil) throws -> [String] {
-        try evaluate(rule, content: content, baseURL: baseURL, elements: false)
+        try bounded(evaluate(rule, content: content, baseURL: baseURL, elements: false).map(string))
     }
     func elements(_ rule: String, in content: String, baseURL: URL? = nil) throws -> [String] {
-        try evaluate(rule, content: content, baseURL: baseURL, elements: true)
+        try bounded(evaluate(rule, content: content, baseURL: baseURL, elements: true).map(string))
+    }
+    /// BookInfo's init rule selects one element, then makes that exact value
+    /// the input for later fields. Its serialized text alone cannot indicate
+    /// whether JavaScript returned an object or a string containing JSON.
+    func initializedContent(_ rule: String, in content: String, baseURL: URL? = nil) throws -> (text: String, structured: Bool) {
+        guard let first = try evaluate(rule, content: content, baseURL: baseURL, elements: true).first else { return ("", false) }
+        if let text = first as? String { return (text, false) }
+        return (first is NSNull ? "null" : try string(first), true)
     }
     func template(_ value: String, content: String = "", baseURL: URL? = nil) throws -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -158,7 +166,7 @@ struct LegadoRuleEngine {
         return try interpolate(value, content: content, baseURL: baseURL)
     }
 
-    private func evaluate(_ rule: String, content: String, baseURL: URL?, elements: Bool) throws -> [String] {
+    private func evaluate(_ rule: String, content: String, baseURL: URL?, elements: Bool) throws -> [Any] {
         try Task.checkCancellation()
         guard rule.utf8.count <= 64 * 1024, content.utf8.count <= 2 * 1024 * 1024, context.depth < 32 else { throw LegadoCompatibilityError.limit }
         context.depth += 1; defer { context.depth -= 1 }
@@ -168,22 +176,22 @@ struct LegadoRuleEngine {
             let parts = try LegadoRuleScanner.split(rule, on: delimiter)
             if parts.count > 1 {
                 if delimiter == "||" {
-                    for part in parts { let values = try evaluate(part, content: content, baseURL: baseURL, elements: elements); if values.contains(where: { !$0.isEmpty }) { return values } }
+                    for part in parts { let values = try evaluate(part, content: content, baseURL: baseURL, elements: elements); if try values.contains(where: { !(try string($0)).isEmpty }) { return values } }
                     return []
                 }
-                var lists: [[String]] = [], intermediateBytes = 0, intermediateCount = 0
+                var lists: [[Any]] = [], intermediateBytes = 0, intermediateCount = 0
                 for part in parts {
                     let values = try evaluate(part, content: content, baseURL: baseURL, elements: elements)
-                    intermediateBytes += values.reduce(0) { $0 + $1.utf8.count }; intermediateCount += values.count
+                    intermediateBytes += try values.reduce(0) { $0 + (try string($1)).utf8.count }; intermediateCount += values.count
                     guard intermediateBytes <= 2 * 1024 * 1024, intermediateCount <= 2000 else { throw LegadoCompatibilityError.limit }
                     if !values.isEmpty { lists.append(values) }
                 }
-                if delimiter == "&&" { return try bounded(lists.flatMap { $0 }) }
-                var result: [String] = []
+                if delimiter == "&&" { return try typedElements(lists.flatMap { $0 }) }
+                var result: [Any] = []
                 // fd026e0 intentionally uses the first successful list as the
                 // interleave span; trailing items in later lists are omitted.
                 for index in 0..<(lists.first?.count ?? 0) { for list in lists where list.indices.contains(index) { result.append(list[index]) } }
-                return try bounded(result)
+                return try typedElements(result)
             }
         }
         return try pipeline(rule, content: content, baseURL: baseURL, elements: elements)
@@ -239,7 +247,7 @@ struct LegadoRuleEngine {
         guard parts.count > 1 else { return parts }
         return parts
     }
-    private func pipeline(_ input: String, content: String, baseURL: URL?, elements: Bool) throws -> [String] {
+    private func pipeline(_ input: String, content: String, baseURL: URL?, elements: Bool) throws -> [Any] {
         let chars = Array(input)
         var index = 0, start = 0, stack: [Character] = [], quote: Character?, escaped = false
         var result: Any = content
@@ -266,10 +274,11 @@ struct LegadoRuleEngine {
                 }
                 if LegadoRuleScanner.matches(chars, index, "@js:") {
                     result = try js(String(chars[(index + 4)...]), result: result, original: content, baseURL: baseURL, decodeStructured: initialResult)
-                    return try strings(result)
+                    return try typedElements(result)
                 }
                 guard let end = LegadoRuleScanner.scriptEnd(chars, from: index + 4) else { throw LegadoCompatibilityError.invalid("<js> 缺少 </js>") }
                 result = try js(String(chars[(index + 4)..<end]), result: result, original: content, baseURL: baseURL, decodeStructured: initialResult)
+                _ = try typedElements(result)
                 initialResult = false
                 index = end + 5; start = index; replacementStage = 0; continue
             }
@@ -278,8 +287,8 @@ struct LegadoRuleEngine {
             index += 1
         }
         let tail = String(chars[start...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        if !tail.isEmpty { return try strings(stage(tail, result: result, baseURL: baseURL, elements: elements)) }
-        return try strings(result)
+        if !tail.isEmpty { return try typedElements(stage(tail, result: result, baseURL: baseURL, elements: elements)) }
+        return try typedElements(result)
     }
     private func stage(_ input: String, result: Any, baseURL: URL?, elements: Bool) throws -> Any {
         let parts = try replacementParts(input), content = try string(result)
@@ -473,6 +482,17 @@ struct LegadoRuleEngine {
         return String(decoding: bytes, as: UTF8.self)
     }
     private func strings(_ value: Any) throws -> [String] { try bounded((value as? [Any] ?? [value]).map(string)) }
+    private func typedElements(_ value: Any) throws -> [Any] {
+        let values = value as? [Any] ?? [value]
+        guard values.count <= 2000 else { throw LegadoCompatibilityError.limit }
+        var bytes = 0
+        for value in values {
+            try Task.checkCancellation()
+            bytes += value is NSNull ? 4 : try string(value).utf8.count
+            guard bytes <= 2 * 1024 * 1024 else { throw LegadoCompatibilityError.limit }
+        }
+        return values
+    }
     private func bounded(_ values: [String]) throws -> [String] {
         guard values.count <= 2000, values.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else { throw LegadoCompatibilityError.limit }
         return values

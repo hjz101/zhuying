@@ -6,14 +6,23 @@ import WebKit
     private var stores: [String:WKWebsiteDataStore] = [:]
     private var order: [String] = []
     init(defaults: UserDefaults) { self.defaults = defaults }
+    nonisolated static func accountScope(sourceID: String, accountID: String = "default") -> String {
+        accountID.isEmpty || accountID == "default" ? sourceID : sourceID + ".account." + StableContentID.make(accountID)
+    }
     static func scope(sourceID: String,origin: URL) -> String { StableContentID.make("browser-v1",sourceID,origin.absoluteString) }
     func store(sourceID: String,origin: URL) -> WKWebsiteDataStore {
+        let originsKey = "browser.origins." + StableContentID.make(sourceID)
+        var origins = Set(defaults.stringArray(forKey: originsKey) ?? [])
+        if origins.insert(origin.absoluteString).inserted { defaults.set(Array(origins).sorted(), forKey: originsKey) }
         let scope = Self.scope(sourceID:sourceID,origin:origin)
         if let store = stores[scope] { order.removeAll{$0 == scope}; order.append(scope); return store }
         let key = "browser.session." + scope,id = defaults.string(forKey:key).flatMap(UUID.init(uuidString:)) ?? UUID()
         defaults.set(id.uuidString,forKey:key)
         let store = WKWebsiteDataStore(forIdentifier:id); stores[scope] = store; order.append(scope)
         while order.count > 8 { stores.removeValue(forKey:order.removeFirst()) }; return store
+    }
+    func knownOrigins(sourceID: String) -> [URL] {
+        (defaults.stringArray(forKey: "browser.origins." + StableContentID.make(sourceID)) ?? []).compactMap(URL.init(string:)).filter { $0.scheme == "https" }
     }
     func usesNativeCookies(sourceID: String,origin: URL) -> Bool { sourceID != "shushan" && defaults.bool(forKey:"browser.native-cookies." + Self.scope(sourceID:sourceID,origin:origin)) }
     func setNativeCookies(_ value: Bool,sourceID: String,origin: URL) {

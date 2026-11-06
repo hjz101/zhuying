@@ -7,14 +7,23 @@ struct ProductionNetworkView: View {
     @State private var message: String?
     @State private var busy = false
     @State private var operation: Task<Void,Never>?
+    @State private var origins: [URL] = []
+    @State private var selectedOrigin = ""
+    @State private var additionalOrigin = ""
+    @State private var isRuleSource = false
     private var source: DemoSource? { library.sources.first{$0.id == sourceID} }
-    private var origin: URL? { source.flatMap{try? ShushanClient.host($0.url)} }
+    private var origin: URL? { URL(string: selectedOrigin) }
     var body: some View {
         ScrollView {
             VStack(alignment:.leading,spacing:23) {
                 AppPageHeader(title:"网络配置",subtitle:"书源级代理 · DNS／IP · HTTPS 主机验证",icon:"network")
                 AppSettingsCard("配置与选项",icon:"slider.horizontal.3") {
                     Picker("书源",selection:$sourceID) { ForEach(library.sources) { Text($0.name).tag($0.id) } }.accessibilityIdentifier("networkSource")
+                    if isRuleSource {
+                        Picker("请求主机", selection: $selectedOrigin) { ForEach(origins, id: \.absoluteString) { Text($0.absoluteString).tag($0.absoluteString) } }.accessibilityIdentifier("networkOrigin")
+                        TextField("允许的 HTTPS 主机", text: $additionalOrigin).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL).accessibilityIdentifier("networkAdditionalOrigin")
+                        Button("允许此主机") { allowOrigin() }.frame(minHeight: 44).disabled(busy || additionalOrigin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("networkAllowOrigin")
+                    }
                     Picker("连接方式",selection:Binding(get:{profile.mode},set:{profile.mode = $0; profile.server = ""; profile.port = $0 == .dns ? 53 : 7890})) { ForEach(SourceNetworkProfile.Mode.allCases,id:\.self) { Text($0.rawValue).tag($0) } }.accessibilityIdentifier("networkMode")
                     if profile.mode != .system {
                         TextField(profile.mode == .proxy ? "代理主机（不含端口）" : profile.mode == .dns ? "DNS 服务器 IP" : "指定 IPv4／IPv6",text:$profile.server).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("networkServer")
@@ -32,9 +41,28 @@ struct ProductionNetworkView: View {
                     .font(.system(size:12)).foregroundStyle(Palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("网络配置").navigationBarTitleDisplayMode(.inline)
-            .onAppear { sourceID = library.sources.first?.id ?? ""; load() }
-            .onChange(of:sourceID) { _,_ in operation?.cancel(); busy = false; load() }
+            .onAppear { sourceID = library.sources.first?.id ?? ""; loadOrigins() }
+            .onChange(of:sourceID) { _,_ in operation?.cancel(); busy = false; additionalOrigin = ""; loadOrigins() }
+            .onChange(of:selectedOrigin) { _,_ in operation?.cancel(); busy = false; load() }
             .onDisappear { operation?.cancel() }
+    }
+    private func loadOrigins() {
+        guard let source else { origins = []; selectedOrigin = ""; return }
+        do {
+            isRuleSource = (try? LegadoSourceDefinition.decode(source)) != nil
+            if isRuleSource { origins = try LegadoNetworkOrigins.all(source: source, state: library.legadoLoginState(for: source)) }
+            else { origins = (try? ShushanClient.host(source.url)).map { [$0] } ?? [] }
+            if !origins.contains(where: { $0.absoluteString == selectedOrigin }) { selectedOrigin = origins.first?.absoluteString ?? "" }
+            load()
+        } catch { origins = []; selectedOrigin = ""; message = error.localizedDescription }
+    }
+    private func allowOrigin() {
+        guard let source else { return }
+        do {
+            let added = try LegadoNetworkOrigins.allow(additionalOrigin, source: source, state: library.legadoLoginState(for: source))
+            additionalOrigin = ""; loadOrigins(); selectedOrigin = added.absoluteString
+            message = "已允许 HTTPS 主机：\(added.absoluteString)"
+        } catch { message = error.localizedDescription }
     }
     private func load() { guard let origin else { return }; do { profile = try library.networkProfiles.profile(sourceID:sourceID,origin:origin); message = nil } catch { message = "未加载配置，请恢复系统网络后重试。" } }
     private func save() { guard let origin else { return }; do { if profile.mode != .system,try library.backendProfiles.profile(sourceID:sourceID,origin:origin).enabled { throw RemoteBackendError.conflictingRoute }; try library.networkProfiles.save(profile,sourceID:sourceID,origin:origin); message = "此书源配置已保存。" } catch { message = error.localizedDescription } }

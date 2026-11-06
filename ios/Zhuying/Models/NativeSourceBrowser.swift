@@ -33,19 +33,24 @@ enum BrowserInput {
     @Published private(set) var downloading = false
     @Published private(set) var message: String?
     @Published var external: URL?
+    @Published var requestedOriginURL: URL?
     @Published var imported: BrowserImportFile?
     @Published var debugHTML: String?
     private var sourceID = ""
     private var origin: URL?
     private var sessions: SourceBrowserSessions?
     private var javascript = true
+    private var allowedOrigins: [URL] = []
+    private var restrictToDeclaredOrigins = false
     private var routing: SourceNetworkTransport?
     private var download: WKDownload?
     private var destination: URL?
     private var progress: NSKeyValueObservation?
     private var deadline: Task<Void,Never>?
     private var observations: [NSKeyValueObservation] = []
-    func configure(sourceID: String,origin: URL?,sessions: SourceBrowserSessions,javascript: Bool) {
+    func configure(sourceID: String,origin: URL?,sessions: SourceBrowserSessions,javascript: Bool,allowedOrigins: [URL] = [],restrictToDeclaredOrigins: Bool = false) {
+        self.allowedOrigins = allowedOrigins
+        self.restrictToDeclaredOrigins = restrictToDeclaredOrigins
         if webView != nil,self.sourceID == sourceID,self.origin == origin,self.javascript == javascript { return }
         close(); self.sourceID = sourceID; self.origin = origin; self.sessions = sessions; self.javascript = javascript
         let config = WKWebViewConfiguration(); config.websiteDataStore = origin.map{sessions.store(sourceID:sourceID,origin:$0)} ?? .nonPersistent(); config.defaultWebpagePreferences.allowsContentJavaScript = javascript
@@ -55,8 +60,21 @@ enum BrowserInput {
         }
     }
     func open(_ value: String) {
-        do { let url = try BrowserInput.url(value); guard allowed(url) else { external = url; return }; message = nil; webView?.load(URLRequest(url:url)) }
+        do {
+            let url = try BrowserInput.url(value)
+            guard allowed(url) else {
+                if allowedOrigins.contains(where: { SourceBrowserSessions.sameOrigin(url, $0) }) { requestedOriginURL = url }
+                else { external = url }
+                return
+            }
+            message = nil; webView?.load(URLRequest(url:url))
+        }
         catch { message = "请输入完整 HTTPS 网页地址；不接受账号或密码内嵌的链接。" }
+    }
+    func openHTML(_ html: String, baseURL: URL) throws {
+        let offline = baseURL.absoluteString == "about:blank" && origin == nil
+        guard html.utf8.count <= 2 * 1024 * 1024, offline || allowed(baseURL) else { throw ContentFailure.invalidResponse }
+        message = nil; webView?.loadHTMLString(html, baseURL: offline ? nil : baseURL)
     }
     func back() { webView?.goBack() }
     func forward() { webView?.goForward() }
@@ -75,7 +93,7 @@ enum BrowserInput {
         deadline?.cancel(); deadline = nil; progress = nil; download?.cancel { _ in }; download = nil; downloading = false
         if let destination { try? FileManager.default.removeItem(at:destination.deletingLastPathComponent()) }; destination = nil
     }
-    func close() { cancelDownload(); observations = []; webView?.stopLoading(); webView?.navigationDelegate = nil; webView?.uiDelegate = nil; webView = nil; routing = nil; canBack = false; canForward = false; loading = false }
+    func close() { cancelDownload(); observations = []; webView?.stopLoading(); webView?.navigationDelegate = nil; webView?.uiDelegate = nil; webView = nil; routing = nil; canBack = false; canForward = false; loading = false; requestedOriginURL = nil }
     func applyNetwork(_ network: SourceNetworkTransport) async throws {
         if let routing,routing.origin == network.origin,routing.profile == network.profile { return }
         let configurations = try await network.proxyConfigurations(); try Task.checkCancellation()
@@ -84,7 +102,7 @@ enum BrowserInput {
     func networkFailed(_ error: Error) { message = error.localizedDescription }
     func discardImport() { if let imported { try? FileManager.default.removeItem(at:imported.url.deletingLastPathComponent()) }; imported = nil }
     func clearSession() async { close(); if let origin,let sessions { await sessions.clear(sourceID:sourceID,origin:origin) }; message = "此书源的本地浏览器会话已清除。" }
-    private func allowed(_ url: URL) -> Bool { (try? BrowserInput.url(url.absoluteString)) != nil && (origin.map{SourceBrowserSessions.sameOrigin(url,$0)} ?? true) }
+    private func allowed(_ url: URL) -> Bool { (try? BrowserInput.url(url.absoluteString)) != nil && (origin.map{SourceBrowserSessions.sameOrigin(url,$0)} ?? !restrictToDeclaredOrigins) }
     private func refresh() { canBack = webView?.canGoBack ?? false; canForward = webView?.canGoForward ?? false; loading = webView?.isLoading ?? false; title = webView?.title ?? "网页浏览" }
     func webView(_ webView: WKWebView,didFinish navigation: WKNavigation!) { refresh() }
     func webView(_ webView: WKWebView,didFail navigation: WKNavigation!,withError error: Error) { refresh(); if (error as NSError).code != NSURLErrorCancelled { message = "网页加载失败，可检查地址后重试。" } }
@@ -94,7 +112,11 @@ enum BrowserInput {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
         if url.absoluteString == "about:blank" { decisionHandler(.allow); return }
         if navigationAction.targetFrame?.isMainFrame == false,(try? BrowserInput.url(url.absoluteString)) != nil { decisionHandler(.allow); return }
-        guard allowed(url) else { if url.scheme == "https" { external = url }; decisionHandler(.cancel); return }
+        guard allowed(url) else {
+            if allowedOrigins.contains(where: { SourceBrowserSessions.sameOrigin(url, $0) }) { requestedOriginURL = url }
+            else if url.scheme == "https" { external = url }
+            decisionHandler(.cancel); return
+        }
         decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
     }
     func webView(_ webView: WKWebView,decidePolicyFor navigationResponse: WKNavigationResponse,decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {

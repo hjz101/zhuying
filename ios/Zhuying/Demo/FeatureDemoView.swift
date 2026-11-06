@@ -74,7 +74,7 @@ struct FeatureDemoView: View {
             else if feature.id == "highlight" { ReadingStyleRulesView().navigationTitle(feature.title) }
             else if feature.id == "comments" { ReadingCommentsPreferencesView().navigationTitle(feature.title) }
             else if !library.isDemo && feature.id == "sourceLogin" && scope == "shushan" { ShushanLoginView() }
-            else if !library.isDemo && feature.id == "sourceLogin" { ProductionSourceAccessView() }
+            else if !library.isDemo && feature.id == "sourceLogin" { LegadoSourceLoginRoute(sourceID: scope) }
             else if !library.isDemo && feature.id == "sourceEdit" && (scope == "shushan" || (scope == "main" && library.sources.first?.id == "shushan")) { SourceConfigurationView(sourceID:"shushan") }
             else if !library.isDemo && feature.id == "sourceEdit" { ProductionSourceRuleEditor(sourceID: scope == "main" ? library.sources.first?.id ?? scope : scope) }
             else if !library.isDemo && feature.id == "sourceImport" { ProductionSourceImportView() }

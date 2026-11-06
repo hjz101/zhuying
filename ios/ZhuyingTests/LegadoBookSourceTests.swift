@@ -70,7 +70,7 @@ final class LegadoBookSourceTests: XCTestCase {
             row["ruleSearch"] = ["bookList": "$.books[*]", "name": "@js:decorate(result.name)", "author": "$.author", "bookUrl": "$.url"]
             row["ruleBookInfo"] = ["name": "$.name", "author": "$.author", "intro": "$.intro", "tocUrl": "$.toc"]
             row["ruleToc"] = ["chapterList": "$.chapters[*]", "chapterName": "$.name", "chapterUrl": "$.url"]
-            row["ruleContent"] = ["content": "@js:java.put('marker','原创尾注'); java.get(JSON.parse(result).endpoint).body() + '\n' + java.get('marker')"]
+            row["ruleContent"] = ["content": #"@js:java.put('marker','原创尾注'); java.get(JSON.parse(result).endpoint).body() + '\n' + java.get('marker')"#]
         }
         var source = DemoSource(id: id, name: "竹影原创阅读规则回归", detail: "原创 fixture", url: "https://fixture.test/")
         source.configuration = try JSONSerialization.data(withJSONObject: row, options: .sortedKeys)
@@ -190,5 +190,20 @@ final class LegadoBookSourceTests: XCTestCase {
             let requests = await transport.requests
             XCTAssertFalse(requests.contains { $0.url?.path == "/chapter/one" })
         }
+    }
+
+    func testUnsupportedContentTransformsNeverReturnUnprocessedProseAsSuccess() async throws {
+        var configured = try source()
+        var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
+        var rules = try XCTUnwrap(package["ruleContent"] as? [String: String])
+        rules["webJs"] = "document.querySelector('#content').innerText"
+        package["ruleContent"] = rules
+        configured.configuration = try JSONSerialization.data(withJSONObject: package)
+        let adapter = try LegadoBookSource(source: configured, transport: LegadoFixtureTransport())
+        let results = try await adapter.search(query: "source", page: 1)
+        let book = try await adapter.details(for: XCTUnwrap(results.books.first))
+        let chapters = try await adapter.chapters(for: book)
+        do { _ = try await adapter.document(for: XCTUnwrap(chapters.first), book: book); XCTFail("WebView transforms require an explicit unsupported error") }
+        catch { XCTAssertEqual(error as? LegadoCompatibilityError, .unsupported("ruleContent.webJs")) }
     }
 }

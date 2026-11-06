@@ -73,9 +73,11 @@ final class LegadoCookieJar: @unchecked Sendable {
         let incoming = HTTPCookie.cookies(withResponseHeaderFields: headers, for: url)
         lock.lock(); defer { lock.unlock() }
         for cookie in incoming {
+            guard cookie.name.utf8.count <= 512, cookie.value.utf8.count <= 8192 else { continue }
             cookies.removeAll { $0.name == cookie.name && $0.domain == cookie.domain && $0.path == cookie.path }
             if cookie.expiresDate.map({ $0 > Date() }) ?? true { cookies.append(cookie) }
         }
+        if cookies.count > 256 { cookies.removeFirst(cookies.count - 256) }
     }
     func set(_ value: String, url: URL) { store(["Set-Cookie": value], url: url) }
     func remove() { lock.lock(); cookies = []; lock.unlock() }
@@ -192,7 +194,7 @@ final class LegadoHTTPExecutor {
     private func send(_ request: URLRequest) throws -> (Data, HTTPURLResponse) {
         precondition(!Thread.isMainThread, "Synchronous source HTTP must run on the source worker queue")
         let waiter = LegadoHTTPResult(), identifier = UUID(), transport = self.transport, control = self.control
-        let task = Task.detached {
+        let task = Task.detached(priority: .userInitiated) {
             defer { control.remove(identifier) }
             do { waiter.complete(.success(try await transport.send(request))) }
             catch { waiter.complete(.failure(error)) }

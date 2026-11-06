@@ -185,6 +185,11 @@ private final class LegadoSourceWorker {
         return result.absoluteString
     }
     private func yes(_ value: String) -> Bool { ["true", "1", "yes"].contains(value.lowercased()) }
+    private func rejectUnsupported(_ rules: [String: String], section: String, fields: [String]) throws {
+        for field in fields where !(rules[field]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) {
+            throw LegadoCompatibilityError.unsupported(section + "." + field)
+        }
+    }
 
     func search(query: String, page: Int) throws -> BookSearchPage {
         bindings["key"] = query; bindings["searchKey"] = query; bindings["page"] = page
@@ -212,6 +217,7 @@ private final class LegadoSourceWorker {
     }
 
     func details(_ book: LibraryBookRecord) throws -> LibraryBookRecord {
+        try rejectUnsupported(definition.bookInfo, section: "ruleBookInfo", fields: ["downloadUrls"])
         let reference = try reference(book)
         try configure(book: book)
         let response = try fetch(reference.bookURL)
@@ -233,6 +239,7 @@ private final class LegadoSourceWorker {
     }
 
     func chapters(_ book: LibraryBookRecord) throws -> [ChapterRecord] {
+        try rejectUnsupported(definition.toc, section: "ruleToc", fields: ["preUpdateJs", "formatJs"])
         var book = book
         if try reference(book).remoteBookID.isEmpty, definition.bookInfo["tocUrl"] != nil { book = try details(book) }
         let reference = try reference(book)
@@ -276,6 +283,7 @@ private final class LegadoSourceWorker {
     }
 
     func document(_ chapter: ChapterRecord, book: LibraryBookRecord) throws -> ChapterDocument {
+        try rejectUnsupported(definition.content, section: "ruleContent", fields: ["webJs", "sourceRegex", "replaceRegex", "payAction"])
         _ = try reference(book)
         guard chapter.bookID == book.id, chapter.access == .readable else { throw ContentFailure.restricted }
         try configure(book: book, chapter: chapter)
@@ -307,7 +315,12 @@ private final class LegadoSourceWorker {
     private static func paragraphs(_ value: String) throws -> [String] {
         let broken = value.replacingOccurrences(of: #"(?i)<br\s*/?>|</(?:p|div|li|h[1-6])\s*>"#, with: "\n", options: .regularExpression)
         let plain: String
-        if broken.contains("<"), broken.contains(">") { plain = try HTMLDocument(string: "<div>" + broken + "</div>").root?.stringValue ?? broken }
+        if broken.contains("<"), broken.contains(">") {
+            // Fuzi nodes keep an unowned document reference. A temporary
+            // document can free the libxml tree before stringValue is read.
+            let parsed = try HTMLDocument(string: "<div>" + broken + "</div>")
+            plain = withExtendedLifetime(parsed) { parsed.root?.stringValue ?? broken }
+        }
         else { plain = broken }
         return plain.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
             .components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }

@@ -147,7 +147,7 @@ struct ReadingCommentsPreferencesView: View {
             AppSettingsCard("神人评论", icon: "quote.bubble") {
                 Toggle("显示神人评论", isOn: $store.settings.preferences.showGodComments).accessibilityIdentifier("showGodComments")
                 NavigationLink { ReadingCommentSkinView(kind: .god) } label: { ReadingPreferenceRow(title: "神评卡片皮肤", detail: store.settings.preferences.effectiveGodStyle) }.accessibilityIdentifier("reading-god-skin")
-                Text("精选评论显示在对应段落下方。当前阅读器使用本地示例评论，不连接评论服务。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text(store.isDemo ? "精选评论显示在对应段落下方。当前阅读器使用本地示例评论，不连接评论服务。" : "书山聚合·番茄的真实热门文字评论显示在对应段落下方，每章最多精选两段。需应用内登录并核对来源原文；无数据或不匹配时不显示，断网可用近期缓存。").font(.system(size: 11)).foregroundStyle(Palette.muted)
             }
         }
     }

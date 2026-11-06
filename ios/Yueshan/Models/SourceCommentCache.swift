@@ -42,15 +42,17 @@ actor SourceCommentCache {
 @MainActor final class ReaderCommentsModel: ObservableObject {
     @Published private(set) var counts: [String:SourceParagraphCount] = [:]
     @Published private(set) var stale = false
+    @Published private(set) var hotComments: [String:SourceComment] = [:]
     private(set) var originalTexts: [String:String] = [:]
     private var generation = UUID()
-    func reset() { generation = UUID(); counts = [:]; originalTexts = [:]; stale = false }
+    func reset() { generation = UUID(); counts = [:]; originalTexts = [:]; hotComments = [:]; stale = false }
     func remap(_ origins: [String:String]) {
-        let original = counts,text = originalTexts
+        let original = counts,text = originalTexts,hot = hotComments
         counts = Dictionary(uniqueKeysWithValues:origins.compactMap{ id,raw in original[raw].map{(id,$0)} })
         originalTexts = Dictionary(uniqueKeysWithValues:origins.compactMap{ id,raw in text[raw].map{(id,$0)} })
+        hotComments = Dictionary(uniqueKeysWithValues:origins.compactMap{ id,raw in hot[raw].map{(id,$0)} })
     }
-    func load(client: ShushanCommentsClient,context: ShushanCommentContext,document: ChapterDocument,cache: SourceCommentCache = .shared) async {
+    func load(client: ShushanCommentsClient,context: ShushanCommentContext,document: ChapterDocument,includeHot: Bool = false,cache: SourceCommentCache = .shared) async {
         reset(); let ticket = generation,key = SourceCommentCache.key(client:client,context:context,version:document.version)
         do {
             let rows: [SourceParagraphCount]
@@ -64,5 +66,25 @@ actor SourceCommentCache {
             counts = ShushanCommentsClient.map(saved,context:context,document:document); stale = true
             originalTexts = Dictionary(uniqueKeysWithValues:document.paragraphs.map{($0.id,$0.text)})
         }
+        guard includeHot,!Task.isCancelled,ticket == generation else { return }
+        let selected = document.paragraphs.filter{(counts[$0.id]?.count ?? 0) > 0}.sorted {
+            let left = counts[$0.id]!,right = counts[$1.id]!
+            if left.hot != right.hot { return left.hot }; return left.count == right.count ? $0.id < $1.id : left.count > right.count
+        }.prefix(2)
+        for paragraph in selected {
+            guard let count = counts[paragraph.id] else { continue }
+            let pageKey = SourceCommentCache.key(client:client,context:context,version:document.version,paragraph:count.nativeID,cursor:"0")
+            let page: SourceCommentPage?
+            var usedStale = false
+            if let saved = await cache.read(SourceCommentPage.self,key:pageKey,maximumAge:300) { page = saved }
+            else {
+                do { let fetched = try await client.page(context,paragraph:count.nativeID); try? await cache.write(fetched,key:pageKey); page = fetched }
+                catch { page = await cache.read(SourceCommentPage.self,key:pageKey,maximumAge:7 * 86400); usedStale = page != nil }
+            }
+            guard !Task.isCancelled,ticket == generation else { return }
+            if usedStale { stale = true }
+            if let page,let quote = page.sourceQuote,ShushanCommentsClient.sameParagraph(quote,paragraph.text),let comment = page.comments.filter({!$0.text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty}).max(by:{$0.likes < $1.likes}) { hotComments[paragraph.id] = comment }
+        }
+
     }
 }

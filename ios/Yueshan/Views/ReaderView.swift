@@ -61,10 +61,14 @@ struct ReaderView: View {
     private var commentContext: ShushanCommentContext? {
         guard !store.isDemo,let metadata = store.remoteMetadata(book.id),let record = store.chapterRecord(bookID:book.id,index:chapter),let context = ShushanCommentContext(book:metadata,chapter:record),context.source == "fq" else { return nil }; return context
     }
-    private var commentTaskID: String { StableContentID.make(loaded?.chapterID ?? "",loaded?.version ?? "",loaded?.originVersion ?? "",String(restoreID),String(store.onlineRevision),shushan.credentialForRequests.map{ShushanCommentsClient(credential:$0).cacheScope} ?? "signed-out",String(store.settings.preferences.showCommentBubbles)) }
+    private var commentTaskID: String { StableContentID.make(loaded?.chapterID ?? "",loaded?.version ?? "",loaded?.originVersion ?? "",String(restoreID),String(store.onlineRevision),shushan.credentialForRequests.map{ShushanCommentsClient(credential:$0).cacheScope} ?? "signed-out",String(store.settings.preferences.showCommentBubbles),String(store.settings.preferences.showGodComments)) }
     private var paragraphCounts: [Int:Int] {
         guard let loaded else { return [:] }
         return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap { index,paragraph in guard let count = comments.counts[paragraph.id]?.count,count > 0 else { return nil }; return (index,count) })
+    }
+
+    private var paragraphHotComments: [Int:SourceComment] {
+        guard let loaded else { return [:] }; return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap{index,paragraph in comments.hotComments[paragraph.id].map{(index,$0)} })
     }
 
     var body: some View {
@@ -106,7 +110,7 @@ struct ReaderView: View {
             .task(id: key) {
                 guard initialized, let loaded else { return }
                 reflowing = true
-                let nextDocument = ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: loaded.paragraphs.map(\.text), isDemo: store.isDemo,sourceID:store.remoteMetadata(book.id)?.source?.sourceID,commentCounts:paragraphCounts)
+                let nextDocument = ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: loaded.paragraphs.map(\.text), isDemo: store.isDemo,sourceID:store.remoteMetadata(book.id)?.source?.sourceID,commentCounts:paragraphCounts,hotComments:paragraphHotComments)
                 rendered = nextDocument
                 if store.settings.mode.isPaged {
                     let newRanges = ReaderPaginator.ranges(document: nextDocument, size: layout.textFrame.size)
@@ -197,10 +201,10 @@ struct ReaderView: View {
         }
         .task(id:commentTaskID) {
             comments.reset()
-            if store.settings.preferences.showCommentBubbles,let credential = shushan.credentialForRequests,let client = store.commentClient(credential:credential),let context = commentContext,let loaded {
+            if store.settings.preferences.showCommentBubbles || store.settings.preferences.showGodComments,let credential = shushan.credentialForRequests,let client = store.commentClient(credential:credential),let context = commentContext,let loaded {
                 let processed = await store.contentProcessor.context(bookID:book.id,document:loaded)
                 if loaded.originVersion != nil && processed == nil { return }
-                await comments.load(client:client,context:context,document:processed?.raw ?? loaded)
+                await comments.load(client:client,context:context,document:processed?.raw ?? loaded,includeHot:store.settings.preferences.showGodComments)
                 if !Task.isCancelled,let processed { comments.remap(processed.origins) }
             }
         }
@@ -329,7 +333,7 @@ struct ReaderView: View {
     private func layoutKey(_ size: CGSize) -> String {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let preferences = (try? encoder.encode(store.settings.preferences)).map { String($0.hashValue) } ?? ""
-        let countsVersion = StableContentID.list(paragraphCounts.keys.sorted().map{"\($0):\(paragraphCounts[$0]!)"})
+        let countsVersion = StableContentID.list(paragraphCounts.keys.sorted().map{"\($0):\(paragraphCounts[$0]!)"} + paragraphHotComments.keys.sorted().map{"\($0):\(paragraphHotComments[$0]!.id):\(paragraphHotComments[$0]!.text)"})
         return "\(chapter)-\(Int(size.width))-\(Int(size.height))-\(store.settings.fontSize)-\(store.settings.lineSpacing)-\(theme.rawValue)-\(store.settings.mode.rawValue)-\(preferences)-\(restoreID)-\(initialized)-\(loaded?.version ?? "")-\(countsVersion)"
     }
     private func updateAnchor(_ value: ReaderAnchor) {

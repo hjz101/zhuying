@@ -81,7 +81,7 @@ struct ReaderDocument {
     let text: NSAttributedString
     let paragraphRanges: [NSRange]
 
-    init(book: Book, chapter: Int, settings: ReadingSettings, paragraphs: [String]? = nil, isDemo: Bool = true,sourceID: String? = nil,commentCounts: [Int:Int] = [:]) {
+    init(book: Book, chapter: Int, settings: ReadingSettings, paragraphs: [String]? = nil, isDemo: Bool = true,sourceID: String? = nil,commentCounts: [Int:Int] = [:],hotComments: [Int:SourceComment] = [:]) {
         let text = NSMutableAttributedString(string: "")
         let preferences = settings.preferences
         let palette = ReaderPalette(settings: settings)
@@ -137,9 +137,9 @@ struct ReaderDocument {
                 text.append(badge)
             }
             text.append(NSAttributedString(string: "\n", attributes: [.font: font, .paragraphStyle: style]))
-            if isDemo && preferences.showGodComments {
+            if preferences.showGodComments && (isDemo || hotComments[paragraphIndex] != nil) {
                 let attachment = ReaderResponsiveCommentAttachment()
-                attachment.image = ReaderCommentArtwork.godComment(settings: settings)
+                attachment.image = ReaderCommentArtwork.godComment(settings: settings,comment:isDemo ? nil : hotComments[paragraphIndex])
                 attachment.bounds = CGRect(x: 0, y: -2, width: 180, height: 47)
                 let card = NSMutableAttributedString(attachment: attachment)
                 card.addAttribute(.readerCommentParagraph, value: paragraphIndex, range: NSRange(location: 0, length: card.length))
@@ -285,8 +285,9 @@ enum ReaderCommentArtwork {
         }
         return remember(image, key: key)
     }
-    static func godComment(settings: ReadingSettings) -> UIImage {
-        let key = key("god", settings: settings)
+    static func godComment(settings: ReadingSettings,comment: SourceComment? = nil) -> UIImage {
+        let suffix = comment.map{StableContentID.make($0.id,$0.author,$0.text,String($0.likes))} ?? "demo"
+        let key = key("god-" + suffix, settings: settings)
         if let cached = cache.object(forKey: key) { return cached }
         let palette = ReaderPalette(settings: settings)
         let image = UIGraphicsImageRenderer(size: CGSize(width: 230, height: 60)).image { _ in
@@ -298,8 +299,10 @@ enum ReaderCommentArtwork {
             fill.setFill(); path.fill()
             stroke.setStroke(); path.lineWidth = style == "画框" ? 2 : 0.5; path.stroke()
             if style == "画框" { UIBezierPath(rect: rect.insetBy(dx: 4, dy: 4)).stroke() }
-            ("神人评论 · 本地示例" as NSString).draw(at: CGPoint(x: 10, y: 9), withAttributes: [.font: UIFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: palette.accent])
-            ("这盏茶，怕不是等了整整一章。" as NSString).draw(at: CGPoint(x: 10, y: 29), withAttributes: [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: palette.ink])
+            ((comment.map{"热评 · " + String($0.author.prefix(16)) + " · " + String($0.likes)} ?? "神人评论 · 本地示例") as NSString).draw(at: CGPoint(x: 10, y: 9), withAttributes: [.font: UIFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: palette.accent])
+            let paragraph = NSMutableParagraphStyle(); paragraph.lineBreakMode = .byTruncatingTail
+            if let comment { (String(comment.text.prefix(180)) as NSString).draw(in:CGRect(x:10,y:27,width:210,height:29),withAttributes:[.font:UIFont.systemFont(ofSize:12),.foregroundColor:palette.ink,.paragraphStyle:paragraph]) }
+            else { ("这盏茶，怕不是等了整整一章。" as NSString).draw(at:CGPoint(x:10,y:29),withAttributes:[.font:UIFont.systemFont(ofSize:12),.foregroundColor:palette.ink]) }
         }
         return remember(image, key: key)
     }

@@ -76,6 +76,11 @@ final class QuickJSScriptRuntimeTests: XCTestCase {
         XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - started, 2)
     }
 
+    func testThrownMessageCannotBecomeAnUnboundedNativeOutputBuffer() async throws {
+        do { _ = try await evaluate("throw new Error('章👩🏽‍🚀'.repeat(10000))"); XCTFail("Expected script exception") }
+        catch QuickJSScriptError.javascript(let message) { XCTAssertLessThanOrEqual(message.utf8.count, 16_384) }
+    }
+
     func testRuntimeHeapLimitRejectsAllocationAndCannotBeCaughtToEscapeBudget() async throws {
         var policy = LegadoScriptPolicy(); policy.memoryLimitBytes = 2 * 1024 * 1024
         do { _ = try await evaluate("try { new ArrayBuffer(64 * 1024 * 1024) } catch(e) {}; 'ignored allocation failure'", policy: policy); XCTFail("Expected memory limit") }

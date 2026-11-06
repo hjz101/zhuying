@@ -161,7 +161,13 @@ static void zy_exception(JSContext *context, ZYState *state, ZYQJSResult *result
     JSValue error = JS_GetException(context);
     const char *message = JS_ToCString(context, error);
     result->status = state->abort_status != ZYQJS_OK ? state->abort_status : state->memory_exhausted ? ZYQJS_MEMORY_LIMIT : ZYQJS_SCRIPT_EXCEPTION;
-    if (message) { result->message = strdup(message); JS_FreeCString(context, message); }
+    if (message) {
+        size_t message_limit = state->limits.maximum_output_bytes < 16384 ? state->limits.maximum_output_bytes : 16384;
+        size_t message_length = strnlen(message, message_limit);
+        while (message_length && (((unsigned char)message[message_length] & 0xc0) == 0x80)) message_length--;
+        result->message = strndup(message, message_length);
+        JS_FreeCString(context, message);
+    }
     else result->message = strdup("JavaScript evaluation failed");
     JS_FreeValue(context, error);
 }

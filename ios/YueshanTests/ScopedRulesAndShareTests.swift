@@ -27,7 +27,7 @@ final class ScopedRulesAndShareTests: XCTestCase {
         XCTAssertEqual(try bound.ranges(in:"星光👩🏽‍🚀星光").count,2)
     }
     func testSharingRoutingDecodesOnceSeparatesKindsAndNeverAcceptsCredentialsOrUnknownDialects() throws {
-        XCTAssertNil(ProductionCapabilities.badge(for:"links"))
+        for id in ["links","details","contents","reading"] { XCTAssertNil(ProductionCapabilities.badge(for:id)) }
         var url = URLComponents(); url.scheme = "yueshan"; url.host = "import"; url.queryItems = [.init(name:"kind",value:"source"),.init(name:"url",value:"https://reader.test/source.json?edition=1")]
         let first = try ShareImportRequest.parse(url.url!), second = try ShareImportRequest.parse(url.url!)
         XCTAssertEqual(first.id,second.id); XCTAssertEqual(first.kind,.source); XCTAssertEqual(first.url.query,"edition=1")

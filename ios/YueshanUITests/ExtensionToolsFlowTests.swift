@@ -84,4 +84,16 @@ final class ExtensionToolsFlowTests: XCTestCase {
         XCTAssertTrue(message.waitForExistence(timeout:5)); XCTAssertTrue(message.label.contains("无效"))
     }
 
+    @MainActor func testProductionBookShortcutsUseRealDetailsCatalogAndReader() {
+        for (id,title) in [("details","书籍详情"),("contents","章节目录"),("reading","正文阅读")] {
+            let app = open(id,title:title,fixtures:["--legacy-library-fixtures"])
+            let entry = app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'production-book-'")).firstMatch
+            XCTAssertTrue(entry.waitForExistence(timeout:8)); entry.tap()
+            if id == "details" { XCTAssertTrue(app.buttons["detailRead"].waitForExistence(timeout:5)); app.buttons["detailRead"].tap() }
+            else if id == "contents" { XCTAssertTrue(app.buttons["chapter-1"].waitForExistence(timeout:5)); app.buttons["chapter-1"].tap() }
+            let reader = app.textViews["continuousText"]; XCTAssertTrue(reader.waitForExistence(timeout:10)); XCTAssertTrue((reader.value as? String)?.contains("升级前已经读到的真实段落") == true)
+            app.terminate()
+        }
+    }
+
 }

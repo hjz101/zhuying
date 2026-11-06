@@ -1,6 +1,6 @@
 import Foundation
 enum ProductionCapabilities {
-    static let live: Set<String> = ["sources", "sourceImport", "sourceEdit", "sourceDebug", "sourceBatch", "sourceSwitch", "search", "discover", "chapterCache", "import", "epub", "txt", "fulltext", "statistics", "shelf", "bookmarks", "themes", "fonts", "typography", "pageStyle", "titleDesign", "highlight", "progress", "backup", "files", "cache"]
+    static let live: Set<String> = ["details","contents","reading","sources", "sourceImport", "sourceEdit", "sourceDebug", "sourceBatch", "sourceSwitch", "search", "discover", "chapterCache", "import", "epub", "txt", "fulltext", "statistics", "shelf", "bookmarks", "themes", "fonts", "typography", "pageStyle", "titleDesign", "highlight", "progress", "backup", "files", "cache"]
     static func badge(for id: String) -> String? {
         if ["onlineTTS","aiRoles"].contains(id) { return "需配置服务" }
         if id == "icloud" { return "需 iCloud 权限" }

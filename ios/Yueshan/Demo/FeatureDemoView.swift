@@ -48,6 +48,7 @@ struct FeatureDemoView: View {
     var body: some View {
         Group {
             if feature.id == "import" || (!library.isDemo && ["epub", "txt"].contains(feature.id)) { SmartImportView() }
+            else if !library.isDemo && ["details","contents","reading"].contains(feature.id) { ProductionBookToolView(feature:feature,bookID:bookID) }
             else if !library.isDemo && feature.id == "fulltext" { ProductionTextSearchView(bookID: bookID, onRead: onRead) }
             else if !library.isDemo && feature.id == "statistics" { FootprintsView(title: feature.title) }
             else if !library.isDemo && feature.id == "links" { ShareImportView() }
@@ -349,5 +350,40 @@ struct FeatureDemoView: View {
             result[range].foregroundColor = Palette.green
         }
         return result
+    }
+}
+
+
+private struct ProductionBookToolView: View {
+    let feature: DemoFeature
+    var bookID: String?
+    @EnvironmentObject private var library: LibraryStore
+    @State private var catalogBook: Book?
+    var body: some View {
+        Group {
+            if feature.id == "details",let book = library.books.first(where:{$0.id == bookID}) { BookDetailView(book:book) }
+            else {
+                ScrollView { VStack(alignment:.leading,spacing:23) {
+                    AppPageHeader(title:feature.title,subtitle:"选择已导入或已加入的作品",icon:feature.icon)
+                    if library.books.isEmpty {
+                        Text("尚无作品，请先导入文件或搜索书籍。").font(.system(size:13)).foregroundStyle(Palette.muted).accessibilityIdentifier("bookToolEmpty")
+                        NavigationLink("智能导入") { SmartImportView() }
+                    }
+                    ForEach(library.books) { book in
+                        if feature.id == "details" { NavigationLink { BookDetailView(book:book) } label: { entry(book) }.accessibilityIdentifier("production-book-" + book.id) }
+                        else { Button { if feature.id == "contents" { catalogBook = book } else { library.read(book) } } label: { entry(book) }.accessibilityIdentifier("production-book-" + book.id) }
+                    }
+                }.padding(22) }.appPageStyle().navigationTitle(feature.title).navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(item:$catalogBook) { book in
+            ContentsView(book:book,currentChapter:library.progress[book.id]?.chapter) { chapter in
+                catalogBook = nil
+                Task { @MainActor in try? await Task.sleep(for:.milliseconds(350)); library.read(book,chapter:chapter) }
+            }
+        }
+    }
+    private func entry(_ book: Book) -> some View {
+        HStack(spacing:14) { BookCover(book:book,width:48); VStack(alignment:.leading,spacing:6) { Text(book.title).font(.system(size:15)); Text(book.author).font(.system(size:11)).foregroundStyle(Palette.muted) }; Spacer(); Image(systemName:"chevron.right").font(.system(size:11)) }.foregroundStyle(Palette.green).padding(16).background(Palette.card,in:.rect(cornerRadius:12))
     }
 }

@@ -1,10 +1,10 @@
 import XCTest
 
 final class GlobalThemeFlowTests: XCTestCase {
-    @MainActor private func launch(preserve: Bool = false) -> XCUIApplication {
+    @MainActor private func launch(preserve: Bool = false, inkMountain: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--global-theme-fixtures"] + (preserve ? ["--preserve-ui-test-state"] : [])
+        app.launchArguments = ["--ui-testing", "--global-theme-fixtures"] + (preserve ? ["--preserve-ui-test-state"] : []) + (inkMountain ? ["--ink-mountain-theme-fixtures"] : [])
         app.launch(); return app
     }
     @MainActor private func reveal(_ element: XCUIElement, app: XCUIApplication) {
@@ -104,7 +104,14 @@ final class GlobalThemeFlowTests: XCTestCase {
     @MainActor func testReceivedThemeCanBePreviewedSavedWithoutApplyingThenFullyApplied() {
         let app = launch(); openThemes(app)
         app.buttons["globalThemeImport"].tap()
-        let file = app.collectionViews["File View"].cells.matching(NSPredicate(format: "label BEGINSWITH %@", "竹影完整主题")).firstMatch
+        chooseThemeFile("竹影完整主题", app: app)
+        let save = app.buttons["globalThemeSaveOnly"]; reveal(save, app: app); save.tap()
+        XCTAssertTrue(app.staticTexts["globalThemeResult"].label.contains("当前外观保留"))
+        apply(app)
+        capture(app, "竹影-收到主题包-完整应用")
+    }
+    @MainActor private func chooseThemeFile(_ prefix: String, app: XCUIApplication) {
+        let file = app.collectionViews["File View"].cells.matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
         if !file.waitForExistence(timeout: 3) {
             for labels in [["Browse", "浏览"], ["Browse", "浏览"], ["On My iPhone", "我的iPhone", "我的 iPhone"]] {
                 for label in labels {
@@ -118,9 +125,28 @@ final class GlobalThemeFlowTests: XCTestCase {
         XCTAssertTrue(file.waitForExistence(timeout: 8), app.debugDescription); file.tap()
         if app.buttons["Open"].waitForExistence(timeout: 1) { app.buttons["Open"].tap() }
         else if app.buttons["打开"].exists { app.buttons["打开"].tap() }
-        let save = app.buttons["globalThemeSaveOnly"]; reveal(save, app: app); save.tap()
-        XCTAssertTrue(app.staticTexts["globalThemeResult"].label.contains("当前外观保留"))
-        apply(app)
-        capture(app, "竹影-收到主题包-完整应用")
+    }
+    @MainActor func testRealInkMountainLightAndDarkPackagesImportApplyAndRenderInExistingShelf() {
+        let app = launch(inkMountain: true); openThemes(app)
+        for mode in ["浅色", "深色"] {
+            app.buttons["globalThemeImport"].tap()
+            chooseThemeFile("水墨山水-孤舟-" + mode, app: app)
+            apply(app)
+            capture(app, "竹影-孤舟-\(mode)-主题预览")
+            app.buttons["完成"].tap()
+            XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, "水墨山水·孤舟（\(mode)）")
+            app.tabBars.buttons["书架"].tap()
+            XCTAssertTrue(app.buttons["continueReading"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.tabBars.buttons.count, 4)
+            capture(app, "竹影-孤舟-\(mode)-书架")
+            app.buttons["continueReading"].tap()
+            let guide = app.buttons["dismissGestureGuide"]
+            if guide.waitForExistence(timeout: 2) { guide.tap() }
+            XCTAssertTrue(app.staticTexts["chapterTitle"].waitForExistence(timeout: 8))
+            capture(app, "竹影-孤舟-\(mode)-实际阅读")
+            app.buttons["返回书架"].tap()
+            app.tabBars.buttons["我的"].tap()
+            XCTAssertTrue(app.navigationBars["主题管理"].waitForExistence(timeout: 5))
+        }
     }
 }

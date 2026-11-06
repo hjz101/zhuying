@@ -36,10 +36,13 @@ struct ThemeAppearanceContext: Equatable {
     func image(_ path: String) -> UIImage? {
         ThemeImageCache.image(path: path, bundle: bundle)
     }
+    func iconImage(_ path: String, scale: CGFloat) -> UIImage? {
+        ThemeImageCache.icon(path: path, bundle: bundle, scale: scale)
+    }
 }
 private enum ThemeImageCache {
     static let cache: NSCache<NSString, UIImage> = {
-        let cache = NSCache<NSString, UIImage>(); cache.countLimit = 32; cache.totalCostLimit = 32 * 1024 * 1024; return cache
+        let cache = NSCache<NSString, UIImage>(); cache.countLimit = 64; cache.totalCostLimit = 32 * 1024 * 1024; return cache
     }()
     static func image(path: String, bundle: GlobalThemeBundle) -> UIImage? {
         guard let data = bundle.resources[path] else { return nil }
@@ -48,6 +51,23 @@ private enum ThemeImageCache {
         guard let image = UIImage(data: data) else { return nil }
         cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * image.scale * image.scale * 4))
         return image
+    }
+    static func icon(path: String, bundle: GlobalThemeBundle, scale: CGFloat) -> UIImage? {
+        let scale = scale.isFinite ? min(4, max(1, scale)) : 1
+        let key = (bundle.id + ":icon:" + String(Double(scale)) + ":" + path) as NSString
+        if let image = cache.object(forKey: key) { return image }
+        guard let original = image(path: path, bundle: bundle) else { return nil }
+        let size = CGSize(width: 20, height: 20)
+        let format = UIGraphicsImageRendererFormat(); format.scale = scale; format.opaque = false
+        let factor = min(size.width / original.size.width, size.height / original.size.height)
+        let fitted = CGSize(width: original.size.width * factor, height: original.size.height * factor)
+        let result = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            original.draw(in: CGRect(x: (size.width - fitted.width) / 2, y: (size.height - fitted.height) / 2, width: fitted.width, height: fitted.height))
+        }
+        // Native Tab labels extract the UIImage and ignore SwiftUI frame/resizable
+        // modifiers. Give the bitmap a real point size while keeping Retina pixels.
+        cache.setObject(result, forKey: key, cost: Int(20 * 20 * scale * scale * 4))
+        return result
     }
 }
 private struct ThemeAppearanceKey: EnvironmentKey { static let defaultValue = ThemeAppearanceContext() }
@@ -59,6 +79,7 @@ extension EnvironmentValues {
 
 struct ThemeIcon: View {
     @Environment(\.themeAppearance) private var appearance
+    @Environment(\.displayScale) private var displayScale
     @Environment(\.isEnabled) private var enabled
     @Environment(\.isFocused) private var focused
     @Environment(\.themeControlState) private var state
@@ -78,7 +99,7 @@ struct ThemeIcon: View {
         return selected ? asset.selected ?? asset.path : asset.path
     }
     var body: some View {
-        if let path, let uiImage = appearance.image(path) {
+        if let path, let uiImage = appearance.iconImage(path, scale: displayScale) {
             Image(uiImage: uiImage).renderingMode(asset?.template == false ? .original : .template)
                 .resizable().scaledToFit().frame(width: 20, height: 20).accessibilityHidden(true)
         } else { Image(systemName: asset?.symbol ?? systemName) }

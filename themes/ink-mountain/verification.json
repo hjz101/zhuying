@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-06",
+  "source": {
+    "name": "水墨山水-孤舟-主题包.zip",
+    "format": "origo.theme-suite",
+    "schemaVersion": 4,
+    "version": 6,
+    "sha256": "ff3ed309216165a2b749dd611f9ed767090db9c160edb4f89b7b2438932d9acc"
+  },
+  "artifacts": [
+    {
+      "file": "水墨山水-孤舟-浅色.zhuyingtheme",
+      "bytes": 7140747,
+      "sha256": "ac4545e65830c7d9429fbdca4cc75cbf37a3798d8b25e9a42455c7555f204382"
+    },
+    {
+      "file": "水墨山水-孤舟-深色.zhuyingtheme",
+      "bytes": 7170851,
+      "sha256": "f17d41b888ba7bf6bf41090a5ee2971191de7af9db8fc70c4647ac19ea8a0112"
+    }
+  ],
+  "validation": {
+    "nativeUnitTestsPassed": 405,
+    "scriptTestsPassed": 86,
+    "uiFlowsPassed": 2,
+    "appearanceModesTested": [
+      "light",
+      "dark"
+    ],
+    "nativeFontsCSSSVGValidated": true,
+    "allResourceHashesValidated": true,
+    "reproducedByteForByte": true,
+    "iconPointSize": 20,
+    "retinaIconPixelsAt3x": 60,
+    "minimumRecommendedBuild": 12,
+    "environment": "iPhone 17 Pro / iOS 26.5 Simulator",
+    "resultBundle": "/tmp/zhuying-ink-mountain-verified.xcresult"
+  }
+}

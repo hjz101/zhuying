@@ -296,4 +296,57 @@ final class GlobalThemeTests: XCTestCase {
         settings.preferences.colors?.accent = 0x123456
         XCTAssertFalse(identities.contains(GlobalThemePreview.fingerprint(settings)))
     }
+
+    private func inkMountainPackage(_ mode: String) throws -> Data {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return try Data(contentsOf: root.appendingPathComponent("themes/ink-mountain/水墨山水-孤舟-\(mode).zhuyingtheme"))
+    }
+
+    func testRealInkMountainPackagesPassNativeAssetsFontCSSSVGRulesAndRoundTrip() throws {
+        for mode in ["浅色", "深色"] {
+            let bundle = try GlobalThemePackage.decode(inkMountainPackage(mode))
+            XCTAssertEqual(bundle.manifest.packageKind, "full")
+            XCTAssertEqual(bundle.document.app.dark, mode == "深色")
+            XCTAssertEqual(bundle.resources.keys.filter { $0.hasPrefix("assets/icons/") }.count, 160)
+            XCTAssertEqual(bundle.document.fontBindings["reader.body"]?.postScriptName, "XuandongKaishu")
+            XCTAssertNotNil(bundle.document.app.icons["navigation.back"]?.path)
+            XCTAssertNotNil(bundle.document.app.icons["state.loading"]?.path)
+            XCTAssertTrue(bundle.document.reader?.appearance.preferences.headerEnabled == true)
+            let restored = try GlobalThemePackage.decode(GlobalThemePackage.encode(bundle))
+            XCTAssertEqual(restored.document, bundle.document)
+            XCTAssertEqual(restored.resources, bundle.resources)
+        }
+    }
+
+    func testImportedRetinaIconsHaveNativePointSizeWithoutResizingBackgrounds() throws {
+        let bundle = try GlobalThemePackage.decode(inkMountainPackage("浅色"))
+        let context = ThemeAppearanceContext(bundle: bundle)
+        let path = try XCTUnwrap(bundle.document.app.icons["navigation.shelf"]?.path)
+        let icon = try XCTUnwrap(context.iconImage(path, scale: 3))
+        XCTAssertEqual(icon.size, CGSize(width: 20, height: 20))
+        XCTAssertEqual(icon.scale, 3)
+        XCTAssertEqual(icon.cgImage?.width, 60); XCTAssertEqual(icon.cgImage?.height, 60)
+        XCTAssertTrue(icon === context.iconImage(path, scale: 3))
+        let background = try XCTUnwrap(context.image(try XCTUnwrap(bundle.document.reader?.background?.path)))
+        XCTAssertEqual(background.cgImage?.height, 2048)
+    }
+
+    func testRealInkMountainThemesInstallLicensedFontAndApplyBothModesWithoutBehaviorChanges() async throws {
+        let fonts = ReadingFontLibrary.shared, original = fonts.directory
+        fonts.useDirectory(directory.appendingPathComponent("fonts"))
+        defer { fonts.reload(reset: true); fonts.useDirectory(original) }
+        let store = store(), library = library(); store.attach(library)
+        let behavior = library.settings.mode, tap = library.settings.tapToTurn, haptics = library.settings.haptics
+        for mode in ["浅色", "深色"] {
+            let bundle = try store.importPackage(inkMountainPackage(mode))
+            try await store.apply(bundle)
+            XCTAssertEqual(store.active.id, bundle.id)
+            XCTAssertEqual(store.readerBundle?.document.reader?.background, bundle.document.reader?.background)
+            XCTAssertEqual(library.settings.preferences.fontName, "XuandongKaishu")
+            XCTAssertNotNil(library.settings.preferences.effectiveTitleCSS)
+            XCTAssertNotNil(library.settings.preferences.bubbleSVG)
+            XCTAssertEqual(library.settings.preferences.effectiveGodStyle, "画框")
+            XCTAssertEqual(library.settings.mode, behavior); XCTAssertEqual(library.settings.tapToTurn, tap); XCTAssertEqual(library.settings.haptics, haptics)
+        }
+    }
 }

@@ -24,10 +24,10 @@ with tempfile.TemporaryDirectory() as root:
   assert.doesNotThrow(() => execFileSync('python3', ['-c', script], { stdio: 'pipe' }));
 });
 
-test('step three and four evidence preserves the unresolved real-source and release gates', () => {
+test('historical release evidence remains unapproved while current physical and performance gates stay open', () => {
   const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
   const plan = read('../docs/DEVELOPMENT-PLAN.md');
-  for (const id of ['T003', 'T030', 'T035', 'T036', 'T037', 'T038']) {
+  for (const id of ['T035', 'T036', 'T037', 'T038']) {
     assert.ok(plan.includes(`| [ ] ${id} |`), `${id} still needs real acceptance`);
   }
   const probe = JSON.parse(read('../docs/verification/2026-11-06/source-feasibility-unavailable.json'));

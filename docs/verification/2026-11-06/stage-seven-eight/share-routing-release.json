@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "samples": [
+    {
+      "launch": "cold",
+      "kind": "source",
+      "platform": "iOS Simulator 26.5",
+      "configuration": "Release",
+      "observedKindMatches": true,
+      "previewButtonVisible": true,
+      "importConfirmationAbsentBeforePreview": true,
+      "sha256": "9edc9de0d9f3b3924d06cdeb012f48135eb8ed2bbfb83f199526711ab017f407"
+    },
+    {
+      "launch": "warm",
+      "kind": "theme",
+      "platform": "iOS Simulator 26.5",
+      "configuration": "Release",
+      "observedKindMatches": true,
+      "previewButtonVisible": true,
+      "importConfirmationAbsentBeforePreview": true,
+      "sha256": "84d7203e3f501aeb4753f8fe120973a415b7a9cd17436e6e249e26b38032aa25"
+    }
+  ],
+  "remoteDownloadStarted": false,
+  "libraryMutated": false
+}

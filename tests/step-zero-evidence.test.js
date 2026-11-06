@@ -36,7 +36,7 @@ test('recorded raw samples determine all maxima, medians and target results, inc
   }
 });
 
-test('unavailable real sources remain a failed gate after both requested works were attempted', () => {
+test('historical failed source evidence is retained when a later verified probe passes', () => {
   assert.equal(source.sourceID, 'shushan');
   assert.equal(source.status, 'failed');
   assert.equal(source.works.length, 0);
@@ -45,7 +45,13 @@ test('unavailable real sources remain a failed gate after both requested works w
   assert.ok(source.requests.some(x => x.endpoint === 'content' && x.httpStatus === 201));
   assert.ok(source.requests.some(x => x.endpoint === 'content' && x.httpStatus === 503));
   const plan = read('../docs/DEVELOPMENT-PLAN.md').toString('utf8');
-  assert.match(plan, /\| \[ \] T003 \|/, 'A failed real probe must not mark T003 complete');
+  const latest = JSON.parse(read('../docs/verification/2026-11-06/stage-seven-eight/source-feasibility-after-native-id-fix.json'));
+  assert.equal(latest.status, 'passed'); assert.equal(latest.works.length, 2);
+  for (const work of latest.works) {
+    assert.ok(work.chapters.length >= 3); assert.equal(new Set(work.chapters.map(chapter => chapter.contentHash)).size, work.chapters.length);
+    assert.ok(work.chapters.every(chapter => chapter.utf16Count >= 200));
+  }
+  assert.match(plan, /\| \[x\] T003 \|/, 'Current G1 status requires the later real two-work evidence');
 });
 
 test('source evidence contains only approved metadata and no credential or raw prose fields', () => {

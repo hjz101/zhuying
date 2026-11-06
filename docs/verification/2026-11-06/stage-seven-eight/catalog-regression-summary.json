@@ -1,0 +1,46 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "4038B360-1687-474F-BEC3-D5B1A898BC11",
+        "deviceName" : "Yueshan Development QA",
+        "modelName" : "iPhone 17 Pro",
+        "osBuildNumber" : "23F77",
+        "osVersion" : "26.5",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+      "passedTests" : 352,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "Yueshan · Built with macOS 26.4",
+  "expectedFailures" : 0,
+  "failedTests" : 0,
+  "finishTime" : 1793958363.401,
+  "passedTests" : 352,
+  "result" : "Passed",
+  "skippedTests" : 0,
+  "startTime" : 1793958279.887,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+
+  ],
+  "title" : "Test - Yueshan",
+  "topInsights" : [
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "59% of duration",
+      "text" : "7 longest test runs with outlier durations exceeding 0.39s (three standard deviations)"
+    }
+  ],
+  "totalTestCount" : 352
+}

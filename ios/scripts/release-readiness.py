@@ -23,8 +23,12 @@ def source_digest(root: Path) -> str:
     for name in ['ios/Yueshan.xcodeproj/project.pbxproj', 'ios/Yueshan.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved']:
         path = root / name
         if path.is_file(): paths.append(path)
-    for folder in ['Yueshan', 'YueshanTests', 'YueshanUITests', 'YueshanPerformanceTests', 'YueshanPerformanceUITests', 'YueshanTestSupport']:
-        paths += [p for p in (root / 'ios' / folder).rglob('*') if p.is_file() and p.suffix in {'.swift', '.json', '.plist', '.ttf', '.epub'}]
+    for folder in ['Yueshan', 'YueshanTests', 'YueshanUITests', 'YueshanLiveAcceptanceUITests', 'YueshanPerformanceTests', 'YueshanPerformanceUITests', 'YueshanTestSupport']:
+        paths += [p for p in (root / 'ios' / folder).rglob('*') if p.is_file() and p.suffix.lower() in {'.swift', '.json', '.plist', '.ttf', '.otf', '.epub', '.pdf', '.zip', '.rar', '.7z', '.cbz', '.cbr', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.wav', '.txt', '.md', '.entitlements'}]
+    paths += list((root / 'ios/Yueshan.xcodeproj/xcshareddata/xcschemes').glob('*.xcscheme'))
+    for folder in ['backend', 'tests']:
+        paths += [p for p in (root / folder).rglob('*') if p.is_file() and p.suffix in {'.js', '.mjs', '.json'}]
+    if (root / 'package.json').is_file(): paths.append(root / 'package.json')
     digest = hashlib.sha256()
     for path in sorted(paths):
         for value in [path.relative_to(root).as_posix().encode(), path.read_bytes()]:

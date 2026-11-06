@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "localDirectory": "artifacts/0.8.0/validation",
+  "logs": [
+    {
+      "name": "yueshan-stage-eight-final-ui.log",
+      "bytes": 882190,
+      "sha256": "9d67a8d8c23af36afc4fd0464f53e7eb9bfdb2296fa02041490409ce521e8b27"
+    },
+    {
+      "name": "yueshan-stage-eight-delivery-check.log",
+      "bytes": 396171,
+      "sha256": "347607c1b686a011860e90ae471796546c0943871e76bfa3cf8b8ddfdbec07fb"
+    },
+    {
+      "name": "yueshan-stage-eight-final-closure.log",
+      "bytes": 261822,
+      "sha256": "ece6513e50f81a3763abdad16713ac380c2311f24d16de64381c812fb19ce3ec"
+    },
+    {
+      "name": "yueshan-stage-eight-small-screen.log",
+      "bytes": 574183,
+      "sha256": "cdeade1fac213a6ab59fbd507f3f776c310d124ce7f0c0004db5b11b91a55502"
+    },
+    {
+      "name": "yueshan-stage-eight-live-ui.log",
+      "bytes": 299759,
+      "sha256": "89249773cdd4bb8d82304a0089be162b682a460e041a8741a8c464b92778ef63"
+    },
+    {
+      "name": "yueshan-stage-eight-live-ui-retest.log",
+      "bytes": 69268,
+      "sha256": "10781abee4ba0ec03bac5dc48fe25b3363adcfb82306a01f6795c2b21538727a"
+    },
+    {
+      "name": "yueshan-stage-eight-final-performance.log",
+      "bytes": 264523,
+      "sha256": "0915ff9244cae63a3a7edb0dbbc4076a462d7cad065812525c0b3a8aadc144e0"
+    },
+    {
+      "name": "yueshan-stage-eight-node-final.log",
+      "bytes": 17497,
+      "sha256": "3c25b4c88f0ae20a4db37514e90b6e931e5cf5f044d631a8b4fcd0e151765098"
+    },
+    {
+      "name": "yueshan-stage-eight-final-audit-node.log",
+      "bytes": 17497,
+      "sha256": "16e2729908282d3191016ce6295458c4992a2665d5d59fcb6d333c6bd4410967"
+    }
+  ]
+}

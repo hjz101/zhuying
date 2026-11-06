@@ -50,6 +50,11 @@ with tempfile.TemporaryDirectory() as root:
  app.write_text('struct Changed {}');after=m.source_digest(p);assert after!=before
  test=p/'ios/YueshanTests/Test.swift';test.write_text('func testOne() {}');assert m.source_digest(p)!=after;assert m.inventory(p)['unitTests']==1
  before=m.source_digest(p);epub=p/'ios/YueshanTests/original.epub';epub.write_bytes(b'original EPUB fixture');assert m.source_digest(p)!=before
+ before=m.source_digest(p);live=p/'ios/YueshanLiveAcceptanceUITests';live.mkdir();(live/'Original.swift').write_text('func testLive() {}');assert m.source_digest(p)!=before
+ for name in ['archive.rar','archive.7z','comic.cbz','image.png','notice.txt']:
+  before=m.source_digest(p);(p/'ios/YueshanTests'/name).write_bytes(b'original sample');assert m.source_digest(p)!=before
+ before=m.source_digest(p);(p/'backend').mkdir();(p/'backend/reader.mjs').write_text('export const version=1');assert m.source_digest(p)!=before
+ before=m.source_digest(p);scheme=p/'ios/Yueshan.xcodeproj/xcshareddata/xcschemes';scheme.mkdir(parents=True);(scheme/'Test.xcscheme').write_text('<Scheme/>');assert m.source_digest(p)!=before
 `;
   assert.doesNotThrow(() => execFileSync('python3', ['-c', script], { stdio: 'pipe' }));
 });

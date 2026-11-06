@@ -41,3 +41,29 @@ iCloud Drive 传输与备份／记录合并基础已加入，尚未接入完整�
 ## 正文净化与原文定位
 
 正则／受限 JS 的版本化净化、顺序和作用域、真实配置界面及导入导出已接阅读、朗读、全文搜索。原文不改写，规则随完整备份保存；处理结果含来源版本与段落对应，段评继续核对原文。`/tmp/yueshan-purification-feature.log` 的 338 项单元测试通过；界面测试发现首次打开章节失败时空 ZStack 导致错误按钮零宽，补齐阅读容器尺寸后，`/tmp/yueshan-purification-ui-retest.log` 的编辑／启用／显式重定位／重启续读流程通过。支持与边界见 `docs/CONTENT-PROCESSING.md`。
+
+- `network-browser-probe.json`：App内真实HTTPS经指定IP CONNECT隧道、无效证书拒绝及Gutenberg公开TXT下载预览通过；不修改正常书库，不使用用户凭据。
+- 来源段评最终契约和只读范围见 `../../../SOURCE-COMMENTS.md`；早期失败探测文件保留用于追溯，以 `source-comments-page-probe.json` 为最终分页证据。
+
+## 最终功能组合与真实界面
+
+- iPhone 17 Pro／iOS26.5全量83条普通UI流程零失败：`/tmp/yueshan-stage-eight-final-ui.log`、`ui-summary.json`。后来新增的扩展缓存清理在同设备独立通过，`final-closure-summary.json`；共84条不同普通流程。覆盖47个Demo入口及原有排版／字体／CSS／SVG／系统文件／音频／存储／迁移。
+- 最新357项完整原生单元及封面入口复验通过：`/tmp/yueshan-stage-eight-delivery-check.log`、`delivery-summary.json`。正式工具摘要显示实际Open Library服务，Demo原始Bing文案保留，布局与导航未改。
+- iPhone SE第三代／iOS26.5：352项当时完整单元与12条扩展、PDF／漫画UI均通过，`small-screen-summary.json`；后续原生单元补至357项并在主设备全量复验。不是物理设备或iOS17运行记录。
+- `Yueshan Live Acceptance`专用scheme实际点击《西游记》《红楼梦》的搜索结果、详情、目录、各前三回、未收藏退出重启和“我的→继续阅读”；重启完整渲染文本一致，`live-ui-summary.json`、`live-app-acceptance.json`。首轮测试误选只面向收藏书的书架续读入口，已改为既有正确路径，最终103.40秒通过；保留首次失败日志`/tmp/yueshan-stage-eight-live-ui.log`。
+- 两书真实正式存储诊断另见`live-library-prepare.json`／`live-library-restart.json`，验证六章缓存、收藏／书签／排版与同段UTF16偏移恢复。真实正常用户书库未改，凭据由App读取，报告无原文、密码或API Key。
+- 当前74项Node与语法检查通过，日志`/tmp/yueshan-stage-eight-last-node.log`；7项冻结Demo完整性检查通过，Demo子模块仍保持冻结提交。旧证据测试曾强制T003永久未通过，现改为同时核对保留的失败历史与后续真实成功，不放宽预算或发布门槛。
+
+## 冻结性能
+
+最新3项测量／正确性测试通过，见`performance-summary.json`、`performance.json`、`launch.json`。预算SHA-256仍为`269f789b9de7889d7f56fc76caabe0775752727ba105475b60871af67dffc28e`，10项中9项达标：启动最大2507.05ms，分页462.20ms，重排495.50ms；测试宿主RSS389.75MiB仍超256MiB。没有修改阈值或删掉失败指标。
+
+正常Debug App未注入XCTest的补充测量见`native-app.json`：117997 UTF16单元、164页，内容完整，RSS290.66MiB；初始化到就绪308.31ms排除了dyld，不替代完整启动或冻结宿主口径，更不替代真机。
+
+T003／G1与T030现已通过。iCloud真实账号／双设备、真实多源与用户自配语音／AI／后端长期组合、iOS17／真机、签名／内测，以及冻结RSS仍按各任务保留待验，G3／G4／G5不宣布批准。当前交付为可构建的0.8.0开发候选。
+
+## Release与外部链接
+
+模拟器arm64 Release及未签名iPhoneOS Release均构建成功，版本0.8.0／构建8，最低iOS17。已安装到正常QA模拟器，原有登录与正常书库保留。设备构建仍有上游libarchive预编译库的部分符号化警告与原有方向配置提示；构建成功不作为真机运行证明，不扩大归档变体支持。
+
+Release通过实际系统`yueshan://import`冷启动进入书源预览，运行中主题链接切换到主题预览，均显示正确类型；未触发下载或保存。结果见`share-routing-release.json`，截图在本机`artifacts/0.8.0/validation/share-*-release.png`。验证后恢复正常正式启动。

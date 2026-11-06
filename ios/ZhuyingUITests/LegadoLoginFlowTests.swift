@@ -44,6 +44,12 @@ final class LegadoLoginFlowTests: XCTestCase {
         let account = app.textFields["legadoLoginField-测试账号"], password = app.secureTextFields["legadoLoginField-测试密码"]
         account.tap(); account.typeText("fixture-reader"); password.tap(); password.typeText("fixture-password")
         let save = app.buttons["保存测试登录"]; reveal(save, app: app); save.tap()
+        let feedback = app.staticTexts["legadoLoginMessage"]
+        XCTAssertTrue(feedback.waitForExistence(timeout: 8))
+        XCTAssertTrue(feedback.label.contains("测试信息已保存"))
+        XCTAssertLessThan(feedback.frame.midY, app.windows.firstMatch.frame.height / 2, "Feedback floats above the form regardless of scroll position")
+        let dismissFeedback = app.buttons["关闭反馈"]
+        if dismissFeedback.isHittable { dismissFeedback.tap() }
         let status = app.staticTexts["legadoLoginStatus"]
         let unverified = expectation(for: NSPredicate(format: "label CONTAINS %@", "尚未验证"), evaluatedWith: status)
         wait(for: [unverified], timeout: 8)
@@ -63,5 +69,31 @@ final class LegadoLoginFlowTests: XCTestCase {
         let signedOut = expectation(for: NSPredicate(format: "label == %@", "尚未登录"), evaluatedWith: app.staticTexts["legadoLoginStatus"])
         wait(for: [signedOut], timeout: 8)
         XCTAssertNotEqual(app.textFields["legadoLoginField-测试账号"].value as? String, "fixture-reader")
+    }
+
+    @MainActor func testRightSwipeOffersScopedLoginRefreshAndBrowserWithoutRemovingLeftSwipeEdit() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--production", "--legado-fixtures"]; app.launch()
+        enterSources(app); importFixture(app)
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'source-row-' AND label CONTAINS %@", "竹影阅读3.0脚本原型")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); reveal(row, app: app)
+        let sourceID = String(row.identifier.dropFirst("source-row-".count))
+        row.swipeRight()
+        XCTAssertTrue(app.buttons["source-leading-login-" + sourceID].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["source-refresh-" + sourceID].exists)
+        XCTAssertTrue(app.buttons["source-browser-" + sourceID].exists)
+        app.buttons["source-leading-login-" + sourceID].tap()
+        XCTAssertTrue(app.staticTexts["legadoLoginStatus"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        row.swipeRight(); app.buttons["source-refresh-" + sourceID].tap()
+        XCTAssertTrue(app.staticTexts["sourceRefreshMessage"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["sourceRefreshMessage"].label.contains("已刷新"))
+        let close = app.buttons["关闭反馈"]; if close.isHittable { close.tap() }
+        row.swipeRight(); app.buttons["source-browser-" + sourceID].tap()
+        let address = app.textFields["browserAddress"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5)); XCTAssertTrue((address.value as? String)?.contains("legado-js.fixture") == true)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        row.swipeLeft()
+        XCTAssertTrue(app.buttons["source-edit-" + sourceID].waitForExistence(timeout: 3))
     }
 }

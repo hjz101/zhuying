@@ -3,16 +3,21 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct ProductionSourceAccessView: View {
+    var sourceID = "main"
+    @EnvironmentObject private var library: LibraryStore
     var body: some View {
         ScrollView {
             VStack(alignment:.leading,spacing:23) {
-                AppPageHeader(title:"访问说明",subtitle:"自定义书源 · 阅读 3.0 基础兼容",icon:"person.badge.key")
-                AppSettingsCard("公开访问",icon:"info.circle") {
+                AppPageHeader(title:"书源登录",subtitle:library.sources.first(where: { $0.id == sourceID })?.name ?? "选择书源完成网页登录",icon:"person.badge.key")
+                NavigationLink { ProductionBrowserView(initialSourceID: sourceID == "main" ? nil : sourceID) } label: {
+                    ThemeLabel("打开网页登录", systemImage: "globe").frame(maxWidth: .infinity, minHeight: 48)
+                }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("sourceWebLogin")
+                AppSettingsCard("登录方式",icon:"info.circle") {
                     Text("原生 JSON／提取规则和阅读 3.0 基础兼容书源使用 HTTPS 接口。导入预览不会执行脚本；发起搜索或阅读时才运行规则。可在内置浏览器登录并为此源启用 Cookie 复用；需要 Android 界面或额外宿主接口的规则仍需适配。")
                         .font(.system(size:13)).lineSpacing(6)
                 }
             }.padding(22)
-        }.appPageStyle().navigationTitle("访问说明").navigationBarTitleDisplayMode(.inline)
+        }.appPageStyle().navigationTitle("书源登录").navigationBarTitleDisplayMode(.inline)
     }
 }
 

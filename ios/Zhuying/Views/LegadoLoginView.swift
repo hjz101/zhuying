@@ -10,7 +10,7 @@ struct LegadoSourceLoginRoute: View {
         Group {
             if let model { LegadoLoginFormContent(model: model) }
             else if let error { ContentUnavailableView("无法打开登录表单", systemImage: "person.badge.key", description: Text(error)).appPageStyle() }
-            else if sourceID == "main" || source.map({ (try? SourcePackages.legadoDefinition($0)) == nil }) == true { ProductionSourceAccessView() }
+            else if sourceID == "main" || source.map({ (try? SourcePackages.legadoDefinition($0)) == nil }) == true { ProductionSourceAccessView(sourceID: sourceID) }
             else { ProgressView("正在打开书源登录").appPageStyle() }
         }.task(id: sourceID) {
             guard let source else { if sourceID != "main" { error = "书源已移除，请返回书源管理。" }; return }
@@ -66,13 +66,13 @@ private struct LegadoLoginFormContent: View {
                     }
                 }
                 if model.busy { HStack { ProgressView("正在执行书源操作"); Spacer(); Button("取消") { model.cancel() }.frame(minHeight: 44) }.font(.system(size: 12)) }
-                if let message = model.message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).textSelection(.enabled).accessibilityIdentifier("legadoLoginMessage") }
                 Button("退出并清除本地登录", role: .destructive) { confirmLogout = true }.font(.system(size: 13)).frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("legadoLogout")
                 Text("登录信息按书源、账号和当前书库隔离保存。网页操作完成或脚本执行结束都不代表账号已经通过验证。")
                     .font(.system(size: 11)).foregroundStyle(Palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("书源登录").navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
+            .sourceFloatingFeedback(model.message, identifier: "legadoLoginMessage")
             .onAppear {
                 let source = model.source, state = model.state
                 model.useBrowserCleanup { try await library.clearLegadoBrowserSessions(source: source, state: state) }

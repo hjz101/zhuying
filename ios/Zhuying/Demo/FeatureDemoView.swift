@@ -63,7 +63,7 @@ struct FeatureDemoView: View {
             else if !library.isDemo && feature.id == "icloud" { ProductionCloudView() }
             else if !library.isDemo && feature.id == "engine" { ProductionRuleTesterView() }
             else if !library.isDemo && feature.id == "purify" { ProductionContentRulesView() }
-            else if !library.isDemo && feature.id == "browser" { ProductionBrowserView() }
+            else if !library.isDemo && feature.id == "browser" { ProductionBrowserView(initialSourceID: scope == "main" ? nil : scope) }
             else if !library.isDemo && feature.id == "backend" { ProductionBackendView() }
             else if !library.isDemo && feature.id == "network" { ProductionNetworkView() }
             else if !library.isDemo && feature.id == "aiConfig" { ProductionAudioServiceView() }

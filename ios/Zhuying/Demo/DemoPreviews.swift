@@ -5,6 +5,9 @@ struct SourceManagementView: View {
     @Environment(\.themeAppearance) private var appAppearance
     var title = "书源"
     @EnvironmentObject private var demo: FeatureDemoStore
+    @EnvironmentObject private var library: LibraryStore
+    @EnvironmentObject private var account: ShushanAccountStore
+    @StateObject private var quickActions = SourceQuickActions()
     @State private var query = ""
     @State private var kind: DemoSourceKind?
     @State private var group: String?
@@ -26,12 +29,14 @@ struct SourceManagementView: View {
         VStack(spacing: 0) {
             controls
             List {
-                DemoSourceRows(providedSources: sources, compact: true, managing: managing, selection: $selection, route: $route)
+                DemoSourceRows(providedSources: sources, compact: true, managing: managing, selection: $selection, route: $route, refreshingSourceID: quickActions.refreshingSourceID, refresh: refresh)
                     .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
                     .listRowBackground(Color.clear)
             }.listStyle(.plain).scrollContentBackground(.hidden)
         }.background(ThemeSurface())
             .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+            .sourceFloatingFeedback(quickActions.message, identifier: "sourceRefreshMessage")
+            .onDisappear { quickActions.cancel() }
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索名称、网址或分组")
             .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { toolbarActions } }
             .safeAreaInset(edge: .bottom, spacing: 0) { if managing { batchActions } }
@@ -118,6 +123,7 @@ struct SourceManagementView: View {
                 }
             } label: { ThemeIcon(systemName: "plus") }.accessibilityLabel("添加书源").accessibilityIdentifier("sourceAdd")
             Menu {
+                NavigationLink { DiscoverView() } label: { ThemeLabel("发现页", systemImage: "safari") }.accessibilityIdentifier("sourcesDiscover")
                 ThemeButton("导出书源", systemImage: "square.and.arrow.up") { route = .init(sourceID: "main", featureID: "sourceImport") }
                 ThemeButton("批量检测", systemImage: "checklist") { route = .init(sourceID: "main", featureID: "sourceBatch") }
                 ThemeButton("规则调试", systemImage: "curlybraces") { route = .init(sourceID: "main", featureID: "engine") }
@@ -141,14 +147,29 @@ struct SourceManagementView: View {
     private func batchLabel(_ text: String, _ icon: String) -> some View {
         VStack(spacing: 4) { ThemeIcon(systemName: icon).font(.system(size: 17)); Text(text) }.frame(maxWidth: .infinity, minHeight: 44)
     }
+    private func refresh(_ source: DemoSource) {
+        quickActions.refresh(source, demo: demo.isDemo) {
+            try await library.refreshSourceRuntime(sourceID: source.id, credential: account.credentialForRequests, expired: account.expired)
+        }
+    }
 }
 
 struct DemoSourceList: View {
+    @EnvironmentObject private var demo: FeatureDemoStore
+    @EnvironmentObject private var library: LibraryStore
+    @EnvironmentObject private var account: ShushanAccountStore
+    @StateObject private var quickActions = SourceQuickActions()
     var scope: String
     var group = "全部"
     @State private var route: SourceActionRoute?
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) { DemoSourceRows(group: group, route: $route) }
+        VStack(alignment: .leading, spacing: 13) { DemoSourceRows(group: group, route: $route, refreshingSourceID: quickActions.refreshingSourceID) { source in
+            quickActions.refresh(source, demo: demo.isDemo) {
+                try await library.refreshSourceRuntime(sourceID: source.id, credential: account.credentialForRequests, expired: account.expired)
+            }
+        } }
+            .sourceFloatingFeedback(quickActions.message, identifier: "sourceRefreshMessage")
+            .onDisappear { quickActions.cancel() }
             .navigationDestination(item: $route) { item in FeatureDemoView(feature: FeatureCatalog.feature(item.featureID), scope: item.sourceID) }
     }
 }
@@ -169,6 +190,8 @@ struct DemoSourceRows: View {
     var managing = false
     var selection: Binding<Set<String>> = .constant([])
     @Binding var route: SourceActionRoute?
+    var refreshingSourceID: String?
+    var refresh: (DemoSource) -> Void = { _ in }
     @State private var removal: DemoSource?
     private var sources: [DemoSource] {
         providedSources ?? demo.sources.filter { (group == "全部" || $0.group == group) && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)) }
@@ -191,14 +214,24 @@ struct DemoSourceRows: View {
                 rowLabel(source)
             }.buttonStyle(.plain).accessibilityIdentifier("source-row-\(source.id)")
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button { open("sourceLogin", source) } label: { ThemeLabel(demo.isDemo || source.id == "shushan" ? source.loginStatus.action : "访问说明", systemImage: "person.badge.key") }.tint(appAppearance.palette.primary)
+                    Button { open("sourceLogin", source) } label: { ThemeLabel(source.loginStatus.action, systemImage: "person.badge.key") }.tint(appAppearance.palette.primary)
                         .accessibilityIdentifier("source-login-\(source.id)")
                     Button { open("sourceEdit", source) } label: { ThemeLabel("编辑", systemImage: "square.and.pencil") }.tint(appAppearance.palette.accent)
                         .accessibilityIdentifier("source-edit-\(source.id)")
                 }
+                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                    Button { open("sourceLogin", source) } label: { ThemeLabel(source.loginStatus.action, systemImage: "person.badge.key") }.tint(appAppearance.palette.primary)
+                        .accessibilityIdentifier("source-leading-login-\(source.id)")
+                    Button { refresh(source) } label: { ThemeLabel("刷新书源", systemImage: "arrow.clockwise") }.tint(appAppearance.palette.accent)
+                        .disabled(refreshingSourceID != nil).accessibilityIdentifier("source-refresh-\(source.id)")
+                    Button { open("browser", source) } label: { ThemeLabel("浏览器打开", systemImage: "globe") }.tint(appAppearance.palette.green)
+                        .accessibilityIdentifier("source-browser-\(source.id)")
+                }
                 .contextMenu {
                     ThemeButton(source.pinned ? "取消置顶" : "置顶书源", systemImage: "pin") { demo.toggleSourcePin(source.id) }
-                    ThemeButton(demo.isDemo || source.id == "shushan" ? source.loginStatus.action : "访问说明", systemImage: "person.badge.key") { open("sourceLogin", source) }
+                    ThemeButton(source.loginStatus.action, systemImage: "person.badge.key") { open("sourceLogin", source) }
+                    ThemeButton("刷新书源", systemImage: "arrow.clockwise") { refresh(source) }.disabled(refreshingSourceID != nil)
+                    ThemeButton("浏览器打开", systemImage: "globe") { open("browser", source) }
                     ThemeButton("编辑", systemImage: "square.and.pencil") { open("sourceEdit", source) }
                     ThemeButton("调试", systemImage: "ladybug") { open("sourceDebug", source) }
                     ThemeButton(source.enabled ? "停用书源" : "启用书源", systemImage: "power") {
@@ -258,7 +291,7 @@ struct DemoSourceDetail: View {
                         }))
                     }
                     NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("sourceLogin"), scope: sourceID) } label: {
-                        ThemeLabel(demo.isDemo || source.id == "shushan" ? source.loginStatus.action : "访问说明", systemImage: "person.badge.key").frame(maxWidth: .infinity, minHeight: 48)
+                        ThemeLabel(source.loginStatus.action, systemImage: "person.badge.key").frame(maxWidth: .infinity, minHeight: 48)
                             .foregroundStyle(appAppearance.palette.onPrimary).background(appAppearance.palette.primary, in: .rect(cornerRadius: 12))
                     }.buttonStyle(.plain).accessibilityIdentifier("sourceDetailLogin")
                     ForEach(["sourceEdit", "sourceDebug"], id: \.self) { id in

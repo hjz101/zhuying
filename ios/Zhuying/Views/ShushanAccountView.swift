@@ -26,10 +26,6 @@ struct ShushanLoginView: View {
                         SecureField("账号密码", text: $password).textContentType(.password).accessibilityIdentifier("shushanPassword")
                     }.font(.system(size: 13)).padding(.vertical, 6)
                 }.disabled(account.busy)
-                if let message = account.message {
-                    Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted).textSelection(.disabled)
-                        .accessibilityIdentifier("shushanLoginMessage")
-                }
                 Button {
                     let submittedPassword = password
                     password = ""
@@ -46,6 +42,7 @@ struct ShushanLoginView: View {
                     .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted).lineSpacing(5)
             }.padding(22)
         }.appPageStyle().navigationTitle("书源登录").navigationBarTitleDisplayMode(.inline)
+            .sourceFloatingFeedback(account.message, identifier: "shushanLoginMessage")
             .onDisappear { loginTask?.cancel(); password = "" }
     }
 }

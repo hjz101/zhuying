@@ -81,3 +81,21 @@ bash ios/scripts/verify.sh performance
 冻结预算及哈希不变。3 项独立性能／兼容测量测试通过，原始数据见 [本轮存储与排版](verification/2026-11-06/stage-four-performance.json) 和 [本轮自动化启动](verification/2026-11-06/stage-four-launch.json)。分页最大 459.55 ms、重排 501.21 ms、1200 章书库打开 6.28 ms；宿主峰值 387.56 MiB 仍高于 256 MiB，自动化启动最大 3547.84 ms 仍高于 3000 ms。
 
 另通过正常生产数据域、显式开发参数运行未注入 XCTest 的 Debug App，执行同等规模 Unicode 文字的两次排版，见 [App 独立诊断](verification/2026-11-06/native-app-performance.json)。本次单样本为 117997 UTF-16 单元、164 页，重组文字完整，峰值 RSS 283.63 MiB；初始化到可操作 279.98 ms **排除了 dyld**。该单样本既非完整冷启动，也不是 Release 真机结果；不替换冻结 XCTest 指标，内存仍需优化并补真机采样。T035 未标记完成。
+
+## 2026-11-06：步骤四补充复测与阶段内存采样
+
+原始报告：[冻结性能复测](verification/2026-11-06/stage-four-follow-up/performance.json)、[启动复测](verification/2026-11-06/stage-four-follow-up/launch.json)、[独立 App 诊断](verification/2026-11-06/stage-four-follow-up/native-app.json)。预算 SHA-256、负载、样本数与所有上限保持不变；3 项测量／内容正确性测试通过，10 项指标中 9 项达到原目标，RSS 仍失败。
+
+| 测量项 | 本轮最大值 | 原目标 | 状态 |
+| --- | --- | --- | --- |
+| 长章分页 | 458.92 ms | 2000 ms | 通过 |
+| 横屏／30 pt 重排 | 505.67 ms | 2000 ms | 通过 |
+| 1200 章书库打开 | 6.03 ms | 3000 ms | 通过 |
+| 测试宿主峰值 RSS | 386.14 MiB | 256 MiB | 未通过 |
+| 正式空安装书架可操作 | 2443.94 ms | 3000 ms | 通过 |
+
+启动测试仍从 `app.launch()` 前开始，到同一书架按钮 `isHittable` 为止，包含自动化握手；5 次原始样本均保存。`launch()` 已等待空闲，原 `waitForExistence` 对已经存在的元素也增加首次轮询等待；现先即时查询，不存在才轮询。改动修正测试驱动的额外等待，没有排除 App／自动化时间或缩短计时边界，不把约一秒的差值当作产品启动优化。原失败报告永久保留。
+
+七阶段内存同时记录 RSS、生命周期峰值 RSS 和 Darwin `phys_footprint`。兼容样本前峰值 RSS 已约 354.11 MiB，随后约 384.16 MiB，最终 386.14 MiB；对应物理占用约 59.27～66.22 MiB。无 XCTest 注入的 Debug App 单次诊断为 117997 UTF-16 单元、164 页，文字重组完整；峰值 RSS 284.81 MiB，物理占用约 42.49～44.16 MiB，初始化 290.65 ms 仍排除了 dyld。物理占用与 RSS 定义不同，只补充定位，不能据此宣称原内存门槛或真机验收通过。
+
+网络会话现按需创建并失效，SVG 预览合并重复任务、取消旧渲染并限制缓存，相关并发／取消／过期结果测试及主题界面回归通过。本轮数据不足以宣称 RSS 已有显著改善。用户暂时无法提供真机和开发团队，Release 真机内存、iOS 17 及签名内测仍待外部条件；T035 也依赖尚未通过的真实在线 T030。

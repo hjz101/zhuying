@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-06",
+  "sourceDigest": "78e5036e0704819bbc6a1a7e6c1e862ad5347d423e195ec2e479bb12eea36e41",
+  "performanceReport": "performance.json",
+  "launchReport": "launch.json",
+  "nativeDiagnosticReport": "native-app.json",
+  "functional": {
+    "status": "passed",
+    "failedTests": 0,
+    "unitTests": 246,
+    "uiFlows": 68,
+    "nodeTests": 68,
+    "demoSnapshotChecks": 7,
+    "performanceCorrectnessTests": 3,
+    "coverageStrategy": "Previous complete 67-flow regression plus new navigation flow and affected network, theme, reader and small-screen reruns; not a second full 68-flow run.",
+    "unitLog": "yueshan-stage-four-resources-final.log",
+    "performanceLog": "yueshan-stage-four-final-performance.log",
+    "uiReruns": [
+      {
+        "log": "yueshan-lazy-network-validation.log",
+        "passedUIFlows": [
+          "NavigationFlowTests.testVisitedTabsKeepSearchQueryAndStatisticsSelection",
+          "OnlineReadingFlowTests.testTwoFixtureBooksSearchDetailsThreeChaptersAndOfflineRestartWithoutFavorite",
+          "ProductionLaunchTests.testProductionSourceLoginHasRealFieldsAndEmptyToolsDoNotCrash"
+        ]
+      },
+      {
+        "log": "yueshan-theme-lifecycle-validation.log",
+        "passedUIFlows": [
+          "ProductionLaunchTests.testProductionThemeSelectionSurvivesRestartUsingOriginalThemePage",
+          "ReadingPreferencesFlowTests.testOverviewTypographyTitleAndPersistence",
+          "ThemeAssetsFlowTests.testCSSAndSVGLibrariesMixAndMissingAttachments",
+          "ThemeAssetsFlowTests.testFileImportIncludesAssetsAndIndependentResources"
+        ]
+      },
+      {
+        "log": "yueshan-small-screen-validation.log",
+        "passedUIFlows": [
+          "ReaderFlowTests.testShelfCategoriesReflowBelowTitleAtAccessibilityTextSize",
+          "SmartImportFlowTests.testProductionDatabaseImportThreeChaptersBackgroundAndRestart",
+          "ThemeAssetsFlowTests.testCSSAndSVGLibrariesMixAndMissingAttachments"
+        ]
+      },
+      {
+        "log": "yueshan-small-screen-final.log",
+        "passedUIFlows": [
+          "ReaderFlowTests.testPagedReaderFillsScreenAndKeepsPageWhenControlsToggle",
+          "ReaderFlowTests.testScrollingReaderFillsScreenWithoutMovingWhenControlsToggle",
+          "ReaderFlowTests.testSpineShelfRemainsInsidePageAtAccessibilityTextSize"
+        ]
+      },
+      {
+        "log": "yueshan-main-screen-final.log",
+        "passedUIFlows": [
+          "ReaderFlowTests.testShelfReaderContentsAndPreferences"
+        ]
+      }
+    ]
+  },
+  "liveApp": {
+    "status": "blocked",
+    "sampleKind": "live-app",
+    "books": [],
+    "priorRealRequests": 64,
+    "priorQualifiedBooks": 0,
+    "reports": [
+      "../source-feasibility-unavailable.json",
+      "../source-classics-unavailable.json"
+    ],
+    "reason": "Membership restriction, upstream 503, empty catalogs and invalid content prevented two works with three consecutive chapters. Fixture results do not replace App acceptance."
+  },
+  "deviceMatrix": {
+    "status": "not-run",
+    "sampleKind": "physical-device",
+    "cases": [
+      {
+        "id": "background-resume",
+        "status": "not-run"
+      },
+      {
+        "id": "backup-restore",
+        "status": "not-run"
+      },
+      {
+        "id": "current-ios",
+        "status": "not-run"
+      },
+      {
+        "id": "font-import",
+        "status": "not-run"
+      },
+      {
+        "id": "force-quit-resume",
+        "status": "not-run"
+      },
+      {
+        "id": "ios17",
+        "status": "not-run"
+      },
+      {
+        "id": "landscape",
+        "status": "not-run"
+      },
+      {
+        "id": "large-screen",
+        "status": "not-run"
+      },
+      {
+        "id": "large-text",
+        "status": "not-run"
+      },
+      {
+        "id": "offline",
+        "status": "not-run"
+      },
+      {
+        "id": "small-screen",
+        "status": "not-run"
+      },
+      {
+        "id": "third-party-files",
+        "status": "not-run"
+      },
+      {
+        "id": "upgrade-data",
+        "status": "not-run"
+      },
+      {
+        "id": "voiceover",
+        "status": "not-run"
+      }
+    ],
+    "reason": "User confirmed that a physical iPhone and Apple development team are temporarily unavailable; only iOS 26.5 simulator runtime is installed."
+  },
+  "signedInternalTest": {
+    "status": "not-run",
+    "installed": false,
+    "upgradedWithData": false,
+    "feedbackReviewed": false,
+    "openBlockingIssues": null,
+    "reason": "No configured development team or valid local signing identity; unsigned archives do not satisfy installation or user feedback acceptance."
+  },
+  "simulatorMatrix": {
+    "sampleKind": "simulator",
+    "model": "iPhone SE (3rd generation)",
+    "os": "iOS 26.5",
+    "cases": [
+      {
+        "id": "ReaderFlowTests.testShelfCategoriesReflowBelowTitleAtAccessibilityTextSize",
+        "status": "passed"
+      },
+      {
+        "id": "ReaderFlowTests.testSpineShelfRemainsInsidePageAtAccessibilityTextSize",
+        "status": "passed"
+      },
+      {
+        "id": "ReaderFlowTests.testScrollingReaderFillsScreenWithoutMovingWhenControlsToggle",
+        "status": "passed"
+      },
+      {
+        "id": "ReaderFlowTests.testPagedReaderFillsScreenAndKeepsPageWhenControlsToggle",
+        "status": "passed"
+      },
+      {
+        "id": "SmartImportFlowTests.testProductionDatabaseImportThreeChaptersBackgroundAndRestart",
+        "status": "passed"
+      },
+      {
+        "id": "ThemeAssetsFlowTests.testCSSAndSVGLibrariesMixAndMissingAttachments",
+        "status": "passed"
+      }
+    ],
+    "notes": [
+      "Reader assertions use the frozen Demo bottom padding and allow scrolling the system layout menu at accessibility text sizes.",
+      "Two initial geometry/menu test assumptions were corrected and all affected cases passed on rerun.",
+      "These cases do not satisfy the physical-device matrix."
+    ]
+  },
+  "releaseGate": "not-approved"
+}

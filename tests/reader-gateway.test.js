@@ -33,3 +33,11 @@ test('gateway bounds actual streams and maps timeouts without exposing credentia
 test('gateway configuration excludes embedded credentials and implicit all-path forwarding', () => {
   for (const config of [{ a: { origin: 'http://source.example', paths: ['/'] } }, { a: { origin: 'https://user:secret@source.example', paths: ['/'] } }, { a: { origin: 'https://source.example', paths: [] } }]) assert.throws(() => sourceConfiguration(config));
 });
+
+test('gateway returns a bounded request error without forwarding an oversized or invalid POST', async t => {
+  let calls = 0; const send = await setup(t, { fetchImpl: async () => { calls++; return new Response('should not run'); } });
+  const tooLarge = await send({ ...value, padding: 'x'.repeat(1024 * 1024 + 1) });
+  assert.equal(tooLarge.status, 413); assert.deepEqual(await tooLarge.json(), { error: 'request_too_large' });
+  const invalid = await send({ ...value, method: 'POST', bodyBase64: '!invalid!' }); assert.equal(invalid.status, 400);
+  assert.equal(calls, 0);
+});

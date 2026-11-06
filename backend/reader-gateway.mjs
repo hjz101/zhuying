@@ -21,7 +21,7 @@ export function sourceConfiguration(input) {
 }
 async function body(request) {
   let total = 0; const chunks = [];
-  for await (const chunk of request) { total += chunk.length; if (total > MAX_REQUEST) throw new GatewayError(413, 'request_too_large'); chunks.push(chunk); }
+  for await (const chunk of request.iterator({ destroyOnReturn: false })) { total += chunk.length; if (total > MAX_REQUEST) { request.resume(); throw new GatewayError(413, 'request_too_large'); } chunks.push(chunk); }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { invalid(); }
 }
 function authorize(actual, expected) {

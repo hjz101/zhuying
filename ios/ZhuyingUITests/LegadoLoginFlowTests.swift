@@ -50,6 +50,7 @@ final class LegadoLoginFlowTests: XCTestCase {
         let browser = app.buttons["打开测试网页登录"]; reveal(browser, app: app); browser.tap()
         XCTAssertTrue(app.buttons["legadoInteractionCancel"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.webViews.staticTexts["网页登录脚本已就绪"].waitForExistence(timeout: 8))
         let complete = app.buttons["legadoInteractionComplete"]
         let ready = expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: complete); wait(for: [ready], timeout: 8)
         complete.tap()

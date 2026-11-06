@@ -11,6 +11,7 @@ struct LegadoBrowserInteractionView: View {
     @State private var visited: [String: URL] = [:]
     @State private var loadedInitialHTML = false
     @State private var injectedView: ObjectIdentifier?
+    @State private var injecting = false
     @State private var finishing = false
     @State private var message: String?
     var body: some View {
@@ -35,7 +36,7 @@ struct LegadoBrowserInteractionView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) { Button("取消") { coordinator.complete(id: request.id, result: .failure(LegadoInteractionError.cancelled)) }.accessibilityIdentifier("legadoInteractionCancel") }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("完成并返回") { finish() }.disabled(browser.loading || browser.webView?.url == nil || finishing || message != nil || browser.message != nil)
+                        Button("完成并返回") { finish() }.disabled(browser.loading || browser.webView?.url == nil || injecting || finishing || message != nil || browser.message != nil)
                             .accessibilityIdentifier("legadoInteractionComplete")
                     }
                 }
@@ -74,8 +75,11 @@ struct LegadoBrowserInteractionView: View {
     private func injectScript() {
         guard let script = request.javaScript, !script.isEmpty, let view = browser.webView, injectedView != ObjectIdentifier(view) else { return }
         injectedView = ObjectIdentifier(view)
+        let identifier = ObjectIdentifier(view)
+        injecting = true
         injection?.cancel()
         injection = Task { @MainActor in
+            defer { if injectedView == identifier { injecting = false } }
             do { _ = try await view.evaluateJavaScript(script) }
             catch { if !Task.isCancelled { message = "网页脚本未完成：\(error.localizedDescription)" } }
         }

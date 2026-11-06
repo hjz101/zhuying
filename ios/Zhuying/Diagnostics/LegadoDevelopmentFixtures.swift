@@ -20,7 +20,7 @@ enum LegadoDevelopmentFixtures {
                 ["name": "保存测试登录", "type": "button", "action": "saveFixtureLogin()"],
                 ["name": "打开测试网页登录", "type": "button", "action": "openFixtureBrowser()"]
             ],
-            "loginUrl": "function saveFixtureLogin(){source.putLoginInfo(JSON.stringify(result));java.toast('测试信息已保存，尚未验证');} function openFixtureBrowser(){java.showBrowser('" + host + "/login','<html><head><title>竹影原创网页登录</title></head><body><h1>竹影原创网页登录</h1><p>完成后返回原登录表单。</p></body></html>',\"document.body.dataset.ready='yes'\");}",
+            "loginUrl": "function saveFixtureLogin(){source.putLoginInfo(JSON.stringify(result));java.toast('测试信息已保存，尚未验证');} function openFixtureBrowser(){java.showBrowser('" + host + "/login','<html><head><title>竹影原创网页登录</title></head><body><h1>竹影原创网页登录</h1><p>完成后返回原登录表单。</p></body></html>',\"document.body.dataset.ready='yes';document.querySelector('h1').textContent='网页登录脚本已就绪'\");}",
             "ruleSearch": ["bookList": "class.book", "name": "class.title@text", "author": "class.author@text", "bookUrl": "tag.a@href"],
             "ruleBookInfo": ["name": "tag.h1@text", "author": "class.author@text", "intro": "class.intro@text", "tocUrl": "id.toc@href"],
             "ruleToc": ["chapterList": "class.chapter", "chapterName": "tag.a@text", "chapterUrl": "tag.a@href"],

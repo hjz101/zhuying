@@ -96,4 +96,14 @@ final class ExtensionToolsFlowTests: XCTestCase {
         }
     }
 
+    @MainActor func testExtendedCacheCleanupKeepsImportedBookAndReadingRecords() {
+        let app = open("cache",title:"缓存管理",fixtures:["--legacy-library-fixtures"])
+        let clear = app.buttons["clearExtensionCache"]; for _ in 0..<6 { if clear.isHittable { break }; app.swipeUp() }; clear.tap()
+        app.buttons["只清理可重建扩展缓存"].tap()
+        XCTAssertTrue(app.staticTexts["cacheMessage"].waitForExistence(timeout:5)); XCTAssertTrue(app.staticTexts["cacheMessage"].label.contains("阅读记录保留"))
+        app.navigationBars.buttons.element(boundBy:0).tap(); app.navigationBars.buttons.element(boundBy:0).tap(); app.tabBars.buttons["书架"].tap()
+        XCTAssertTrue(app.buttons["continueReading"].waitForExistence(timeout:5)); app.buttons["continueReading"].tap()
+        XCTAssertTrue(app.textViews["continuousText"].waitForExistence(timeout:10)); XCTAssertTrue((app.textViews["continuousText"].value as? String)?.contains("升级前已经读到的真实段落") == true)
+    }
+
 }

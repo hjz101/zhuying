@@ -6,6 +6,9 @@ struct ProductionCacheView: View {
     @State private var bytes = 0
     @State private var chapters = 0
     @State private var audioBytes = 0
+    @State private var imageBytes = 0
+    @State private var extensionBytes: Int?
+    @State private var clearingExtensions = false
     @State private var message: String?
     @State private var confirming = false
     @State private var clearingAudio = false
@@ -16,20 +19,24 @@ struct ProductionCacheView: View {
                 AppSettingsCard("空间占用", icon: "chart.pie") {
                     HStack { Label("章节", systemImage: "doc.text"); Spacer(); Text(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) }.accessibilityIdentifier("actualCacheUsage")
                     HStack { Text("已缓存章节"); Spacer(); Text("\(chapters)") }
-                    HStack { Label("图片", systemImage: "photo"); Spacer(); Text("未缓存") }
+                    HStack { Label("图片内存", systemImage: "photo"); Spacer(); Text(ByteCountFormatter.string(fromByteCount:Int64(imageBytes),countStyle:.file)) }.accessibilityIdentifier("actualImageCacheUsage")
+                    HStack { Text("段评与脚本缓存"); Spacer(); Text(extensionBytes.map{ByteCountFormatter.string(fromByteCount:Int64($0),countStyle:.file)} ?? "无法统计") }.accessibilityIdentifier("actualExtensionCacheUsage")
                     HStack { Label("音频", systemImage: "waveform"); Spacer(); Text(ByteCountFormatter.string(fromByteCount:Int64(audioBytes),countStyle:.file)) }.accessibilityIdentifier("actualAudioCacheUsage")
                 }.font(.system(size: 12))
                 Text("近期缓存最多 60 章、32 MiB；联网时超过 24 小时尝试更新，断网仍可读已缓存正文。当前章优先，预取失败不阻塞阅读。清理近期缓存会保留主动下载、导入正文、进度、收藏、书签、字体和主题。")
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
                 NavigationLink { ProductionDownloadView(bookID:bookID) } label: { Label("管理主动下载",systemImage:"arrow.down.circle") }.font(.system(size:13))
-                Button(bookID == nil ? "清理近期章节缓存" : "清理当前作品缓存") { clearingAudio = false; confirming = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("clearRecentCache")
-                Button("停止朗读并清理音频缓存") { clearingAudio = true; confirming = true }.buttonStyle(PrimaryButtonStyle(filled:false)).accessibilityIdentifier("clearAudioCache")
+                Button(bookID == nil ? "清理近期章节缓存" : "清理当前作品缓存") { clearingAudio = false; clearingExtensions = false; confirming = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("clearRecentCache")
+                Button("停止朗读并清理音频缓存") { clearingAudio = true; clearingExtensions = false; confirming = true }.buttonStyle(PrimaryButtonStyle(filled:false)).accessibilityIdentifier("clearAudioCache")
+                Button("清理图片、段评与脚本缓存") { clearingAudio = false; clearingExtensions = true; confirming = true }.buttonStyle(PrimaryButtonStyle(filled:false)).accessibilityIdentifier("clearExtensionCache")
                 if let message { Text(message).font(.system(size: 12)).accessibilityIdentifier("cacheMessage") }
             }.padding(22)
         }.appPageStyle().navigationTitle("缓存管理").navigationBarTitleDisplayMode(.inline)
             .task { await refresh() }
             .confirmationDialog("确认清理？", isPresented: $confirming, titleVisibility: .visible) {
-                if clearingAudio {
+                if clearingExtensions {
+                    Button("只清理可重建扩展缓存",role:.destructive) { Task { do { try await ExtensionCacheMaintenance.clear(); await refresh(); message = "扩展缓存已清理，书籍、规则、登录、图片原件和阅读记录保留。" } catch { message = "清理未完成：\(error.localizedDescription)" } } }
+                } else if clearingAudio {
                     Button("停止并清理音频",role:.destructive) { Task { do { try await library.audio.clearCache(); await refresh(); message = "音频缓存已清理，阅读、主动下载和角色设置保留。" } catch { message = "清理未完成：\(error.localizedDescription)" } } }
                 } else {
                     Button("只清理网络章节缓存", role: .destructive) { Task { do { try await library.onlineService?.clearCache(bookID: bookID); await refresh(); message = "缓存已清理，阅读记录和导入正文保留。" } catch { message = "清理未完成：\(error.localizedDescription)" } } }
@@ -40,6 +47,8 @@ struct ProductionCacheView: View {
     @MainActor private func refresh() async {
         let usage = await library.onlineService?.cacheUsage(); bytes = usage?.bytes ?? 0; chapters = usage?.chapters ?? 0
         audioBytes = (try? await library.audio.cacheBytes()) ?? 0
+        imageBytes = MediaImageCache.shared.bytes
+        do { extensionBytes = try await SourceCommentCache.shared.usage() + ScriptCache.shared.usage() } catch { extensionBytes = nil }
     }
 }
 
@@ -73,7 +82,7 @@ struct ProductionFilesView: View {
                 if files.isEmpty { ContentUnavailableView("还没有导入文件", systemImage: "folder") }
                 if busy { ProgressView() }
                 if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("fileMessage") }
-                Text("PDF 归档为提取的文字，导出为 TXT。永久删除同时移除该作品的书架、历史、书签和正文；仅移出收藏请使用书架管理。")
+                Text("PDF 可选择文字提取或保留原版式；原版式与漫画不导出虚构 TXT。永久删除同时移除该作品的书架、历史、书签和正文；仅移出收藏请使用书架管理。")
                     .font(.system(size: 11)).foregroundStyle(Palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("文件管理").navigationBarTitleDisplayMode(.inline).disabled(busy)

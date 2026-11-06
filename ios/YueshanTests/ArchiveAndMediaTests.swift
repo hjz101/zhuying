@@ -87,4 +87,21 @@ final class ArchiveAndMediaTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath:imageURL.path))
         let deleted = try library(); await deleted.bootstrapProductionIfNeeded(); XCTAssertTrue(deleted.mediaBookmarks.isEmpty); XCTAssertTrue(deleted.mediaLocations.isEmpty)
     }
+    @MainActor func testExtensionCacheCleanupUsesActualBytesAndPreservesRulesAndOriginalMedia() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); defer { try? FileManager.default.removeItem(at:root) }
+        let scripts = ScriptCache(directory:root.appendingPathComponent("scripts")),comments = SourceCommentCache(directory:root.appendingPathComponent("comments")),images = MediaImageCache(),scope = StableContentID.make("original-cache-test")
+        try await scripts.put(scope:scope,key:"k",value:"v"); try await comments.write([SourceParagraphCount(nativeID:"0",count:2,hot:true)],key:scope)
+        let scriptBytes = try await scripts.usage(),commentBytes = try await comments.usage(); XCTAssertGreaterThan(scriptBytes,0); XCTAssertGreaterThan(commentBytes,0)
+        let processor = ContentProcessingStore(directory:root.appendingPathComponent("rules")); try await processor.save([.init(name:"规则",pattern:"广告")])
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+        let image = UIGraphicsImageRenderer(size:CGSize(width:700,height:700),format:format).image { context in UIColor.green.setFill(); context.fill(CGRect(x:0,y:0,width:700,height:700)) }
+        let refs = (0..<10).map{ResourceFileReference(digest:StableContentID.make("image",String($0)),bytes:1,kind:.image)}
+        for ref in refs { images.save(image,reference:ref) }
+        XCTAssertLessThanOrEqual(images.bytes,16 * 1024 * 1024); XCTAssertNil(images.image(refs[0])); XCTAssertNotNil(images.image(refs[9]))
+        let original = root.appendingPathComponent("original.png"); try image.pngData()!.write(to:original)
+        try await ExtensionCacheMaintenance.clear(comments:comments,scripts:scripts,images:images)
+        let remainingScripts = try await scripts.usage(),remainingComments = try await comments.usage(); XCTAssertEqual(remainingScripts,0); XCTAssertEqual(remainingComments,0); XCTAssertEqual(images.bytes,0)
+        let rules = try await processor.rules(); XCTAssertEqual(rules.count,1); XCTAssertTrue(FileManager.default.fileExists(atPath:original.path))
+    }
+
 }

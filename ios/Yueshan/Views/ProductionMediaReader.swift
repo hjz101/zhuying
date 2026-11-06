@@ -4,15 +4,25 @@ import ImageIO
 
 @MainActor final class MediaImageCache {
     static let shared = MediaImageCache()
-    private let cache = NSCache<NSString,UIImage>()
+    private var cache: [String:UIImage] = [:]
+    private var order: [String] = []
+    private(set) var bytes = 0
+    private var costs: [String:Int] = [:]
     private var observer: NSObjectProtocol?
     init() {
-        cache.countLimit = 8; cache.totalCostLimit = 16 * 1024 * 1024
         observer = NotificationCenter.default.addObserver(forName:UIApplication.didReceiveMemoryWarningNotification,object:nil,queue:.main) { [weak self] _ in Task { @MainActor in self?.clear() } }
     }
-    func image(_ reference: ResourceFileReference) -> UIImage? { cache.object(forKey:reference.digest as NSString) }
-    func save(_ image: UIImage,reference: ResourceFileReference) { cache.setObject(image,forKey:reference.digest as NSString,cost:(image.cgImage?.bytesPerRow ?? 0) * (image.cgImage?.height ?? 0)) }
-    func clear() { cache.removeAllObjects() }
+    func image(_ reference: ResourceFileReference) -> UIImage? {
+        guard let image = cache[reference.digest] else { return nil }; order.removeAll{$0 == reference.digest}; order.append(reference.digest); return image
+    }
+    func save(_ image: UIImage,reference: ResourceFileReference) {
+        guard let cg = image.cgImage else { return }; let cost = cg.bytesPerRow * cg.height
+        guard cost > 0,cost <= 16 * 1024 * 1024 else { return }
+        bytes -= costs[reference.digest] ?? 0; costs[reference.digest] = cost; bytes += cost
+        cache[reference.digest] = image; order.removeAll{$0 == reference.digest}; order.append(reference.digest)
+        while order.count > 8 || bytes > 16 * 1024 * 1024 { let key = order.removeFirst(); bytes -= costs.removeValue(forKey:key) ?? 0; cache.removeValue(forKey:key) }
+    }
+    func clear() { cache = [:]; order = []; costs = [:]; bytes = 0 }
     deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
 }
 

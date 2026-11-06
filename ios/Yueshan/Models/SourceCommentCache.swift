@@ -27,6 +27,7 @@ actor SourceCommentCache {
             if index >= 128 || bytes > 16 * 1024 * 1024 || values.isSymbolicLink == true { try FileManager.default.removeItem(at:file) }
         }
     }
+    func usage() throws -> Int { try DisposableCacheFiles.bytes(in:directory) }
     func clear() throws {
         do { try FileManager.default.removeItem(at:directory) }
         catch let error as NSError where error.domain == NSCocoaErrorDomain && [NSFileNoSuchFileError,NSFileReadNoSuchFileError].contains(error.code) { }

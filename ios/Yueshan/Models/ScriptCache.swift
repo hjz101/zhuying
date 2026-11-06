@@ -27,5 +27,22 @@ actor ScriptCache {
         let files = try FileManager.default.contentsOfDirectory(at:directory,includingPropertiesForKeys:[.contentModificationDateKey]).filter{$0.pathExtension == "json"}.sorted{((try? $0.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate) ?? .distantPast) > ((try? $1.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate) ?? .distantPast)}
         for file in files.dropFirst(32) { try FileManager.default.removeItem(at:file) }
     }
+    func usage() throws -> Int { try DisposableCacheFiles.bytes(in:directory) }
     func clear() throws { if FileManager.default.fileExists(atPath:directory.path) { try FileManager.default.removeItem(at:directory) } }
+}
+
+
+enum DisposableCacheFiles {
+    static func bytes(in directory: URL) throws -> Int {
+        do {
+            return try FileManager.default.contentsOfDirectory(at:directory,includingPropertiesForKeys:[.isRegularFileKey,.isSymbolicLinkKey,.fileSizeKey]).filter{$0.pathExtension == "json"}.reduce(0) { total,url in
+                let values = try url.resourceValues(forKeys:[.isRegularFileKey,.isSymbolicLinkKey,.fileSizeKey]); return total + (values.isRegularFile == true && values.isSymbolicLink != true ? values.fileSize ?? 0 : 0)
+            }
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && [NSFileNoSuchFileError,NSFileReadNoSuchFileError].contains(error.code) { return 0 }
+    }
+}
+@MainActor enum ExtensionCacheMaintenance {
+    static func clear(comments: SourceCommentCache = .shared,scripts: ScriptCache = .shared,images: MediaImageCache? = nil) async throws {
+        try Task.checkCancellation(); try await comments.clear(); try await scripts.clear(); (images ?? .shared).clear()
+    }
 }

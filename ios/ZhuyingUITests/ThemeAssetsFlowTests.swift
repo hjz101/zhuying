@@ -97,4 +97,42 @@ final class ThemeAssetsFlowTests: XCTestCase {
         app.buttons["themeAssetApply"].tap(); back(app)
         XCTAssertTrue(app.buttons["activeThemeCard"].label.contains("远山独立标题"))
     }
+
+    @MainActor func testProductionApplyShowsImmediateFeedbackAndPersistsActualReadingTheme() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--production"]
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["我的"].tap()
+        let themes = app.buttons["profileThemes"]
+        reveal(themes, app: app); themes.tap()
+        let night = app.buttons["theme-card-night"]
+        reveal(night, app: app); night.tap()
+        app.buttons["themeApply"].tap()
+        let applied = app.staticTexts["themeAppliedFeedback"]
+        XCTAssertTrue(applied.waitForExistence(timeout: 5))
+        XCTAssertTrue(applied.isHittable, "成功反馈应与底部应用按钮同时可见")
+        XCTAssertTrue(applied.label.contains("夜读深林"))
+        back(app); back(app)
+        let settings = app.buttons["profileReadingSettings"]
+        reveal(settings, app: app); settings.tap()
+        XCTAssertTrue(app.staticTexts["readingPreferenceSummary"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["readingPreferenceSummary"].label.contains("夜读深林"))
+        capture(app, "Production-Applied-Reading-Theme")
+        app.buttons["readingPreferencesDone"].tap()
+
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "--production", "--preserve-ui-test-state"]
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["我的"].tap()
+        reveal(themes, app: app); themes.tap()
+        XCTAssertTrue(app.buttons["activeThemeCard"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["activeThemeCard"].label.contains("夜读深林"))
+        back(app)
+        reveal(settings, app: app); settings.tap()
+        XCTAssertTrue(app.staticTexts["readingPreferenceSummary"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["readingPreferenceSummary"].label.contains("夜读深林"))
+    }
 }

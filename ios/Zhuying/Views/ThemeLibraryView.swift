@@ -6,6 +6,7 @@ private enum ThemeLibraryFilter: String, CaseIterable { case all = "全部", lig
 
 struct ThemeLibraryView: View {
     @EnvironmentObject private var demo: FeatureDemoStore
+    @EnvironmentObject private var store: LibraryStore
     @State private var tab = ThemeLibraryTab.bundles
     @State private var filter = ThemeLibraryFilter.all
     @State private var query = ""
@@ -33,7 +34,8 @@ struct ThemeLibraryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                if let settings = demo.readingLibrary?.settings, settings.preferences.colors == nil {
+                if store.settings.preferences.colors == nil {
+                    let settings = store.settings
                     HStack(spacing: 12) {
                         Circle().fill(settings.theme.background).frame(width: 30, height: 30).overlay(Circle().stroke(Palette.line))
                         VStack(alignment: .leading, spacing: 5) {
@@ -132,20 +134,17 @@ struct ThemeLibraryView: View {
             .onChange(of: tab) { _, _ in filter = .all; selection.removeAll() }
             .onChange(of: filter) { _, _ in selection.removeAll() }
             .onChange(of: query) { _, _ in selection.removeAll() }
+            .onAppear { if demo.readingLibrary !== store { demo.connectReader(store) } }
             .alert("导入结果", isPresented: Binding(get: { importMessage != nil }, set: { if !$0 { importMessage = nil } })) {
                 Button("知道了", role: .cancel) { importMessage = nil }
             } message: { Text(importMessage ?? "") }
-            .fileImporter(isPresented: $showingFiles, allowedContentTypes: [.json], allowsMultipleSelection: true) { result in
+            .nativeFileImporter(isPresented: $showingFiles, allowedContentTypes: [.json], allowsMultipleSelection: true) { result in
                 do {
                     let urls = try result.get()
                     var added = 0, titles = 0, bubbles = 0, duplicates = 0, invalid = 0
                     for url in urls {
-                        let access = url.startAccessingSecurityScopedResource()
-                        defer { if access { url.stopAccessingSecurityScopedResource() } }
                         do {
-                            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-                            guard size <= 3 * 1024 * 1024 else { invalid += 1; continue }
-                            let result = try demo.importThemeData(Data(contentsOf: url))
+                            let result = try demo.importThemeData(ImportedFileReader.read(url, maximumBytes: 3 * 1024 * 1024))
                             added += result.added; titles += result.titlesAdded; bubbles += result.bubblesAdded; duplicates += result.duplicates; invalid += result.invalid
                         } catch { invalid += 1 }
                     }
@@ -191,6 +190,7 @@ private struct ThemeBundleDetail: View {
     let themeID: String
     var useCurrentMix = false
     @EnvironmentObject private var demo: FeatureDemoStore
+    @EnvironmentObject private var store: LibraryStore
     @State private var titleID: String?
     @State private var bubbleID: String?
     @State private var initialized = false
@@ -209,7 +209,7 @@ private struct ThemeBundleDetail: View {
                     }
                     ThemeStylePreview(theme: theme, title: asset(titleID), bubble: asset(bubbleID), longTitle: longTitle)
                     Text("正文实际效果").font(.system(size: 13, weight: .medium))
-                    ThemeNativeReadingPreview(settings: demo.readerPreview(theme: theme, titleID: titleID, bubbleID: bubbleID), theme: theme)
+                    ThemeNativeReadingPreview(settings: didApply ? store.settings : demo.readerPreview(theme: theme, titleID: titleID, bubbleID: bubbleID), theme: theme)
                     Text("上方套装预览展示原始 CSS／SVG；正文实际效果展示原生支持的标题样式。个人自定义标题和气泡会保留。 ").font(.system(size: 11)).foregroundStyle(Palette.muted)
                     Toggle("预览长章节标题", isOn: $longTitle).font(.system(size: 12)).accessibilityIdentifier("themeLongTitle")
                     assetSelector(theme, kind: .title)
@@ -221,12 +221,19 @@ private struct ThemeBundleDetail: View {
                 }.padding(22)
             }.appPageStyle().navigationTitle("主题预览").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
                 .safeAreaInset(edge: .bottom) {
-                    HStack(spacing: 10) {
-                        Button("应用整套") { didApply = demo.applyThemeMix(themeID: themeID, titleID: titleID, bubbleID: bubbleID) }
-                            .buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("themeApply")
-                        Button("仅配色") { demo.activeThemeID = themeID; demo.updateReaderTheme(colorsOnly: true); didApply = true }
-                            .buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("themeApplyColors")
-                        Button("自定义搭配") { showMixer = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("themeCustomize")
+                    VStack(spacing: 8) {
+                        if didApply {
+                            Label("已应用到正文 · \(store.settings.preferences.colors?.name ?? store.settings.theme.title)", systemImage: "checkmark.circle.fill")
+                                .font(.system(size: 12)).foregroundStyle(Palette.green)
+                                .accessibilityIdentifier("themeAppliedFeedback")
+                        }
+                        HStack(spacing: 10) {
+                            Button("应用整套") { didApply = demo.applyThemeMix(themeID: themeID, titleID: titleID, bubbleID: bubbleID) }
+                                .buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("themeApply")
+                            Button("仅配色") { demo.activeThemeID = themeID; demo.updateReaderTheme(colorsOnly: true); didApply = true }
+                                .buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("themeApplyColors")
+                            Button("自定义搭配") { showMixer = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("themeCustomize")
+                        }
                     }.padding(.horizontal, 22).padding(.vertical, 10).background(Palette.background)
                 }
                 .onAppear {

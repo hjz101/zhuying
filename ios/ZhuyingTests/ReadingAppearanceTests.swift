@@ -3,6 +3,96 @@ import UIKit
 @testable import Zhuying
 
 @MainActor final class ReadingAppearanceTests: XCTestCase {
+    func testProductionThemeApplicationUpdatesActualReaderAndSurvivesRelaunch() async throws {
+        let domain = "production-theme-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: domain)!
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { defaults.removePersistentDomain(forName: domain); try? FileManager.default.removeItem(at: root) }
+        let demo = FeatureDemoStore(defaults: defaults, seedDemoData: false)
+        let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
+                                   productionPersistence: try ProductionLibraryPersistence(directory: root))
+        await library.bootstrapProductionIfNeeded(prepareAppearance: {
+            .init(fallbackThemeLibrary: demo.themeSnapshot, originalFontManifest: nil, fontHashes: [:])
+        })
+        demo.connectReader(library)
+        library.settings.fontSize = 25
+        library.settings.preferences.titleCSS = ".chapter-title{font-size:33px}"
+        library.settings.preferences.customBubbleSVG = ThemeStyleSamples.bubbleSVG[1]
+        library.settings.preferences.bubbleFollowsTheme = false
+        let theme = try XCTUnwrap(demo.themes.first { $0.id == "night" })
+        XCTAssertTrue(demo.applyThemeMix(themeID: theme.id, titleID: theme.titleStyleIDs.first, bubbleID: theme.bubbleStyleIDs.first))
+        let palette = ReaderPalette(settings: library.settings)
+        XCTAssertEqual(palette.background, UIColor(readerHex: theme.background))
+        XCTAssertEqual(palette.ink, UIColor(readerHex: theme.ink))
+        XCTAssertEqual(palette.hexAccent, theme.accent)
+        XCTAssertEqual(library.settings.preferences.colors?.dark, true)
+        XCTAssertEqual(library.settings.fontSize, 25)
+        XCTAssertEqual(library.settings.preferences.titleCSS, ".chapter-title{font-size:33px}")
+        XCTAssertFalse(library.settings.preferences.bubbleFollowsTheme)
+        XCTAssertEqual(library.settings.preferences.customBubbleSVG, ThemeStyleSamples.bubbleSVG[1])
+        XCTAssertNotNil(library.settings.preferences.themeTitleCSS)
+        XCTAssertEqual(library.settings.preferences.bubbleSVG, demo.themeAssets.first { $0.id == theme.bubbleStyleIDs.first }?.content)
+        let saved = await library.flushPendingWrites()
+        XCTAssertTrue(saved)
+
+        let restored = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
+                                    productionPersistence: try ProductionLibraryPersistence(directory: root))
+        await restored.bootstrapProductionIfNeeded()
+        let restoredThemes = FeatureDemoStore(defaults: defaults, seedDemoData: false)
+        restoredThemes.connectReader(restored)
+        XCTAssertEqual(restoredThemes.activeThemeID, "night")
+        XCTAssertEqual(restored.settings.preferences.colors, library.settings.preferences.colors)
+        XCTAssertEqual(ReaderPalette(settings: restored.settings).background, palette.background)
+        XCTAssertEqual(restored.settings.preferences.titleCSS, library.settings.preferences.titleCSS)
+        XCTAssertEqual(restored.settings.preferences.customBubbleSVG, library.settings.preferences.customBubbleSVG)
+    }
+
+    func testNormalizedProductionAppearanceStillSavesAndMarksUserChanges() async throws {
+        let domain = "normalized-appearance-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: domain)!
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { defaults.removePersistentDomain(forName: domain); try? FileManager.default.removeItem(at: root) }
+        let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
+                                   productionPersistence: try ProductionLibraryPersistence(directory: root))
+        await library.bootstrapProductionIfNeeded()
+        var next = library.settings
+        next.fontSize = 99
+        next.preferences.colors = ReaderColors(background: 0x26382E, ink: 0xC5CCB5, accent: 0xD3A16F, name: "夜读深林", dark: true)
+        next.preferences.titleCSS = ".chapter-title{unsupported: value}"
+        library.settings = next
+        XCTAssertEqual(library.settings.fontSize, 30)
+        XCTAssertNil(library.settings.preferences.titleCSS)
+        XCTAssertTrue(defaults.bool(forKey: "reader.user-settings-edited.v1"))
+        let saved = await library.flushPendingWrites()
+        XCTAssertTrue(saved)
+        let restored = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
+                                    productionPersistence: try ProductionLibraryPersistence(directory: root))
+        await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.settings, library.settings)
+    }
+
+    func testFirstProductionThemeIsPersistedWhenNoLibrarySnapshotWasSeeded() async throws {
+        let domain = "first-production-theme-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: domain)!
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { defaults.removePersistentDomain(forName: domain); try? FileManager.default.removeItem(at: root) }
+        let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
+                                   productionPersistence: try ProductionLibraryPersistence(directory: root))
+        await library.bootstrapProductionIfNeeded()
+        XCTAssertNil(library.themeLibrary)
+        let demo = FeatureDemoStore(seedDemoData: false)
+        demo.connectReader(library)
+        demo.applyTheme("night")
+        XCTAssertEqual(library.themeLibrary?.themeID, "night")
+        let saved = await library.flushPendingWrites()
+        XCTAssertTrue(saved)
+        let restored = LibraryStore(books: [], defaults: defaults, seedDemoData: false,
+                                    productionPersistence: try ProductionLibraryPersistence(directory: root))
+        await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.themeLibrary?.themeID, "night")
+        XCTAssertEqual(restored.settings.preferences.colors?.name, "夜读深林")
+    }
+
     func testThemeLibrarySurvivesRelaunchAndApplicationsKeepPersonalOverrides() throws {
         let domain = "reader-themes-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: domain)!

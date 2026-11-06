@@ -57,18 +57,19 @@ enum ThemeReaderBridge {
         if readingLibrary !== library {
             for task in bubbleRenderTasks.values { task.cancel() }
             bubbleRenderTasks = [:]; bubbleRenderKeys = [:]; completedBubbleKeys = [:]; bubbleRenderRevisions = [:]
+            themePersistence = nil
         }
         readingLibrary = library
         if !library.isDemo, library.loadState == .ready {
             restoringSources = true; sources = library.sources; restoringSources = false
             sourcePersistence = { [weak library] in library?.updateSources($0) }
+            themePersistence = { [weak library] in library?.updateThemeLibrary($0) }
         }
         if !library.isDemo, library.loadState == .ready, let snapshot = library.themeLibrary {
             restoringThemeLibrary = true
             themes = snapshot.themes; themeAssets = snapshot.assets
             activeThemeID = snapshot.themeID; activeTitleStyleID = snapshot.titleID; activeBubbleStyleID = snapshot.bubbleID
             restoringThemeLibrary = false
-            themePersistence = { [weak library] in library?.updateThemeLibrary($0) }
         }
         if let colors = library.settings.preferences.colors {
             let matches: (DemoTheme) -> Bool = { $0.name == colors.name && $0.background == colors.background && $0.ink == colors.ink && $0.accent == colors.accent }

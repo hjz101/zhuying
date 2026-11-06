@@ -175,7 +175,9 @@ final class LibraryStore: ObservableObject {
         didSet {
             if productionPersistence != nil {
                 let resolved = ReadingStyleResolver.resolve(settings, previous: oldValue)
-                if resolved != settings { settings = resolved; return }
+                // Assigning this property from its own didSet does not invoke
+                // didSet again. The normalized value still needs to be saved.
+                if resolved != settings { settings = resolved }
             }
             if !suppressPersistence && settings != oldValue { defaults.set(true,forKey:"reader.user-settings-edited.v1") }
             persist()

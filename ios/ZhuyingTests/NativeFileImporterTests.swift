@@ -8,11 +8,16 @@ import UniformTypeIdentifiers
     func testSelectionDeliversAllProviderCopiesExactlyOnce() throws {
         let urls = [URL(fileURLWithPath: "/tmp/竹影导入.txt"), URL(fileURLWithPath: "/tmp/竹影套装.json")]
         var results: [Result<[URL], Error>] = []
-        let coordinator = NativeFileImporter.Coordinator { results.append($0) }
+        var dismissalsRequested = 0
+        let coordinator = NativeFileImporter.Coordinator(dismiss: { dismissalsRequested += 1 }) { results.append($0) }
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: true)
         coordinator.documentPicker(picker, didPickDocumentsAt: urls)
+        XCTAssertTrue(results.isEmpty, "Do not import or present result alerts over Files")
+        coordinator.didDismiss()
+        coordinator.didDismiss()
         coordinator.documentPickerWasCancelled(picker)
         coordinator.documentPicker(picker, didPickDocumentsAt: urls)
+        XCTAssertEqual(dismissalsRequested, 1)
         XCTAssertEqual(results.count, 1)
         XCTAssertEqual(try results.first?.get(), urls)
     }
@@ -22,13 +27,28 @@ import UniformTypeIdentifiers
         var cancellations: [NSError] = []
         let cancelled = NativeFileImporter.Coordinator { if case .failure(let error) = $0 { cancellations.append(error as NSError) } }
         cancelled.documentPickerWasCancelled(picker)
+        cancelled.didDismiss()
         cancelled.documentPicker(picker, didPickDocumentsAt: [])
         XCTAssertEqual(cancellations.count, 1)
         XCTAssertEqual(cancellations.first?.code, NSUserCancelledError)
         var emptyFailed = false
         let empty = NativeFileImporter.Coordinator { if case .failure = $0 { emptyFailed = true } }
         empty.documentPicker(picker, didPickDocumentsAt: [])
+        empty.didDismiss()
         XCTAssertTrue(emptyFailed)
+    }
+
+    func testSystemDismissalBeforeSelectionCallbackStillDeliversExactlyOnce() throws {
+        let url = URL(fileURLWithPath: "/tmp/竹影文件提供商副本.txt")
+        var results: [Result<[URL], Error>] = []
+        let coordinator = NativeFileImporter.Coordinator { results.append($0) }
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: true)
+        coordinator.didDismiss()
+        XCTAssertTrue(results.isEmpty)
+        coordinator.documentPicker(picker, didPickDocumentsAt: [url])
+        coordinator.didDismiss()
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(try results.first?.get(), [url])
     }
 
     func testCoordinatedReadPreservesUnicodeNameAndOriginalBytesAtExactLimit() throws {

@@ -1,14 +1,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum ThemeLibraryTab: String, CaseIterable { case bundles = "主题套装", titles = "章节标题", bubbles = "段评气泡" }
+private enum ThemeLibraryTab: String, CaseIterable { case themes = "主题", bundles = "阅读搭配", titles = "章节标题", bubbles = "段评气泡" }
 private enum ThemeLibraryFilter: String, CaseIterable { case all = "全部", light = "浅色", dark = "深色", favorites = "收藏", imported = "我的导入" }
 
 struct ThemeLibraryView: View {
     @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var store: LibraryStore
-    @State private var tab = ThemeLibraryTab.bundles
+    @State private var tab = ThemeLibraryTab.themes
     @State private var filter = ThemeLibraryFilter.all
     @State private var query = ""
     @State private var managing = false
@@ -35,25 +35,36 @@ struct ThemeLibraryView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            Picker("主题内容", selection: $tab) {
+                ForEach(ThemeLibraryTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }.pickerStyle(.segmented).accessibilityIdentifier("themeLibraryTabs")
+                .padding(.horizontal, 22).padding(.vertical, 10)
+            if tab == .themes {
+                GlobalThemeManagerView { summary in
+                    tab = .bundles; importMessage = summary
+                }
+            } else { readingLibrary }
+        }.appPageStyle().navigationTitle("主题管理").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
+            .onChange(of: tab) { _, _ in filter = .all; selection.removeAll(); managing = false }
+            .onChange(of: filter) { _, _ in selection.removeAll() }
+            .onChange(of: query) { _, _ in selection.removeAll() }
+            .onAppear { if demo.readingLibrary !== store { demo.connectReader(store) } }
+            .alert("导入结果", isPresented: Binding(get: { importMessage != nil }, set: { if !$0 { importMessage = nil } })) {
+                Button("知道了", role: .cancel) { importMessage = nil }
+            } message: { Text(importMessage ?? "") }
+    }
+
+    private var readingLibrary: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                NavigationLink { GlobalThemeManagerView() } label: {
-                    HStack(spacing: 12) {
-                        ThemeIcon(systemName: "paintpalette")
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("全局主题、制作与分享").font(.system(size: 14, weight: .medium))
-                            Text("配色 · 图标 · 背景 · 完整阅读套装").font(.system(size: 11))
-                        }
-                        Spacer(); ThemeIcon(systemName: "chevron.right")
-                    }.padding(15).background(appAppearance.palette.soft, in: .rect(cornerRadius: 14))
-                }.buttonStyle(.plain).accessibilityIdentifier("globalThemeEntry")
                 if store.settings.preferences.colors == nil {
                     let settings = store.settings
                     HStack(spacing: 12) {
                         Circle().fill(settings.theme.background).frame(width: 30, height: 30).overlay(Circle().stroke(appAppearance.palette.line))
                         VStack(alignment: .leading, spacing: 5) {
                             Text("当前纸色 · \(settings.theme.title)").font(.system(size: 13, weight: .medium))
-                            Text("选择下方套装可应用完整主题").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
+                            Text("选择下方搭配可应用阅读配色与样式").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
                         }
                         Spacer()
                     }.padding(14).background(appAppearance.palette.soft, in: .rect(cornerRadius: 12)).accessibilityElement(children: .combine).accessibilityIdentifier("activePaperCard")
@@ -76,14 +87,11 @@ struct ThemeLibraryView: View {
                         Text("当前阅读配色 · \(colors.name)").font(.system(size: 13))
                     }.padding(14).background(appAppearance.palette.soft, in: .rect(cornerRadius: 12)).accessibilityIdentifier("activeGlobalReaderTheme")
                 }
-                Picker("样式资源", selection: $tab) {
-                    ForEach(ThemeLibraryTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }.pickerStyle(.segmented).accessibilityIdentifier("themeLibraryTabs")
                 HStack {
                     Menu {
                         ThemeButton("选择套装文件", systemImage: "doc") { showingFiles = true }
                         ThemeButton("导入示例套装", systemImage: "sparkles") { _ = demo.importDemoThemes(); importMessage = demo.themeImportMessage }
-                    } label: { ThemeLabel("导入套装 / 样式", systemImage: "square.and.arrow.down").font(.system(size: 12)) }.accessibilityIdentifier("themeImport")
+                    } label: { ThemeLabel("导入阅读搭配 / 样式", systemImage: "square.and.arrow.down").font(.system(size: 12)) }.accessibilityIdentifier("themeImport")
                     Spacer()
                     Button(managing ? "完成" : "管理") { managing.toggle(); selection.removeAll() }.font(.system(size: 12)).accessibilityIdentifier("themeManage")
                 }
@@ -136,7 +144,7 @@ struct ThemeLibraryView: View {
                     .font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
                 NavigationLink("导入格式与说明") { ThemeImportHelp() }.font(.system(size: 12))
             }.padding(22)
-        }.appPageStyle().navigationTitle("主题管理").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
+        }
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索名称、风格或所属套装")
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if managing && !selection.isEmpty {
@@ -150,13 +158,6 @@ struct ThemeLibraryView: View {
                     }.padding(16).background(.regularMaterial)
                 }
             }
-            .onChange(of: tab) { _, _ in filter = .all; selection.removeAll() }
-            .onChange(of: filter) { _, _ in selection.removeAll() }
-            .onChange(of: query) { _, _ in selection.removeAll() }
-            .onAppear { if demo.readingLibrary !== store { demo.connectReader(store) } }
-            .alert("导入结果", isPresented: Binding(get: { importMessage != nil }, set: { if !$0 { importMessage = nil } })) {
-                Button("知道了", role: .cancel) { importMessage = nil }
-            } message: { Text(importMessage ?? "") }
             .nativeFileImporter(isPresented: $showingFiles, allowedContentTypes: [.json], allowsMultipleSelection: true) { result in
                 do {
                     let urls = try result.get()

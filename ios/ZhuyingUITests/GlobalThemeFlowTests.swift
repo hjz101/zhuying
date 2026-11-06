@@ -17,8 +17,9 @@ final class GlobalThemeFlowTests: XCTestCase {
     @MainActor private func openThemes(_ app: XCUIApplication) {
         app.tabBars.buttons["我的"].tap()
         let entry = app.buttons["profileThemes"]; reveal(entry, app: app); entry.tap()
-        let global = app.buttons["globalThemeEntry"]; reveal(global, app: app); global.tap()
-        XCTAssertTrue(app.navigationBars["全局主题"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.navigationBars["主题管理"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["globalThemeCreate"].exists)
+        XCTAssertFalse(app.buttons["globalThemeEntry"].exists)
     }
     @MainActor private func apply(_ app: XCUIApplication) {
         let apply = app.buttons["globalThemeApply"]; reveal(apply, app: app); apply.tap()
@@ -29,7 +30,7 @@ final class GlobalThemeFlowTests: XCTestCase {
     }
     @MainActor private func backToManager(_ app: XCUIApplication) {
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.navigationBars["全局主题"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["主题管理"].waitForExistence(timeout: 5))
     }
     @MainActor private func capture(_ app: XCUIApplication, _ name: String) {
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
@@ -66,7 +67,7 @@ final class GlobalThemeFlowTests: XCTestCase {
         if app.buttons["Return"].exists { app.buttons["Return"].tap() }
         app.swipeUp()
         let save = app.buttons["globalThemeEditorSave"]; reveal(save, app: app); save.tap()
-        XCTAssertTrue(app.navigationBars["全局主题"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(app.navigationBars["主题管理"].waitForExistence(timeout: 12), app.debugDescription)
         XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, "我的竹影配色")
         XCTAssertEqual(app.tabBars.buttons.count, 4)
     }
@@ -79,6 +80,26 @@ final class GlobalThemeFlowTests: XCTestCase {
         let save = app.buttons.matching(NSPredicate(format: "label IN %@", ["保存", "Save", "存储"])).firstMatch
         XCTAssertTrue(save.waitForExistence(timeout: 8), app.debugDescription)
         capture(app, "竹影-AI主题制作资料导出")
+    }
+    @MainActor func testUnifiedThemeManagerKeepsReadingAssetsWithoutAnExtraNavigationLevel() {
+        let app = launch(); openThemes(app)
+        let tabs = app.segmentedControls["themeLibraryTabs"]
+        XCTAssertEqual(tabs.buttons.count, 4)
+        XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, "竹影原色")
+        capture(app, "竹影-统一主题管理")
+        tabs.buttons["阅读搭配"].tap()
+        XCTAssertTrue(app.buttons["theme-card-paper"].waitForExistence(timeout: 5))
+        tabs.buttons["章节标题"].tap()
+        XCTAssertTrue(app.buttons["theme-asset-paper:title:line"].waitForExistence(timeout: 5))
+        tabs.buttons["段评气泡"].tap()
+        XCTAssertTrue(app.buttons["theme-asset-night:bubble:main"].waitForExistence(timeout: 5))
+        tabs.buttons["主题"].tap()
+        XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, "竹影原色")
+        XCTAssertTrue(app.buttons["globalThemeExport"].exists)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["profileThemes"].waitForExistence(timeout: 5))
+        XCTAssertFalse(tabs.exists)
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
     }
     @MainActor func testReceivedThemeCanBePreviewedSavedWithoutApplyingThenFullyApplied() {
         let app = launch(); openThemes(app)

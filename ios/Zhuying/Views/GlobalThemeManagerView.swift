@@ -6,6 +6,7 @@ extension UTType {
 }
 
 struct GlobalThemeManagerView: View {
+    var onReadingImport: ((String) -> Void)? = nil
     @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var demo: FeatureDemoStore
@@ -20,7 +21,7 @@ struct GlobalThemeManagerView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                AppPageHeader(title: "全局主题", subtitle: "配色、图标和背景 · 沿用原有页面与操作", icon: "paintpalette")
+                AppPageHeader(title: "主题", subtitle: "配色、图标、背景与阅读外观", icon: "paintpalette")
                 AppSettingsCard("当前外观", icon: "checkmark.circle") {
                     Text(themes.active.manifest.name).accessibilityIdentifier("globalThemeCurrent")
                     HStack {
@@ -57,11 +58,17 @@ struct GlobalThemeManagerView: View {
                 }
                 if let message = themes.message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent) }
             }.padding(22)
-        }.appPageStyle().navigationTitle("全局主题").navigationBarTitleDisplayMode(.inline)
+        }.appPageStyle()
             .onAppear { themes.attach(library) }
-            .nativeFileImporter(isPresented: $showImport, allowedContentTypes: [.zhuyingTheme, .zip], allowsMultipleSelection: false) { result in
+            .nativeFileImporter(isPresented: $showImport, allowedContentTypes: [.zhuyingTheme, .zip, .json], allowsMultipleSelection: false) { result in
                 do {
                     guard let url = try result.get().first else { return }
+                    if url.pathExtension.lowercased() == "json" {
+                        let imported = try demo.importThemeData(ImportedFileReader.read(url, maximumBytes: 3 * 1024 * 1024))
+                        let summary = "新增 \(imported.added) 套主题、\(imported.titlesAdded) 款标题、\(imported.bubblesAdded) 款气泡 · 重复 \(imported.duplicates) 项 · 无效 \(imported.invalid) 项"
+                        if let onReadingImport { onReadingImport(summary) } else { message = summary }
+                        return
+                    }
                     let data = try ImportedFileReader.read(url, maximumBytes: GlobalThemePackage.maximumBytes)
                     let decoded = try GlobalThemePackage.decode(data)
                     pending = decoded
@@ -146,7 +153,7 @@ struct GlobalThemeDetailView: View {
                 selected.readingBehavior = options.readingBehavior
                 try await themes.apply(bundle, options: selected)
                 demo.refreshReaderBubbles()
-                message = "已应用并保存，可在全局主题中恢复。"
+                message = "已应用并保存，可在主题管理中恢复。"
             } catch { message = error.localizedDescription }
         }
     }

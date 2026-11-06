@@ -236,6 +236,7 @@ final class FeatureFlowTests: XCTestCase {
     @MainActor func testThemeLibraryImportPreviewFiltersAndDetails() {
         let app = launch()
         open("themes", title: "主题管理", app: app)
+        app.segmentedControls["themeLibraryTabs"].buttons["阅读搭配"].tap()
         let activePaper = app.descendants(matching: .any)["activePaperCard"].firstMatch
         XCTAssertTrue(activePaper.waitForExistence(timeout: 5))
         XCTAssertTrue(activePaper.label.contains("暖纸"))

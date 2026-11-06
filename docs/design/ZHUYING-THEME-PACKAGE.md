@@ -1,6 +1,6 @@
 # 竹影主题包：可分享、可还原的外观方案
 
-状态：全局主题 v1 已实现。入口为「我的 → 主题管理 → 全局主题、制作与分享」。支持制作配色、图片背景与应用内图标，导入／导出 `.zhuyingtheme`，完整应用、混搭、恢复上次外观，以及导出 AI 制作资料。旧阅读 JSON 导入继续保留。
+状态：全局主题 v1 已实现。入口为「我的 → 主题管理」。支持制作配色、图片背景与应用内图标，导入／导出 `.zhuyingtheme`，完整应用、混搭、恢复上次外观，以及导出 AI 制作资料。旧阅读 JSON 导入继续保留。
 
 机器协议随 App 打包：[能力合同](../../ios/Zhuying/Resources/theme-contract.json)、[theme.json Schema](../../ios/Zhuying/Resources/theme.schema.json)、[manifest.json Schema](../../ios/Zhuying/Resources/manifest.schema.json)。生成工具为 `python3 ios/scripts/generate-theme-contract.py`。制作主题以 App 导出的资料和有效基础模板为准。
 

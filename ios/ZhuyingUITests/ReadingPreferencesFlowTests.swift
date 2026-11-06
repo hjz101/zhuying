@@ -165,6 +165,9 @@ final class ReadingPreferencesFlowTests: XCTestCase {
                 XCTAssertTrue(tabs.waitForExistence(timeout: 5))
                 XCTAssertTrue(tabs.buttons["章节标题"].exists)
                 XCTAssertTrue(tabs.buttons["段评气泡"].exists)
+                XCTAssertTrue(app.buttons["globalThemeImport"].exists)
+                XCTAssertTrue(app.buttons["globalThemeCreate"].exists)
+                tabs.buttons["阅读搭配"].tap()
                 XCTAssertTrue(app.buttons["themeImport"].exists)
             default: XCTFail("Unverified native settings route: \(id)")
             }

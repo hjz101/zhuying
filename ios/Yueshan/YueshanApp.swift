@@ -13,6 +13,7 @@ struct YueshanApp: App {
         #if DEBUG
         _ = NativePerformanceValidation.processStarted
         #endif
+        try? BrowserDownloadFiles.discardAbandoned()
         let environment = AppEnvironment()
         let defaults = environment.defaults()
         let credentialService = environment.isUITesting ? "com.yueshan.shushan.ui-tests" : "com.yueshan.shushan.\(environment.mode.rawValue)"

@@ -3,9 +3,21 @@ import WebKit
 import Combine
 
 struct BrowserImportFile: Identifiable { let id = UUID(); let url: URL }
+enum BrowserDownloadFiles {
+    static var directory: URL { FileManager.default.urls(for:.cachesDirectory,in:.userDomainMask)[0].appendingPathComponent("BrowserDownloads") }
+    /// Call once at App startup, before any new download or preview can exist.
+    static func discardAbandoned(directory: URL = BrowserDownloadFiles.directory) throws {
+        do { try FileManager.default.removeItem(at:directory) }
+        catch let error as NSError where error.domain == NSCocoaErrorDomain && [NSFileNoSuchFileError,NSFileReadNoSuchFileError].contains(error.code) { }
+    }
+}
 enum BrowserInput {
     static func url(_ text: String) throws -> URL {
         guard text.utf8.count <= 8192,let url = URL(string:text.trimmingCharacters(in:.whitespacesAndNewlines)),url.scheme == "https",url.host != nil,url.user == nil,url.password == nil else { throw ContentFailure.invalidResponse }; return url
+    }
+    static func downloadFilename(response: URLResponse,suggested: String) throws -> String {
+        guard let response = response as? HTTPURLResponse,(200...299).contains(response.statusCode),response.expectedContentLength <= BookImporter.maximumBytes else { throw BookImportError.message("下载响应失败或超过20 MB，请检查网页链接。") }
+        return try filename(suggested)
     }
     static func filename(_ name: String) throws -> String {
         let safe = (name as NSString).lastPathComponent
@@ -106,7 +118,7 @@ enum BrowserInput {
     func download(_ download: WKDownload,decideDestinationUsing response: URLResponse,suggestedFilename: String,completionHandler: @escaping (URL?) -> Void) {
         do {
             guard self.download === download,response.expectedContentLength <= BookImporter.maximumBytes else { throw RuleExtractionError.limit }
-            let name = try BrowserInput.filename(suggestedFilename),folder = FileManager.default.urls(for:.cachesDirectory,in:.userDomainMask)[0].appendingPathComponent("BrowserDownloads/" + UUID().uuidString)
+            let name = try BrowserInput.downloadFilename(response:response,suggested:suggestedFilename),folder = BrowserDownloadFiles.directory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true); let file = folder.appendingPathComponent(name); destination = file; completionHandler(file)
         } catch { message = error.localizedDescription; completionHandler(nil); cancelDownload() }
     }

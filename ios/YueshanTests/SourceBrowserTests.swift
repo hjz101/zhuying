@@ -23,6 +23,10 @@ final class SourceBrowserTests: XCTestCase {
         XCTAssertEqual(try BrowserInput.url("https://source.test/books?q=1").host,"source.test")
         for url in ["http://source.test","javascript:alert(1)","file:///etc/passwd","https://user:password@source.test"] { XCTAssertThrowsError(try BrowserInput.url(url)) }
         XCTAssertEqual(try BrowserInput.filename("../../原创书.epub"),"原创书.epub")
+        let url = URL(string:"https://source.test/book.txt")!
+        XCTAssertThrowsError(try BrowserInput.downloadFilename(response:HTTPURLResponse(url:url,statusCode:404,httpVersion:nil,headerFields:nil)!,suggested:"book.txt"))
+        XCTAssertThrowsError(try BrowserInput.downloadFilename(response:HTTPURLResponse(url:url,statusCode:200,httpVersion:nil,headerFields:["Content-Length":"20971521"])!,suggested:"book.txt"))
+        XCTAssertEqual(try BrowserInput.downloadFilename(response:HTTPURLResponse(url:url,statusCode:200,httpVersion:nil,headerFields:nil)!,suggested:"book.txt"),"book.txt")
         for name in ["book.js","C:\\private\\book.pdf","book.pdf\n","book"] { XCTAssertThrowsError(try BrowserInput.filename(name)) }
     }
     @MainActor func testManualNavigationKeepsHistoryContainerAndSourceChangeReleasesIt() {
@@ -35,4 +39,13 @@ final class SourceBrowserTests: XCTestCase {
         browser.configure(sourceID:"B",origin:origin,sessions:sessions,javascript:true); XCTAssertFalse(first === browser.webView)
         browser.close(); XCTAssertNil(browser.webView)
     }
+    func testStartupReclaimsAbandonedBrowserFilesWithoutTouchingImportedOriginals() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); defer { try? FileManager.default.removeItem(at:root) }
+        let downloads = root.appendingPathComponent("BrowserDownloads"),original = root.appendingPathComponent("original.txt")
+        try FileManager.default.createDirectory(at:downloads.appendingPathComponent("interrupted"),withIntermediateDirectories:true)
+        try Data("partial".utf8).write(to:downloads.appendingPathComponent("interrupted/book.txt")); try Data("original".utf8).write(to:original)
+        try BrowserDownloadFiles.discardAbandoned(directory:downloads); try BrowserDownloadFiles.discardAbandoned(directory:downloads)
+        XCTAssertFalse(FileManager.default.fileExists(atPath:downloads.path)); XCTAssertEqual(try String(contentsOf:original,encoding:.utf8),"original")
+    }
+
 }

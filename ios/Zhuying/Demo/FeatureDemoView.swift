@@ -317,8 +317,8 @@ struct FeatureDemoView: View {
         case .browser:
             VStack(alignment: .leading, spacing: 18) {
                 let source = demo.sources.first { $0.id == scope }
-                ThemeLabel(source.map { $0.url + "/login" } ?? (text("url").isEmpty ? "https://books.example/login" : text("url")), systemImage: "lock").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
-                Text(source?.name ?? "山海书库").font(.system(size: 30, design: .serif))
+                ThemeLabel(source.map { $0.url + "/login" } ?? (text("url").isEmpty ? SourceDistributionPolicy.unselectedLoginAddress : text("url")), systemImage: "lock").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
+                Text(source?.name ?? SourceDistributionPolicy.unselectedSourceName).font(.system(size: 30, design: .serif))
                 Text("这是本地网页占位预览，表单和 Cookie 状态由演示数据呈现。").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted)
                 if feature.id != "sourceLogin" {
                     NavigationLink { FeatureDemoView(feature: FeatureCatalog.feature("sourceLogin"), scope: scope) } label: { ThemeLabel("打开登录流程", systemImage: "person.circle") }

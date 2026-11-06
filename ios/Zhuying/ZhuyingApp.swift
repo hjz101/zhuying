@@ -26,7 +26,7 @@ struct ZhuyingApp: App {
         do {
             let books = environment.isDemo ? try Book.load() : []
             let manager = FileManager.default
-            let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+            let testing = environment.isUITesting
             let archive = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent(environment.importsComponent).appendingPathComponent("books.json")
             let databaseDirectory = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -64,6 +64,10 @@ struct ZhuyingApp: App {
             }
             var rejectFirstOpen = testing && ProcessInfo.processInfo.arguments.contains("--storage-retry-fixture")
             #if DEBUG
+            if testing && environment.resetsTestState && ProcessInfo.processInfo.arguments.contains("--native-source-fixtures") {
+                let source = DemoSource(id: "shushan", name: "用户配置测试源", detail: "原创测试配置", url: "https://native.fixture.test")
+                defaults.set(try JSONEncoder().encode([source]), forKey: "zhuying.production.sources.v1")
+            }
             if testing && ProcessInfo.processInfo.arguments.contains("--source-diagnostic-fixtures") {
                 try SourceDiagnosticDevelopmentFixtures.write(to: manager.urls(for: .documentDirectory, in: .userDomainMask)[0])
             }

@@ -1,6 +1,6 @@
 # 竹影 · iOS 阅读器
 
-竹影（Zhuying）使用 SwiftUI 开发，当前版本为 0.8.0（build 14），支持正式阅读与独立 Demo 模式。用 Xcode 打开 `ios/Zhuying.xcodeproj`，选择 `Zhuying` scheme 和 iPhone 模拟器运行；正式模式使用 `Zhuying Production` scheme。IPA 的生成方式见 [IPA 导出说明](docs/release/IPA-EXPORT.md)。
+竹影（Zhuying）使用 SwiftUI 开发，当前版本为 0.8.0（build 15），支持正式阅读与独立 Demo 模式。用 Xcode 打开 `ios/Zhuying.xcodeproj`，选择 `Zhuying` scheme 和 iPhone 模拟器运行；正式模式使用 `Zhuying Production` scheme。IPA 的生成方式见 [IPA 导出说明](docs/release/IPA-EXPORT.md)。
 
 原生版使用与测试方式见 [iOS 说明](ios/README.md)，47 个模块的覆盖与模拟边界见 [功能清单](ios/FEATURES.md)。下方保留的是之前的网页草稿，仅供历史设计参考。
 
@@ -49,3 +49,5 @@ npm test
 ```
 
 测试覆盖检索、题材过滤、书架去重与排序、移除后保留进度、未收藏阅读、章节边界、持久化、存储异常及非法路由。界面验收记录见 `docs/DEMO-QA.md`，产品方向见 `docs/PRD.md`。
+
+build 15 的发行包不再预置书源，首次安装列表为空，保留用户自行导入与已有配置。[本轮改动与验证](docs/release/2026-11-07-build15.md)。

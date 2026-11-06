@@ -33,3 +33,15 @@ python3 ios/scripts/export-ipa.py \
   --material /path/to/private-material \
   --output artifacts/0.8.0/ipa/Zhuying.ipa
 ```
+
+## 无预置书源检查
+
+从 build 15 起，发行包首次书源列表为空，具体书源由用户自行导入。导出后执行：
+
+```sh
+python3 ios/scripts/verify-source-free-package.py \
+  --ipa artifacts/0.8.0/ipa/竹影-0.8.0-build15-unsigned.ipa \
+  --output artifacts/0.8.0/ipa/竹影-0.8.0-build15-unsigned-source-free.json
+```
+
+也可用 `--app` 检查构建后的 App。工具检查发行声明、资源中的具体书源定义，以及可执行文件中的已知预设标记；不会把通用 JSON Schema、解析接口或本地书籍样章当作书源。新库空源、外部导入及删除后重启还需实际 Release 界面验证，不能只凭声明字段判断。

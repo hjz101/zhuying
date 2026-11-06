@@ -9,11 +9,11 @@ struct ShushanLoginView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 23) {
-                AppPageHeader(title: "书源登录", subtitle: "书山聚合", icon: "person.crop.circle")
+                AppPageHeader(title: "书源登录", subtitle: SourceDistributionPolicy.nativeServiceName, icon: "person.crop.circle")
                 AppSettingsCard("登录信息", icon: "person.badge.key") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("服务地址").font(.system(size: 12, weight: .medium))
-                        TextField(ShushanClient.defaultHost, text: $account.hostText)
+                        TextField(SourceDistributionPolicy.serviceAddressPrompt, text: $account.hostText)
                             .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                             .accessibilityIdentifier("shushanHost")
                         Divider()

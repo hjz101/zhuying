@@ -20,14 +20,18 @@ final class SourceDraftFlowTests: XCTestCase {
         newDraft(app); app.navigationBars.buttons.element(boundBy: 0).tap(); XCTAssertEqual(rows.count, 0)
         app.terminate(); app.launchArguments += ["--preserve-ui-test-state"]; app.launch(); sources(app)
         XCTAssertEqual(rows.count, 0); newDraft(app)
-        let editor = app.textViews["sourceRulesJSON"]; editor.tap()
-        editor.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2) + #"{"bookSourceName":"竹影用户原创源","bookSourceUrl":"https://user-draft.fixture"}"#)
+        let editor = app.textViews["sourceRulesJSON"]; editor.tap(); editor.press(forDuration: 1.2)
+        let selectAll = app.descendants(matching: .any).matching(NSPredicate(format: "label IN %@", ["Select All", "全选"])).firstMatch
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), app.debugDescription); selectAll.tap()
+        let fixture = #"{"bookSourceName":"竹影用户原创源","bookSourceUrl":"https://user-draft.fixture"}"#
+        editor.typeText(fixture)
+        XCTAssertEqual(editor.value as? String, fixture, "人工 JSON 夹具实际输入：\(editor.value as? String ?? "<missing>")")
         let save = app.buttons["sourceRulesSave"]
         for _ in 0..<8 { if save.isHittable { break }; app.swipeUp() }
         save.tap()
         let message = app.staticTexts["sourceRulesMessage"]
         XCTAssertTrue(message.waitForExistence(timeout: 10))
-        XCTAssertTrue(message.label.contains("已保存有效配置"), message.label)
+        XCTAssertTrue(message.label.contains("已保存有效配置"), "\(message.label)；人工 JSON 夹具：\(editor.value as? String ?? "<missing>")")
         app.navigationBars.buttons.element(boundBy: 0).tap(); XCTAssertEqual(rows.count, 1)
         app.terminate(); app.launch(); sources(app)
         XCTAssertEqual(rows.count, 1); XCTAssertTrue(rows.firstMatch.label.contains("竹影用户原创源"))

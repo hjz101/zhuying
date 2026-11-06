@@ -27,6 +27,15 @@ import XCTest
         XCTAssertTrue(FeatureDemoStore(defaults: defaults, seedDemoData: false).sources.isEmpty)
         XCTAssertThrowsError(try store.saveSourceJSON(json(), sourceID: id))
     }
+    func testProductionCannotGenerateSuccessfulSourceChecksWithoutExecutingProviders() throws {
+        let store = FeatureDemoStore(defaults: defaults, seedDemoData: false)
+        let library = LibraryStore(books: [], defaults: defaults, seedDemoData: false)
+        store.execute("生成演示报告", feature: FeatureCatalog.feature("sourceBatch"), scope: "main", book: nil, library: library)
+        let outcome = try XCTUnwrap(store.outcomes["sourceBatch:main"])
+        XCTAssertFalse(outcome.success)
+        XCTAssertEqual(outcome.detail, "请先导入书源并运行检测。")
+        XCTAssertTrue(store.sources.isEmpty)
+    }
     func testValidationLeavesDraftUncommittedAndRejectsEmptyInvalidMultipleOrDuplicateSources() throws {
         let store = FeatureDemoStore(defaults: defaults, seedDemoData: false), id = store.createSource()
         var persisted = 0; store.sourcePersistence = { _ in persisted += 1 }

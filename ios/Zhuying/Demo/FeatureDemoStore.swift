@@ -429,7 +429,13 @@ final class FeatureDemoStore: ObservableObject {
         case "创建演示备份": backups.insert("竹影_演示_\(backups.count + 1).qibackup", at: 0); detail = "已生成备份列表占位，不创建真实备份文件。"
         case "模拟恢复所选备份": detail = "恢复流程预览完成，未覆盖本机阅读记录。"
         case "模拟立即同步": detail = "模拟状态：同步完成 · 3 本书的进度已对齐。未连接 iCloud。"
-        case "生成演示报告": detail = "测试完成（模拟）\n成功 2 个 · 失败 1 个 · 超时 1 个\n山海书库：143 ms，四步通过\n云间小说：216 ms，正文通过\n示例失效源：规则未命中\n纸上漫游：请求超时"
+        case "生成演示报告":
+            #if DEBUG
+            if isDemo { detail = "测试完成（模拟）\n成功 2 个 · 失败 1 个 · 超时 1 个\n山海书库：143 ms，四步通过\n云间小说：216 ms，正文通过\n示例失效源：规则未命中\n纸上漫游：请求超时" }
+            else { success = false; detail = "请先导入书源并运行检测。" }
+            #else
+            success = false; detail = "请先导入书源并运行检测。"
+            #endif
         case "运行模拟测试": detail = "\(text(feature, "step", scope: scope))步骤通过（模拟）\n命中 8 条结果 · 耗时 143 ms\n标题：长风渡山海\n正文：雨是在午后停的……"
         case "识别链接", "识别内容", "预览导入":
             let input = text(feature, feature.id == "sourceImport" ? "url" : "input", scope: scope)

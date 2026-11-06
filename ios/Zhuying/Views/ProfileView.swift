@@ -192,7 +192,7 @@ private struct DemoAboutView: View {
                         .foregroundStyle(appAppearance.palette.muted)
                     Text("ZHUYING FOR iOS · DESIGN PREVIEW 0.3").font(.system(size: 9)).foregroundStyle(appAppearance.palette.muted)
                     } else {
-                        Text("原生文字阅读器，支持 TXT／文字 PDF、书山聚合固定接口、书架与稳定位置、本地备份。")
+                        Text(SourceDistributionPolicy.aboutDescription)
                         Text("在线可读性取决于书源；阅读时长来自实际前台会话。需要服务配置的能力及尚未接入的扩展会单独说明。")
                         Text("ZHUYING FOR iOS · DEVELOPMENT CANDIDATE").font(.system(size: 9)).foregroundStyle(appAppearance.palette.muted)
                     }

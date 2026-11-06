@@ -68,7 +68,7 @@ enum ShushanAccountError: Error, LocalizedError, Equatable {
     case invalidHost, emptyFields, rejected, keychain(OSStatus)
     var errorDescription: String? {
         switch self {
-        case .invalidHost: "请输入完整的 HTTPS 书源地址，例如 https://v1.vossc.com。"
+        case .invalidHost: "请输入完整的 HTTPS 书源服务地址。"
         case .emptyFields: "请填写邮箱和密码。"
         case .rejected: "登录未成功，请检查账号、密码或书源服务状态。"
         case .keychain: "无法保存或读取登录状态，请稍后重试。"
@@ -77,7 +77,11 @@ enum ShushanAccountError: Error, LocalizedError, Equatable {
 }
 
 struct ShushanClient: Sendable {
+    #if DEBUG
     static let defaultHost = "https://v1.vossc.com"
+    #else
+    static let defaultHost = ""
+    #endif
     let transport: any HTTPTransport
     init(transport: any HTTPTransport = SourceHTTPTransport()) { self.transport = transport }
 
@@ -187,9 +191,11 @@ final class ShushanAccountStore: ObservableObject {
         let savedID = defaults.string(forKey: "zhuying.shushan.installation-id")
         deviceID = savedID.flatMap { UUID(uuidString: $0) }?.uuidString ?? UUID().uuidString
         defaults.set(deviceID, forKey: "zhuying.shushan.installation-id")
-        hostText = defaults.string(forKey: "zhuying.shushan.host") ?? ShushanClient.defaultHost
-        do { credential = try vault.load(host: ShushanClient.host(hostText)) }
-        catch { message = error.localizedDescription }
+        hostText = defaults.string(forKey: "zhuying.shushan.host") ?? ""
+        if !hostText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            do { credential = try vault.load(host: ShushanClient.host(hostText)) }
+            catch { message = error.localizedDescription }
+        }
     }
 
     var credentialForRequests: ShushanCredential? {

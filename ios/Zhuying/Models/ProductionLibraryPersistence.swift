@@ -251,7 +251,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
 
     private func migrateSources(_ data: Data?) async throws {
         guard try await records.preference(key: Self.sourcesKey) == nil else { return }
-        let sources = try data.map { try JSONDecoder().decode([DemoSource].self, from: $0) } ?? [.init(id: "shushan", name: "书山聚合", detail: "固定原生书源", url: ShushanClient.defaultHost)]
+        let sources = try data.map { try JSONDecoder().decode([DemoSource].self, from: $0) } ?? []
         try Self.validateSources(sources)
         var values = [Self.sourcesKey: try JSONEncoder().encode(sources)]
         if let data { values["migration.sources.original.v1"] = data }

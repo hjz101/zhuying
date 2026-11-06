@@ -15,8 +15,10 @@ private struct LoginFixtureTransport: HTTPTransport {
 private final class MemoryShushanVault: ShushanCredentialStorage, @unchecked Sendable {
     private let lock = NSLock()
     private var credentials: [URL: ShushanCredential] = [:]
+    private var loads = 0
+    var loadCount: Int { lock.lock(); defer { lock.unlock() }; return loads }
     var rejectsSave = false
-    func load(host: URL) throws -> ShushanCredential? { lock.lock(); defer { lock.unlock() }; return credentials[host] }
+    func load(host: URL) throws -> ShushanCredential? { lock.lock(); defer { lock.unlock() }; loads += 1; return credentials[host] }
     func save(_ credential: ShushanCredential) throws {
         lock.lock(); defer { lock.unlock() }
         if rejectsSave { throw ShushanAccountError.keychain(errSecInteractionNotAllowed) }
@@ -46,8 +48,9 @@ private actor SuspendedLoginTransport: HTTPTransport {
 
 @MainActor
 final class ShushanAccountTests: XCTestCase {
+    private let fixtureHost = "https://account-fixture.example.test"
     func testHostValidationRejectsCredentialsPathsAndPlaintext() throws {
-        XCTAssertEqual(try ShushanClient.host(" HTTPS://V1.VOSSC.COM/ ").absoluteString, "https://v1.vossc.com")
+        XCTAssertEqual(try ShushanClient.host(" HTTPS://ACCOUNT-FIXTURE.EXAMPLE.TEST/ ").absoluteString, fixtureHost)
         for input in ["http://example.test", "https://user:pass@example.test", "https://example.test/login", "https://example.test?key=secret", "https://example.test/#token", "invalid"] {
             XCTAssertThrowsError(try ShushanClient.host(input))
         }
@@ -62,7 +65,7 @@ final class ShushanAccountTests: XCTestCase {
             XCTAssertEqual(form.queryItems?.first { $0.name == "password" }?.value, "p+a&= 密码")
             XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
         }
-        let credential = try await ShushanClient(transport: transport).login(host: ShushanClient.host(ShushanClient.defaultHost), email: " reader+test@example.test ", password: "p+a&= 密码")
+        let credential = try await ShushanClient(transport: transport).login(host: ShushanClient.host(fixtureHost), email: " reader+test@example.test ", password: "p+a&= 密码")
         XCTAssertEqual(credential.apiKey, "test-only-key")
         XCTAssertEqual(credential.nickname, "测试用户")
         XCTAssertEqual(String(data: Data(base64Encoded: credential.authenticationHeader)!, encoding: .utf8), "test-only-key")
@@ -70,14 +73,14 @@ final class ShushanAccountTests: XCTestCase {
     func testHTTP200ErrorAndIncompleteResponseNeverCountAsLoginSuccess() async throws {
         for body in ["{\"error\":\"缺少登录凭证\"}", "{\"code\":403,\"data\":{}}", "{\"code\":200,\"data\":{\"user\":{\"api_key\":\"\"}}}"] {
             do {
-                _ = try await ShushanClient(transport: LoginFixtureTransport(body: body)).login(host: ShushanClient.host(ShushanClient.defaultHost), email: "test@example.test", password: "test")
+                _ = try await ShushanClient(transport: LoginFixtureTransport(body: body)).login(host: ShushanClient.host(fixtureHost), email: "test@example.test", password: "test")
                 XCTFail("Must reject business failure")
             } catch { XCTAssertEqual(error as? ShushanAccountError, .rejected) }
         }
     }
     func testKeychainCredentialIsScopedToHostAndCanBeUpdatedAndRemoved() throws {
         let vault = ShushanKeychain(service: "com.zhuying.tests.keychain.\(UUID().uuidString)")
-        let host = try ShushanClient.host(ShushanClient.defaultHost)
+        let host = try ShushanClient.host(fixtureHost)
         defer { try? vault.remove(host: host) }
         let credential = ShushanCredential(host: host, apiKey: "test-key", nickname: "test")
         try vault.save(credential)
@@ -95,6 +98,7 @@ final class ShushanAccountTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: domain) }
         let vault = MemoryShushanVault()
         let account = ShushanAccountStore(defaults: defaults, client: .init(transport: LoginFixtureTransport()), vault: vault)
+        account.hostText = fixtureHost
         await account.login(email: "test@example.test", password: "test")
         XCTAssertNotNil(account.credential)
         XCTAssertFalse(account.busy)
@@ -103,7 +107,7 @@ final class ShushanAccountTests: XCTestCase {
         XCTAssertEqual(restored.credential, account.credential)
         restored.logout()
         XCTAssertNil(restored.credential)
-        XCTAssertNil(try vault.load(host: ShushanClient.host(ShushanClient.defaultHost)))
+        XCTAssertNil(try vault.load(host: ShushanClient.host(fixtureHost)))
         vault.rejectsSave = true
         await restored.login(email: "test@example.test", password: "test")
         XCTAssertNil(restored.credential)
@@ -116,6 +120,7 @@ final class ShushanAccountTests: XCTestCase {
         let transport = SuspendedLoginTransport()
         let vault = MemoryShushanVault()
         let account = ShushanAccountStore(defaults: defaults, client: .init(transport: transport), vault: vault)
+        account.hostText = fixtureHost
         let task = Task { await account.login(email: "test@example.test", password: "test") }
         while !(await transport.started) { await Task.yield() }
         account.logout()
@@ -123,7 +128,7 @@ final class ShushanAccountTests: XCTestCase {
         await task.value
         XCTAssertNil(account.credential)
         XCTAssertFalse(account.busy)
-        XCTAssertNil(try vault.load(host: ShushanClient.host(ShushanClient.defaultHost)))
+        XCTAssertNil(try vault.load(host: ShushanClient.host(fixtureHost)))
     }
     func testLegacyCredentialRestoresWithStableInstallationIdentityAndLoginUsesSameHeader() async throws {
         let domain = "com.zhuying.shushan.identity.\(UUID().uuidString)"
@@ -133,6 +138,7 @@ final class ShushanAccountTests: XCTestCase {
         let credential = try JSONDecoder().decode(ShushanCredential.self, from: old)
         XCTAssertNil(credential.deviceID)
         let vault = MemoryShushanVault(); try vault.save(credential)
+        defaults.set(credential.host.absoluteString,forKey:"zhuying.shushan.host")
         let account = ShushanAccountStore(defaults: defaults, vault: vault)
         let restored = ShushanAccountStore(defaults: defaults, vault: vault)
         XCTAssertEqual(account.deviceID, restored.deviceID)
@@ -146,5 +152,33 @@ final class ShushanAccountTests: XCTestCase {
         let result = try await client.login(host: credential.host, email: "test@example.test", password: "fixture", deviceID: expectedID)
         XCTAssertEqual(result.deviceID, expectedID)
         XCTAssertFalse(defaults.dictionaryRepresentation().values.contains { String(describing: $0).contains("fixture-key") })
+    }
+
+    func testMissingOrBlankSavedHostDoesNotProbeVaultOrProduceAnAccountError() throws {
+        let domain = "com.zhuying.account.empty.\(UUID().uuidString)", defaults = UserDefaults(suiteName:domain)!
+        defer { defaults.removePersistentDomain(forName:domain) }
+        let vault = MemoryShushanVault()
+        try vault.save(.init(host:ShushanClient.host(fixtureHost),apiKey:"synthetic",nickname:"fixture"))
+        let account = ShushanAccountStore(defaults:defaults,vault:vault)
+        XCTAssertEqual(account.hostText,""); XCTAssertNil(account.credential); XCTAssertNil(account.message)
+        XCTAssertEqual(vault.loadCount,0)
+        XCTAssertNil(defaults.string(forKey:"zhuying.shushan.host"))
+        defaults.set(" \n",forKey:"zhuying.shushan.host")
+        let blank = ShushanAccountStore(defaults:defaults,vault:vault)
+        XCTAssertNil(blank.credential); XCTAssertNil(blank.message); XCTAssertEqual(vault.loadCount,0)
+    }
+
+    func testSavedHostRestoresOnlyItsMatchingCredentialWithoutInstallingADefault() throws {
+        let domain = "com.zhuying.account.saved.\(UUID().uuidString)", defaults = UserDefaults(suiteName:domain)!
+        defer { defaults.removePersistentDomain(forName:domain) }
+        let host = try ShushanClient.host(fixtureHost), credential = ShushanCredential(host:host,apiKey:"synthetic-saved",nickname:"fixture")
+        let vault = MemoryShushanVault(); try vault.save(credential)
+        defaults.set(host.absoluteString,forKey:"zhuying.shushan.host")
+        let account = ShushanAccountStore(defaults:defaults,vault:vault)
+        XCTAssertEqual(account.hostText,host.absoluteString)
+        XCTAssertEqual(account.credential,credential); XCTAssertNil(account.message); XCTAssertEqual(vault.loadCount,1)
+        #if !DEBUG
+        XCTAssertEqual(ShushanClient.defaultHost,"")
+        #endif
     }
 }

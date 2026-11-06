@@ -24,6 +24,7 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         let backend = try ProductionLibraryPersistence(directory: root)
         let loaded = try await backend.bootstrap(legacySnapshot: nil, archiveURL: nil)
         XCTAssertTrue(loaded.books.isEmpty)
+        XCTAssertTrue(loaded.sources.isEmpty)
         XCTAssertTrue(loaded.snapshot.favorites.isEmpty)
         XCTAssertTrue(loaded.snapshot.progress.isEmpty)
         let records = try SQLiteLibraryRepository(url: root.appendingPathComponent("library.sqlite"))
@@ -32,6 +33,40 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         let reopened = try ProductionLibraryPersistence(directory: root)
         let second = try await reopened.bootstrap(legacySnapshot: Data("invalid old file".utf8), archiveURL: nil)
         XCTAssertTrue(second.books.isEmpty, "A completed migration must not reread stale legacy data")
+        XCTAssertTrue(second.sources.isEmpty, "Reopening a fresh library must not seed a source")
+        let storedSources = try await records.preference(key: ProductionLibraryPersistence.sourcesKey)
+        XCTAssertEqual(try JSONDecoder().decode([DemoSource].self, from: XCTUnwrap(storedSources)), [])
+    }
+
+    func testSourceMigrationPreservesUserConfigurationsIncludingLegacyNativeAdapterIdentity() async throws {
+        let root = try directory()
+        let rules = NativeSourceRules(search:"lookup?q={query}&page={page}",details:"book/{bookID}",catalog:"toc/{bookID}",content:"text/{chapterID}")
+        let configuration = try JSONSerialization.data(withJSONObject:["adapter":"json-v1","endpoints":JSONSerialization.jsonObject(with:JSONEncoder().encode(rules))])
+        let saved = [DemoSource(id:"shushan",name:"用户保存的来源",group:"原分组",enabled:false,detail:"用户配置",url:"https://native-user.example.test",pinned:true),
+                     DemoSource(id:"imported-json",name:"用户导入",group:"自定义",detail:"原生规则",url:"https://custom-user.example.test",configuration:configuration)]
+        let original = try JSONEncoder().encode(saved)
+        let backend = try ProductionLibraryPersistence(directory:root)
+        let migrated = try await backend.bootstrap(legacySnapshot:nil,archiveURL:nil,legacySources:original)
+        XCTAssertEqual(migrated.sources,saved)
+        let records = try SQLiteLibraryRepository(url:root.appendingPathComponent("library.sqlite"))
+        let legacyBytes = try await records.preference(key:"migration.sources.original.v1")
+        XCTAssertEqual(legacyBytes,original)
+        let reopened = try ProductionLibraryPersistence(directory:root)
+        let restored = try await reopened.bootstrap(legacySnapshot:nil,archiveURL:nil,legacySources:Data("[]".utf8))
+        XCTAssertEqual(restored.sources,saved,"A stale empty migration input must not erase existing user sources")
+    }
+
+    func testExplicitEmptySourcesRemainEmptyWhenStaleLegacyConfigurationReappears() async throws {
+        let root = try directory(), backend = try ProductionLibraryPersistence(directory:root)
+        let initial = try await backend.bootstrap(legacySnapshot:nil,archiveURL:nil,legacySources:Data("[]".utf8))
+        XCTAssertTrue(initial.sources.isEmpty)
+        let stale = [DemoSource(id:"shushan",name:"用户旧配置",detail:"旧迁移数据",url:"https://legacy-user.example.test")]
+        let reopened = try ProductionLibraryPersistence(directory:root)
+        let restored = try await reopened.bootstrap(legacySnapshot:nil,archiveURL:nil,legacySources:JSONEncoder().encode(stale))
+        XCTAssertTrue(restored.sources.isEmpty)
+        let records = try SQLiteLibraryRepository(url:root.appendingPathComponent("library.sqlite"))
+        let original = try await records.preference(key:"migration.sources.original.v1")
+        XCTAssertEqual(original,Data("[]".utf8))
     }
 
     func testLegacyMigrationPreservesBooksOrderUnicodeLocationPreferencesAndOriginalBytes() async throws {

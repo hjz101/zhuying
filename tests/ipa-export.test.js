@@ -7,6 +7,10 @@ test('IPA export validates profile scope, expiry, certificate binding and actual
 import importlib.util,datetime as d,tempfile,pathlib,plistlib,zipfile
 s=importlib.util.spec_from_file_location('ipa','ios/scripts/export-ipa.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 now=d.datetime(2026,11,6,tzinfo=d.timezone.utc)
+assert m.issuer_download_url('http://certs.apple.com/wwdrg3.der')=='https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer'
+try:m.issuer_download_url('https://other.invalid/issuer')
+except ValueError:pass
+else:raise AssertionError('Unknown issuer host accepted')
 p={'CreationDate':now-d.timedelta(days=1),'ExpirationDate':now+d.timedelta(days=30),'ApplicationIdentifierPrefix':['TESTTEAM'],'TeamIdentifier':['TESTTEAM'],'ProvisionedDevices':['synthetic-device'],'DeveloperCertificates':[b'original-cert'],'Entitlements':{'application-identifier':'TESTTEAM.app.original.test','keychain-access-groups':['TESTTEAM.*'],'get-task-allow':False}}
 assert m.choose_identifier('com.reader.original',p)=='app.original.test'
 e=m.entitlements(p,'app.original.test',b'original-cert',now);assert e['application-identifier']=='TESTTEAM.app.original.test' and e['get-task-allow'] is False

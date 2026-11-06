@@ -99,6 +99,15 @@ def mac_compatible_p12(material, work, openssl, temporary_password):
         os.close(read_fd)
         if write_fd is not None:os.close(write_fd)
 
+def issuer_download_url(aia):
+    url = urllib.parse.urlsplit(aia)
+    if url.hostname != 'certs.apple.com' or url.username or url.password:
+        raise ValueError('Unexpected certificate issuer URL')
+    generation = re.fullmatch(r'/wwdrg([2-6])[.]der',url.path,re.I)
+    if generation:
+        return 'https://www.apple.com/certificateauthority/AppleWWDRCAG'+generation.group(1)+'.cer'
+    return urllib.parse.urlunsplit(('https',url.netloc,url.path,url.query,''))
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -160,10 +169,7 @@ def main():
             detail = invoke([openssl,'x509','-noout','-text'],data=pem,label='Certificate issuer metadata').decode()
             match = re.search(r'CA Issuers - URI:(https?://[^\s]+)',detail)
             if match and fingerprint not in trusted:
-                url = urllib.parse.urlsplit(match.group(1))
-                if url.hostname != 'certs.apple.com' or url.username or url.password:
-                    raise ValueError('Unexpected certificate issuer URL')
-                url = urllib.parse.urlunsplit(('https',url.netloc,url.path,url.query,''))
+                url = issuer_download_url(match.group(1))
                 with urllib.request.urlopen(url,timeout=20) as response:
                     issuer = response.read(128 * 1024 + 1)
                 if len(issuer) > 128 * 1024:

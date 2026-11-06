@@ -41,6 +41,38 @@ VM. Host callbacks are never retained after an evaluation returns. Serialized
 VMs may move between background threads; stack top and actual available stack
 are refreshed before execution and cleanup.
 
+All Swift QuickJS entry points share `QuickJSScriptMemoryBudget.shared`, whose
+default ceiling is 96 MiB. This reserves each VM's configured heap ceiling
+(normally 16 MiB, hence at most six default VMs), including active and idle
+sessions. It does not measure process RSS, actual JS heap use or native host
+buffers. `snapshot` reports current/peak reservations, active sessions, waiters
+and completed/scheduled evictions for diagnostics.
+
+Owners wrap the entire serialized source operation in
+`session.withLease(memoryLimitBytes:timeoutSeconds:cancelled:) { ... }`, before
+running its first rule and until its last rule or browser interaction returns.
+This pins library globals across gaps between evaluations. `evaluate` also
+obtains a short lease automatically; a nested evaluation reuses the outer
+reservation. A nested rule may use a smaller heap but cannot expand its pinned
+operation's reservation. Explicit scope preparation/reset belongs before the
+outer lease, since reset cancels the active lease.
+
+When the ceiling is occupied, background callers first evict the least recently
+used idle VM, or wait for active operations to release their leases. Waiting
+observes Swift-task cancellation, the supplied cancellation check, session
+reset and its own deadline (`memoryBudgetTimedOut`). Main-thread lease/evaluate
+calls are rejected. Retiring VMs keep their reservation until C destruction
+finishes, preventing overlapping heap ceilings during reclamation.
+
+Darwin memory-pressure events and UIKit memory warnings reclaim idle VMs on a
+background queue. Active leases, including browser waits, survive; if pressure
+remains high they are reclaimed after the operation ends. Reset and releasing
+the last Swift owner on the main thread also defer idle VM destruction to that
+queue. A later evaluation reloads its library from the source and its persistent
+host state; JS globals that were never written to host storage are intentionally
+lost after idle eviction. Hosts retain responsibility for their own storage and
+network limits.
+
 The bridge preserves synchronous script completion values. Known `java.*`,
 `cookie.*`, `cache.*` and the supported
 `source`/`book`/`chapter` object methods call a supplied synchronous host. HTTP

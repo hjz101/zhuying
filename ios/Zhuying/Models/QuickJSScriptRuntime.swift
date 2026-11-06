@@ -29,6 +29,7 @@ enum QuickJSScriptError: LocalizedError, Equatable {
     case timedOut
     case bridgeLimit
     case busy
+    case memoryBudgetTimedOut
 
     var errorDescription: String? {
         switch self {
@@ -39,6 +40,7 @@ enum QuickJSScriptError: LocalizedError, Equatable {
         case .timedOut: "Legado 脚本执行超时，已停止执行。"
         case .bridgeLimit: "Legado 脚本的宿主调用次数或数据量超过额度。"
         case .busy: "Legado 脚本会话正在执行，不能并发或重入同一个运行环境。"
+        case .memoryBudgetTimedOut: "等待 Legado 脚本内存额度超时，请稍后重试。"
         }
     }
 }
@@ -53,7 +55,7 @@ enum QuickJSScriptRuntime {
     static func evaluate(_ script: String, bindings: [String: Any], library: String = "",
                          policy: LegadoScriptPolicy = .init(),
                          host: (String, [Any]) throws -> Any) throws -> Any {
-        try evaluateInSession(nil, script: script, bindings: bindings, library: library, policy: policy, host: host)
+        try QuickJSScriptSession().evaluate(script, bindings: bindings, library: library, policy: policy, host: host)
     }
 
     fileprivate static func evaluateInSession(_ session: OpaquePointer?, script: String, bindings: [String: Any], library: String,
@@ -161,17 +163,74 @@ enum QuickJSScriptRuntime {
 /// scope. Bindings, host closures, cancellation and quotas are refreshed for
 /// every call. The VM can move threads only between serialized evaluations.
 final class QuickJSScriptSession: @unchecked Sendable {
+    let memoryBudgetID = UUID()
+    private let budget: QuickJSScriptMemoryBudget
+    private let leaseGate = NSRecursiveLock()
     private let execution = NSLock()
     private let lifecycle = NSLock()
     private var generation = 0
     private var loadedGeneration = 0
     private var active: LegadoScriptCancellation?
+    private struct LeaseScope {
+        let id: UUID
+        let token: LegadoScriptCancellation
+        let cancelled: () -> Bool
+    }
+    private var scopes: [LeaseScope] = [] // Only the lease-owning thread reads this.
+    private var leaseCancellations: [UUID: LegadoScriptCancellation] = [:]
     private var pointer: OpaquePointer?
 
-    deinit { discard() }
+    init(budget: QuickJSScriptMemoryBudget = .shared) { self.budget = budget }
+
+    deinit {
+        guard pointer != nil else { return }
+        let retired = DetachedRuntime(pointer)
+        budget.ownerDeinitialized(memoryBudgetID) { retired.destroy() }
+    }
+
+    /// Pin the shared library for the entire source operation, including gaps
+    /// between rules and browser waits. Only background threads may wait for a
+    /// budget; same-thread nested leases reuse the operation's reservation.
+    func withLease<Value>(memoryLimitBytes: Int = 16 * 1024 * 1024, timeoutSeconds: TimeInterval = 30,
+                          cancelled: @escaping () -> Bool = { false }, _ body: () throws -> Value) throws -> Value {
+        guard !Thread.isMainThread else { throw QuickJSScriptError.mainThread }
+        guard leaseGate.try() else { throw QuickJSScriptError.busy }
+        defer { leaseGate.unlock() }
+        let scope = LeaseScope(id: UUID(), token: LegadoScriptCancellation(), cancelled: cancelled)
+        lifecycle.lock(); leaseCancellations[scope.id] = scope.token; lifecycle.unlock()
+        scopes.append(scope)
+        defer {
+            scopes.removeLast()
+            lifecycle.lock(); leaseCancellations[scope.id] = nil; lifecycle.unlock()
+        }
+        let checks = scopes.map { value in { value.token.isCancelled || value.cancelled() } }
+        let reservation = try budget.acquire(session: self, bytes: memoryLimitBytes, timeoutSeconds: timeoutSeconds,
+                                             cancelled: { checks.contains { $0() } })
+        defer {
+            if scopes.count == 1 {
+                lifecycle.lock(); let revision = generation; lifecycle.unlock()
+                if revision != loadedGeneration { discard() }
+            }
+            budget.release(reservation, retainsRuntime: pointer != nil)
+        }
+        do { return try body() }
+        catch {
+            // An outer operation can fail outside an individual JS eval. Its
+            // library must not carry partial operation state into the next one.
+            if scopes.count == 1 { discard() }
+            throw error
+        }
+    }
 
     func evaluate(_ script: String, bindings: [String: Any], library: String = "",
                   policy: LegadoScriptPolicy = .init(), host: (String, [Any]) throws -> Any) throws -> Any {
+        try withLease(memoryLimitBytes: policy.memoryLimitBytes, timeoutSeconds: policy.timeoutSeconds, cancelled: policy.cancelled) {
+            try evaluateLeased(script, bindings: bindings, library: library, policy: policy, host: host)
+        }
+    }
+
+    private func evaluateLeased(_ script: String, bindings: [String: Any], library: String,
+                                policy: LegadoScriptPolicy, host: (String, [Any]) throws -> Any) throws -> Any {
         guard !Thread.isMainThread else { throw QuickJSScriptError.mainThread }
         guard execution.try() else { throw QuickJSScriptError.busy }
         defer { execution.unlock() }
@@ -179,8 +238,9 @@ final class QuickJSScriptSession: @unchecked Sendable {
         lifecycle.lock(); active = cancellation; let revision = generation; lifecycle.unlock()
         defer { lifecycle.lock(); active = nil; lifecycle.unlock() }
         if revision != loadedGeneration { discard(); loadedGeneration = revision }
+        let checks = scopes.map { value in { value.token.isCancelled || value.cancelled() } }
         var scopedPolicy = policy
-        scopedPolicy.cancelled = { cancellation.isCancelled || policy.cancelled() }
+        scopedPolicy.cancelled = { cancellation.isCancelled || policy.cancelled() || checks.contains { $0() } }
         do {
             if pointer == nil { pointer = ZYQuickJSCreateSession() }
             guard let pointer else { throw QuickJSScriptError.memoryLimit }
@@ -195,12 +255,22 @@ final class QuickJSScriptSession: @unchecked Sendable {
     /// Reset never waits for a script/network callback on the caller's thread.
     /// An active call is cancelled; its VM is discarded after it unwinds.
     func reset() {
-        lifecycle.lock(); generation &+= 1; active?.cancel(); lifecycle.unlock()
-        if execution.try() { discard(); execution.unlock() }
+        lifecycle.lock(); generation &+= 1; active?.cancel()
+        leaseCancellations.values.forEach { $0.cancel() }; lifecycle.unlock()
+        budget.resetIdleSession(memoryBudgetID)
     }
+
+    /// Budget retirement excludes all leases before calling this on a worker.
+    func reclaimMemoryForBudget() { precondition(!Thread.isMainThread); discard() }
 
     private func discard() {
         if let pointer { ZYQuickJSDestroySession(pointer) }
         pointer = nil
+    }
+
+    private final class DetachedRuntime: @unchecked Sendable {
+        let pointer: OpaquePointer?
+        init(_ pointer: OpaquePointer?) { self.pointer = pointer }
+        func destroy() { precondition(!Thread.isMainThread); if let pointer { ZYQuickJSDestroySession(pointer) } }
     }
 }

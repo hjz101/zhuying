@@ -213,7 +213,12 @@ final class QuickJSScriptSession: @unchecked Sendable {
             }
             budget.release(reservation, retainsRuntime: pointer != nil)
         }
-        do { return try body() }
+        do {
+            let value = try body()
+            try Task.checkCancellation()
+            if checks.contains(where: { $0() }) { throw CancellationError() }
+            return value
+        }
         catch {
             // An outer operation can fail outside an individual JS eval. Its
             // library must not carry partial operation state into the next one.
@@ -262,6 +267,13 @@ final class QuickJSScriptSession: @unchecked Sendable {
 
     /// Budget retirement excludes all leases before calling this on a worker.
     func reclaimMemoryForBudget() { precondition(!Thread.isMainThread); discard() }
+
+    /// Checked under the budget lock when the final pin is released. Reset
+    /// unlocks lifecycle before taking that lock, so a reset racing with the
+    /// end of an operation either retires here or sees an idle reservation.
+    func needsBudgetReclamation() -> Bool {
+        lifecycle.lock(); defer { lifecycle.unlock() }; return generation != loadedGeneration
+    }
 
     private func discard() {
         if let pointer { ZYQuickJSDestroySession(pointer) }

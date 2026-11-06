@@ -145,7 +145,7 @@ final class QuickJSScriptMemoryBudget: @unchecked Sendable {
         if reservation.leases == 0 {
             clock &+= 1; reservation.lastUse = clock
             if !retainsRuntime { remove(reservation) }
-            else if pressureIsHigh { victim = beginRetirement(reservation) }
+            else if pressureIsHigh || reservation.session?.needsBudgetReclamation() == true { victim = beginRetirement(reservation) }
         }
         condition.broadcast(); condition.unlock()
         if let victim { schedule(victim) }

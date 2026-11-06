@@ -189,6 +189,28 @@ final class QuickJSScriptMemoryBudgetTests: XCTestCase {
         XCTAssertEqual(rebuilt, 1)
     }
 
+    func testResetBetweenRulesCancelsTheOperationLeaseAndReclaimsItsReservation() async throws {
+        let budget = QuickJSScriptMemoryBudget(limitBytes: heap), session = QuickJSScriptSession(budget: budget)
+        let entered = expectation(description: "rule completed"), gate = DispatchSemaphore(value: 0)
+        let library = library, policy = policy(), heap = heap
+        defer { gate.signal() }
+        let operation = Task.detached {
+            try session.withLease(memoryLimitBytes: heap) {
+                _ = try session.evaluate("next()", bindings: [:], library: library, policy: policy) { _,_ in NSNull() }
+                entered.fulfill()
+                guard gate.wait(timeout: .now() + 3) == .success else { throw QuickJSScriptError.timedOut }
+                return 42
+            }
+        }
+        defer { operation.cancel() }
+        await fulfillment(of: [entered], timeout: 2)
+        session.reset(); gate.signal()
+        do { _ = try await operation.value; XCTFail("Reset must also invalidate the gap between JS rules") } catch is CancellationError {}
+        try await waitFor { budget.snapshot.reservedBytes == 0 }
+        let rebuilt = try await evaluate(session)
+        XCTAssertEqual(rebuilt, 1)
+    }
+
     @MainActor func testReleasingTheLastOwnerOnMainThreadDefersCDestructionAndReleasesReservation() async throws {
         let budget = QuickJSScriptMemoryBudget(limitBytes: heap)
         var session: QuickJSScriptSession? = QuickJSScriptSession(budget: budget)

@@ -152,6 +152,21 @@ final class SourceDiagnosticsTests: XCTestCase {
             catch { XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .incompleteAcceptance) }
         }
     }
+    func testCurrentContextRequiresTheSameSourceAccountProfileRulesAndSessionEpoch() throws {
+        try SourceAcceptanceRunner.requireCurrentContext(scope, scope)
+        let source = SourceDiagnosticScope(sourceID: "another-source", accountID: scope.accountID, libraryProfile: scope.libraryProfile,
+                                           configurationHash: scope.configurationHash, sessionEpoch: scope.sessionEpoch)
+        var account = scope; account.accountID = "another-account"
+        var profile = scope; profile.libraryProfile = "another-profile"
+        var rules = scope; rules.configurationHash = StableContentID.make("changed-during-verification")
+        var session = scope; session.sessionEpoch += 1
+        for changed in [source,account,profile,rules,session] {
+            do {
+                try SourceAcceptanceRunner.requireCurrentContext(scope, changed)
+                XCTFail("A completed run cannot establish acceptance for a changed context")
+            } catch { XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .incompleteAcceptance) }
+        }
+    }
     func testCheckpointIsAccountAndProfileScopedAndFailedWriteKeepsOriginal() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

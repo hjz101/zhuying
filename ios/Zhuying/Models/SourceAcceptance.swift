@@ -134,6 +134,12 @@ actor SourceAcceptanceStore {
 
 enum SourceAcceptanceRunner {
     static let engineVersion = "zhuying-source-acceptance-3.2"
+    static func requireCurrentContext(_ initial: SourceDiagnosticScope, _ current: SourceDiagnosticScope) throws {
+        guard initial.id == current.id, initial.configurationHash == current.configurationHash,
+              initial.sessionEpoch == current.sessionEpoch else {
+            throw SourceDiagnosticFailure(issue: .init(code: .incompleteAcceptance))
+        }
+    }
     /// Compare actual prose independently of provider-controlled version IDs.
     /// Formatting-only whitespace or canonical Unicode differences must not
     /// turn one repeated chapter into several pieces of acceptance evidence.

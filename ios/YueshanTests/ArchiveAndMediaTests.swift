@@ -34,6 +34,13 @@ final class ArchiveAndMediaTests: XCTestCase {
         XCTAssertEqual(members.count,1); XCTAssertEqual(members.first?.path,"test.bin"); XCTAssertEqual(members.first?.data.count,1200)
         XCTAssertThrowsError(try BoundedArchive.read(fixture("upstream-encrypted.rar")))
     }
+    func testRAR4AndRAR5VolumesAreRejectedBeforeDecompression() throws {
+        var rar4 = try fixture("original-stored.rar"); rar4[10] |= 1
+        do { _ = try BoundedArchive.read(rar4); XCTFail("Split RAR4") } catch { XCTAssertTrue(error.localizedDescription.contains("分卷")) }
+        // Original minimal RAR5 main header: size=3, type=main, flags=0, archive volume=1.
+        let rar5 = Data([0x52,0x61,0x72,0x21,0x1a,0x07,0x01,0,0,0,0,0,3,1,0,1])
+        do { _ = try BoundedArchive.read(rar5); XCTFail("Split RAR5") } catch { XCTAssertTrue(error.localizedDescription.contains("分卷")) }
+    }
     @MainActor func testOriginalPDFAndComicResourcesSurviveDatabaseBackupAndRestore() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); defer { try? FileManager.default.removeItem(at:root) }
         let renderer = UIGraphicsPDFRenderer(bounds:CGRect(x:0,y:0,width:320,height:480))

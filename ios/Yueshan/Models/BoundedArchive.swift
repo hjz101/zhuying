@@ -19,7 +19,7 @@ enum BoundedArchive {
         throw BookImportError.message("未识别为 ZIP、RAR 或 7z，请检查文件是否完整。")
     }
     static func read(_ data: Data) throws -> [ArchiveMember] {
-        try BookImporter.validateSize(data.count); let format = try identify(data)
+        try BookImporter.validateSize(data.count); let format = try identify(data); try rejectSplitRAR(data,format:format)
         // libarchive consults the POSIX thread locale when converting names.
         // iOS starts with "C" even for Chinese UI; keep this synchronous read
         // in a temporary UTF-8 locale without changing the process locale.
@@ -65,6 +65,35 @@ enum BoundedArchive {
             }
             guard !members.isEmpty,archive_read_has_encrypted_entries(archive) <= 0 else { throw invalid() }
             return members.sorted { $0.path.compare($1.path,options:[.numeric,.caseInsensitive],locale:Locale(identifier:"en_US_POSIX")) == .orderedAscending }
+        }
+    }
+    private static func rejectSplitRAR(_ data: Data,format: Format) throws {
+        guard format == .rar else { return }
+        let bytes = [UInt8](data)
+        func split() -> BookImportError { .message("当前不支持分卷归档，请提供完整的单卷文件，原包未改动。") }
+        if data.starts(with:[0x52,0x61,0x72,0x21,0x1a,0x07,0x00]) {
+            guard bytes.count >= 14,bytes[9] == 0x73 else { throw invalid() }
+            if bytes[10] & 1 != 0 { throw split() }
+        } else {
+            var offset = 12
+            func number() throws -> UInt64 {
+                var value: UInt64 = 0
+                for index in 0..<10 {
+                    guard offset < bytes.count else { throw invalid() }; let byte = bytes[offset]; offset += 1
+                    guard index < 9 || byte <= 1 else { throw invalid() }
+                    value |= UInt64(byte & 127) << (index * 7)
+                    if byte & 128 == 0 { return value }
+                }
+                throw invalid()
+            }
+            let size = try number(),start = offset
+            guard size <= 1024 * 1024,size <= UInt64(bytes.count - start),try number() == 1 else { throw invalid() }
+            let headerFlags = try number()
+            if headerFlags & 1 != 0 { _ = try number() }
+            if headerFlags & 2 != 0 { _ = try number() }
+            let archiveFlags = try number()
+            guard offset <= start + Int(size) else { throw invalid() }
+            if archiveFlags & 1 != 0 { throw split() }
         }
     }
     private static func invalid() -> BookImportError { .message("归档损坏、格式变体不受支持或包含不安全路径，原包未改动。") }

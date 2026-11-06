@@ -132,6 +132,10 @@ enum SourcePackages {
 protocol DiscoveryBookSource: BookSource {
     var supportsDiscovery: Bool { get }
     func discover(category: String,page: Int) async throws -> BookSearchPage
+    func discoveryCategories() async throws -> [SourceDiscoveryCategory]
+}
+extension DiscoveryBookSource {
+    func discoveryCategories() async throws -> [SourceDiscoveryCategory] { [.init(title: "全部", request: "全部")] }
 }
 struct ConfigurableBookSource: DiscoveryBookSource {
     struct RemoteBook: Codable { let id: String; let title: String; let author: String; var summary: String?; var coverURL: String? }
@@ -144,6 +148,9 @@ struct ConfigurableBookSource: DiscoveryBookSource {
     let rules: NativeSourceRules
     let transport: any HTTPTransport
     var supportsDiscovery: Bool { rules.discover != nil }
+    func discoveryCategories() async throws -> [SourceDiscoveryCategory] {
+        (rules.categories?.isEmpty == false ? rules.categories! : ["全部"]).map { .init(title: $0, request: $0) }
+    }
     init(source: DemoSource, transport: any HTTPTransport = SourceHTTPTransport()) throws {
         sourceID = source.id; host = try ShushanClient.host(source.url); name = source.name
         rules = try SourcePackages.rules(source); self.transport = transport
@@ -258,6 +265,7 @@ actor MultiSourceSearch {
         // page is exhausted according to its adapter cursor.
         let books = sources.flatMap { results[$0.sourceID]?.books ?? [] }
         if results.isEmpty && !requests.isEmpty { throw ContentFailure.unavailable }
-        return .init(books: books, nextPage: cursors.isEmpty ? nil : page + 1, hasPartialFailures: reports.contains { $0.status != "成功" }, sourceReports: reports)
+        let messages = sources.compactMap { results[$0.sourceID]?.feedback }.filter { !$0.isEmpty }
+        return .init(books: books, nextPage: cursors.isEmpty ? nil : page + 1, hasPartialFailures: reports.contains { $0.status != "成功" }, sourceReports: reports, feedback: messages.isEmpty ? nil : messages.joined(separator: "\n"))
     }
 }

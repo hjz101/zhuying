@@ -141,7 +141,7 @@ private final class LegadoSourceSession: @unchecked Sendable {
 
 /// Executes the original rule dialect in a source worker, preserving the public
 /// BookSource contract used by search, reader, cache and downloads.
-struct LegadoBookSource: BookSource, @unchecked Sendable {
+struct LegadoBookSource: DiscoveryBookSource, @unchecked Sendable {
     let sourceID: String
     let definition: LegadoSourceDefinition
     private let origin: URL?
@@ -200,6 +200,14 @@ struct LegadoBookSource: BookSource, @unchecked Sendable {
     }
     var pendingOperationCount: Int { session.pendingOperationCount }
     func resetRuntime() { session.reset() }
+    var supportsDiscovery: Bool { !definition.exploreURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    func discoveryCategories() async throws -> [SourceDiscoveryCategory] {
+        try await operation { try $0.discoveryCategories() }
+    }
+    func discover(category: String, page: Int) async throws -> BookSearchPage {
+        guard supportsDiscovery, (1...100).contains(page), category.utf8.count <= 64 * 1024 else { throw ContentFailure.invalidResponse }
+        return try await operation { try $0.discover(category: category, page: page) }
+    }
     func search(query: String, page: Int) async throws -> BookSearchPage {
         guard (1...100).contains(page), !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, query.utf8.count <= 1024 else { throw ContentFailure.invalidResponse }
         return try await operation { try $0.search(query: query, page: page) }
@@ -272,7 +280,7 @@ private final class LegadoSourceWorker {
     private var libraryScript: String {
         let login = definition.raw["loginUrl"] as? String ?? ""
         let program = login.hasPrefix("@js:") ? String(login.dropFirst(4)) : login
-        if program.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("https://") || program.isEmpty { return definition.jsLib }
+        if ["http", "https"].contains(URL(string: program.trimmingCharacters(in: .whitespacesAndNewlines))?.scheme?.lowercased() ?? "") || program.isEmpty { return definition.jsLib }
         return definition.jsLib + "\n;\n" + program
     }
     func login(action: String, values: [String: String]) throws -> LegadoLoginActionResult {
@@ -391,27 +399,55 @@ private final class LegadoSourceWorker {
         }
     }
 
-    func search(query: String, page: Int) throws -> BookSearchPage {
-        bindings["key"] = query; bindings["searchKey"] = query; bindings["page"] = page
+    func discoveryCategories() throws -> [SourceDiscoveryCategory] {
         try configure()
-        let templateHasPage = definition.searchURL.range(of: #"\{\{\s*page\b"#, options: .regularExpression) != nil ||
-            ((definition.searchURL.hasPrefix("@js:") || definition.searchURL.hasPrefix("<js>")) && definition.searchURL.range(of: #"\bpage\b"#, options: .regularExpression) != nil)
+        let value = try withRuleField(.exploreURL) { try engine.template(definition.exploreURL, baseURL: currentURL) }
+        return try SourceDiscoveryCategory.parse(value)
+    }
+    func discover(category: String, page: Int) throws -> BookSearchPage {
+        let request: String
+        if category.isEmpty || category == "全部" {
+            guard let first = try discoveryCategories().first else { return .init(books: [], nextPage: nil) }
+            request = first.request
+        } else { request = category }
+        return try listing(query: "explore:" + request, page: page, request: request,
+                           rules: definition.search.merging(definition.explore) { _, explore in explore }, exploring: true)
+    }
+    func search(query: String, page: Int) throws -> BookSearchPage {
+        try listing(query: query, page: page, request: definition.searchURL, rules: definition.search, exploring: false)
+    }
+    private func listing(query: String, page: Int, request: String, rules: [String: String], exploring: Bool) throws -> BookSearchPage {
+        bindings["key"] = exploring ? "" : query; bindings["searchKey"] = exploring ? "" : query; bindings["page"] = page
+        try configure()
+        let templateHasPage = request.range(of: #"\{\{\s*page\b"#, options: .regularExpression) != nil ||
+            ((request.hasPrefix("@js:") || request.hasPrefix("<js>")) && request.range(of: #"\bpage\b"#, options: .regularExpression) != nil)
         if page == 1 { shared.resetSearch(query) }
         let address: String
         if let next = shared.searchURL(query, page: page) { address = next }
         else {
             guard page == 1 || templateHasPage else { throw LegadoRequestError.unsupported("没有该关键词的下一页地址，请重新搜索") }
-            address = definition.searchURL
+            address = request
         }
-        let response = try withRuleField(.searchURL) { try fetch(address) }
-        let rules = definition.search
+        let response: LegadoHTTPPage
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if exploring && (trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>")) {
+            // A category may be a login/browser action with no URL result.
+            // Execute once; only a returned route proceeds through HTTP.
+            let rendered = try withRuleField(.exploreURL) { try renderRequest(address, baseURL: currentURL) }
+            let result = rendered.trimmingCharacters(in: .whitespacesAndNewlines)
+            let object = (try? JSONSerialization.jsonObject(with: Data(result.utf8))) as? [String: Any]
+            if result.isEmpty || ["null", "undefined"].contains(result) || (object?["body"] != nil && object?["url"] != nil && object?["statusCode"] != nil) {
+                return .init(books: [], nextPage: nil, feedback: shared.lastMessage.isEmpty ? "操作已完成。" : shared.lastMessage)
+            }
+            response = try withRuleField(.exploreURL) { try fetch(rendered) }
+        } else { response = try withRuleField(exploring ? .exploreURL : .searchURL) { try fetch(address) } }
         let rowRule = rules["bookList"] ?? ""
-        let rows = rowRule.isEmpty ? [response.text] : try withRuleField(.searchBookList) { try engine.elements(rowRule, in: response.text, baseURL: response.url) }
+        let rows = rowRule.isEmpty ? [response.text] : try withRuleField(exploring ? .exploreBookList : .searchBookList) { try engine.elements(rowRule, in: response.text, baseURL: response.url) }
         guard rows.count <= 500 else { throw LegadoRequestError.searchResultLimit }
         var books: [LibraryBookRecord] = [], seen = Set<String>(), budget = LegadoMetadataBudget(), bookReferences: [LegadoReference] = []
         for row in rows {
-            let title = try field(rules["name"], in: row, baseURL: response.url, structured: true, location: .searchName)
-            let address = try field(rules["bookUrl"], in: row, baseURL: response.url, structured: true, location: .searchBookURL)
+            let title = try field(rules["name"], in: row, baseURL: response.url, structured: true, location: exploring ? .exploreName : .searchName)
+            let address = try field(rules["bookUrl"], in: row, baseURL: response.url, structured: true, location: exploring ? .exploreBookURL : .searchBookURL)
             guard !title.isEmpty, !address.isEmpty else { continue }
             let bookReference = try LegadoReference.parse(url(address, baseURL: response.url), baseURL: response.url)
             let bookURL = try shared.referenceKey(bookReference, role: "book", sourceID: definition.sourceURL)
@@ -431,7 +467,7 @@ private final class LegadoSourceWorker {
             } else if rules["nextPageUrl"] == nil && templateHasPage { nextPage = page + 1 }
         }
         try shared.registerBatch(bookReferences, role: "book", sourceID: definition.sourceURL)
-        return .init(books: books, nextPage: nextPage)
+        return .init(books: books, nextPage: nextPage, feedback: shared.lastMessage.isEmpty ? nil : shared.lastMessage)
     }
 
     func details(_ book: LibraryBookRecord) throws -> LibraryBookRecord {

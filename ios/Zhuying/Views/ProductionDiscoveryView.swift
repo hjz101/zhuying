@@ -15,7 +15,7 @@ struct ProductionSubscriptionsView: View {
                         VStack(alignment:.leading,spacing:7) {
                             Toggle(source.name,isOn:Binding(get:{library.subscribedSourceIDs.contains(source.id)},set:{library.subscribe(sourceID:source.id,enabled:$0)}))
                                 .disabled(!source.enabled || !SourcePackages.isRunnable(source))
-                            Text((try? SourcePackages.rules(source))?.discover != nil ? "支持分类发现和书架更新" : "分类发现未支持；可用来源支持书架更新检查")
+                            Text(((try? SourcePackages.rules(source))?.discover != nil || (try? SourcePackages.legadoDefinition(source))?.exploreURL.isEmpty == false) ? "支持分类发现和书架更新" : "分类发现未支持；可用来源支持书架更新检查")
                                 .font(.system(size:11)).foregroundStyle(appAppearance.palette.muted)
                         }
                     }
@@ -77,5 +77,78 @@ struct SubscribedDiscoverySection: View {
             try Task.checkCancellation(); var seen = Set(books.map(\.id)); let additions = value.books.filter { seen.insert($0.id).inserted }
             books += additions; nextPage = page > 1 && additions.isEmpty ? nil : value.nextPage; partial = value.hasPartialFailures
         } catch { if !Task.isCancelled { message = error.localizedDescription } }
+    }
+}
+
+/// Source-scoped discovery reuses the same detail/read destinations as search.
+struct RichDiscoverySection: View {
+    @Environment(\.themeAppearance) private var appAppearance
+    @EnvironmentObject private var library: LibraryStore
+    @StateObject private var model = OnlineDiscoveryStore()
+    let sourceID: String
+    @Binding var feedback: String?
+    private var key: String { sourceID + ":" + String(library.onlineRevision) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 9) {
+                    ForEach(model.categories) { category in
+                        Button { if let service = library.onlineService { model.select(category, service: service) } } label: {
+                            Text(category.title).font(.system(size: 13, weight: model.selected == category ? .semibold : .regular))
+                                .padding(.horizontal, 17).frame(minHeight: 44)
+                                .background(appAppearance.palette.primary.opacity(model.selected == category ? 0.17 : 0.06), in: Capsule())
+                        }.accessibilityAddTraits(model.selected == category ? .isSelected : [])
+                            .accessibilityIdentifier("discovery-category-" + category.title)
+                    }
+                }
+            }
+            HStack {
+                SectionHeading(title: model.selected?.title ?? "来源发现", subtitle: "\(model.books.count) 部作品")
+                Spacer()
+                Button { if let service = library.onlineService { model.refresh(service: service) } } label: {
+                    ThemeIcon(systemName: "arrow.clockwise").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                }.disabled(model.busy).accessibilityLabel("刷新发现分类").accessibilityIdentifier("refreshDiscovery")
+            }
+            if model.busy && model.books.isEmpty { ProgressView("正在读取书源发现") }
+            if let message = model.message {
+                Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("discoveryError")
+                Button("重试") { if let service = library.onlineService { model.refresh(service: service) } }
+            } else if !model.busy && model.books.isEmpty && !model.categories.isEmpty && model.feedback == nil {
+                ThemeUnavailableView("此分类暂未返回作品", systemImage: "books.vertical", description: Text("可切换分类，或登录当前书源后刷新。"))
+            }
+            LazyVStack(spacing: 20) {
+                ForEach(model.books) { record in
+                    NavigationLink { BookDetailView(book: record.presentation(chapters: []), onlineRecord: record) } label: {
+                        RichDiscoveryBookRow(record: record)
+                    }.buttonStyle(.plain).accessibilityIdentifier("discovery-book-" + record.id)
+                    if record.id != model.books.last?.id { Divider().overlay(appAppearance.palette.line) }
+                }
+            }
+            if model.partial { Text("部分来源读取失败，可刷新重试。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted) }
+            if model.nextPage != nil {
+                Button(model.busy ? "正在加载" : "加载更多") { if let service = library.onlineService { model.more(service: service) } }
+                    .disabled(model.busy).accessibilityIdentifier("discoveryMore")
+            }
+        }
+        .task(id: key) { if let service = library.onlineService { model.open(sourceID: sourceID, service: service) } }
+        .onChange(of: model.feedback) { _, message in feedback = message }
+        .onDisappear { model.cancel() }
+    }
+}
+
+struct RichDiscoveryBookRow: View {
+    @Environment(\.themeAppearance) private var appAppearance
+    let record: LibraryBookRecord
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            SourceBookCover(record: record, width: 77, height: 107)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(record.title).font(.system(size: 17, weight: .semibold, design: .serif)).foregroundStyle(appAppearance.palette.green).lineLimit(3)
+                Text("\(record.author.isEmpty ? "作者未提供" : record.author) · \(record.source?.provider ?? "在线来源")")
+                    .font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted).lineLimit(2)
+                if !record.summary.isEmpty { Text(record.summary).font(.system(size: 12)).lineSpacing(4).foregroundStyle(appAppearance.palette.muted).lineLimit(3) }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            ThemeIcon(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted).padding(.top, 35)
+        }.frame(maxWidth: .infinity, minHeight: 107, alignment: .leading).contentShape(Rectangle())
     }
 }

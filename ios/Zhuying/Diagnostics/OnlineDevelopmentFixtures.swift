@@ -3,10 +3,18 @@ import Foundation
 
 /// Original text, available only with the isolated UI-test launch flag.
 /// Passing these fixtures is never counted as real-source acceptance.
-struct OnlineDevelopmentFixtures: BookSource {
+struct OnlineDevelopmentFixtures: DiscoveryBookSource {
+    var supportsDiscovery: Bool { true }
+    func discoveryCategories() async throws -> [SourceDiscoveryCategory] { [.init(title: "排行榜", request: "rank"), .init(title: "全部", request: "all")] }
+    func discover(category: String, page: Int) async throws -> BookSearchPage { try await search(query: category, page: page) }
     let sourceID = "shushan"
     func search(query: String, page: Int) async throws -> BookSearchPage {
-        .init(books: (1...2).map { index in
+        if query == "精准测试" {
+            return .init(books: ["精准测试", "无关推荐"].enumerated().map { index, title in
+                .init(id: "remote-precision-\(index)", title: title, author: "竹影测试", summary: "原创精准搜索测试", source: .init(sourceID: sourceID, nativeBookID: "precision-\(index)", provider: "测试来源", bookURL: "https://fixture.invalid/precision/\(index)"), addedAt: Date())
+            }, nextPage: nil)
+        }
+        return .init(books: (1...2).map { index in
             .init(id: "remote-ui-fixture-\(index)", title: "原生联调作品\(index)", author: "竹影测试", summary: "用于端到端验证的原创测试正文。",
                   source: .init(sourceID: sourceID, nativeBookID: "fixture-\(index)", provider: "测试来源", bookURL: "https://fixture.invalid/\(index)"), addedAt: Date())
         }, nextPage: nil)

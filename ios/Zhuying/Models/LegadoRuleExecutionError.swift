@@ -14,6 +14,7 @@ struct LegadoRuleExecutionError: Error, LocalizedError {
         case tocChapterList = "ruleToc.chapterList", tocChapterName = "ruleToc.chapterName", tocChapterURL = "ruleToc.chapterUrl"
         case tocNextURL = "ruleToc.nextTocUrl", tocIsVolume = "ruleToc.isVolume", tocIsVIP = "ruleToc.isVip", tocIsPay = "ruleToc.isPay"
         case content = "ruleContent.content", contentTitle = "ruleContent.title", contentNextURL = "ruleContent.nextContentUrl"
+        case exploreURL = "exploreUrl"
         case exploreBookList = "ruleExplore.bookList", exploreName = "ruleExplore.name", exploreBookURL = "ruleExplore.bookUrl"
     }
     let field: Field

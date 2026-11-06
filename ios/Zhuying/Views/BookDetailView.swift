@@ -66,7 +66,9 @@ struct BookDetailView: View {
         .navigationTitle("作品详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) {
-            Button { store.toggleFavorite(currentBook) } label: { ThemeIcon(systemName: store.isFavorite(currentBook) ? "bookmark.fill" : "bookmark") }.accessibilityLabel(store.isFavorite(currentBook) ? "移出书架" : "加入书架")
+            Button { Task { await loadOnline() } } label: { ThemeIcon(systemName: "arrow.clockwise").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+                .accessibilityLabel("刷新作品详情").accessibilityIdentifier("refreshBookDetail")
+                .disabled(loading || (store.isDemo || (onlineRecord == nil && store.remoteMetadata(book.id) == nil)))
         } }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack(spacing: 12) {
@@ -92,10 +94,12 @@ struct BookDetailView: View {
 
     @MainActor private func loadOnline() async {
         guard !store.isDemo, let record = onlineRecord ?? store.remoteMetadata(book.id), let service = store.onlineService else { return }
+        guard !loading else { return }
         loading = true; failure = nil
         defer { loading = false }
         do {
             let (record, catalog) = try await service.details(record)
+            try Task.checkCancellation()
             loadedBook = try await store.registerRemoteBook(record, chapters: catalog)
         } catch is CancellationError {} catch { failure = error.localizedDescription }
     }

@@ -55,6 +55,8 @@ struct SourceBookReference: Codable, Equatable, Sendable {
     var bookURL: String
     var remoteBookID: String = ""
     var origin: String? = nil
+    /// Per-book control of user purification rules; source extraction still runs.
+    var useReplaceRule: Bool? = nil
     var id: String { origin.map { StableContentID.make(sourceID, $0, nativeBookID) } ?? StableContentID.make(sourceID, nativeBookID) }
 }
 

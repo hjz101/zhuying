@@ -71,9 +71,12 @@ actor ContentProcessingStore {
         let key = StableContentID.make(bookID,document.chapterID,document.originVersion ?? document.version)
         guard let value = cached[key],value.chapter.document.version == document.version else { return nil }; return value.chapter
     }
-    func process(_ raw: ChapterDocument,bookID: String,sourceID: String?) async throws -> ProcessedChapter {
+    func process(_ raw: ChapterDocument,bookID: String,sourceID: String?,useReplaceRule: Bool = true) async throws -> ProcessedChapter {
         try Task.checkCancellation()
         let key = StableContentID.make(bookID,raw.chapterID,raw.version),identity = Dictionary(uniqueKeysWithValues:raw.paragraphs.map{($0.id,$0.id)})
+        // This gate applies after source extraction. It must not read rules,
+        // return an earlier purified cache, or mutate the shared rule manifest.
+        guard useReplaceRule else { return .init(raw:raw,document:raw,origins:identity,rulesVersion:"purification-disabled") }
         do {
             let all = try rules(),version = try revision(),active = all.filter{$0.applies(book:bookID,source:sourceID)}
             if active.isEmpty { return .init(raw:raw,document:raw,origins:identity,rulesVersion:version) }
@@ -140,8 +143,9 @@ struct ProcessedChapterRepository: ChapterDocumentLoading {
     let processor: ContentProcessingStore
     let bookID: String
     let sourceID: String?
+    var useReplaceRule = true
     func document(chapterID: String) async throws -> ChapterDocument? {
         guard let raw = try await base.document(chapterID:chapterID) else { return nil }
-        return try await processor.process(raw,bookID:bookID,sourceID:sourceID).document
+        return try await processor.process(raw,bookID:bookID,sourceID:sourceID,useReplaceRule:useReplaceRule).document
     }
 }

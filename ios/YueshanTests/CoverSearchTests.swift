@@ -50,4 +50,10 @@ final class CoverSearchTests: XCTestCase {
         let files = (try? FileManager.default.contentsOfDirectory(at:root.appendingPathComponent("resources/media"),includingPropertiesForKeys:nil)) ?? []
         XCTAssertTrue(files.isEmpty); XCTAssertThrowsError(try CoverSearchClient.normalized(Data("<svg/>".utf8)))
     }
+    func testProductionCoverSummaryNamesVerifiedProviderWhileDemoCopyIsPreserved() {
+        let feature = FeatureCatalog.feature("covers")
+        XCTAssertTrue(feature.summary.contains("Bing")); XCTAssertTrue(ProductionCapabilities.summary(for:feature).contains("Open Library")); XCTAssertFalse(ProductionCapabilities.summary(for:feature).contains("Bing"))
+        XCTAssertEqual(ProductionCapabilities.summary(for:FeatureCatalog.feature("fonts")),FeatureCatalog.feature("fonts").summary)
+    }
+
 }

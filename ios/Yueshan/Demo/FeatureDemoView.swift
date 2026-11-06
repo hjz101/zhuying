@@ -19,13 +19,14 @@ struct FeatureHubView: View {
 }
 
 struct FeatureRow: View {
+    @EnvironmentObject private var library: LibraryStore
     let feature: DemoFeature
     var body: some View {
         HStack(spacing: 13) {
             Image(systemName: feature.icon).font(.system(size: 18)).foregroundStyle(Palette.green).frame(width: 34, height: 38)
             VStack(alignment: .leading, spacing: 6) {
                 Text(feature.title).font(.system(size: 14, weight: .medium)).foregroundStyle(Palette.green)
-                Text(feature.summary).font(.system(size: 10)).foregroundStyle(Palette.muted).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
+                Text(library.isDemo ? feature.summary : ProductionCapabilities.summary(for:feature)).font(.system(size: 10)).foregroundStyle(Palette.muted).lineSpacing(3).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 2)
             Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted)

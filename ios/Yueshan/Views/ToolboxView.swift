@@ -179,6 +179,7 @@ private struct ToolDestination: View {
 }
 
 private struct ToolEntryRow: View {
+    @EnvironmentObject private var library: LibraryStore
     let feature: DemoFeature
     var body: some View {
         HStack(spacing: 12) {
@@ -188,7 +189,7 @@ private struct ToolEntryRow: View {
                     Text(feature.title).font(.system(size: 14, weight: .medium))
                     ToolCapabilityBadge(feature: feature)
                 }
-                Text(feature.summary).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1)
+                Text(library.isDemo ? feature.summary : ProductionCapabilities.summary(for:feature)).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1)
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted)

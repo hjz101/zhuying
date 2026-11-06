@@ -14,6 +14,7 @@ enum SourceDiagnosticEvidenceKind: String, Codable, Sendable { case nativeNetwor
 struct SourceAcceptanceChapter: Codable, Equatable, Sendable {
     let identityHash: String
     let versionHash: String
+    let contentHash: String
     let characters: Int
 }
 struct SourceAcceptanceBook: Codable, Equatable, Sendable {
@@ -40,7 +41,7 @@ struct SourceAcceptanceStep: Codable, Sendable {
 }
 struct SourceAcceptanceReport: Codable, Identifiable, Sendable {
     enum Status: String, Codable, Sendable { case failed, awaitingRestart, verificationFailed, restartVerified }
-    var version = 1
+    var version = 2
     let id: UUID
     let scopeHash: String
     let initialProcessID: UUID
@@ -55,8 +56,26 @@ struct SourceAcceptanceReport: Codable, Identifiable, Sendable {
     var verificationProcessID: UUID?
     var verifiedAt: Date?
     var verificationSteps: [SourceAcceptanceStep] = []
+    var verificationBooks: [SourceAcceptanceBook] = []
     var issue: SourceDiagnosticIssue?
-    var canVerifyRestart: Bool { status != .failed && books.count == 2 && books.allSatisfy { $0.chapters.count == 3 } }
+    var canVerifyRestart: Bool {
+        version == 2 && engineVersion == SourceAcceptanceRunner.engineVersion && status != .failed && Self.distinctEvidence(books) && Self.completeSteps(initialSteps)
+    }
+    static func distinctEvidence(_ books: [SourceAcceptanceBook]) -> Bool {
+        let chapters = books.flatMap(\.chapters)
+        return books.count == 2 && Set(books.map(\.workHash)).count == 2 && Set(books.map(\.identityHash)).count == 2 &&
+            books.allSatisfy({ $0.chapters.count == 3 }) && Set(chapters.map(\.identityHash)).count == 6 &&
+            Set(chapters.map(\.versionHash)).count == 6 && Set(chapters.map(\.contentHash)).count == 6
+    }
+    static func completeSteps(_ steps: [SourceAcceptanceStep]) -> Bool {
+        guard steps.count == 11, steps.allSatisfy({ $0.issue == nil && $0.count > 0 }),
+              steps.filter({ $0.step == .search && $0.bookIndex == nil && $0.chapterIndex == nil && ($0.network?.successfulFetches ?? 0) > 0 }).count == 1 else { return false }
+        return (0..<2).allSatisfy { book in
+            steps.filter { $0.step == .details && $0.bookIndex == book && $0.chapterIndex == nil }.count == 1 &&
+            steps.filter { $0.step == .catalog && $0.bookIndex == book && $0.chapterIndex == nil }.count == 1 &&
+            (0..<3).allSatisfy { chapter in steps.filter { $0.step == .content && $0.bookIndex == book && $0.chapterIndex == chapter && ($0.network?.successfulFetches ?? 0) > 0 }.count == 1 }
+        }
+    }
 }
 
 actor SourceAcceptanceStore {
@@ -74,6 +93,11 @@ actor SourceAcceptanceStore {
         }
         catch { throw SourceDiagnosticFailure(issue: .init(code: .stateUnavailable)) }
         guard data.count <= 2 * 1024 * 1024 else { throw ContentFailure.invalidResponse }
+        struct Header: Decodable { let version: Int; let engineVersion: String }
+        let header = try JSONDecoder().decode(Header.self, from: data)
+        guard header.version == 2, header.engineVersion == SourceAcceptanceRunner.engineVersion else {
+            throw SourceDiagnosticFailure(issue: .init(code: .incompleteAcceptance))
+        }
         let report = try JSONDecoder().decode(SourceAcceptanceReport.self, from: data)
         try validate(report, scope: scope); return report
     }
@@ -87,34 +111,37 @@ actor SourceAcceptanceStore {
         } catch { throw SourceDiagnosticFailure(issue: .init(code: .stateUnavailable)) }
     }
     private func validate(_ report: SourceAcceptanceReport, scope: SourceDiagnosticScope) throws {
+        guard report.configurationHash == scope.configurationHash, report.sessionHash == StableContentID.make(String(scope.sessionEpoch)) else {
+            throw SourceDiagnosticFailure(issue: .init(code: .incompleteAcceptance))
+        }
         func digest(_ value: String) -> Bool { value.count == 64 && value.allSatisfy { "0123456789abcdef".contains($0) } }
         let allSteps = report.initialSteps + report.verificationSteps
-        guard report.version == 1, report.scopeHash == scope.id, digest(report.configurationHash), digest(report.sessionHash), report.engineVersion == SourceAcceptanceRunner.engineVersion,
-              report.books.count <= 2,
+        guard report.version == 2, report.scopeHash == scope.id, digest(report.configurationHash), digest(report.sessionHash), report.engineVersion == SourceAcceptanceRunner.engineVersion,
+              report.books.count <= 2, report.verificationBooks.count <= 2,
               report.initialSteps.count <= 16, report.verificationSteps.count <= 16,
               allSteps.allSatisfy({ $0.milliseconds >= 0 && $0.count >= 0 && ($0.network.map { $0.successfulFetches >= 0 && $0.failedFetches >= 0 && $0.bytes >= 0 } ?? true) }),
-              report.books.allSatisfy({ digest($0.identityHash) && digest($0.workHash) && $0.chapters.count <= 3 && $0.chapters.allSatisfy { digest($0.identityHash) && digest($0.versionHash) && $0.characters > 0 } }) else { throw ContentFailure.invalidResponse }
-        func complete(_ steps: [SourceAcceptanceStep]) -> Bool {
-            guard steps.count == 11, steps.allSatisfy({ $0.issue == nil && $0.count > 0 }),
-                  steps.filter({ $0.step == .search && $0.bookIndex == nil && $0.chapterIndex == nil && ($0.network?.successfulFetches ?? 0) > 0 }).count == 1 else { return false }
-            return (0..<2).allSatisfy { book in
-                steps.filter { $0.step == .details && $0.bookIndex == book && $0.chapterIndex == nil }.count == 1 &&
-                steps.filter { $0.step == .catalog && $0.bookIndex == book && $0.chapterIndex == nil }.count == 1 &&
-                (0..<3).allSatisfy { chapter in steps.filter { $0.step == .content && $0.bookIndex == book && $0.chapterIndex == chapter && ($0.network?.successfulFetches ?? 0) > 0 }.count == 1 }
-            }
-        }
+              (report.books + report.verificationBooks).allSatisfy({ digest($0.identityHash) && digest($0.workHash) && $0.chapters.count <= 3 && $0.chapters.allSatisfy { digest($0.identityHash) && digest($0.versionHash) && digest($0.contentHash) && $0.characters > 0 } }) else { throw ContentFailure.invalidResponse }
         if report.status != .failed {
-            guard report.books.count == 2, Set(report.books.map(\.workHash)).count == 2, Set(report.books.map(\.identityHash)).count == 2,
-                  report.books.allSatisfy({ $0.chapters.count == 3 && Set($0.chapters.map(\.identityHash)).count == 3 }), complete(report.initialSteps) else { throw ContentFailure.invalidResponse }
+            guard SourceAcceptanceReport.distinctEvidence(report.books), SourceAcceptanceReport.completeSteps(report.initialSteps) else { throw ContentFailure.invalidResponse }
         }
         if report.status == .restartVerified {
-            guard let process = report.verificationProcessID, process != report.initialProcessID, report.verifiedAt != nil, report.issue == nil, complete(report.verificationSteps) else { throw ContentFailure.invalidResponse }
+            guard let process = report.verificationProcessID, process != report.initialProcessID, report.verifiedAt != nil, report.issue == nil,
+                  SourceAcceptanceReport.distinctEvidence(report.verificationBooks), report.verificationBooks == report.books,
+                  SourceAcceptanceReport.completeSteps(report.verificationSteps) else { throw ContentFailure.invalidResponse }
         }
     }
 }
 
 enum SourceAcceptanceRunner {
-    static let engineVersion = "zhuying-source-acceptance-3.1"
+    static let engineVersion = "zhuying-source-acceptance-3.2"
+    /// Compare actual prose independently of provider-controlled version IDs.
+    /// Formatting-only whitespace or canonical Unicode differences must not
+    /// turn one repeated chapter into several pieces of acceptance evidence.
+    static func contentIdentity(_ document: ChapterDocument) -> String {
+        let text = document.paragraphs.map(\.text).joined(separator: "\n").precomposedStringWithCanonicalMapping
+        let normalized = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return StableContentID.make("source-acceptance-prose-v1", normalized)
+    }
     static func workIdentity(_ book: LibraryBookRecord) -> String {
         func normalize(_ value: String) -> String { String(value.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }) }
         return StableContentID.make(normalize(book.title), normalize(book.author))
@@ -131,7 +158,7 @@ enum SourceAcceptanceRunner {
         var report = baseline ?? .init(id: UUID(), scopeHash: scope.id, initialProcessID: processID, createdAt: Date(), evidenceKind: evidenceKind,
                                      configurationHash: scope.configurationHash, sessionHash: StableContentID.make(String(scope.sessionEpoch)), engineVersion: engineVersion)
         let verifying = baseline != nil
-        if verifying { report.verificationProcessID = processID; report.verificationSteps = []; report.verifiedAt = nil; report.issue = nil; report.status = .verificationFailed }
+        if verifying { report.verificationProcessID = processID; report.verificationSteps = []; report.verificationBooks = []; report.verifiedAt = nil; report.issue = nil; report.status = .verificationFailed }
         var results: [SourceDiagnosticResult] = [], current = SourceDiagnostics.Step.search
         var currentBook: Int?, currentChapter: Int?, before: SourceDiagnosticNetworkEvidence?
         var start = ProcessInfo.processInfo.systemUptime
@@ -163,6 +190,7 @@ enum SourceAcceptanceRunner {
             try require(selected.count == 2, .incompleteAcceptance)
             await append(page.books.count, network: searchNetwork)
             var checked: [SourceAcceptanceBook] = []
+            var chapterIdentities = Set<String>(), chapterVersions = Set<String>(), chapterContents = Set<String>()
             for (bookIndex, candidate) in selected.enumerated() {
                 await begin(.details, book: bookIndex)
                 let details = try await AsyncOperationDeadline.run(seconds: timeout) { try await source.details(for: candidate) }
@@ -196,12 +224,16 @@ enum SourceAcceptanceRunner {
                     // adapter supplies that association, require every chapter
                     // to produce its own native fetch evidence.
                     try require((network?.successfulFetches ?? 0) > 0, .incompleteAcceptance)
-                    let evidence = SourceAcceptanceChapter(identityHash: StableContentID.make(chapter.id), versionHash: StableContentID.make(content.version), characters: count)
+                    let evidence = SourceAcceptanceChapter(identityHash: StableContentID.make(chapter.id), versionHash: StableContentID.make(content.version),
+                                                           contentHash: contentIdentity(content), characters: count)
+                    try require(chapterIdentities.insert(evidence.identityHash).inserted, .incompleteAcceptance)
+                    try require(chapterVersions.insert(evidence.versionHash).inserted && chapterContents.insert(evidence.contentHash).inserted, .duplicateContent)
                     if let baseline { try require(evidence == baseline.books[bookIndex].chapters[chapterIndex], .incompleteAcceptance) }
                     chapterEvidence.append(evidence)
                     await append(count, network: network)
                 }
                 checked.append(.init(identityHash: StableContentID.make(details.id), workHash: workIdentity(candidate), chapters: chapterEvidence))
+                if verifying { report.verificationBooks = checked }
             }
             report.issue = nil
             if verifying { report.status = .restartVerified; report.verifiedAt = Date() }

@@ -3,7 +3,7 @@ import Foundation
 struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
     enum Code: String, Codable, Sendable {
         case loginRequired, loginExpired, hostNotAllowed, unsupportedRule, unsupportedHost, scriptFailure, timedOut, cancelled
-        case noSearchResults, emptyCatalog, emptyContent, restricted, unavailable, invalidResponse, sourceDisabled, stateUnavailable, incompleteAcceptance, resourceLimit, busy
+        case noSearchResults, emptyCatalog, emptyContent, restricted, unavailable, invalidResponse, sourceDisabled, stateUnavailable, incompleteAcceptance, resourceLimit, busy, duplicateContent
     }
     enum Recovery: String, Codable, Sendable { case login, network, rules, retry }
     let code: Code
@@ -38,6 +38,7 @@ struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
         case .sourceDisabled: "此书源已停用或移除。请在书源管理中启用后重试。"
         case .stateUnavailable: "此账号的本地会话暂不可用。原记录已保留，请重试。"
         case .incompleteAcceptance: "完整验收证据不足，需要两本书各三章、实际联网请求和真正重启后的复核。"
+        case .duplicateContent: "验收章节返回了重复的正文或版本，不能作为六个独立章节的证据。请检查章节规则或更换作品；共用前言不能替代三章正文。"
         case .resourceLimit: "此步骤超过脚本或数据资源额度。请缩小输入或检查规则后重试。"
         case .busy: "此书源的执行资源正在使用，请稍后重新调试。"
         }
@@ -47,6 +48,7 @@ struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
         case .loginRequired, .loginExpired, .restricted: [.login, .retry]
         case .hostNotAllowed, .unavailable, .timedOut: [.network, .retry]
         case .unsupportedRule, .unsupportedHost, .scriptFailure, .invalidResponse, .emptyContent, .emptyCatalog: [.rules, .login, .retry]
+        case .duplicateContent: [.rules, .retry]
         default: [.retry]
         }
     }

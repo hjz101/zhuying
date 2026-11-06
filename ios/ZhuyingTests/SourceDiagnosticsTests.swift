@@ -3,7 +3,8 @@ import XCTest
 
 private actor DiagnosticProbe: SourceDiagnosticEvidenceProvider {
     let sourceID = "diagnostic-secret-source?token=private"
-    enum Mode { case normal, noSearch, noCatalog, noContent, cachedContent, failedCachedContent, changedContent, duplicateWork, authentication, cancelled }
+    enum Mode { case normal, noSearch, noCatalog, noContent, cachedContent, failedCachedContent, changedContent, duplicateWork, authentication, cancelled
+        case repeatedContent, repeatedContentForgedVersions, repeatedVersions, crossBookRepeatedContent, formattingOnlyContent }
     let mode: Mode
     private var evidence = SourceDiagnosticNetworkEvidence()
     private var searches = 0
@@ -22,10 +23,23 @@ private actor DiagnosticProbe: SourceDiagnosticEvidenceProvider {
         fetched()
         return mode == .noCatalog ? [] : (0..<3).map { .init(id: book.id + "-\($0)", bookID: book.id, nativeChapterID: String($0), title: "原创章节", order: $0, access: .readable) }
     }
-    func document(for chapter: ChapterRecord, book: LibraryBookRecord) -> ChapterDocument {
+    func document(for chapter: ChapterRecord, book: LibraryBookRecord) throws -> ChapterDocument {
         if mode == .failedCachedContent { evidence.failedFetches += 1 }
         else if mode != .cachedContent { fetched() }
-        return .init(chapterID: chapter.id, paragraphs: mode == .noContent ? [" \n"] : [mode == .changedContent ? "变化后的原创正文" : "private-original-body：竹影原创正文"])
+        let paragraphs: [String]
+        switch mode {
+        case .noContent: paragraphs = [" \n"]
+        case .changedContent: paragraphs = ["变化后的原创正文：" + chapter.id]
+        case .repeatedContent, .repeatedContentForgedVersions: paragraphs = ["private-original-body：同一正文重复返回"]
+        case .crossBookRepeatedContent: paragraphs = ["private-original-body：同章跨作品重复：" + chapter.nativeChapterID]
+        case .formattingOnlyContent: paragraphs = [String(repeating: " ", count: chapter.order) + "private-original-body：格式不同的同一正文" + String(repeating: "\n\t", count: chapter.order)]
+        default: paragraphs = ["private-original-body：竹影原创正文：" + chapter.id]
+        }
+        let document = ChapterDocument(chapterID: chapter.id, paragraphs: paragraphs)
+        guard mode == .repeatedVersions || mode == .repeatedContentForgedVersions else { return document }
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(document)) as? [String: Any])
+        object["version"] = mode == .repeatedVersions ? "one-provider-version" : "forged-version-" + chapter.id
+        return try JSONDecoder().decode(ChapterDocument.self, from: JSONSerialization.data(withJSONObject: object))
     }
 }
 private struct DiagnosticFailingWriter: AtomicFileWriting {
@@ -76,11 +90,15 @@ final class SourceDiagnosticsTests: XCTestCase {
         XCTAssertEqual(batch.last?.issue?.code, .loginExpired)
     }
     func testCompleteAcceptanceRequiresTwoBooksSixChaptersAndAnotherProcess() async throws {
+        // Supplying UUIDs here tests the policy branches. Actual process
+        // termination/relaunch is a separate app UI verification.
         let firstProcess = UUID(), probe = DiagnosticProbe()
         let initial = try await run(probe, process: firstProcess)
         XCTAssertEqual(initial.status, .awaitingRestart); XCTAssertEqual(initial.books.count, 2)
         XCTAssertTrue(initial.books.allSatisfy { $0.chapters.count == 3 })
         XCTAssertEqual(initial.initialSteps.filter { $0.step == .content }.count, 6)
+        XCTAssertEqual(Set(initial.books.flatMap(\.chapters).map(\.contentHash)).count, 6)
+        XCTAssertEqual(Set(initial.books.flatMap(\.chapters).map(\.versionHash)).count, 6)
         XCTAssertTrue(initial.initialSteps.allSatisfy { ($0.network?.successfulFetches ?? 0) > 0 })
         let before = await probe.searchCount()
         do { _ = try await run(probe, process: firstProcess, baseline: initial); XCTFail("Same process is not restart proof") }
@@ -88,7 +106,25 @@ final class SourceDiagnosticsTests: XCTestCase {
         let after = await probe.searchCount(); XCTAssertEqual(before, after)
         let verified = try await run(DiagnosticProbe(), baseline: initial)
         XCTAssertEqual(verified.status, .restartVerified); XCTAssertNotEqual(verified.verificationProcessID, initial.initialProcessID)
+        XCTAssertEqual(verified.verificationBooks, initial.books)
         XCTAssertEqual(verified.verificationSteps.filter { $0.step == .content }.count, 6)
+    }
+    func testRepeatedProseVersionsOrFormattingCannotMasqueradeAsIndependentChapters() async throws {
+        for mode in [DiagnosticProbe.Mode.repeatedContent, .repeatedContentForgedVersions, .repeatedVersions, .crossBookRepeatedContent, .formattingOnlyContent] {
+            let report = try await run(DiagnosticProbe(mode))
+            XCTAssertEqual(report.status, .failed)
+            XCTAssertEqual(report.issue?.code, .duplicateContent)
+            XCTAssertEqual(report.initialSteps.last?.step, .content)
+            XCTAssertFalse(report.canVerifyRestart)
+            XCTAssertNil(report.verifiedAt)
+        }
+        XCTAssertEqual(SourceDiagnosticIssue(code: .duplicateContent).recoveries, [.rules,.retry])
+    }
+    func testCanonicalContentFingerprintUsesTheBodyRatherThanChapterOrProviderVersion() {
+        let plain = ChapterDocument(chapterID: "first", paragraphs: ["Café 竹影", "独立正文"])
+        let formatted = ChapterDocument(chapterID: "another", paragraphs: [" Cafe\u{0301}  竹影 \n\t独立正文 "])
+        XCTAssertEqual(SourceAcceptanceRunner.contentIdentity(plain), SourceAcceptanceRunner.contentIdentity(formatted))
+        XCTAssertNotEqual(SourceAcceptanceRunner.contentIdentity(plain), SourceAcceptanceRunner.contentIdentity(.init(chapterID: "first", paragraphs: ["另一篇正文"])))
     }
     func testCachedOrFailedNetworkContentCannotPassDespiteSuccessfulCatalog() async throws {
         let cached = try await run(DiagnosticProbe(.cachedContent))
@@ -128,6 +164,91 @@ final class SourceDiagnosticsTests: XCTestCase {
         let failing = SourceAcceptanceStore(directory: directory, writer: DiagnosticFailingWriter())
         do { try await failing.save(try await run(DiagnosticProbe()), scope: scope); XCTFail("Storage errors must propagate") } catch {}
         let preserved = try await store.load(scope: scope); XCTAssertEqual(preserved?.id, initial.id)
+    }
+    func testCheckpointRoundTripPreservesSeparateBaselineAndVerificationContentEvidence() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let initial = try await run(DiagnosticProbe())
+        try await SourceAcceptanceStore(directory: directory).save(initial, scope: scope)
+        let reloaded = try await SourceAcceptanceStore(directory: directory).load(scope: scope)
+        let baseline = try XCTUnwrap(reloaded)
+        XCTAssertEqual(baseline.books, initial.books)
+        XCTAssertEqual(baseline.initialProcessID, initial.initialProcessID)
+        let verified = try await run(DiagnosticProbe(), baseline: baseline)
+        try await SourceAcceptanceStore(directory: directory).save(verified, scope: scope)
+        let restored = try await SourceAcceptanceStore(directory: directory).load(scope: scope)
+        XCTAssertEqual(restored?.status, .restartVerified)
+        XCTAssertEqual(restored?.verificationBooks, restored?.books)
+        XCTAssertEqual(Set(restored?.verificationBooks.flatMap(\.chapters).map(\.contentHash) ?? []).count, 6)
+    }
+    func testStoreRejectsDuplicateContentOrVersionsEvenWithDifferentChapterIdentities() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let valid = try await run(DiagnosticProbe()), store = SourceAcceptanceStore(directory: directory)
+        for field in ["contentHash", "versionHash"] {
+            var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(valid)) as? [String: Any])
+            var books = try XCTUnwrap(object["books"] as? [[String: Any]])
+            var chapters = try XCTUnwrap(books[0]["chapters"] as? [[String: Any]])
+            chapters[1][field] = chapters[0][field]; books[0]["chapters"] = chapters; object["books"] = books
+            let bytes = try JSONSerialization.data(withJSONObject: object)
+            let forged = try JSONDecoder().decode(SourceAcceptanceReport.self, from: bytes)
+            XCTAssertFalse(forged.canVerifyRestart)
+            do { try await store.save(forged, scope: scope); XCTFail("Duplicate content/version evidence cannot be saved as complete") } catch {}
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try bytes.write(to: directory.appendingPathComponent(scope.id + ".json"))
+            do { _ = try await store.load(scope: scope); XCTFail("Duplicate evidence must also be rejected when loading") } catch {}
+        }
+    }
+    func testStoreRejectsRestartLabelWhoseRecordedContentDiffersFromTheBaseline() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let baseline = try await run(DiagnosticProbe())
+        let verified = try await run(DiagnosticProbe(), baseline: baseline)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(verified)) as? [String: Any])
+        var books = try XCTUnwrap(object["verificationBooks"] as? [[String: Any]])
+        var chapters = try XCTUnwrap(books[0]["chapters"] as? [[String: Any]])
+        chapters[0]["contentHash"] = StableContentID.make("different-returned-body")
+        books[0]["chapters"] = chapters; object["verificationBooks"] = books
+        let bytes = try JSONSerialization.data(withJSONObject: object)
+        let forged = try JSONDecoder().decode(SourceAcceptanceReport.self, from: bytes)
+        XCTAssertTrue(SourceAcceptanceReport.distinctEvidence(forged.verificationBooks))
+        let store = SourceAcceptanceStore(directory: directory)
+        do { try await store.save(forged, scope: scope); XCTFail("Distinct hashes alone cannot prove the same chapters survived restart") } catch {}
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try bytes.write(to: directory.appendingPathComponent(scope.id + ".json"))
+        do { _ = try await store.load(scope: scope); XCTFail("A forged restart label cannot bypass baseline comparison") } catch {}
+    }
+    func testLegacyAcceptanceEngineAndMissingInitialStepsCannotBeReusedAsRestartProof() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let valid = try await run(DiagnosticProbe())
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(valid)) as? [String: Any])
+        object["version"] = 1; object["engineVersion"] = "zhuying-source-acceptance-3.1"
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let bytes = try JSONSerialization.data(withJSONObject: object), url = directory.appendingPathComponent(scope.id + ".json")
+        try bytes.write(to: url)
+        do { _ = try await SourceAcceptanceStore(directory: directory).load(scope: scope); XCTFail("Old loose acceptance evidence must be rerun") }
+        catch { XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .incompleteAcceptance) }
+        XCTAssertEqual(try Data(contentsOf: url), bytes, "Rejected historical evidence stays intact")
+        var incomplete = valid; incomplete.initialSteps = []
+        XCTAssertFalse(incomplete.canVerifyRestart)
+        do { _ = try await run(DiagnosticProbe(), baseline: incomplete); XCTFail("A book list is not initial network evidence") }
+        catch { XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .incompleteAcceptance) }
+    }
+    func testStoreDoesNotDisplayAnOldPassingRecordAfterRulesOrAccountEpochChange() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let baseline = try await run(DiagnosticProbe()), verified = try await run(DiagnosticProbe(), baseline: baseline)
+        let store = SourceAcceptanceStore(directory: directory)
+        try await store.save(verified, scope: scope)
+        var rules = scope; rules.configurationHash = StableContentID.make("different-rules")
+        var account = scope; account.sessionEpoch = 1
+        let url = directory.appendingPathComponent(scope.id + ".json"), preserved = try Data(contentsOf: directory.appendingPathComponent(scope.id + ".json"))
+        for changed in [rules,account] {
+            do { _ = try await store.load(scope: changed); XCTFail("Historical evidence does not establish current rules or session") }
+            catch { XCTAssertEqual(SourceDiagnosticIssue.classify(error).code, .incompleteAcceptance) }
+        }
+        XCTAssertEqual(try Data(contentsOf: url), preserved)
     }
     func testExportContainsOnlyFixedClassificationHashesAndRequestCounts() async throws {
         let report = try await run(DiagnosticProbe())

@@ -69,13 +69,13 @@ enum SourceDiagnostics {
             return results
         }
     }
-    static func batch(sources: [any BookSource], query: String, concurrency: Int, timeout: Double) async throws -> [SourceDiagnosticResult] {
+    static func batch(sources: [any BookSource], query: String, concurrency: Int, timeout: Double, authStatuses: [String: LegadoAuthStatus] = [:]) async throws -> [SourceDiagnosticResult] {
         var all: [SourceDiagnosticResult] = []
         try await withThrowingTaskGroup(of: [SourceDiagnosticResult].self) { group in
             var cursor = 0
             func enqueue() {
                 guard cursor < sources.count else { return }; let source = sources[cursor]; cursor += 1
-                group.addTask { try await run(source: source, query: query, through: .content, timeout: timeout) }
+                group.addTask { try await run(source: source, query: query, through: .content, timeout: timeout, authStatus: authStatuses[source.sourceID]) }
             }
             for _ in 0..<min(max(1, min(10, concurrency)), sources.count) { enqueue() }
             while let result = try await group.next() { try Task.checkCancellation(); all += result; enqueue() }

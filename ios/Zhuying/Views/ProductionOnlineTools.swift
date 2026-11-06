@@ -287,8 +287,13 @@ struct ProductionSourceDiagnosticsView: View {
         operation = Task { @MainActor in
             defer { if revision == token { busy = false; operation = nil } }
             var providers: [any BookSource] = [], configuration: [SourceDiagnosticResult] = []
+            var authStatuses: [String: LegadoAuthStatus] = [:]
             for source in library.sources where source.enabled && (batch || source.id == selectedID) {
-                do { providers.append(try library.configuredDiagnosticBookSource(source, credential: shushan.credentialForRequests)) }
+                do {
+                    let (_, auth, _) = try context(source)
+                    providers.append(try library.configuredDiagnosticBookSource(source, credential: shushan.credentialForRequests))
+                    if let auth { authStatuses[source.id] = auth }
+                }
                 catch {
                     let auth = (try? context(source))?.1
                     configuration.append(SourceDiagnostics.result(sourceID: source.id, step: "配置", start: ProcessInfo.processInfo.systemUptime, issue: .classify(error, authStatus: auth)))
@@ -308,7 +313,7 @@ struct ProductionSourceDiagnosticsView: View {
                     message = report.issue?.message ?? acceptanceStatus(report)
                 } else {
                     let values: [SourceDiagnosticResult]
-                    if batch { values = try await SourceDiagnostics.batch(sources: providers, query: query, concurrency: concurrency, timeout: timeout) }
+                    if batch { values = try await SourceDiagnostics.batch(sources: providers, query: query, concurrency: concurrency, timeout: timeout, authStatuses: authStatuses) }
                     else if let provider = providers.first {
                         let auth = library.sources.first(where: { $0.id == selectedID }).flatMap { (try? context($0))?.1 }
                         values = try await SourceDiagnostics.run(source: provider, query: query, through: target ?? step, timeout: timeout, authStatus: auth)

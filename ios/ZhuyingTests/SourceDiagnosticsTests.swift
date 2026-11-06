@@ -68,6 +68,8 @@ final class SourceDiagnosticsTests: XCTestCase {
         let reports = try await SourceDiagnostics.run(source: DiagnosticProbe(.authentication), query: "private", through: .content, authStatus: .expired)
         XCTAssertEqual(reports.last?.issue?.code, .loginExpired)
         XCTAssertEqual(reports.last?.issue?.recoveries, [.login, .retry])
+        let batch = try await SourceDiagnostics.batch(sources: [DiagnosticProbe(.authentication)], query: "private", concurrency: 3, timeout: 5, authStatuses: [scope.sourceID: .expired])
+        XCTAssertEqual(batch.last?.issue?.code, .loginExpired)
     }
     func testCompleteAcceptanceRequiresTwoBooksSixChaptersAndAnotherProcess() async throws {
         let firstProcess = UUID(), probe = DiagnosticProbe()
@@ -89,6 +91,8 @@ final class SourceDiagnosticsTests: XCTestCase {
         XCTAssertEqual(cached.status, .failed); XCTAssertEqual(cached.issue?.code, .incompleteAcceptance)
         let failed = try await run(DiagnosticProbe(.failedCachedContent))
         XCTAssertEqual(failed.status, .failed); XCTAssertEqual(failed.issue?.code, .unavailable)
+        let basic = try await SourceDiagnostics.run(source: DiagnosticProbe(.failedCachedContent), query: "private", through: .content)
+        XCTAssertEqual(basic.last?.issue?.code, .unavailable)
     }
     func testChangedChapterCannotPassRestartVerification() async throws {
         let baseline = try await run(DiagnosticProbe())

@@ -1,5 +1,7 @@
 # JavaScript 宿主 v1
 
+本页介绍手动运行的 Worker 工具。导入阅读 3.0 书源后，在搜索和阅读中运行的独立 QuickJS 兼容层见[阅读 3.0 基础兼容](LEGADO-COMPATIBILITY.md)；两个执行入口保留各自的接口与隔离规则。
+
 入口为“书源兼容引擎 → JavaScript 宿主与兼容报告”，也可从书源调试进入。导入的其他阅读器脚本不会自动执行；用户填写函数体与 JSON 输入，点击运行后才执行。
 
 示例：`return input.map(value => value.trim());`。函数体在 async function 中执行，以 `input` 和冻结的 `host` 作为参数，返回可 JSON 序列化数据。错误、超时、取消或 WebContent 进程退出不会修改正文和书库。

@@ -1,6 +1,6 @@
 # 原生兼容书源 v1
 
-正式版可导入 HTTPS 链接或 JSON 文件，预览确认后保存；也可编辑和导出。未知规则保留但不运行。支持原生 JSON v1 和下述 extract-v1；CSS／XPath／JSONPath／正则均按明确版本与子集执行，不将 JSON 语法通过视为任意阅读 3.0 方言兼容。
+正式版可导入 HTTPS 链接或 JSON 文件，预览确认后保存；也可编辑和导出。未知规则保留但不运行。支持原生 JSON v1、下述 extract-v1 和[阅读 3.0 基础兼容原型](LEGADO-COMPATIBILITY.md)。CSS／XPath／JSONPath／正则及脚本宿主均按明确范围执行，不将 JSON 语法通过视为任意阅读 3.0 书源已验证可读。
 
 单个来源示例（域名仅为占位，不能用于可读性验收）：
 

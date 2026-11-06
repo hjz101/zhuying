@@ -4,6 +4,8 @@
 
 原生版使用与测试方式见 [iOS 说明](ios/README.md)，47 个模块的覆盖与模拟边界见 [功能清单](ios/FEATURES.md)。下方保留的是之前的网页草稿，仅供历史设计参考。
 
+新增阅读 3.0 端侧基础兼容原型：原版 JSON 规则经现有书源入口导入后，可使用规则解析与同步 JavaScript 宿主执行搜索、详情、目录和正文。已实现范围、限额及尚需适配的高级书源见 [兼容说明](docs/LEGADO-COMPATIBILITY.md)。
+
 正式版的功能优先级、72 项任务、前置依赖、可并行工作线和阶段验收见 [完整开发流程与任务清单](docs/DEVELOPMENT-PLAN.md)。
 
 正式开发的当前状态与验证证据见 [实施记录](docs/IMPLEMENTATION-STATUS.md)，书山聚合的接口子集及待联调范围见 [接入记录](docs/SHUSHAN-INTEGRATION.md)。界面与交互一致性按 `AGENTS.md` 执行。

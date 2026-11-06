@@ -13,14 +13,14 @@ struct SourceConfigurationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 23) {
-                AppPageHeader(title: "书源编辑", subtitle: "书山聚合 · 固定原生适配器", icon: "square.and.pencil")
+                AppPageHeader(title: "书源编辑", subtitle: SourceDistributionPolicy.nativeServiceName + " · 原生接口适配器", icon: "square.and.pencil")
                 AppSettingsCard("基本信息", icon: "info.circle") {
                     TextField("书源名称", text: $name).accessibilityIdentifier("sourceConfigName")
                     TextField("HTTPS 服务地址", text: $address).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL).accessibilityIdentifier("sourceConfigURL")
                     TextField("分组", text: $group).accessibilityIdentifier("sourceConfigGroup")
                     Toggle("启用书源", isOn: $enabled)
                 }
-                Text("仅支持书山聚合的小说接口。修改服务地址后需在登录页登录对应主机；任意规则和其他媒体保留原入口，当前不可运行。")
+                Text("此页面用于编辑已导入的原生小说接口。修改服务地址后需登录对应主机；其他规则可在 JSON 编辑器中配置。")
                     .font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted)
                 if let message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("sourceConfigMessage") }
                 Button("保存书源") { Task { await save() } }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("sourceConfigSave")

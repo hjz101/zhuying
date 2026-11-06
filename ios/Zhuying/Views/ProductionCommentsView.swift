@@ -17,7 +17,7 @@ struct ProductionCommentsView: View {
         ScrollView {
             VStack(alignment:.leading,spacing:18) {
                 Text("本段评论").font(.system(size:23,weight:.medium,design:.serif))
-                Text("书山聚合 · 番茄 · 只读评论").font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
+                Text(SourceDistributionPolicy.nativeServiceName + " · 只读评论").font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                 Text(originalText).font(.system(size:14)).lineSpacing(7)
                 if stale { Text("当前展示缓存，联网后可刷新。").font(.system(size:12)).foregroundStyle(appAppearance.palette.muted).accessibilityIdentifier("commentsStale") }
                 ForEach(comments) { comment in

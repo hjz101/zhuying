@@ -76,7 +76,7 @@ struct DiscoverView: View {
         SectionHeading(title: query.isEmpty ? "故事小馆" : "搜索结果", subtitle: "\(online.results.count) 个来源版本")
         if online.busy && online.results.isEmpty { ProgressView("正在搜索书源").frame(maxWidth: .infinity).accessibilityIdentifier("onlineSearching") }
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            ThemeUnavailableView("搜索书名或作者", systemImage: "magnifyingglass", description: Text("搜索已启用的可运行书源；书山聚合需先登录。不同来源版本分别保留。"))
+            ThemeUnavailableView("搜索书名或作者", systemImage: "magnifyingglass", description: Text(SourceDistributionPolicy.searchHelp))
         } else if online.results.isEmpty && !online.busy && online.message == nil { ContentUnavailableView.search(text: query) }
         if let message = online.message {
             Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("onlineSearchError")

@@ -9,22 +9,19 @@ struct AppEnvironment: Equatable {
     let isLiveValidation: Bool
 
     init(arguments: [String] = ProcessInfo.processInfo.arguments) {
+        #if DEBUG
         isUITesting = arguments.contains("--ui-testing")
         preservesTestState = arguments.contains("--preserve-ui-test-state")
-        #if DEBUG
         isLiveValidation = arguments.contains("--live-source-acceptance") && arguments.contains("--production") && !isUITesting
-        #else
-        isLiveValidation = false
-        #endif
         if arguments.contains("--production") { mode = .production }
         else if arguments.contains("--demo") || isUITesting { mode = .demo }
-        else {
-            #if DEBUG
-            mode = .demo
-            #else
-            mode = .production
-            #endif
-        }
+        else { mode = .demo }
+        #else
+        isUITesting = false
+        preservesTestState = false
+        isLiveValidation = false
+        mode = .production
+        #endif
     }
     var isDemo: Bool { mode == .demo }
     var resetsTestState: Bool { isUITesting && !preservesTestState }

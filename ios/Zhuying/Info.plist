@@ -75,6 +75,8 @@
 			</dict>
 		</dict>
 	</array>
+	<key>ZhuyingBundledSources</key>
+	<false/>
 	<key>ZhuyingSourceRevision</key>
 	<string>$(ZHUYING_SOURCE_REVISION)</string>
 </dict>

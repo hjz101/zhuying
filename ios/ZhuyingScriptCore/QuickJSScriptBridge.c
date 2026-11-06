@@ -8,6 +8,12 @@
 #include <pthread.h>
 #endif
 
+typedef struct ZYHostError {
+    JSValue object;
+    uint32_t id;
+    struct ZYHostError *next;
+} ZYHostError;
+
 typedef struct {
     ZYQJSLimits limits;
     ZYQJSHostCallback host;
@@ -18,6 +24,7 @@ typedef struct {
     size_t bridge_bytes;
     ZYQJSStatus abort_status;
     int memory_exhausted;
+    ZYHostError *host_errors;
 } ZYState;
 
 /* Size accounting includes our headers, including runtime initialization.
@@ -109,6 +116,32 @@ static int zy_network_method(const char *method) {
     return 0;
 }
 
+static JSValue zy_throw_host_error(JSContext *context, ZYState *state, const char *message, int id) {
+    JS_ThrowInternalError(context, "%s", message);
+    JSValue error = JS_GetException(context);
+    if (id > 0 && JS_IsObject(error)) {
+        ZYHostError *entry = malloc(sizeof(*entry));
+        if (!entry) {
+            JS_FreeValue(context, error);
+            state->memory_exhausted = 1;
+            return JS_ThrowInternalError(context, "host error association unavailable");
+        }
+        entry->object = JS_DupValue(context, error); entry->id = (uint32_t)id;
+        entry->next = state->host_errors; state->host_errors = entry;
+    }
+    return JS_Throw(context, error);
+}
+
+static void zy_clear_host_errors(JSContext *context, ZYState *state) {
+    ZYHostError *entry = state->host_errors;
+    state->host_errors = NULL;
+    while (entry) {
+        ZYHostError *next = entry->next;
+        if (context) JS_FreeValue(context, entry->object);
+        free(entry); entry = next;
+    }
+}
+
 static JSValue zy_host(JSContext *context, JSValueConst receiver, int count, JSValueConst *arguments) {
     (void)receiver;
     ZYState *state = JS_GetContextOpaque(context);
@@ -154,7 +187,7 @@ static JSValue zy_host(JSContext *context, JSValueConst receiver, int count, JSV
                 result = JS_ThrowInternalError(context, "host response limit exceeded");
             } else {
                 state->bridge_bytes += output_length;
-                result = is_error ? JS_ThrowInternalError(context, "%s", output) : JS_ParseJSON(context, output, output_length, "host-result.json");
+                result = is_error ? zy_throw_host_error(context, state, output, is_error) : JS_ParseJSON(context, output, output_length, "host-result.json");
                 // A cancelled/expired UI interaction must also invalidate a
                 // persistent scope when a source catches the host exception.
                 if (interactive && is_error) state->abort_status = ZYQJS_SCRIPT_EXCEPTION;
@@ -279,8 +312,13 @@ static const char *zy_shim =
 
 static void zy_exception(JSContext *context, ZYState *state, ZYQJSResult *result) {
     JSValue error = JS_GetException(context);
-    const char *message = JS_ToCString(context, error);
     result->status = state->abort_status != ZYQJS_OK ? state->abort_status : state->memory_exhausted ? ZYQJS_MEMORY_LIMIT : ZYQJS_SCRIPT_EXCEPTION;
+    if (result->status == ZYQJS_SCRIPT_EXCEPTION && JS_IsObject(error)) {
+        for (ZYHostError *entry = state->host_errors; entry; entry = entry->next) {
+            if (JS_StrictEq(context, error, entry->object)) { result->host_error_id = entry->id; break; }
+        }
+    }
+    const char *message = JS_ToCString(context, error);
     if (message) {
         size_t message_limit = state->limits.maximum_output_bytes < 16384 ? state->limits.maximum_output_bytes : 16384;
         size_t message_length = strnlen(message, message_limit);
@@ -414,13 +452,13 @@ ZYQJSResult ZYQuickJSSessionEvaluate(ZYQuickJSSession *session,
                                    const char *bindings_json, size_t bindings_length,
                                    ZYQJSLimits limits, ZYQJSHostCallback host,
                                    ZYQJSCancelCallback cancelled, void *opaque) {
-    ZYQJSResult result = {ZYQJS_OK, NULL, NULL};
+    ZYQJSResult result = {ZYQJS_OK, NULL, NULL, 0};
     if (!session) { result.status = ZYQJS_INVALID_INPUT; return result; }
     if (session->evaluating) { result.status = ZYQJS_BUSY; return result; }
     if (!script || !library || !bindings_json || script_length > 256 * 1024 || library_length > 2 * 1024 * 1024 ||
         bindings_length > limits.maximum_bridge_bytes || limits.memory_limit_bytes < 256 * 1024 ||
         limits.stack_limit_bytes < 64 * 1024 || !limits.timeout_milliseconds || limits.timeout_milliseconds > 30000 ||
-        !limits.maximum_output_bytes || !limits.maximum_bridge_bytes) {
+        !limits.maximum_output_bytes || !limits.maximum_bridge_bytes || limits.maximum_host_calls > 4096) {
         zy_clear_session(session); result.status = ZYQJS_INVALID_INPUT; return result;
     }
     if (session->runtime && (session->memory_limit != limits.memory_limit_bytes ||
@@ -466,6 +504,7 @@ ZYQJSResult ZYQuickJSSessionEvaluate(ZYQuickJSSession *session,
  evaluated:
     JS_FreeValue(context, value);
  finish:
+    zy_clear_host_errors(session->context, state);
     if (result.status != ZYQJS_OK) zy_clear_session(session);
     // Persistent JavaScript functions resolve the host on the next evaluation,
     // never through a dangling pointer to the previous Swift callback box.
@@ -481,7 +520,7 @@ ZYQJSResult ZYQuickJSEvaluate(const char *script, size_t script_length,
                             ZYQJSLimits limits, ZYQJSHostCallback host,
                             ZYQJSCancelCallback cancelled, void *opaque) {
     ZYQuickJSSession *session = ZYQuickJSCreateSession();
-    if (!session) return (ZYQJSResult){ZYQJS_MEMORY_LIMIT, NULL, NULL};
+    if (!session) return (ZYQJSResult){ZYQJS_MEMORY_LIMIT, NULL, NULL, 0};
     ZYQJSResult result = ZYQuickJSSessionEvaluate(session, script, script_length, library, library_length,
                                               bindings_json, bindings_length, limits, host, cancelled, opaque);
     ZYQuickJSDestroySession(session);
@@ -491,7 +530,7 @@ ZYQJSResult ZYQuickJSEvaluate(const char *script, size_t script_length,
 void ZYQuickJSFreeResult(ZYQJSResult *result) {
     if (!result) return;
     free(result->json); free(result->message);
-    result->json = NULL; result->message = NULL;
+    result->json = NULL; result->message = NULL; result->host_error_id = 0;
 }
 
 const char *ZYQuickJSVersion(void) { return "2026-06-04"; }

@@ -30,7 +30,9 @@ typedef struct {
     size_t maximum_bridge_bytes;
 } ZYQJSLimits;
 
-/* Return a malloc-owned UTF-8 JSON value (or error message when *is_error=1).
+/* Return a malloc-owned UTF-8 JSON value (or error message when *is_error>0).
+   Positive error IDs are unique within this evaluation. A result reports that
+   ID only if the final uncaught exception is the identical host Error object.
    The bridge frees the returned buffer with free(). Calls are synchronous on
    the evaluating thread. The host must bound and cancel any blocking I/O. */
 typedef char *(*ZYQJSHostCallback)(void *opaque, const char *method, const char *arguments_json, int *is_error);
@@ -40,6 +42,7 @@ typedef struct {
     ZYQJSStatus status;
     char *json;
     char *message;
+    uint32_t host_error_id;
 } ZYQJSResult;
 
 typedef struct ZYQuickJSSession ZYQuickJSSession;

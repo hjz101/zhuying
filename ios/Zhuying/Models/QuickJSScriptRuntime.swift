@@ -9,6 +9,9 @@ struct LegadoScriptPolicy {
     var maximumHostCalls = 128
     var maximumBridgeBytes = 4 * 1024 * 1024
     var maximumOutputBytes = 2 * 1024 * 1024
+    /// Restore a native cause only for the identical uncaught host Error from
+    /// this evaluation. Ordinary caught errors do not invalidate the session.
+    var restoreHostErrors = false
     var cancelled: () -> Bool = { false }
 }
 
@@ -112,6 +115,7 @@ enum QuickJSScriptRuntime {
             case ZYQJS_BRIDGE_LIMIT: throw QuickJSScriptError.bridgeLimit
             case ZYQJS_BUSY: throw QuickJSScriptError.busy
             case ZYQJS_SCRIPT_EXCEPTION:
+                if policy.restoreHostErrors, let id = Int32(exactly: result.host_error_id), let cause = callbacks.hostErrors[id] { throw cause }
                 throw QuickJSScriptError.javascript(result.message.map { String(cString: $0) } ?? "未知异常")
             default: throw QuickJSScriptError.invalidInput
             }
@@ -122,6 +126,7 @@ enum QuickJSScriptRuntime {
         let policy: LegadoScriptPolicy
         let host: (String, [Any]) throws -> Any
         var bridgeOverflow = false
+        var hostErrors: [Int32: any Error] = [:]
         init(policy: LegadoScriptPolicy, host: @escaping (String, [Any]) throws -> Any) { self.policy = policy; self.host = host }
     }
 
@@ -146,7 +151,13 @@ enum QuickJSScriptRuntime {
                 return allocation
             }
         } catch {
-            isError.pointee = 1
+            guard callbacks.hostErrors.count < callbacks.policy.maximumHostCalls else {
+                callbacks.bridgeOverflow = true; isError.pointee = 1
+                return strdup("host error association limit exceeded")
+            }
+            let id = Int32(callbacks.hostErrors.count + 1)
+            callbacks.hostErrors[id] = error
+            isError.pointee = id
             return strdup(error.localizedDescription)
         }
     }

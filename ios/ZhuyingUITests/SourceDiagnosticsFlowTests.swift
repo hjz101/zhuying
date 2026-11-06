@@ -73,6 +73,9 @@ final class SourceDiagnosticsFlowTests: XCTestCase {
         XCTAssertTrue(app.textFields["legadoLoginField-原创账号"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let retry = app.buttons["sourceDiagnosticRetry"]; reveal(retry, app: app); retry.tap()
-        XCTAssertTrue(issue.waitForExistence(timeout: 15)); XCTAssertFalse(app.staticTexts["sourceAcceptanceStatus"].exists)
+        // The first 401 expires the native session. Returning from the login
+        // form without submitting credentials must retain that expired state.
+        let expired = app.staticTexts["sourceDiagnosticIssue-loginExpired"]
+        XCTAssertTrue(expired.waitForExistence(timeout: 15)); XCTAssertFalse(app.staticTexts["sourceAcceptanceStatus"].exists)
     }
 }

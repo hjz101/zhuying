@@ -43,5 +43,11 @@ final class LegadoSourceDefinitionTests: XCTestCase {
         XCTAssertThrowsError(try definition(value))
         value = row(); value["adapter"] = "json-v1"
         XCTAssertThrowsError(try definition(value))
+        for key in ["header", "jsLib", "searchUrl"] {
+            value = row(); value[key] = ["unexpected": "object"]
+            XCTAssertThrowsError(try definition(value), key)
+        }
+        value = row(); value["ruleContent"] = ["content": true]
+        XCTAssertThrowsError(try definition(value))
     }
 }

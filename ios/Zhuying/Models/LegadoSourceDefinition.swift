@@ -35,6 +35,9 @@ struct LegadoSourceDefinition {
               raw["adapter"] == nil || raw["adapter"] as? String == "legado-3" else {
             throw LegadoCompatibilityError.invalid("书源配置")
         }
+        for key in ["bookSourceUrl", "searchUrl", "header", "jsLib", "loginUrl", "exploreUrl"] {
+            if let value = raw[key], !(value is NSNull), !(value is String) { throw LegadoCompatibilityError.invalid(key) }
+        }
         func string(_ key: String) -> String { raw[key] as? String ?? "" }
         func rules(_ key: String) throws -> [String: String] {
             guard let value = raw[key] else { return [:] }
@@ -43,7 +46,7 @@ struct LegadoSourceDefinition {
             for (field, value) in row {
                 if value is NSNull { continue }
                 if let text = value as? String { result[field] = text }
-                else if let number = value as? NSNumber { result[field] = number.stringValue }
+                else if key == "ruleBookInfo", field == "canReName", let number = value as? NSNumber { result[field] = number.stringValue }
                 else { throw LegadoCompatibilityError.invalid(key + "." + field) }
             }
             return result

@@ -44,6 +44,18 @@ extension ExtractionRule {
     }
 }
 enum RuleExtraction {
+    /// Preserve JSON value types for rule pipelines before projecting them to
+    /// strings. A JSON string containing "[1,2]" is not an array selection.
+    static func jsonValues(_ expression: String, from input: String) throws -> [Any] {
+        try Task.checkCancellation()
+        guard input.utf8.count <= 2 * 1024 * 1024 else { throw RuleExtractionError.limit }
+        try ExtractionRule(kind: .jsonPath, expression: expression).validate()
+        let json = try JSONSerialization.jsonObject(with: Data(input.utf8), options: [.fragmentsAllowed])
+        let values = try JSONPathV1.select(json, tokens: JSONPathV1.parse(expression))
+        let bytes = try JSONSerialization.data(withJSONObject: values, options: [.fragmentsAllowed])
+        guard bytes.count <= 2 * 1024 * 1024 else { throw RuleExtractionError.limit }
+        return values
+    }
     static let support = [
         "CSS v1：元素、class、id、属性选择、后代／子代／相邻／兄弟组合；输出文字、HTML 或属性。",
         "XPath v1：元素路径、属性与位置谓词；不支持函数、轴、联合或外部文档。",

@@ -96,6 +96,7 @@ enum LegadoRuleScanner {
     static func scriptEnd(_ chars: [Character], from start: Int) -> Int? {
         var quote: Character?, escaped = false, lineComment = false, blockComment = false, index = start
         var regex = false, regexClass = false, expressionStart = true
+        var controlParentheses: [Bool] = [], pendingControl = false
         while index < chars.count {
             let char = chars[index]
             if lineComment { if char == "\n" { lineComment = false }; index += 1; continue }
@@ -118,7 +119,13 @@ enum LegadoRuleScanner {
             else if char.isLetter || char == "_" || char == "$" {
                 let begin = index
                 while index + 1 < chars.count, chars[index + 1].isLetter || chars[index + 1].isNumber || chars[index + 1] == "_" || chars[index + 1] == "$" { index += 1 }
-                expressionStart = ["return", "throw", "case", "delete", "typeof", "void", "in", "of", "yield", "await"].contains(String(chars[begin...index]))
+                let word = String(chars[begin...index])
+                pendingControl = ["if", "while", "for", "with", "switch", "catch"].contains(word)
+                expressionStart = ["return", "throw", "case", "delete", "typeof", "void", "in", "of", "yield", "await", "else", "do"].contains(word)
+            } else if char == "(" {
+                controlParentheses.append(pendingControl); pendingControl = false; expressionStart = true
+            } else if char == ")" {
+                expressionStart = controlParentheses.popLast() ?? false
             } else if !char.isWhitespace { expressionStart = "([{:;,=!?&|+-*%~^<>/".contains(char) }
             index += 1
         }
@@ -164,32 +171,47 @@ struct LegadoRuleEngine {
                     for part in parts { let values = try evaluate(part, content: content, baseURL: baseURL, elements: elements); if values.contains(where: { !$0.isEmpty }) { return values } }
                     return []
                 }
-                let lists = try parts.map { try evaluate($0, content: content, baseURL: baseURL, elements: elements) }
+                var lists: [[String]] = [], intermediateBytes = 0, intermediateCount = 0
+                for part in parts {
+                    let values = try evaluate(part, content: content, baseURL: baseURL, elements: elements)
+                    intermediateBytes += values.reduce(0) { $0 + $1.utf8.count }; intermediateCount += values.count
+                    guard intermediateBytes <= 2 * 1024 * 1024, intermediateCount <= 2000 else { throw LegadoCompatibilityError.limit }
+                    if !values.isEmpty { lists.append(values) }
+                }
                 if delimiter == "&&" { return try bounded(lists.flatMap { $0 }) }
                 var result: [String] = []
-                for index in 0..<(lists.map(\.count).max() ?? 0) { for list in lists where list.indices.contains(index) { result.append(list[index]) } }
+                // fd026e0 intentionally uses the first successful list as the
+                // interleave span; trailing items in later lists are omitted.
+                for index in 0..<(lists.first?.count ?? 0) { for list in lists where list.indices.contains(index) { result.append(list[index]) } }
                 return try bounded(result)
             }
         }
-        let replacements = try replacementParts(rule)
-        var values = try pipeline(replacements[0], content: content, baseURL: baseURL, elements: elements)
+        return try pipeline(rule, content: content, baseURL: baseURL, elements: elements)
+    }
+    private func applyReplacements(_ selected: [String], parts replacements: [String], content: String, baseURL: URL?, elements: Bool) throws -> [String] {
+        var values = selected
         if replacements.count > 1 {
+            if context.scalarJS, !elements { values = [values.joined(separator: "\n")] }
             guard replacements.count <= 4 else { throw LegadoCompatibilityError.unsupported("多重正则替换分隔符") }
             let pattern = try interpolate(replacements[1], content: content, baseURL: baseURL)
             guard pattern.utf8.count <= 512 else { throw LegadoCompatibilityError.limit }
             let replacement = replacements.count > 2 ? try interpolate(replacements[2], content: content, baseURL: baseURL) : ""
             let regex = try NSRegularExpression(pattern: pattern)
             let start = ProcessInfo.processInfo.systemUptime
+            var transformedBytes = 0
             values = try values.map { value in
                 var matches: [NSTextCheckingResult] = [], stopped = false
                 regex.enumerateMatches(in: value, options: [.reportProgress, .reportCompletion], range: NSRange(value.startIndex..., in: value)) { match, flags, stop in
                     if Task.isCancelled || ProcessInfo.processInfo.systemUptime - start > 0.2 || flags.contains(.internalError) || matches.count >= 2000 { stopped = true; stop.pointee = true; return }
-                    if let match { matches.append(match) }
+                    if let match { matches.append(match); if replacements.count == 4 { stop.pointee = true } }
                 }
                 if stopped { try Task.checkCancellation(); throw LegadoCompatibilityError.limit }
                 if replacements.count == 4 {
                     guard let match = matches.first else { return "" }
-                    return regex.replacementString(for: match, in: value, offset: 0, template: replacement)
+                    let output = regex.replacementString(for: match, in: value, offset: 0, template: replacement)
+                    transformedBytes += output.utf8.count
+                    guard transformedBytes <= 2 * 1024 * 1024 else { throw LegadoCompatibilityError.limit }
+                    return output
                 }
                 let source = value as NSString
                 var output = "", offset = 0, bytes = 0
@@ -203,7 +225,8 @@ struct LegadoRuleEngine {
                     output += prefix; output += substituted; offset = NSMaxRange(match.range)
                 }
                 let suffix = source.substring(from: offset)
-                guard bytes + suffix.utf8.count <= 2 * 1024 * 1024 else { throw LegadoCompatibilityError.limit }
+                transformedBytes += bytes + suffix.utf8.count
+                guard transformedBytes <= 2 * 1024 * 1024 else { throw LegadoCompatibilityError.limit }
                 return output + suffix
             }
         }
@@ -220,36 +243,53 @@ struct LegadoRuleEngine {
         let chars = Array(input)
         var index = 0, start = 0, stack: [Character] = [], quote: Character?, escaped = false
         var result: Any = content
+        var initialResult = true
+        var replacementStage = 0
         while index < chars.count {
             let char = chars[index]
+            if replacementStage > 0 {
+                if char == "\\" { index += min(2, chars.count - index); continue }
+                if LegadoRuleScanner.matches(chars, index, "##") { replacementStage += 1; index += 2; continue }
+                if replacementStage == 1 || !(LegadoRuleScanner.matches(chars, index, "@js:") || LegadoRuleScanner.matches(chars, index, "<js>")) { index += 1; continue }
+            }
             if let active = quote {
                 if escaped { escaped = false } else if char == "\\" { escaped = true } else if char == active { quote = nil }
                 index += 1; continue
             }
             if char == "\"" || char == "'" || char == "`" { quote = char; index += 1; continue }
+            if stack.isEmpty, LegadoRuleScanner.matches(chars, index, "##") { replacementStage = 1; index += 2; continue }
             if stack.isEmpty, LegadoRuleScanner.matches(chars, index, "@js:") || LegadoRuleScanner.matches(chars, index, "<js>") {
                 let prefix = String(chars[start..<index]).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !prefix.isEmpty {
-                    let selected = try select(prefix, content: string(result), baseURL: baseURL, elements: elements)
-                    result = context.scalarJS ? selected.joined(separator: "\n") : selected
+                    result = try stage(prefix, result: result, baseURL: baseURL, elements: elements)
+                    initialResult = false
                 }
                 if LegadoRuleScanner.matches(chars, index, "@js:") {
-                    result = try js(String(chars[(index + 4)...]), result: result, original: content, baseURL: baseURL)
+                    result = try js(String(chars[(index + 4)...]), result: result, original: content, baseURL: baseURL, decodeStructured: initialResult)
                     return try strings(result)
                 }
                 guard let end = LegadoRuleScanner.scriptEnd(chars, from: index + 4) else { throw LegadoCompatibilityError.invalid("<js> 缺少 </js>") }
-                result = try js(String(chars[(index + 4)..<end]), result: result, original: content, baseURL: baseURL)
-                index = end + 5; start = index; continue
+                result = try js(String(chars[(index + 4)..<end]), result: result, original: content, baseURL: baseURL, decodeStructured: initialResult)
+                initialResult = false
+                index = end + 5; start = index; replacementStage = 0; continue
             }
             if char == "[" || char == "{" || char == "(" { stack.append(char) }
             else if char == "]" || char == "}" || char == ")" { if !stack.isEmpty { stack.removeLast() } }
             index += 1
         }
         let tail = String(chars[start...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        if !tail.isEmpty { return try select(tail, content: string(result), baseURL: baseURL, elements: elements) }
+        if !tail.isEmpty { return try strings(stage(tail, result: result, baseURL: baseURL, elements: elements)) }
         return try strings(result)
     }
-    private func select(_ original: String, content: String, baseURL: URL?, elements: Bool) throws -> [String] {
+    private func stage(_ input: String, result: Any, baseURL: URL?, elements: Bool) throws -> Any {
+        let parts = try replacementParts(input), content = try string(result)
+        var JSONValues: [Any]?
+        let selected = parts[0].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? try strings(result) : try select(parts[0], content: content, baseURL: baseURL, elements: elements, jsonResult: { JSONValues = $0 })
+        let values = try applyReplacements(selected, parts: parts, content: content, baseURL: baseURL, elements: elements)
+        if elements, parts.count == 1 { return JSONValues ?? values }
+        return context.scalarJS ? values.joined(separator: "\n") : values
+    }
+    private func select(_ original: String, content: String, baseURL: URL?, elements: Bool, jsonResult: (([Any]) -> Void)? = nil) throws -> [String] {
         var rule = original
         let chars = Array(rule); var index = 0, retained = "", quote: Character?, escaped = false
         while index < chars.count {
@@ -270,6 +310,9 @@ struct LegadoRuleEngine {
                     let value = try text(map[key]!, in: content, baseURL: baseURL)
                     guard key.utf8.count <= 512, value.utf8.count <= 128 * 1024,
                           context.variables.count < 512 || context.variables[key] != nil else { throw LegadoCompatibilityError.limit }
+                    let existingBytes = context.variables.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count }
+                    let previousBytes = context.variables[key].map { key.utf8.count + $0.utf8.count } ?? 0
+                    guard existingBytes - previousBytes + key.utf8.count + value.utf8.count <= 512 * 1024 else { throw LegadoCompatibilityError.limit }
                     context.variables[key] = value
                 }
                 index = end + 1
@@ -286,11 +329,9 @@ struct LegadoRuleEngine {
         rule = try interpolate(rule, content: content, baseURL: baseURL)
         if rule.lowercased().hasPrefix("@json:") { rule = String(rule.dropFirst(6)) }
         if rule.hasPrefix("$") {
-            let values = try RuleExtraction.extract(.init(kind: .jsonPath, expression: rule), from: content)
-            return try bounded(values.flatMap { value -> [String] in
-                if let array = (try? JSONSerialization.jsonObject(with: Data(value.utf8))) as? [Any] { return try array.map(string) }
-                return [value]
-            })
+            let values = try RuleExtraction.jsonValues(rule, from: content).flatMap { ($0 as? [Any]) ?? [$0] }
+            jsonResult?(values)
+            return try bounded(values.map { $0 is NSNull ? "null" : try string($0) })
         }
         if rule.lowercased().hasPrefix("@xpath:") { rule = String(rule.dropFirst(7)) }
         if rule.hasPrefix("/") { return try RuleExtraction.extract(.init(kind: .xpath, expression: rule, projection: elements ? .html : .text), from: content) }
@@ -315,10 +356,10 @@ struct LegadoRuleEngine {
         }
         return result
     }
-    private func js(_ script: String, result: Any, original: String, baseURL: URL?) throws -> Any {
+    private func js(_ script: String, result: Any, original: String, baseURL: URL?, decodeStructured: Bool = true) throws -> Any {
         guard let evaluate = context.evaluateJS else { throw LegadoCompatibilityError.unsupported("JavaScript 宿主未连接") }
         var bindings = context.bindings
-        if context.structuredInput, let text = result as? String, let json = try? JSONSerialization.jsonObject(with: Data(text.utf8), options: [.fragmentsAllowed]) { bindings["result"] = json }
+        if decodeStructured, context.structuredInput, let text = result as? String, let json = try? JSONSerialization.jsonObject(with: Data(text.utf8), options: [.fragmentsAllowed]) { bindings["result"] = json }
         else { bindings["result"] = result }
         bindings["src"] = original; if let baseURL { bindings["baseUrl"] = baseURL.absoluteString }
         return try evaluate(script, bindings)
@@ -330,8 +371,9 @@ struct LegadoRuleEngine {
         var parts = try LegadoRuleScanner.split(rule, on: "@").filter { !$0.isEmpty }
         let projections = ["text", "ownText", "textNodes", "html", "all"]
         var projection = elements ? "all" : "text"
-        if let last = parts.last, projections.contains(last) || (parts.count > 1 && !["class.", "id.", "tag."].contains(where: { last.hasPrefix($0) }) && last.range(of: #"^[A-Za-z_:][A-Za-z0-9_:.-]*$"#, options: .regularExpression) != nil) || (rule.hasPrefix("@") && parts.count == 1) {
-            projection = last; parts.removeLast()
+        var explicitProjection = false
+        if let last = parts.last, projections.contains(last) || ((!elements || parts.count > 1) && !["class.", "id.", "tag."].contains(where: { last.hasPrefix($0) }) && last.range(of: #"^[A-Za-z_:][A-Za-z0-9_:.-]*$"#, options: .regularExpression) != nil) || (rule.hasPrefix("@") && parts.count == 1) {
+            projection = last; explicitProjection = true; parts.removeLast()
         }
         let lower = content.lowercased()
         guard !lower.contains("<!entity"), !(lower.contains("<!doctype") && (lower.contains("system") || lower.contains("public") || lower.contains("["))), content.filter({ $0 == "<" }).count <= 8000 else { throw LegadoCompatibilityError.limit }
@@ -343,7 +385,15 @@ struct LegadoRuleEngine {
         } else { nodes = document.root.map { [$0] } ?? [] }
         for part in parts {
             try Task.checkCancellation()
-            if part == "children" { nodes = nodes.flatMap(\.children); continue }
+            if part == "children" {
+                var children: [Fuzi.XMLElement] = []
+                for parent in nodes {
+                    let values = parent.children
+                    guard children.count + values.count <= 2000 else { throw LegadoCompatibilityError.limit }
+                    children += values
+                }
+                nodes = children; continue
+            }
             if part.hasPrefix("text.") || part.hasPrefix("ownText.") { throw LegadoCompatibilityError.unsupported("jsoup 文本选择器 " + part) }
             var selector = part, position: Int?
             let dialects = [("class.", "."), ("id.", "#"), ("tag.", "")]
@@ -354,23 +404,55 @@ struct LegadoRuleEngine {
                 selector = dialect.1 + selector
             }
             try ExtractionRule(kind: .css, expression: selector).validate()
-            nodes = nodes.flatMap { parent -> [Fuzi.XMLElement] in
+            var next: [Fuzi.XMLElement] = []
+            for parent in nodes {
+                try Task.checkCancellation()
                 let selected = Array(parent.css(selector))
-                guard let position else { return selected }
-                let index = position < 0 ? selected.count + position : position
-                return selected.indices.contains(index) ? [selected[index]] : []
+                let values: [Fuzi.XMLElement]
+                if let position {
+                    let index = position < 0 ? selected.count + position : position
+                    values = selected.indices.contains(index) ? [selected[index]] : []
+                } else { values = selected }
+                guard next.count + values.count <= 2000 else { throw LegadoCompatibilityError.limit }
+                next += values
             }
-            guard nodes.count <= 2000 else { throw LegadoCompatibilityError.limit }
+            nodes = next
         }
-        return try bounded(nodes.flatMap { node -> [String] in
-            switch projection {
-            case "all": return [node.rawXML]
-            case "html": return [node.childNodes(ofTypes: [.Element, .Text, .CDataSection, .Comment]).map(\.rawXML).joined()]
-            case "ownText": return [normalize(node.childNodes(ofTypes: [.Text, .CDataSection]).map(\.stringValue).joined(separator: " "))]
-            case "textNodes": return node.childNodes(ofTypes: [.Text, .CDataSection]).map { normalize($0.stringValue) }.filter { !$0.isEmpty }
-            case "text": return [normalize(try nodeText(node))]
-            default: return node[projection].map { [$0] } ?? []
+        if projection == "html" || projection == "all" {
+            var values: [String] = [], outputBytes = 0
+            for node in nodes {
+                try Task.checkCancellation()
+                if projection == "html", ["script", "style"].contains(node.tag?.lowercased() ?? "") { continue }
+                var value = node.rawXML
+                if projection == "html" { for child in node.css("script, style") { try Task.checkCancellation(); value = value.replacingOccurrences(of: child.rawXML, with: "") } }
+                outputBytes += value.utf8.count
+                guard outputBytes <= 2 * 1024 * 1024 else { throw LegadoCompatibilityError.limit }
+                values.append(value)
             }
+            if elements, !explicitProjection { return try bounded(values) }
+            return try bounded(values.isEmpty ? [] : [values.joined(separator: "\n")])
+        }
+        var seenAttributes = Set<String>()
+        var projectedBytes = 0, projectedCount = 0
+        return try bounded(nodes.flatMap { node -> [String] in
+            let values: [String]
+            switch projection {
+            case "ownText":
+                let value = normalize(node.childNodes(ofTypes: [.Text, .CDataSection]).map(\.stringValue).joined(separator: " "))
+                values = value.isEmpty ? [] : [value]
+            case "textNodes":
+                let texts = node.childNodes(ofTypes: [.Text, .CDataSection]).map { normalize($0.stringValue) }.filter { !$0.isEmpty }
+                values = texts.isEmpty ? [] : [texts.joined(separator: "\n")]
+            case "text":
+                let value = normalize(try nodeText(node))
+                values = value.isEmpty ? [] : [value]
+            default:
+                guard let value = node[projection], !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, seenAttributes.insert(value).inserted else { return [] }
+                values = [value]
+            }
+            projectedBytes += values.reduce(0) { $0 + $1.utf8.count }; projectedCount += values.count
+            guard projectedBytes <= 2 * 1024 * 1024, projectedCount <= 2000 else { throw LegadoCompatibilityError.limit }
+            return values
         })
     }
     private func normalize(_ input: String) -> String { input.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ") }

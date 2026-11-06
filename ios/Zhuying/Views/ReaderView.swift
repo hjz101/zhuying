@@ -8,6 +8,7 @@ extension ReadingTheme {
 }
 
 struct ReaderView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     @EnvironmentObject private var shushan: ShushanAccountStore
     @Environment(\.dismiss) private var dismiss
@@ -102,7 +103,7 @@ struct ReaderView: View {
                 if loading.phase == .loading || !initialized && loading.phase == .idle { ProgressView("正在打开章节").accessibilityIdentifier("chapterLoading") }
                 else if case let .failed(reason) = loading.phase {
                     ContentUnavailableView {
-                        Label("章节暂时无法打开", systemImage: "doc.text.magnifyingglass")
+                        ThemeLabel("章节暂时无法打开", systemImage: "doc.text.magnifyingglass")
                     } description: { Text(reason) }
                     actions: {
                         Button("重试") { goChapter(requestedChapter ?? chapter, resume: requestedResume, atEnd: requestedAtEnd, location: requestedLocation) }.accessibilityIdentifier("retryChapter")
@@ -142,7 +143,7 @@ struct ReaderView: View {
                 if !store.isDemo { ReaderNarrationMiniPlayer(audio: store.audio, bookID: book.id, open: { showNarration = true }, follow: { followNarration(store.audio.state.anchor, force: true) }) }
             }
         }
-        .background(readerBackground.ignoresSafeArea())
+        .background(ThemeReaderBackdrop(color: readerBackground).ignoresSafeArea())
         .foregroundStyle(readerInk)
         .preferredColorScheme((store.settings.preferences.colors?.dark ?? (theme == .dark)) ? .dark : .light)
         .task { await loadChapter(chapter, resume: resume, atEnd: false, location: startingAnchor) }
@@ -240,7 +241,7 @@ struct ReaderView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         Text("本地示例评论").font(.system(size: 23, weight: .medium, design: .serif))
                         Text("第 \((commentParagraph ?? 0) + 1) 段 · 本次只展示本地示例，不连接评论服务。")
-                            .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                            .font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted)
                         Text(loaded?.paragraphs[safe: commentParagraph ?? 0]?.text ?? "")
                             .font(.system(size: 14)).lineSpacing(7)
                         AppSettingsCard("神人评论 · 示例", icon: "bubble.left") {
@@ -249,7 +250,7 @@ struct ReaderView: View {
                     }.padding(22)
                 }.appPageStyle().navigationTitle("本段评论")
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { commentParagraph = nil } } }
-                } else { ContentUnavailableView("段评暂不可用",systemImage:"bubble.left",description:Text("请确认书源登录与当前段落数据。")) }
+                } else { ThemeUnavailableView("段评暂不可用",systemImage:"bubble.left",description:Text("请确认书源登录与当前段落数据。")) }
             }.presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showGestureGuide, onDismiss: { store.completeReadingGuide() }) {
@@ -259,7 +260,7 @@ struct ReaderView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Button { save(); dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }.accessibilityLabel("返回书架")
+            Button { save(); dismiss() } label: { ThemeIcon(systemName: "chevron.down").font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }.accessibilityLabel("返回书架")
             Spacer(minLength: 0)
             VStack(spacing: 5) {
                 Text(book.title).font(.system(size: 13, weight: .medium, design: .serif)).tracking(2)
@@ -273,16 +274,16 @@ struct ReaderView: View {
                         haptic()
                         showMessage(added ? "已加入书架" : "已移出书架，阅读进度已保留")
                     } label: {
-                        Label(store.isFavorite(book) ? "取消收藏" : "加入书架", systemImage: store.isFavorite(book) ? "bookmark.slash" : "bookmark")
+                        ThemeLabel(store.isFavorite(book) ? "取消收藏" : "加入书架", systemImage: store.isFavorite(book) ? "bookmark.slash" : "bookmark")
                     }.accessibilityIdentifier("readerFavoriteAction")
                 }
                 Section {
                     ForEach(["fulltext", "sourceSwitch", "bookmarks", "chapterCache", "purify", "highlight"], id: \.self) { id in
-                        Button(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { openFeature(id) }
+                        ThemeButton(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { openFeature(id) }
                     }
                 }
             } label: {
-                Image(systemName: "ellipsis").font(.system(size: 20, weight: .medium)).frame(width: 44, height: 44)
+                ThemeIcon(systemName: "ellipsis").font(.system(size: 20, weight: .medium)).frame(width: 44, height: 44)
             }.accessibilityLabel("更多阅读工具").accessibilityIdentifier("readerMoreTools")
         }
         .padding(.horizontal, 5).padding(.vertical, 4)
@@ -295,7 +296,7 @@ struct ReaderView: View {
     private var footer: some View {
         VStack(spacing: 10) {
             HStack(spacing: 4) {
-                Button { flip(forward: false) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.disabled(chapter == 0 && (store.settings.mode == .scroll || page == 0)).accessibilityLabel(store.settings.mode.isPaged ? "上一页" : "上一章").accessibilityIdentifier("previousChapter")
+                Button { flip(forward: false) } label: { ThemeIcon(systemName: "chevron.left").frame(width: 44, height: 44) }.disabled(chapter == 0 && (store.settings.mode == .scroll || page == 0)).accessibilityLabel(store.settings.mode.isPaged ? "上一页" : "上一章").accessibilityIdentifier("previousChapter")
                 VStack(spacing: 0) {
                     HStack(spacing: 6) {
                         Text(sliderEditing ? "跳至 · \(book.chapterTitle(Int(sliderValue)))" : "第 \(chapter + 1) / \(book.chapters.count) 章").font(.system(size: 10)).lineLimit(1)
@@ -307,7 +308,7 @@ struct ReaderView: View {
                         if !editing { detachNarration(); goChapter(min(book.chapters.count - 1, Int(sliderValue))) }
                     }.tint(readerInk.opacity(0.65)).accessibilityLabel("章节进度").accessibilityValue(book.chapterTitle(Int(sliderValue))).accessibilityIdentifier("chapterSlider")
                 }
-                Button { flip(forward: true) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.disabled(chapter == book.chapters.count - 1 && (store.settings.mode == .scroll || page == ranges.count - 1)).accessibilityLabel(store.settings.mode.isPaged ? "下一页" : "下一章").accessibilityIdentifier("nextChapter")
+                Button { flip(forward: true) } label: { ThemeIcon(systemName: "chevron.right").frame(width: 44, height: 44) }.disabled(chapter == book.chapters.count - 1 && (store.settings.mode == .scroll || page == ranges.count - 1)).accessibilityLabel(store.settings.mode.isPaged ? "下一页" : "下一章").accessibilityIdentifier("nextChapter")
             }
             .padding(.horizontal, 5).padding(.vertical, 8)
             .readerFloatingSurface()
@@ -336,13 +337,13 @@ struct ReaderView: View {
     private func featureMenu(_ title: String, icon: String, features: [String]) -> some View {
         Menu {
             ForEach(features, id: \.self) { id in
-                Button(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { openFeature(id) }
+                ThemeButton(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon) { openFeature(id) }
             }
         } label: { toolLabel(title, icon: icon) }.accessibilityLabel(title)
     }
     private func toolLabel(_ title: String, icon: String) -> some View {
         VStack(spacing: 5) {
-            Image(systemName: icon).font(.system(size: 20, weight: .medium)).frame(height: 24)
+            ThemeIcon(systemName: icon).font(.system(size: 20, weight: .medium)).frame(height: 24)
             Text(title).font(.system(size: 10))
         }.frame(width: 55, height: 48).foregroundStyle(readerInk.opacity(0.9))
     }
@@ -468,6 +469,7 @@ private extension View {
 }
 
 struct ContentsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @Environment(\.dismiss) private var dismiss
     let book: Book
@@ -496,16 +498,16 @@ struct ContentsView: View {
                                         if library.chapterAccess(book, chapter: index) != .readable {
                                             Text(library.chapterAccess(book, chapter: index) == .volume ? "分卷" : "受限").font(.system(size: 10))
                                         }
-                                        if index == currentChapter { Text("正在阅读").font(.system(size: 10)); Image(systemName: "waveform").font(.system(size: 12)) }
-                                        else { Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted) }
-                                    }.foregroundStyle(Palette.green).padding(.horizontal, 16).frame(minHeight: 56)
-                                        .background(index == currentChapter ? Palette.soft : Color.clear)
+                                        if index == currentChapter { Text("正在阅读").font(.system(size: 10)); ThemeIcon(systemName: "waveform").font(.system(size: 12)) }
+                                        else { ThemeIcon(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted) }
+                                    }.foregroundStyle(appAppearance.palette.green).padding(.horizontal, 16).frame(minHeight: 56)
+                                        .background(index == currentChapter ? appAppearance.palette.soft : Color.clear)
                                         .contentShape(Rectangle())
                                 }.buttonStyle(.plain).disabled(library.chapterAccess(book, chapter: index) != .readable).id(index).accessibilityIdentifier("chapter-\(index)")
-                                if index != visibleChapters.last { Divider().overlay(Palette.line).padding(.horizontal, 16) }
+                                if index != visibleChapters.last { Divider().overlay(appAppearance.palette.line).padding(.horizontal, 16) }
                             }
                         }
-                        .background(Palette.card, in: .rect(cornerRadius: 18)).clipShape(.rect(cornerRadius: 18))
+                        .background(appAppearance.palette.card, in: .rect(cornerRadius: 18)).clipShape(.rect(cornerRadius: 18))
                     }.padding(22)
                 }
                 .appPageStyle()
@@ -513,8 +515,8 @@ struct ContentsView: View {
             }
             .navigationTitle("章节目录").navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: "搜索章节")
-            .toolbar { ToolbarItem(placement: .topBarLeading) { Button(reversed ? "倒序" : "正序", systemImage: "arrow.up.arrow.down") { reversed.toggle() } } }
+            .toolbar { ToolbarItem(placement: .topBarLeading) { ThemeButton(reversed ? "倒序" : "正序", systemImage: "arrow.up.arrow.down") { reversed.toggle() } } }
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
-        }.appPageStyle().presentationBackground(Palette.background).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(26)
+        }.appPageStyle().presentationBackground(appAppearance.palette.background).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(26)
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 import WebKit
 
 struct ProductionBrowserView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @StateObject private var browser = NativeSourceBrowser()
     @State private var sourceID = ""
@@ -35,10 +36,10 @@ struct ProductionBrowserView: View {
                 HStack { Button("查看页面结构") { browser.inspect() }; Spacer(); Button("下载当前链接") { browser.downloadCurrent() }.disabled(browser.downloading) }.font(.system(size:12))
                 if browser.downloading { ProgressView("正在下载"); Button("取消下载") { browser.cancelDownload() } }
                 Button("清除此书源浏览器数据",role:.destructive) { Task { await browser.clearSession() } }.font(.system(size:12))
-                if sourceID == "shushan" { NavigationLink("书山应用内登录") { ShushanLoginView() }; Text("书山原生请求使用应用内登录；浏览器会话独立。") .font(.system(size:12)).foregroundStyle(Palette.muted) }
-                if let message = browser.message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("browserMessage") }
+                if sourceID == "shushan" { NavigationLink("书山应用内登录") { ShushanLoginView() }; Text("书山原生请求使用应用内登录；浏览器会话独立。") .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted) }
+                if let message = browser.message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("browserMessage") }
                 Text("书源间和主机间独立会话；外站需切换临时会话。仅复用当前书源的匹配 Cookie，不转发给其他来源。下载最多 20 MB，支持 TXT／EPUB／PDF 和 ZIP／RAR／7z 图片归档，完成后仍需预览确认；不自动执行导入规则。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("内置浏览器").navigationBarTitleDisplayMode(.inline)
             .onChange(of:javascript) { _,_ in if browser.webView != nil { open() } }

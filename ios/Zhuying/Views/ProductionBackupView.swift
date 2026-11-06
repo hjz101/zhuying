@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ProductionBackupView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @State private var exportFile: ExportFile?
     @State private var importing = false
@@ -15,10 +16,10 @@ struct ProductionBackupView: View {
                 AppSettingsCard("备份内容", icon: "doc.text") {
                     Text("书架、导入正文、稳定进度、书签、分组、阅读偏好、字体和主题。")
                     Text("不含登录凭据或近期缓存。恢复会替换当前书库，其他设备需重新登录在线来源。仅支持竹影原生备份格式，不兼容其他软件的同名文件。")
-                        .foregroundStyle(Palette.muted)
+                        .foregroundStyle(appAppearance.palette.muted)
                 }.font(.system(size: 12)).lineSpacing(6)
                 if busy { ProgressView("正在校验与处理备份") }
-                if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("backupMessage") }
+                if let message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("backupMessage") }
                 Button("创建本地备份") {
                     Task { await perform {
                         let data = try await library.createBackup()

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionDownloadView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var bookID: String?
     @EnvironmentObject private var library: LibraryStore
     @State private var selectedBook = ""
@@ -23,13 +24,13 @@ struct ProductionDownloadView: View {
                 Button("开始下载") { Task { await perform { try await library.enqueueDownload(bookID:selectedBook,count:count == "全部章节" ? nil : count == "后续 10 章" ? 10 : 50,wifiOnly:wifiOnly) } } }
                     .buttonStyle(PrimaryButtonStyle()).disabled(selectedBook.isEmpty).accessibilityIdentifier("enqueueDownload")
                 AppSettingsCard("下载队列",icon:"list.bullet") {
-                    Text("\(ByteCountFormatter.string(fromByteCount:Int64(bytes),countStyle:.file)) / 256 MiB · 最多同时下载 2 章").font(.system(size:11)).foregroundStyle(Palette.muted)
+                    Text("\(ByteCountFormatter.string(fromByteCount:Int64(bytes),countStyle:.file)) / 256 MiB · 最多同时下载 2 章").font(.system(size:11)).foregroundStyle(appAppearance.palette.muted)
                     ForEach(tasks) { task in
                         VStack(alignment:.leading,spacing:10) {
                             HStack { Text(task.book.title); Spacer(); Text(status(task.status)).font(.system(size:11)) }
                             ProgressView(value:Double(task.completed.count),total:Double(max(1,task.chapters.count)))
                             Text("\(task.completed.count) / \(task.chapters.count) 章").font(.system(size:11))
-                            if let message = task.message { Text(message).font(.system(size:11)).foregroundStyle(Palette.accent) }
+                            if let message = task.message { Text(message).font(.system(size:11)).foregroundStyle(appAppearance.palette.accent) }
                             HStack {
                                 if task.status == .running || task.status == .queued { Button("暂停") { Task { await perform { try await library.onlineService?.downloads?.pause(task.id) } } } }
                                 else if task.status != .completed { Button("继续／重试") { Task { await perform { try await library.onlineService?.downloads?.resume(task.id) } } } }
@@ -40,8 +41,8 @@ struct ProductionDownloadView: View {
                     if tasks.isEmpty { Text("没有下载任务").font(.system(size:12)) }
                 }
                 Text("主动下载独立于近期缓存；清理近期缓存会保留下载。退出到后台时暂停，回到前台可继续。Wi-Fi 条件未满足时等待；原生备份不包含可重新下载的网络正文。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent) }
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent) }
             }.padding(22)
         }.appPageStyle().navigationTitle("章节缓存").navigationBarTitleDisplayMode(.inline)
             .task {
@@ -63,6 +64,7 @@ struct ProductionDownloadView: View {
 }
 
 struct ProductionSourceSwitchView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var bookID: String?
     @EnvironmentObject private var library: LibraryStore
     @State private var candidates: [LibraryBookRecord] = []
@@ -82,8 +84,8 @@ struct ProductionSourceSwitchView: View {
                     Button("查找候选来源") { Task { await load(original) } }.buttonStyle(PrimaryButtonStyle(filled:false)).disabled(busy)
                     ForEach(candidates) { candidate in
                         Button { Task { await choose(candidate,original:original) } } label: {
-                            HStack { VStack(alignment:.leading) { Text(candidate.title + " · " + candidate.author); Text(candidate.source?.provider ?? "来源").font(.system(size:11)) }; Spacer(); Image(systemName:selection?.id == candidate.id ? "checkmark.circle.fill" : "circle") }
-                                .font(.system(size:13)).padding(16).frame(maxWidth:.infinity,alignment:.leading).background(.white.opacity(0.7),in:.rect(cornerRadius:10))
+                            HStack { VStack(alignment:.leading) { Text(candidate.title + " · " + candidate.author); Text(candidate.source?.provider ?? "来源").font(.system(size:11)) }; Spacer(); ThemeIcon(systemName:selection?.id == candidate.id ? "checkmark.circle.fill" : "circle") }
+                                .font(.system(size:13)).padding(16).frame(maxWidth:.infinity,alignment:.leading).background(appAppearance.palette.card,in:.rect(cornerRadius:10))
                         }.buttonStyle(.plain).disabled(busy)
                     }
                     if selection != nil {
@@ -91,13 +93,13 @@ struct ProductionSourceSwitchView: View {
                             Picker("章节",selection:$chapter) { Text("请选择章节").tag(-1); ForEach(Array(catalog.enumerated()),id:\.element.id) { index,item in if item.access == .readable { Text(item.title).tag(index) } } }
                             Toggle("位置无法确认时，从所选章首继续",isOn:$fromStart)
                             Text("章名及顺序只用于建议，正文上下文必须唯一匹配。不同来源作为独立版本保留，原来源的历史和书签不会删除。")
-                                .font(.system(size:11)).foregroundStyle(Palette.muted)
+                                .font(.system(size:11)).foregroundStyle(appAppearance.palette.muted)
                         }
                         Button("切换并继续阅读") { Task { await apply(original) } }.buttonStyle(PrimaryButtonStyle()).disabled(chapter < 0 || busy)
                     }
-                } else { ContentUnavailableView("请先打开一本作品",systemImage:"book") }
+                } else { ThemeUnavailableView("请先打开一本作品",systemImage:"book") }
                 if busy { ProgressView("正在验证书源") }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent) }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent) }
             }.padding(22)
         }.appPageStyle().navigationTitle("换源").navigationBarTitleDisplayMode(.inline)
     }
@@ -122,6 +124,7 @@ struct ProductionSourceSwitchView: View {
 }
 
 struct ProductionSourceDiagnosticsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var sourceID: String?
     var batch = false
     @EnvironmentObject private var library: LibraryStore
@@ -153,7 +156,7 @@ struct ProductionSourceDiagnosticsView: View {
                     HStack { Text(library.sources.first(where:{$0.id == report.sourceID})?.name ?? "来源"); Spacer(); Text("\(report.step) · \(report.status) · \(report.milliseconds) ms · \(report.count)") }.font(.system(size:11)).padding(.vertical,8)
                 }
                 if !reports.isEmpty { Button("导出脱敏报告") { do { export = try ExportFile.prepare(JSONEncoder().encode(reports),filename:"书源检测报告.json") } catch { message = error.localizedDescription } }.buttonStyle(PrimaryButtonStyle(filled:false)) }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent) }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent) }
             }.padding(22)
         }.appPageStyle().navigationTitle(batch ? "批量测试" : "书源调试").navigationBarTitleDisplayMode(.inline)
             .onAppear { selection = library.sources.contains(where: { $0.id == sourceID }) ? sourceID! : library.sources.first?.id ?? "" }

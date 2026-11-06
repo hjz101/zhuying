@@ -34,6 +34,22 @@ test('standalone AI prompt and downloadable fixture use the actual legacy readin
   }
 });
 
+test('shipped AI contract and schemas match the reproducible native source inventory', () => {
+  const script = `
+import importlib.util,json
+s=importlib.util.spec_from_file_location('contract','ios/scripts/generate-theme-contract.py')
+m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+print(json.dumps(m.documents(),ensure_ascii=False))
+`;
+  const generated = JSON.parse(execFileSync('python3', ['-c', script], { encoding: 'utf8' }));
+  for (const [name, value] of Object.entries(generated)) {
+    assert.deepEqual(JSON.parse(read('../ios/Zhuying/Resources/' + name)), value, `${name} must be regenerated with its source`);
+  }
+  assert.ok(generated['theme-contract.json'].symbolIconRoles.includes('symbol.play.fill'));
+  assert.ok(generated['theme-contract.json'].semanticIconRoles.includes('navigation.back'));
+  assert.deepEqual(generated['theme.schema.json'].properties.reader.properties.systemFont.enum, ['default', 'serif']);
+});
+
 test('proposed reader projection covers portable preference fields and excludes local branches', () => {
   const blocks = [...spec.matchAll(/```json\n([\s\S]*?)\n```/g)].map(m => JSON.parse(m[1]));
   const projection = blocks.find(b => b.preferences);

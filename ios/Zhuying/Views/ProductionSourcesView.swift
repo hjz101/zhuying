@@ -17,6 +17,7 @@ struct ProductionSourceAccessView: View {
 }
 
 struct ProductionSourceImportView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var library: LibraryStore
     @State private var method = "URL"
@@ -39,7 +40,7 @@ struct ProductionSourceImportView: View {
                 }
                 if method == "JSON 文件" { Button("选择 JSON 文件") { choosing = true }.buttonStyle(PrimaryButtonStyle(filled: false)) }
                 if method != "URL" {
-                    Button("粘贴 JSON 导入", systemImage: "doc.on.clipboard") {
+                    ThemeButton("粘贴 JSON 导入", systemImage: "doc.on.clipboard") {
                         guard let text = UIPasteboard.general.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                             message = "剪贴板中没有 JSON 文本。"; return
                         }
@@ -53,9 +54,9 @@ struct ProductionSourceImportView: View {
                         Text("可添加 \(preview.sources.count) · 重复 \(preview.duplicates) · 无效 \(preview.invalid)").font(.system(size: 12))
                         if preview.sources.contains(where: { $0.id != "shushan" && (try? SourcePackages.rules($0)) == nil }) {
                             Text("部分书源使用其他阅读器的脚本宿主：可以保存和导出原始规则，当前尚不能用于搜索或阅读。")
-                                .font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourcePackageCompatibility")
+                                .font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("sourcePackageCompatibility")
                         }
-                        ForEach(preview.sources) { source in VStack(alignment: .leading) { Text(source.name); Text(source.detail).font(.system(size: 11)).foregroundStyle(Palette.muted) } }
+                        ForEach(preview.sources) { source in VStack(alignment: .leading) { Text(source.name); Text(source.detail).font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted) } }
                     }
                     Button("确认导入") {
                         Task { let count = demo.confirmSourceImport(preview); self.preview = nil; message = await library.flushPendingWrites() ? "已保存 \(count) 个书源。" : "保存失败，请重试。" }
@@ -63,7 +64,7 @@ struct ProductionSourceImportView: View {
                 }
                 Button("导出书源 JSON") { do { export = try ExportFile.prepare(SourcePackages.export(demo.sources), filename: "竹影书源.json") } catch { message = error.localizedDescription } }
                     .buttonStyle(PrimaryButtonStyle(filled: false))
-                if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourcePackageMessage") }
+                if let message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("sourcePackageMessage") }
             }.padding(22)
         }.appPageStyle().navigationTitle("书源导入导出").navigationBarTitleDisplayMode(.inline)
             .nativeFileImporter(isPresented: $choosing, allowedContentTypes: [.json]) { result in
@@ -94,6 +95,7 @@ struct ProductionSourceImportView: View {
 }
 
 struct ProductionSourceRuleEditor: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let sourceID: String
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var library: LibraryStore
@@ -105,10 +107,10 @@ struct ProductionSourceRuleEditor: View {
                 AppPageHeader(title: "书源编辑", subtitle: "基本信息 · 规则字段 · JSON 校验", icon: "square.and.pencil")
                 AppSettingsCard("JSON 源码", icon: "curlybraces") { TextEditor(text: $json).frame(minHeight: 300).font(.system(size: 12, design: .monospaced)).accessibilityIdentifier("sourceRulesJSON") }
                 Text("支持原生 JSON v1 和 extract-v1 的搜索、详情、目录、正文接口；解析规则支持 CSS／XPath／JSONPath／正则的已声明子集。其他阅读器方言可以保存导出，不会自动执行。修改后需点击保存，返回即取消。")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    .font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted)
                 Button("校验 JSON") { validate(save: false) }.buttonStyle(PrimaryButtonStyle(filled: false))
                 Button("保存书源") { validate(save: true) }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("sourceRulesSave")
-                if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourceRulesMessage") }
+                if let message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("sourceRulesMessage") }
             }.padding(22)
         }.appPageStyle().navigationTitle("书源编辑").navigationBarTitleDisplayMode(.inline)
             .onAppear {

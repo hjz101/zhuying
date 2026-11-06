@@ -7,7 +7,7 @@ struct ShareImportRequest: Identifiable, Equatable {
     var id: String { StableContentID.make(kind.rawValue,url.absoluteString) }
     static func parse(_ incoming: URL) throws -> Self {
         guard incoming.absoluteString.utf8.count <= 8192 else { throw ContentFailure.invalidResponse }
-        if incoming.isFileURL { return .init(kind:.file,url:incoming) }
+        if incoming.isFileURL { return .init(kind: incoming.pathExtension.lowercased() == "zhuyingtheme" ? .theme : .file, url:incoming) }
         guard let parts = URLComponents(url:incoming,resolvingAgainstBaseURL:false),BrandCompatibility.accepts(parts.scheme?.lowercased(), current:"zhuying"),parts.host == "import",parts.path.isEmpty || parts.path == "/",parts.fragment == nil,
               let query = parts.queryItems,query.count == 2,Set(query.map(\.name)) == ["kind","url"],
               let kind = query.first(where:{$0.name == "kind"})?.value.flatMap(Kind.init(rawValue:)),

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ShareImportView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var request: ShareImportRequest? = nil
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var demo: FeatureDemoStore
@@ -11,6 +12,7 @@ struct ShareImportView: View {
     @State private var message: String?
     @State private var operation: Task<Void,Never>?
     @State private var busy = false
+    @State private var globalPackage: GlobalThemeBundle?
     var body: some View {
         Group {
             if let target = request ?? parsed,target.kind == .file { SmartImportView(initialInput:target.url.isFileURL ? .file(target.url) : .remote(target.url)) }
@@ -19,20 +21,21 @@ struct ShareImportView: View {
                     VStack(alignment:.leading,spacing:23) {
                         AppPageHeader(title:"分享与链接",subtitle:"识别类型 · 预览校验 · 明确确认后导入",icon:"link")
                         AppSettingsCard("配置与选项",icon:"link") {
-                            if let target = request ?? parsed { Text(target.kind == .source ? "书源配置" : "主题套装"); Text(target.url.host ?? "本地文件").font(.system(size:12)).foregroundStyle(Palette.muted) }
+                            if let target = request ?? parsed { Text(target.kind == .source ? "书源配置" : "主题套装"); Text(target.url.host ?? "本地文件").font(.system(size:12)).foregroundStyle(appAppearance.palette.muted) }
                             else { TextField("zhuying://import?kind=…&url=…",text:$input,axis:.vertical).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("shareURL") }
                         }
                         Button("预览链接") { preview() }.buttonStyle(PrimaryButtonStyle()).disabled(busy).accessibilityIdentifier("sharePreview")
                         if let summary { Text(summary).font(.system(size:13)).accessibilityIdentifier("shareSummary") }
                         if data != nil { Button("确认导入") { confirm() }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("shareConfirm") }
                         if busy { ProgressView("正在读取"); Button("取消读取") { operation?.cancel(); busy = false } }
-                        if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("shareMessage") }
+                        if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("shareMessage") }
                         Text("支持竹影分享 v1：file 文件、source 书源、theme 主题。收到链接只展示预览入口，确认前不保存配置或执行规则。其他阅读器链接需先转换为已支持的格式。")
-                            .font(.system(size:12)).foregroundStyle(Palette.muted)
+                            .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                     }.padding(22)
                 }.appPageStyle().navigationTitle("分享与链接").navigationBarTitleDisplayMode(.inline)
             }
         }.onDisappear { operation?.cancel() }
+            .sheet(item: $globalPackage) { bundle in NavigationStack { GlobalThemeDetailView(bundle: bundle, pendingImport: true).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { globalPackage = nil } } } } }
     }
     private func preview() {
         operation?.cancel(); data = nil; summary = nil; message = nil
@@ -42,8 +45,15 @@ struct ShareImportView: View {
             operation = Task {
                 defer { if !Task.isCancelled { busy = false } }
                 do {
-                    let bytes = try await BoundedBookDownloader(maximumBytes:target.kind == .theme ? 3 * 1024 * 1024 : 5 * 1024 * 1024,format:.sourceJSON).fetch(target.url).data
+                    let bytes: Data
+                    if target.url.isFileURL { bytes = try ImportedFileReader.read(target.url, maximumBytes: GlobalThemePackage.maximumBytes) }
+                    else { bytes = try await BoundedBookDownloader(maximumBytes:target.kind == .theme ? GlobalThemePackage.maximumBytes : 5 * 1024 * 1024,format:target.kind == .theme ? .themePackage : .sourceJSON).fetch(target.url).data }
                     try Task.checkCancellation()
+                    if target.kind == .theme, bytes.starts(with: [0x50, 0x4b]) {
+                        globalPackage = try GlobalThemePackage.decode(bytes)
+                        summary = "主题包已校验，请在预览中选择加入主题库或应用。"
+                        return
+                    }
                     if target.kind == .source { let p = try SourcePackages.parse(bytes,existing:demo.sources); summary = "可添加 \(p.sources.count) · 重复 \(p.duplicates) · 无效 \(p.invalid)" }
                     else { let p = try ThemePackageParser.parse(bytes,existingThemes:demo.themes,existingAssets:demo.themeAssets); summary = "主题 \(p.themes.count) · 样式 \(p.assets.count) · 无效 \(p.invalid)" }
                     data = bytes

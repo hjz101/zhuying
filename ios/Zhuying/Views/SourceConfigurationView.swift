@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SourceConfigurationView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let sourceID: String
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var library: LibraryStore
@@ -20,8 +21,8 @@ struct SourceConfigurationView: View {
                     Toggle("启用书源", isOn: $enabled)
                 }
                 Text("仅支持书山聚合的小说接口。修改服务地址后需在登录页登录对应主机；任意规则和其他媒体保留原入口，当前不可运行。")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
-                if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourceConfigMessage") }
+                    .font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted)
+                if let message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("sourceConfigMessage") }
                 Button("保存书源") { Task { await save() } }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("sourceConfigSave")
             }.padding(22)
         }.appPageStyle().navigationTitle("书源编辑").navigationBarTitleDisplayMode(.inline)

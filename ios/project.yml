@@ -43,6 +43,17 @@ targets:
         ZhuyingSourceRevision: $(ZHUYING_SOURCE_REVISION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.zhuying.theme
+            UTTypeDescription: 竹影主题包
+            UTTypeConformsTo: [public.zip-archive]
+            UTTypeTagSpecification:
+              public.filename-extension: [zhuyingtheme]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: 竹影主题包
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [com.zhuying.theme]
         NSLocalNetworkUsageDescription: 用于连接您在书源网络配置中指定的局域网代理或 DNS 服务。
         UIBackgroundModes: [audio]
         CFBundleURLTypes:

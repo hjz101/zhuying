@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ReaderPageRegionPreview: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let settings: ReadingSettings
     let zone: String
     var selectedID: String? = nil
@@ -43,8 +44,8 @@ struct ReaderPageRegionPreview: View {
         return Text(display(item)).font(.system(size: item.fontSize)).foregroundStyle(color)
             .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.75)
             .frame(width: elementWidth, height: elementHeight)
-            .background(selectedID == item.id ? Palette.green.opacity(0.08) : Color.clear)
-            .overlay { if selectedID == item.id { RoundedRectangle(cornerRadius: 4).stroke(Palette.accent, lineWidth: 1) } }
+            .background(selectedID == item.id ? appAppearance.palette.green.opacity(0.08) : Color.clear)
+            .overlay { if selectedID == item.id { RoundedRectangle(cornerRadius: 4).stroke(appAppearance.palette.accent, lineWidth: 1) } }
             .contentShape(Rectangle()).accessibilityIdentifier("page-element-\(item.id)")
             .accessibilityLabel("\(zone == "header" ? "页眉" : "页脚")\(item.kind)")
     }
@@ -60,6 +61,7 @@ struct ReaderPageRegionPreview: View {
 }
 
 struct ReadingPageElementsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     @State private var selectedID: String?
     private var prefs: ReaderPreferences { store.settings.preferences }
@@ -68,7 +70,7 @@ struct ReadingPageElementsView: View {
     var body: some View {
         ReadingPreferencePage("页眉与页脚") {
             editorPreview
-            Text("点选文字并拖动，也可在下方用 X / Y 精确微调。每个区域可添加多个元素。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            Text("点选文字并拖动，也可在下方用 X / Y 精确微调。每个区域可添加多个元素。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             AppSettingsCard("显示区域", icon: "rectangle.topthird.inset.filled") {
                 Toggle("显示页眉", isOn: $store.settings.preferences.headerEnabled).accessibilityIdentifier("readerHeaderEnabled")
                 Toggle("显示页脚", isOn: $store.settings.preferences.footerEnabled).accessibilityIdentifier("readerFooterEnabled")
@@ -85,7 +87,7 @@ struct ReadingPageElementsView: View {
                 ReadingValueSlider("页脚区域高度", value: $store.settings.preferences.footerHeight, range: 48...120, id: "footerHeightSlider")
                 ReadingValueSlider("页眉与正文间距", value: $store.settings.preferences.headerGap, range: 0...40, id: "headerGapSlider")
                 ReadingValueSlider("页脚与正文间距", value: $store.settings.preferences.footerGap, range: 0...40, id: "footerGapSlider")
-                Text("元素位置相对于各自区域，区域留白参与正文排版。重叠时可用元素名称切换选中项。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text("元素位置相对于各自区域，区域留白参与正文排版。重叠时可用元素名称切换选中项。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
         }.onAppear { if selectedID == nil { selectedID = prefs.pageElements.first?.id } }
     }
@@ -104,8 +106,8 @@ struct ReadingPageElementsView: View {
             ForEach(prefs.pageElements) { item in
                 Button { selectedID = item.id } label: {
                     Text("\(item.zone == "header" ? "页眉" : "页脚") · \(item.kind)").font(.system(size: 11)).frame(maxWidth: .infinity, minHeight: 38)
-                        .background(selectedID == item.id ? Palette.green : Palette.soft, in: .rect(cornerRadius: 8))
-                        .foregroundStyle(selectedID == item.id ? .white : Palette.green)
+                        .background(selectedID == item.id ? appAppearance.palette.green : appAppearance.palette.soft, in: .rect(cornerRadius: 8))
+                        .foregroundStyle(selectedID == item.id ? appAppearance.palette.onPrimary : appAppearance.palette.green)
                 }.accessibilityIdentifier("page-element-choice-\(item.id)").accessibilityAddTraits(item.id == selectedID ? .isSelected : [])
             }
         }
@@ -144,6 +146,7 @@ struct ReadingPageElementsView: View {
 }
 
 struct ReadingTitlePreferencesView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     @State private var cssText = ""
     @State private var error: String?
@@ -158,7 +161,7 @@ struct ReadingTitlePreferencesView: View {
         ReadingPreferencePage("章节标题") {
             ReadingSettingsPreview(settings: store.settings)
             Picker("样式来源", selection: sourceBinding) { Text("跟随主题").tag(false); Text("自定义").tag(true) }.pickerStyle(.segmented).accessibilityIdentifier("titleStyleSource")
-            Text(prefs.titleCSS == nil ? "使用主题标题样式，修改下方选项会创建个人样式。" : "个人自定义，切换主题时保留。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            Text(prefs.titleCSS == nil ? "使用主题标题样式，修改下方选项会创建个人样式。" : "个人自定义，切换主题时保留。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             AppSettingsCard("标题样式", icon: "textformat") {
                 ReadingValueSlider("标题字号", value: titleNumber("font-size", default: parsed?.fontSize ?? 26), range: 14...40, id: "titleFontSizeSlider")
                 Picker("标题对齐", selection: titleAlignment) { Text("居左").tag("left"); Text("居中").tag("center"); Text("居右").tag("right") }.accessibilityIdentifier("titleAlignmentPicker")
@@ -175,13 +178,13 @@ struct ReadingTitlePreferencesView: View {
                     Button("导入 CSS") { showFiles = true }.accessibilityIdentifier("importTitleCSS")
                 }.font(.system(size: 13)).frame(minHeight: 40)
                 TextEditor(text: $cssText).font(.system(size: 11, design: .monospaced)).frame(height: 170).scrollContentBackground(.hidden)
-                    .padding(8).background(Palette.background, in: .rect(cornerRadius: 8)).accessibilityIdentifier("titleCSSEditor")
+                    .padding(8).background(appAppearance.palette.background, in: .rect(cornerRadius: 8)).accessibilityIdentifier("titleCSSEditor")
                     .onChange(of: cssText) { _, value in
                         if suppressEditorChange { suppressEditorChange = false }
                         else if value != prefs.effectiveTitleCSS { apply(value, updateEditor: false) }
                     }
-                if let error { Label(error, systemImage: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(Palette.accent).accessibilityIdentifier("titleCSSError") }
-                Text("支持标题字号、对齐、颜色、背景、字距、上下留白、字重及下划线；不支持的属性会明确提示，预览保留上次有效样式。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                if let error { ThemeLabel(error, systemImage: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("titleCSSError") }
+                Text("支持标题字号、对齐、颜色、背景、字距、上下留白、字重及下划线；不支持的属性会明确提示，预览保留上次有效样式。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
         }.onAppear { setEditor(ReadingPreferencePresentation.titleEditorCSS(settings: store.settings)) }
             .nativeFileImporter(isPresented: $showFiles, allowedContentTypes: [.plainText, UTType(filenameExtension: "css") ?? .plainText]) { result in

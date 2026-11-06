@@ -10,6 +10,7 @@ struct ProductionNarrationView: View {
 }
 
 private struct NarrationPanel: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @ObservedObject var audio: LibraryAudioCoordinator
     let bookID: String?
     let mode: NarrationMode
@@ -30,31 +31,31 @@ private struct NarrationPanel: View {
                         Picker("声音",selection:$library.narrationSettings.voiceID) { Text("自动选择当前语言").tag(""); ForEach(voices,id:\.identifier) { Text("\($0.name) · \($0.language)").tag($0.identifier) } }
                     } else {
                         Picker("兼容服务",selection:$library.narrationSettings.profileID) { Text("请选择已保存服务").tag(String?.none); ForEach(profiles) { Text($0.name).tag(Optional($0.id)) } }
-                        NavigationLink { ProductionAudioServiceView() } label: { Label("配置在线服务",systemImage:"key") }
+                        NavigationLink { ProductionAudioServiceView() } label: { ThemeLabel("配置在线服务",systemImage:"key") }
                     }
                     Slider(value:$library.narrationSettings.speed,in:0.5...2,step:0.1)
                     Text("语速 \(library.narrationSettings.speed, specifier:"%.1f")×").font(.system(size:12))
                     Toggle("跟随正文位置",isOn:$library.narrationSettings.followsReader)
                 }
                 AppSettingsCard("播放器",icon:"waveform") {
-                    Image(systemName:"waveform").font(.system(size:38,weight:.ultraLight)).frame(maxWidth:.infinity)
+                    ThemeIcon(systemName:"waveform").font(.system(size:38,weight:.ultraLight)).frame(maxWidth:.infinity)
                     Text(audio.state.title.isEmpty ? "还没有开始朗读" : audio.state.title).font(.system(size:23,design:.serif)).frame(maxWidth:.infinity)
-                    Text(audio.state.chapterTitle).font(.system(size:12)).foregroundStyle(Palette.muted).frame(maxWidth:.infinity)
-                    ProgressView(value:audio.state.fraction).tint(Palette.green)
+                    Text(audio.state.chapterTitle).font(.system(size:12)).foregroundStyle(appAppearance.palette.muted).frame(maxWidth:.infinity)
+                    ProgressView(value:audio.state.fraction).tint(appAppearance.palette.primary)
                     Text(phase(audio.state.phase)).font(.system(size:12)).frame(maxWidth:.infinity).accessibilityIdentifier("narrationStatus")
                     HStack(spacing:24) {
-                        Button { audio.previous() } label: { Image(systemName:"backward.end.fill") }.accessibilityLabel("上一章朗读")
-                        Button { toggle() } label: { Image(systemName:isCurrent && audio.state.phase == .playing ? "pause.circle.fill" : "play.circle.fill").font(.system(size:42)) }
+                        Button { audio.previous() } label: { ThemeIcon(systemName:"backward.end.fill") }.accessibilityLabel("上一章朗读")
+                        Button { toggle() } label: { ThemeIcon(systemName:isCurrent && audio.state.phase == .playing ? "pause.circle.fill" : "play.circle.fill").font(.system(size:42)) }
                             .accessibilityLabel(isCurrent && audio.state.phase == .playing ? "暂停朗读" : "开始或继续朗读").accessibilityIdentifier("narrationPlay").disabled(selection.isEmpty)
-                        Button { audio.next() } label: { Image(systemName:"forward.end.fill") }.accessibilityLabel("下一章朗读")
+                        Button { audio.next() } label: { ThemeIcon(systemName:"forward.end.fill") }.accessibilityLabel("下一章朗读")
                     }.frame(maxWidth:.infinity).frame(minHeight:60)
                     Button("停止朗读") { audio.stop() }.frame(maxWidth:.infinity,minHeight:44).accessibilityIdentifier("narrationStop")
                     if let quote = audio.state.anchor?.quote { Text(quote).font(.system(size:12)).lineSpacing(5) }
                 }
-                if library.books.isEmpty { ContentUnavailableView("还没有可朗读的作品",systemImage:"book",description:Text("先导入作品，或打开可阅读的网络章节。")) }
-                if let error = audio.state.message ?? message { Text(error).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("narrationMessage") }
+                if library.books.isEmpty { ThemeUnavailableView("还没有可朗读的作品",systemImage:"book",description:Text("先导入作品，或打开可阅读的网络章节。")) }
+                if let error = audio.state.message ?? message { Text(error).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("narrationMessage") }
                 Text(mode == .system ? "暂停保留当前词位置，退出阅读页后可继续。手动阅读与朗读位置分别保存；开启跟随时更新当前正文。朗读单独计时，播放中不重复累计阅读时长。" : "在线音频按短片段缓冲与恢复，重启会重放当前片段；缓冲不计为播放。跨章需要可读正文和有效服务额度。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                 if mode == .roles { NavigationLink { ProductionRolesView(bookID:selection) } label: { FeatureRow(feature:FeatureCatalog.feature("aiRoles")) } }
             }.padding(22)
         }.appPageStyle().navigationTitle(title ?? mode.rawValue).navigationBarTitleDisplayMode(.inline)
@@ -75,6 +76,7 @@ private struct NarrationPanel: View {
 }
 
 struct ProductionMiniPlayer: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @ObservedObject var audio: LibraryAudioCoordinator
     let open: () -> Void
     var reader = false
@@ -90,17 +92,17 @@ struct ProductionMiniPlayer: View {
                             Text(audio.state.phase == .playing ? "正在朗读 · " + audio.state.chapterTitle : audio.state.phase == .buffering ? "正在缓冲" : audio.state.phase == .paused ? "朗读已暂停" : "朗读未完成，点击查看")
                                 .lineLimit(1).font(.system(size: 10))
                         }
-                    } icon: { Image(systemName:"waveform") }
+                    } icon: { ThemeIcon(systemName:"waveform") }
                         .font(.system(size:11)).frame(maxWidth:.infinity,minHeight:44,alignment:.leading)
                 }.accessibilityLabel("打开朗读播放器，" + audio.state.title).accessibilityIdentifier("miniPlayerOpen")
                 if reader && readerBookID == audio.state.bookID && audio.readerDetached {
-                    Button { audio.returnToNarration(); follow?() } label: { Image(systemName:"text.line.first.and.arrowtriangle.forward").frame(width:44,height:44) }
+                    Button { audio.returnToNarration(); follow?() } label: { ThemeIcon(systemName:"text.line.first.and.arrowtriangle.forward").frame(width:44,height:44) }
                         .accessibilityLabel("返回朗读位置").accessibilityIdentifier("miniPlayerFollow")
                 }
-                Button { audio.state.phase == .playing || audio.state.phase == .buffering ? audio.pause() : audio.resume() } label: { Image(systemName:audio.state.phase == .playing || audio.state.phase == .buffering ? "pause.fill" : "play.fill").frame(width:44,height:44) }
+                Button { audio.state.phase == .playing || audio.state.phase == .buffering ? audio.pause() : audio.resume() } label: { ThemeIcon(systemName:audio.state.phase == .playing || audio.state.phase == .buffering ? "pause.fill" : "play.fill").frame(width:44,height:44) }
                     .accessibilityLabel(audio.state.phase == .playing || audio.state.phase == .buffering ? "暂停朗读" : "继续朗读").accessibilityIdentifier("miniPlayerToggle")
-                Button { audio.stop() } label: { Image(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("关闭播放器")
-            }.foregroundStyle(reader ? Color(ReaderPalette(settings: readerSettings).ink) : Palette.green)
+                Button { audio.stop() } label: { ThemeIcon(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("关闭播放器")
+            }.foregroundStyle(reader ? Color(ReaderPalette(settings: readerSettings).ink) : appAppearance.palette.green)
                 .padding(.horizontal, reader ? 10 : 17).background { if !reader { Rectangle().fill(.regularMaterial) } }
                 .accessibilityElement(children: .contain).accessibilityIdentifier("productionMiniPlayer")
         }
@@ -116,12 +118,13 @@ struct ProductionAudioServiceView: View {
     var body: some View {
         Group {
             if let store { AudioServiceEditor(store:store) }
-            else { ContentUnavailableView("服务配置暂时无法读取",systemImage:"key",description:Text(message ?? "正在读取")) }
+            else { ThemeUnavailableView("服务配置暂时无法读取",systemImage:"key",description:Text(message ?? "正在读取")) }
         }.task { do { store = try library.audio.services() } catch { message = error.localizedDescription } }
     }
 }
 
 private struct AudioServiceEditor: View {
+    @Environment(\.themeAppearance) private var appAppearance
     private enum Field: Hashable { case name,url,tts,analysis,voice,socket,key }
     @FocusState private var focused: Field?
     @ObservedObject var store: AudioServiceStore
@@ -149,12 +152,12 @@ private struct AudioServiceEditor: View {
                     if draft.usesKey { SecureField("访问密钥；留空保留同一主机的已保存密钥",text:$key).focused($focused,equals:.key).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("audioServiceKey") }
                 }.disabled(busy)
                 Text("只填写你自己的客户端访问密钥；服务端凭据由你的网关保管。密钥不会显示、写入日志或进入备份。改变服务地址后需重新保存密钥。服务配置保存在本机，换设备需重新配置。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                 Button("保存配置") { save() }.buttonStyle(PrimaryButtonStyle()).disabled(busy).accessibilityIdentifier("audioServiceSave")
                 Button("测试已保存配置") { test() }.buttonStyle(PrimaryButtonStyle(filled:false)).disabled(busy || !store.profiles.contains(where:{$0.id == selection})).accessibilityIdentifier("audioServiceTest")
                 if !selection.isEmpty { Button("删除服务与密钥",role:.destructive) { do { library.audio.stop(); try store.remove(selection); if library.narrationSettings.profileID == selection { library.narrationSettings.profileID = nil }; selection = ""; message = "已删除服务；密钥清理状态：\(store.cleanupPending ? "待重试" : "完成")。" } catch { message = error.localizedDescription } } }
                 if busy { ProgressView("正在连接，不会自动播放"); Button("取消") { operation?.cancel(); busy = false } }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).textSelection(.enabled).accessibilityIdentifier("audioServiceMessage") }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).textSelection(.enabled).accessibilityIdentifier("audioServiceMessage") }
                 if store.cleanupPending { Button("重试清理旧密钥") { store.retryCleanup() } }
             }.padding(22)
         }.appPageStyle().navigationTitle("AI 服务配置").navigationBarTitleDisplayMode(.inline)
@@ -184,6 +187,7 @@ private struct AudioServiceEditor: View {
 }
 
 struct ProductionRolesView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var bookID: String? = nil
     @EnvironmentObject private var library: LibraryStore
     @State private var selection = ""
@@ -199,12 +203,12 @@ struct ProductionRolesView: View {
                     Picker("作品",selection:$selection) { Text("请选择作品").tag(""); ForEach(library.books) { Text($0.title).tag($0.id) } }
                     Stepper("本次最多 \(library.narrationSettings.maximumAnalysisRequests) 次分析请求",value:$library.narrationSettings.maximumAnalysisRequests,in:1...20)
                     Toggle("跨章时自动分析（使用服务额度）",isOn:$library.narrationSettings.analyzesNextChapter)
-                    NavigationLink { ProductionAudioServiceView() } label: { Label("配置兼容服务与模型",systemImage:"key") }
+                    NavigationLink { ProductionAudioServiceView() } label: { ThemeLabel("配置兼容服务与模型",systemImage:"key") }
                 }
                 Button("分析当前章节") { analyze(force:false) }.buttonStyle(PrimaryButtonStyle()).disabled(selection.isEmpty || busy)
                 if let current = analysis {
                     AppSettingsCard("角色与声音",icon:"person.2") {
-                        Text("已对应 \(current.assignments.count) 个正文片段；未识别角色使用旁白。").font(.system(size:11)).foregroundStyle(Palette.muted)
+                        Text("已对应 \(current.assignments.count) 个正文片段；未识别角色使用旁白。").font(.system(size:11)).foregroundStyle(appAppearance.palette.muted)
                         ForEach(Array(current.roles.enumerated()),id:\.element.id) { index,role in
                             TextField("角色名称",text:Binding(get:{analysis?.roles[safe:index]?.name ?? role.name},set:{if analysis?.roles.indices.contains(index) == true { analysis?.roles[index].name = String($0.prefix(80)) }}))
                             TextField("声音 ID；留空使用服务默认声音",text:voice(role.id)).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -212,12 +216,12 @@ struct ProductionRolesView: View {
                     }
                     Button("保存角色编辑") { Task { do { if let analysis { try await library.audio.saveAnalysis(analysis); message = "角色编辑已保存。" } } catch { message = error.localizedDescription } } }.buttonStyle(PrimaryButtonStyle(filled:false))
                     Button("重新分析（使用服务额度）") { analyze(force:true) }.buttonStyle(PrimaryButtonStyle(filled:false)).disabled(busy)
-                    NavigationLink { ProductionNarrationView(bookID:selection,mode:.roles) } label: { Label("打开多角色播放器",systemImage:"play.circle") }.font(.system(size:13))
+                    NavigationLink { ProductionNarrationView(bookID:selection,mode:.roles) } label: { ThemeLabel("打开多角色播放器",systemImage:"play.circle") }.font(.system(size:13))
                 }
                 if busy { ProgressView("正在分析本章"); Button("取消分析") { operation?.cancel(); busy = false } }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent) }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent) }
                 Text("每次只分析当前章，最多 40000 UTF-16 单元，按不超过 6000 单元分批。缓存按正文版本与服务模型区分；未知角色使用默认声音。角色和分析结果需要你核对，未确认的第三方服务不视为已验收。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("AI 多角色朗读").navigationBarTitleDisplayMode(.inline)
             .onAppear { selection = bookID ?? library.history.first?.id ?? library.books.first?.id ?? "" }

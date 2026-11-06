@@ -55,12 +55,25 @@ struct LibraryBackup: Codable, Sendable {
         let required = Set(database.chapters.filter { locals.contains($0.bookID) }.map(\.id))
         guard Set(documents.map(\.chapterID)) == required,
               documents.allSatisfy({ !$0.paragraphs.isEmpty && $0 == ChapterDocument(chapterID: $0.chapterID, paragraphs: $0.paragraphs.map(\.text)) }) else { throw ContentFailure.invalidResponse }
+        var globalThemeIDs = Set(GlobalThemeBundle.originals.map(\.id))
+        var globalAppIDs = globalThemeIDs, globalReaderIDs = Set<String>()
         for file in resources {
             let components = file.path.split(separator: "/", omittingEmptySubsequences: false)
-            guard components.count == 2, ["fonts", "themes","media","processing"].contains(components[0]),
+            guard components.count == 2, ["fonts", "themes","media","processing", "global-themes"].contains(components[0]),
                   !components[1].contains(".."), !components[1].contains("\\"), !file.data.isEmpty,
                   FileResourceStore.digest(file.data) == file.digest else { throw ContentFailure.invalidResponse }
-            if components[0] == "processing" {
+            if components[0] == "global-themes" {
+                if components[1] == "catalog.json" {
+                    let digests = try JSONDecoder().decode([String].self, from: file.data)
+                    guard Set(digests).count == digests.count, digests.allSatisfy({ $0.count == 64 && $0.allSatisfy { "0123456789abcdef".contains($0) } }) else { throw ContentFailure.invalidResponse }
+                } else {
+                    guard components[1] == file.digest + ".zhuyingtheme" else { throw ContentFailure.invalidResponse }
+                    let bundle = try GlobalThemePackage.decode(file.data)
+                    guard globalThemeIDs.insert(bundle.id).inserted else { throw ContentFailure.invalidResponse }
+                    if bundle.manifest.scopes.contains("app") { globalAppIDs.insert(bundle.id) }
+                    if bundle.document.reader != nil { globalReaderIDs.insert(bundle.id) }
+                }
+            } else if components[0] == "processing" {
                 guard components[1] == "rules.json" else { throw ContentFailure.invalidResponse }; _ = try ContentProcessingStore.decode(file.data)
             } else if components[0] == "fonts" && components[1] == "fonts.json" {
                 let manifest = try JSONDecoder().decode(FontLibraryManifest.self, from: file.data)
@@ -76,6 +89,16 @@ struct LibraryBackup: Codable, Sendable {
                       ResourceFileReference(digest: file.digest, bytes: file.data.count, kind: kind).isValid,
                       components[0] == "fonts" ? kind == .font : components[0] == "media" ? [.pdf,.image].contains(kind) : [.css, .svg, .png].contains(kind) else { throw ContentFailure.invalidResponse }
             }
+        }
+        let globalFiles = resources.filter { $0.path.hasPrefix("global-themes/") }
+        if !globalFiles.isEmpty {
+            guard let index = globalFiles.first(where: { $0.path == "global-themes/catalog.json" }) else { throw ContentFailure.invalidResponse }
+            let digests = try JSONDecoder().decode([String].self, from: index.data)
+            guard Set(globalFiles.map(\.path)) == Set(["global-themes/catalog.json"] + digests.map { "global-themes/" + $0 + ".zhuyingtheme" }) else { throw ContentFailure.invalidResponse }
+        }
+        if let data = database.preferences[ProductionLibraryPersistence.viewKey], let selection = try JSONDecoder().decode(LibraryViewPreferences.self, from: data).globalThemeSelection {
+            guard [selection.appID, selection.previous?.appID].compactMap({ $0 }).allSatisfy(globalAppIDs.contains),
+                  [selection.readerID, selection.previous?.readerID].compactMap({ $0 }).allSatisfy(globalReaderIDs.contains) else { throw ContentFailure.invalidResponse }
         }
         let requiredMedia = Set(database.books.flatMap { ($0.media?.resources ?? []) + [$0.cover].compactMap{$0} })
         guard Set(resources.filter{$0.path.hasPrefix("media/")}.map(\.path)) == Set(requiredMedia.map{"media/" + $0.filename}) else { throw ContentFailure.invalidResponse }

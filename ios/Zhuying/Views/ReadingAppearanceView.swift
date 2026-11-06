@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct ReadingAppearanceView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     @EnvironmentObject private var demo: FeatureDemoStore
     var body: some View {
@@ -22,7 +23,7 @@ struct ReadingAppearanceView: View {
                                     Text(item.title).font(.system(size: 12))
                                 }.foregroundStyle(item.ink).frame(maxWidth: .infinity, minHeight: 80)
                                     .background(item.background, in: .rect(cornerRadius: 11))
-                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(store.settings.preferences.colors == nil && item == store.settings.theme ? Palette.green : Palette.line, lineWidth: 1.5))
+                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(store.settings.preferences.colors == nil && item == store.settings.theme ? appAppearance.palette.green : appAppearance.palette.line, lineWidth: 1.5))
                             }.buttonStyle(.plain).accessibilityIdentifier("reading-paper-\(item.rawValue)")
                         }
                     }
@@ -36,20 +37,22 @@ struct ReadingAppearanceView: View {
                     }.buttonStyle(.plain).accessibilityIdentifier("readingFontLibrary")
                 }
                 Text("主题应用后更新真实阅读配色；独立自定义的章节标题会保留。主题内不受原生渲染支持的 CSS 装饰会单独提示。")
-                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("主题与字体").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
     }
 }
 private struct ReadingAppearanceRow: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let title: String
     let detail: String
     var body: some View {
-        HStack { Text(title).font(.system(size: 14)); Spacer(); Text(detail).font(.system(size: 11)).foregroundStyle(Palette.muted).lineLimit(1); Image(systemName: "chevron.right").font(.system(size: 10)) }.frame(minHeight: 46)
+        HStack { Text(title).font(.system(size: 14)); Spacer(); Text(detail).font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted).lineLimit(1); ThemeIcon(systemName: "chevron.right").font(.system(size: 10)) }.frame(minHeight: 46)
     }
 }
 
 struct ReadingFontManagerView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     @StateObject private var fonts = ReadingFontLibrary.shared
     @State private var sample = "山海有相逢，长风自有归处。Aa 0123，。！？"
@@ -63,8 +66,8 @@ struct ReadingFontManagerView: View {
             VStack(alignment: .leading, spacing: 18) {
                 ReadingSettingsPreview(settings: store.settings)
                 TextField("输入你想比较的文字", text: $sample, axis: .vertical).font(.system(size: 16)).padding(12)
-                    .background(Palette.card, in: .rect(cornerRadius: 10)).accessibilityIdentifier("readingFontSample")
-                Button("导入本地字体", systemImage: "square.and.arrow.down") { showingFiles = true }
+                    .background(appAppearance.palette.card, in: .rect(cornerRadius: 10)).accessibilityIdentifier("readingFontSample")
+                ThemeButton("导入本地字体", systemImage: "square.and.arrow.down") { showingFiles = true }
                     .buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("readingFontImport")
                 ForEach(Array(samples.enumerated()), id: \.offset) { _, entry in
                     Button {
@@ -74,17 +77,17 @@ struct ReadingFontManagerView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Text(entry.0).font(.system(size: 12)); Spacer()
-                                if store.settings.preferences.fontName == entry.1 { Image(systemName: "checkmark.circle.fill") }
+                                if store.settings.preferences.fontName == entry.1 { ThemeIcon(systemName: "checkmark.circle.fill") }
                             }
                             Text(sample.isEmpty ? "山海有相逢，长风自有归处。" : sample).font(previewFont(entry.1)).lineSpacing(8)
-                        }.foregroundStyle(Palette.green).frame(maxWidth: .infinity, alignment: .leading).padding(16)
-                            .background(Palette.card, in: .rect(cornerRadius: 12))
+                        }.foregroundStyle(appAppearance.palette.green).frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                            .background(appAppearance.palette.card, in: .rect(cornerRadius: 12))
                     }.buttonStyle(.plain).accessibilityIdentifier("reading-font-\(entry.1 ?? "system")")
                 }
                 Text("每张卡片直接使用对应字体排字。导入文件保存在本机；字体未包含的字符会使用系统回退字形。")
-                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                 if let name = store.settings.preferences.fontName, name != "__serif__", UIFont(name: name, size: 20) == nil {
-                    Text("当前字体文件不可用，正文暂用系统字体。请重新导入。 ").font(.system(size: 12)).foregroundStyle(Palette.accent)
+                    Text("当前字体文件不可用，正文暂用系统字体。请重新导入。 ").font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent)
                 }
             }.padding(22)
         }.appPageStyle().navigationTitle("字体管理").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()

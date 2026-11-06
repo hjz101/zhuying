@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionBackendView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @State private var sourceID = ""
     @State private var profile = RemoteBackendProfile()
@@ -25,11 +26,11 @@ struct ProductionBackendView: View {
             }
             Button("连接测试") { test() }.buttonStyle(PrimaryButtonStyle()).disabled(origin == nil || busy).accessibilityIdentifier("backendTest")
             if busy { ProgressView("正在验证转发协议"); Button("取消") { operation?.cancel(); busy = false } }
-            if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("backendMessage") }
+            if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("backendMessage") }
             Text("启用后，所选源的原生读取、段评及明确允许联网的脚本请求会经自建服务；书源地址、查询、正文和该请求的认证头／已启用 Cookie 会被后端接收。登录密码和内置浏览器网页不走此转发。密钥仅保存在本机钥匙串，不进入分享、书库备份或日志。")
-                .font(.system(size:12)).foregroundStyle(Palette.muted)
+                .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             Text("使用仓库附带 gateway v1 服务，并在服务端按书源 ID 与路径配置白名单。只支持 HTTPS、GET／POST、4 MiB响应；不支持重定向、WebSocket 或流式响应。与源代理／DNS／IP 互斥。直连回退默认关闭；开启后仅连接失败／超时回退，认证错误、证书错误、协议错误及上游状态不会回退。")
-                .font(.system(size:12)).foregroundStyle(Palette.muted)
+                .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             Text("当前书源 ID：\(sourceID)").font(.system(size:11,design:.monospaced)).textSelection(.enabled)
         }.padding(22) }.appPageStyle().navigationTitle("远程后端").navigationBarTitleDisplayMode(.inline)
             .onAppear { sourceID = library.sources.first?.id ?? ""; load() }

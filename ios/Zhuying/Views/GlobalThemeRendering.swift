@@ -1,0 +1,240 @@
+import SwiftUI
+
+struct AppThemePalette {
+    var appearance: AppThemeAppearance
+    func color(_ role: String, fallback: UInt32 = 0x354F40) -> Color { Color(hex: appearance.colors[role].flatMap(GlobalThemePackage.hex) ?? fallback) }
+    var background: Color { color("background.page") }
+    var green: Color { color("text.primary") }
+    var muted: Color { color("text.secondary") }
+    var line: Color { color("border") }
+    var accent: Color { color("accent") }
+    var card: Color { appearance == .original ? Color.white.opacity(0.72) : color("background.card") }
+    var soft: Color { color("background.soft") }
+    var primary: Color { color("action.primary.background") }
+    var onPrimary: Color { color("action.primary.foreground", fallback: 0xFFFFFF) }
+    var onAccent: Color {
+        if appearance == .original { return .white }
+        if appearance.colors["text.on-accent"] != nil { return color("text.on-accent") }
+        let hex = appearance.colors["accent"].flatMap(GlobalThemePackage.hex) ?? 0
+        func component(_ value: UInt32) -> Double { let c = Double(value) / 255; return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        let luminance = 0.2126 * component(hex >> 16) + 0.7152 * component((hex >> 8) & 255) + 0.0722 * component(hex & 255)
+        return luminance > 0.179 ? .black : .white
+    }
+    func legacyCard(opacity: Double) -> Color { appearance == .original ? Color.white.opacity(opacity) : card }
+    /// Former fixed decorative surfaces inherit the new surface palette. Default theme keeps original values.
+    func surface(_ original: UInt32) -> Color {
+        if let custom = appearance.colors[String(format: "surface.%06X", original)].flatMap(GlobalThemePackage.hex) { return Color(hex: custom) }
+        return appearance == .original ? Color(hex: original) : soft
+    }
+    func legacyColor(_ original: UInt32, role: String) -> Color {
+        appearance == .original ? Color(hex: original) : color(role, fallback: original)
+    }
+}
+struct ThemeAppearanceContext: Equatable {
+    var bundle = GlobalThemeBundle.originals[0]
+    var palette: AppThemePalette { .init(appearance: bundle.document.app) }
+    func image(_ path: String) -> UIImage? {
+        ThemeImageCache.image(path: path, bundle: bundle)
+    }
+}
+private enum ThemeImageCache {
+    static let cache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>(); cache.countLimit = 32; cache.totalCostLimit = 32 * 1024 * 1024; return cache
+    }()
+    static func image(path: String, bundle: GlobalThemeBundle) -> UIImage? {
+        guard let data = bundle.resources[path] else { return nil }
+        let key = (bundle.id + ":" + path) as NSString
+        if let value = cache.object(forKey: key) { return value }
+        guard let image = UIImage(data: data) else { return nil }
+        cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * image.scale * image.scale * 4))
+        return image
+    }
+}
+private struct ThemeAppearanceKey: EnvironmentKey { static let defaultValue = ThemeAppearanceContext() }
+private struct ThemeControlStateKey: EnvironmentKey { static let defaultValue = "normal" }
+extension EnvironmentValues {
+    var themeAppearance: ThemeAppearanceContext { get { self[ThemeAppearanceKey.self] } set { self[ThemeAppearanceKey.self] = newValue } }
+    var themeControlState: String { get { self[ThemeControlStateKey.self] } set { self[ThemeControlStateKey.self] = newValue } }
+}
+
+struct ThemeIcon: View {
+    @Environment(\.themeAppearance) private var appearance
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.isFocused) private var focused
+    @Environment(\.themeControlState) private var state
+    let systemName: String
+    var role: String? = nil
+    var selected = false
+    private var asset: ThemeIconResource? {
+        let resources = appearance.bundle.document.app.icons
+        return role.flatMap { resources[$0] } ?? resources["symbol." + systemName]
+    }
+    private var path: String? {
+        guard let asset else { return nil }
+        if !enabled { return asset.disabled ?? asset.path }
+        if state == "pressed" { return asset.pressed ?? asset.path }
+        if state == "loading" { return asset.loading ?? asset.path }
+        if focused { return asset.focused ?? asset.path }
+        return selected ? asset.selected ?? asset.path : asset.path
+    }
+    var body: some View {
+        if let path, let uiImage = appearance.image(path) {
+            Image(uiImage: uiImage).renderingMode(asset?.template == false ? .original : .template)
+                .resizable().scaledToFit().frame(width: 20, height: 20).accessibilityHidden(true)
+        } else { Image(systemName: asset?.symbol ?? systemName) }
+    }
+}
+
+struct ThemeLabel: View {
+    let title: String
+    let systemImage: String
+    var role: String? = nil
+    var selected = false
+    init(_ title: String, systemImage: String, role: String? = nil, selected: Bool = false) {
+        self.title = title; self.systemImage = systemImage; self.role = role; self.selected = selected
+    }
+    var body: some View { Label { Text(title) } icon: { ThemeIcon(systemName: systemImage, role: role, selected: selected) } }
+}
+
+struct ThemeButton: View {
+    let title: String
+    let systemImage: String
+    var role: ButtonRole?
+    let action: () -> Void
+    init(_ title: String, systemImage: String, role: ButtonRole? = nil, action: @escaping () -> Void) {
+        self.title = title; self.systemImage = systemImage; self.role = role; self.action = action
+    }
+    var body: some View { Button(role: role, action: action) { ThemeLabel(title, systemImage: systemImage) } }
+}
+
+struct ThemeUnavailableView: View {
+    let title: String
+    let systemImage: String
+    var description: Text?
+    init(_ title: String, systemImage: String, description: Text? = nil) {
+        self.title = title; self.systemImage = systemImage; self.description = description
+    }
+    var body: some View { ContentUnavailableView { ThemeLabel(title, systemImage: systemImage) } description: { description } }
+}
+
+struct ThemeProgressStyle: ProgressViewStyle {
+    @Environment(\.themeAppearance) private var appearance
+    func makeBody(configuration: Configuration) -> some View {
+        if let fraction = configuration.fractionCompleted {
+            ProgressView(value: fraction) { configuration.label }.progressViewStyle(.linear).tint(appearance.palette.primary)
+        } else {
+            VStack(spacing: 8) {
+                if appearance.bundle.document.app.icons["state.loading"] != nil {
+                    ThemeIcon(systemName: "hourglass", role: "state.loading").environment(\.themeControlState, "loading")
+                } else { ProgressView().progressViewStyle(.circular).tint(appearance.palette.primary) }
+                configuration.label
+            }
+        }
+    }
+}
+
+struct ThemeSurface: View {
+    @Environment(\.themeAppearance) private var appearance
+    var role = "page"
+    var body: some View {
+        let app = appearance.bundle.document.app
+        let background = app.backgrounds[role] ?? (["page", "card"].contains(role) ? nil : app.backgrounds["page"])
+        ZStack {
+            if role == "card" { appearance.palette.card } else { appearance.palette.background }
+            if let background, let image = appearance.image(background.path) {
+                GeometryReader { size in
+                    Group {
+                        if background.mode == "tile" { Image(uiImage: image).resizable(resizingMode: .tile) }
+                        else if background.mode == "fit" { Image(uiImage: image).resizable().scaledToFit() }
+                        else { Image(uiImage: image).resizable().scaledToFill() }
+                    }.frame(width: size.size.width, height: size.size.height).clipped().opacity(background.opacity)
+                }
+                appearance.palette.background.opacity(background.overlayOpacity)
+            }
+        }.allowsHitTesting(false).accessibilityHidden(true)
+    }
+}
+
+struct ThemePageStyle: ViewModifier {
+    @Environment(\.themeAppearance) private var appearance
+    var role: String
+    func body(content: Content) -> some View {
+        content.background(ThemeSurface(role: role)).background(ThemeNavigationAppearance().frame(width: 0, height: 0)).foregroundStyle(appearance.palette.green)
+            .tint(appearance.palette.primary)
+            .toolbarBackground(appearance.palette.background, for: .navigationBar)
+            .preferredColorScheme(appearance.bundle.document.app.dark ? .dark : .light)
+    }
+}
+
+/// Adjust the existing navigation bar; native back actions and interactive pop remain intact.
+struct ThemeNavigationAppearance: UIViewRepresentable {
+    @Environment(\.themeAppearance) private var appearance
+    final class Probe: UIView {
+        var apply: ((UIView) -> Void)?
+        var signature: String?
+        override func didMoveToWindow() { super.didMoveToWindow(); apply?(self) }
+    }
+    func makeUIView(context: Context) -> Probe { let view = Probe(); view.isUserInteractionEnabled = false; return view }
+    func updateUIView(_ view: Probe, context: Context) {
+        view.apply = { [weak view] probe in
+            guard let view else { return }
+            var responder: UIResponder? = probe
+            while let current = responder {
+                if let controller = current as? UIViewController, let bar = controller.navigationController?.navigationBar {
+                    let asset = appearance.bundle.document.app.icons["navigation.back"]
+                    let signature = [appearance.bundle.id, appearance.bundle.document.app.colors["text.primary"] ?? "", appearance.bundle.document.app.colors["action.primary.background"] ?? "", asset?.path ?? "", asset?.symbol ?? ""].joined(separator: ":")
+                    guard view.signature != signature else { return }; view.signature = signature
+                    var image = asset?.path.flatMap { appearance.image($0) } ?? asset?.symbol.flatMap { UIImage(systemName: $0) }
+                    if let original = image, asset?.path != nil {
+                        image = UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20)).image { _ in original.draw(in: CGRect(x: 0, y: 0, width: 20, height: 20)) }.withRenderingMode(asset?.template == false ? .alwaysOriginal : .alwaysTemplate)
+                    }
+                    func styled(_ source: UINavigationBarAppearance) -> UINavigationBarAppearance {
+                        let value = source.copy()
+                        value.titleTextAttributes[.foregroundColor] = UIColor(appearance.palette.green)
+                        value.largeTitleTextAttributes[.foregroundColor] = UIColor(appearance.palette.green)
+                        value.setBackIndicatorImage(image, transitionMaskImage: image)
+                        return value
+                    }
+                    bar.standardAppearance = styled(bar.standardAppearance)
+                    bar.scrollEdgeAppearance = styled(bar.scrollEdgeAppearance ?? bar.standardAppearance)
+                    bar.compactAppearance = styled(bar.compactAppearance ?? bar.standardAppearance)
+                    bar.tintColor = UIColor(appearance.palette.primary)
+                    return
+                }
+                responder = current.next
+            }
+        }
+        DispatchQueue.main.async { view.apply?(view) }
+    }
+}
+struct ThemeButtonFeedbackStyle: ButtonStyle {
+    @Environment(\.themeAppearance) private var appearance
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .environment(\.themeControlState, configuration.isPressed ? "pressed" : "normal")
+            .opacity(configuration.isPressed ? appearance.bundle.document.app.motion.pressOpacity : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: appearance.bundle.document.app.motion.duration), value: configuration.isPressed)
+    }
+}
+
+struct ThemeReaderBackdrop: View {
+    @ObservedObject private var themes = GlobalThemeStore.shared
+    let color: Color
+    var body: some View {
+        ZStack {
+            color
+            if let bundle = themes.readerBundle, let background = bundle.document.reader?.background,
+               let image = ThemeAppearanceContext(bundle: bundle).image(background.path) {
+                GeometryReader { geometry in
+                    Group {
+                        if background.mode == "tile" { Image(uiImage: image).resizable(resizingMode: .tile) }
+                        else if background.mode == "fit" { Image(uiImage: image).resizable().scaledToFit() }
+                        else { Image(uiImage: image).resizable().scaledToFill() }
+                    }.frame(width: geometry.size.width, height: geometry.size.height).clipped().opacity(background.opacity)
+                }
+                color.opacity(background.overlayOpacity)
+            }
+        }.allowsHitTesting(false).accessibilityHidden(true)
+    }
+}

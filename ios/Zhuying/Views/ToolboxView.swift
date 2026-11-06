@@ -6,6 +6,7 @@ private enum ShortcutSheet: Identifiable {
 }
 
 struct ToolboxView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var toolbox: ToolboxStore
     @State private var query = ""
     @State private var category: ToolCategory?
@@ -22,9 +23,9 @@ struct ToolboxView: View {
                 categoryBar
                 if searching {
                     Text("\(results.count) 项结果\(category.map { " · \($0.title)" } ?? " · 全部工具")")
-                        .font(.system(size: 12)).foregroundStyle(Palette.muted).accessibilityIdentifier("toolsSearchCount")
+                        .font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted).accessibilityIdentifier("toolsSearchCount")
                     if results.isEmpty {
-                        ContentUnavailableView("没有找到相关功能", systemImage: "magnifyingglass", description: Text("试试其他关键词，或切换到全部分类。"))
+                        ThemeUnavailableView("没有找到相关功能", systemImage: "magnifyingglass", description: Text("试试其他关键词，或切换到全部分类。"))
                     } else { rows(results) }
                 } else if let category {
                     categoryContents(category)
@@ -35,13 +36,13 @@ struct ToolboxView: View {
                                 if expanded.contains(item) { expanded.remove(item) } else { expanded.insert(item) }
                             } label: {
                                 HStack(spacing: 12) {
-                                    Image(systemName: item.icon).frame(width: 22)
+                                    ThemeIcon(systemName: item.icon).frame(width: 22)
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(item.title).font(.system(size: 15, weight: .medium))
-                                        Text(item.summary).font(.system(size: 10)).foregroundStyle(Palette.muted)
+                                        Text(item.summary).font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
                                     }
                                     Spacer()
-                                    Image(systemName: expanded.contains(item) ? "chevron.down" : "chevron.right").font(.system(size: 11))
+                                    ThemeIcon(systemName: expanded.contains(item) ? "chevron.down" : "chevron.right").font(.system(size: 11))
                                 }.frame(minHeight: 62).contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityIdentifier("tools-group-\(item.id)")
                                 .accessibilityValue(expanded.contains(item) ? "已展开" : "已收起")
@@ -76,24 +77,24 @@ struct ToolboxView: View {
                     let feature = FeatureCatalog.feature(id)
                     NavigationLink { ToolDestination(feature: feature) } label: {
                         VStack(spacing: 7) {
-                            Image(systemName: feature.icon).font(.system(size: 21, weight: .light)).frame(height: 28)
+                            ThemeIcon(systemName: feature.icon).font(.system(size: 21, weight: .light)).frame(height: 28)
                             Text(feature.title).font(.system(size: 11)).lineLimit(2).multilineTextAlignment(.center)
                             ToolCapabilityBadge(feature: feature)
                         }.frame(maxWidth: .infinity, minHeight: 84, alignment: .top).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("tool-shortcut-\(id)")
                         .contextMenu {
-                            Button("替换工具", systemImage: "arrow.triangle.swap") { sheet = .replace(id) }
-                            Button("向前移动", systemImage: "arrow.left") { toolbox.shift(id, by: -1) }.disabled(toolbox.pinnedIDs.first == id)
-                            Button("向后移动", systemImage: "arrow.right") { toolbox.shift(id, by: 1) }.disabled(toolbox.pinnedIDs.last == id)
-                            Button("移出常用", systemImage: "minus.circle", role: .destructive) { toolbox.remove(id) }
+                            ThemeButton("替换工具", systemImage: "arrow.triangle.swap") { sheet = .replace(id) }
+                            ThemeButton("向前移动", systemImage: "arrow.left") { toolbox.shift(id, by: -1) }.disabled(toolbox.pinnedIDs.first == id)
+                            ThemeButton("向后移动", systemImage: "arrow.right") { toolbox.shift(id, by: 1) }.disabled(toolbox.pinnedIDs.last == id)
+                            ThemeButton("移出常用", systemImage: "minus.circle", role: .destructive) { toolbox.remove(id) }
                         }
                 }
                 if toolbox.canAdd {
                     Button { sheet = .add } label: {
                         VStack(spacing: 7) {
-                            Image(systemName: "plus.circle").font(.system(size: 21, weight: .light)).frame(height: 28)
+                            ThemeIcon(systemName: "plus.circle").font(.system(size: 21, weight: .light)).frame(height: 28)
                             Text("添加常用").font(.system(size: 11))
-                        }.foregroundStyle(Palette.muted).frame(maxWidth: .infinity, minHeight: 84, alignment: .top)
+                        }.foregroundStyle(appAppearance.palette.muted).frame(maxWidth: .infinity, minHeight: 84, alignment: .top)
                     }.buttonStyle(.plain).accessibilityIdentifier("toolsAddShortcut")
                 }
             }.accessibilityIdentifier("toolsShortcuts")
@@ -112,8 +113,8 @@ struct ToolboxView: View {
         Button { category = value } label: {
             Text(value?.shortTitle ?? "全部").font(.system(size: 12, weight: category == value ? .semibold : .regular))
                 .padding(.horizontal, 15).frame(minHeight: 40)
-                .foregroundStyle(category == value ? Color.white : Palette.green)
-                .background(category == value ? Palette.green : Palette.soft, in: Capsule())
+                .foregroundStyle(category == value ? Color.white : appAppearance.palette.green)
+                .background(category == value ? appAppearance.palette.green : appAppearance.palette.soft, in: Capsule())
         }.buttonStyle(.plain).accessibilityIdentifier("tool-category-\(value?.id ?? "all")")
             .accessibilityAddTraits(category == value ? .isSelected : [])
     }
@@ -129,21 +130,21 @@ struct ToolboxView: View {
                     HStack {
                         Text(item == .files ? "格式支持与演示" : "更多功能与细项")
                         Spacer()
-                        Image(systemName: expandedDetails.contains(item) ? "chevron.down" : "chevron.right")
+                        ThemeIcon(systemName: expandedDetails.contains(item) ? "chevron.down" : "chevron.right")
                     }.frame(minHeight: 36).contentShape(Rectangle())
                 }.buttonStyle(.plain).font(.system(size: 12)).accessibilityIdentifier("tools-details-\(item.id)")
                     .accessibilityValue(expandedDetails.contains(item) ? "已展开" : "已收起")
                 if expandedDetails.contains(item) {
                     if item == .files {
                         Text("文件统一从智能导入选择；当前实际支持 TXT 和文字 PDF。以下是各格式的演示页面。")
-                            .font(.system(size: 11)).foregroundStyle(Palette.muted).padding(.vertical, 10)
+                            .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted).padding(.vertical, 10)
                     }
                     rows(item.secondaryFeatures)
                 }
             }
             if item == .sources {
                 Text("登录与编辑：进入书源列表后左滑，或长按具体书源。")
-                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
         }
     }
@@ -154,11 +155,11 @@ struct ToolboxView: View {
                     .buttonStyle(.plain).accessibilityIdentifier("feature-\(feature.id)")
                     .contextMenu {
                         if toolbox.pinnedIDs.contains(feature.id) {
-                            Button("移出常用", systemImage: "minus.circle") { toolbox.remove(feature.id) }
+                            ThemeButton("移出常用", systemImage: "minus.circle") { toolbox.remove(feature.id) }
                         } else if toolbox.canAdd {
-                            Button("加入常用", systemImage: "plus.circle") { toolbox.add(feature.id) }
+                            ThemeButton("加入常用", systemImage: "plus.circle") { toolbox.add(feature.id) }
                         } else {
-                            Button("常用已满，编辑常用", systemImage: "square.and.pencil") { sheet = .manage }
+                            ThemeButton("常用已满，编辑常用", systemImage: "square.and.pencil") { sheet = .manage }
                         }
                     }
                 Divider()
@@ -179,44 +180,47 @@ private struct ToolDestination: View {
 }
 
 private struct ToolEntryRow: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     let feature: DemoFeature
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: feature.icon).font(.system(size: 19, weight: .light)).frame(width: 27)
+            ThemeIcon(systemName: feature.icon).font(.system(size: 19, weight: .light)).frame(width: 27)
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text(feature.title).font(.system(size: 14, weight: .medium))
                     ToolCapabilityBadge(feature: feature)
                 }
-                Text(library.isDemo ? feature.summary : ProductionCapabilities.summary(for:feature)).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(1)
+                Text(library.isDemo ? feature.summary : ProductionCapabilities.summary(for:feature)).font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted).lineLimit(1)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted)
-        }.foregroundStyle(Palette.green).frame(minHeight: 65).contentShape(Rectangle())
+            ThemeIcon(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
+        }.foregroundStyle(appAppearance.palette.green).frame(minHeight: 65).contentShape(Rectangle())
     }
 }
 
 private struct ToolCapabilityBadge: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let feature: DemoFeature
     @EnvironmentObject private var library: LibraryStore
     var body: some View {
         if let badge = library.isDemo ? feature.capabilityBadge : ProductionCapabilities.badge(for: feature.id) {
-            Text(badge).font(.system(size: 8)).foregroundStyle(Palette.accent)
-                .padding(.horizontal, 5).padding(.vertical, 3).background(Palette.accent.opacity(0.08), in: Capsule())
+            Text(badge).font(.system(size: 8)).foregroundStyle(appAppearance.palette.accent)
+                .padding(.horizontal, 5).padding(.vertical, 3).background(appAppearance.palette.accent.opacity(0.08), in: Capsule())
                 .accessibilityIdentifier("tool-status-\(feature.id)")
         }
     }
 }
 
 private struct ToolShortcutEditor: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var toolbox: ToolboxStore
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         List {
             Section {
                 ForEach(toolbox.pinnedIDs, id: \.self) { id in
-                    Label(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon)
+                    ThemeLabel(FeatureCatalog.feature(id).title, systemImage: FeatureCatalog.feature(id).icon)
                         .font(.system(size: 14)).accessibilityIdentifier("shortcut-edit-\(id)")
                 }.onDelete { offsets in for id in offsets.map({ toolbox.pinnedIDs[$0] }) { toolbox.remove(id) } }
                     .onMove { toolbox.move(from: $0, to: $1) }
@@ -224,7 +228,7 @@ private struct ToolShortcutEditor: View {
                 footer: { Text("拖动右侧把手调整顺序；更改自动保存在本机。") }
             Section {
                 NavigationLink("添加常用工具") { ToolShortcutPicker() }.disabled(!toolbox.canAdd).accessibilityIdentifier("shortcutEditorAdd")
-                if !toolbox.canAdd { Text("最多固定四个，先移除一项再添加；也可在首页长按替换。").font(.system(size: 12)).foregroundStyle(Palette.muted) }
+                if !toolbox.canAdd { Text("最多固定四个，先移除一项再添加；也可在首页长按替换。").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted) }
             }
         }.environment(\.editMode, .constant(.active)).scrollContentBackground(.hidden).appPageStyle()
             .navigationTitle("编辑常用").navigationBarTitleDisplayMode(.inline)

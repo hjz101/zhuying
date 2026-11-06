@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 
 struct FootprintsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var title = "足迹"
     @EnvironmentObject private var store: LibraryStore
     @Environment(\.scenePhase) private var scenePhase
@@ -24,7 +25,7 @@ struct FootprintsView: View {
                 }.pickerStyle(.segmented).accessibilityIdentifier("activityPeriod")
                 summary(data)
                 AppSettingsCard(chartTitle, icon: "chart.bar") {
-                    Text(rangeLabel(data.interval)).font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Text(rangeLabel(data.interval)).font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                     if period == .year {
                         Picker("年度图表", selection: $annualBars) {
                             Text("全年热力图").tag(false); Text("月度柱状图").tag(true)
@@ -37,7 +38,7 @@ struct FootprintsView: View {
                 }
                 ranking(data)
                 dayDetail(data)
-                NavigationLink { ReadingHistoryView() } label: { Label("查看全部阅读历史", systemImage: "clock.arrow.circlepath") }
+                NavigationLink { ReadingHistoryView() } label: { ThemeLabel("查看全部阅读历史", systemImage: "clock.arrow.circlepath") }
                     .font(.system(size: 13)).frame(minHeight: 44)
             }.padding(22)
         }.appPageStyle().navigationTitle(title).navigationBarTitleDisplayMode(.inline)
@@ -58,7 +59,7 @@ struct FootprintsView: View {
     }
     private func summary(_ data: ActivityReport) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(period == .day ? "今日阅读时长" : "本\(period.title)阅读时长").font(.system(size: 12)).foregroundStyle(Palette.muted)
+            Text(period == .day ? "今日阅读时长" : "本\(period.title)阅读时长").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted)
             Text(ActivityReport.duration(data.seconds)).font(.system(size: 29, weight: .medium, design: .serif))
                 .accessibilityIdentifier("activityTotal")
             Text(data.changePercent.map { "\(period.comparison) \($0 >= 0 ? "+" : "")\($0)%" } ?? "\(period.comparison) · 暂无对比")
@@ -69,13 +70,13 @@ struct FootprintsView: View {
                 Text("阅读 \(data.readingDays) 天")
                 Spacer()
                 Text("日均 \(ActivityReport.duration(data.seconds / Double(data.elapsedDays)))")
-            }.font(.system(size: 10)).foregroundStyle(Palette.muted)
+            }.font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
             if !store.isDemo {
                 Text("本周期朗读：\(ActivityReport.duration(ActivityReport(sessions:store.activitySessions.filter { $0.kind == .listening },now:now,period:period,calendar:calendar).seconds))")
-                    .font(.system(size:11)).foregroundStyle(Palette.muted).accessibilityIdentifier("activityListeningTotal")
+                    .font(.system(size:11)).foregroundStyle(appAppearance.palette.muted).accessibilityIdentifier("activityListeningTotal")
             }
-        }.foregroundStyle(Palette.green).padding(20).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.soft, in: .rect(cornerRadius: 18))
+        }.foregroundStyle(appAppearance.palette.green).padding(20).frame(maxWidth: .infinity, alignment: .leading)
+            .background(appAppearance.palette.soft, in: .rect(cornerRadius: 18))
     }
     private func buckets(_ data: ActivityReport) -> [DateInterval] {
         let component: Calendar.Component = period == .day ? .hour : period == .year ? .month : .day
@@ -90,7 +91,7 @@ struct FootprintsView: View {
         return VStack(spacing: 10) {
             Chart(Array(ranges.enumerated()), id: \.offset) { index, range in
                 BarMark(x: .value("时间", index), y: .value("分钟", data.total(in: clipped(range)) / 60))
-                    .foregroundStyle(Palette.green).cornerRadius(3)
+                    .foregroundStyle(appAppearance.palette.green).cornerRadius(3)
                     .accessibilityLabel(bucketLabel(range.start)).accessibilityValue(ActivityReport.duration(data.total(in: clipped(range))))
             }.chartXAxis {
                 AxisMarks(values: Array(stride(from: 0, to: ranges.count, by: period == .day ? 6 : 1))) { value in
@@ -98,7 +99,7 @@ struct FootprintsView: View {
                 }
             }.chartYAxis { AxisMarks(position: .leading) }.frame(height: 165)
                 .accessibilityIdentifier("activityBars")
-            Text("纵轴：分钟\(period == .day ? " · 横轴：小时" : "")").font(.system(size: 10)).foregroundStyle(Palette.muted)
+            Text("纵轴：分钟\(period == .day ? " · 横轴：小时" : "")").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
             if period != .day {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack { ForEach(Array(ranges.enumerated()), id: \.offset) { i, range in
@@ -107,7 +108,7 @@ struct FootprintsView: View {
                             .disabled(range.start > now).accessibilityIdentifier("activity-bucket-\(i)")
                     } }
                 }
-                Text(period == .year ? "点月份查看当月首日记录" : "点日期查看当天明细").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                Text(period == .year ? "点月份查看当月首日记录" : "点日期查看当天明细").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
             }
         }
     }
@@ -125,7 +126,7 @@ struct FootprintsView: View {
         let count = calendar.range(of: .day, in: .month, for: start)!.count
         let offset = (calendar.component(.weekday, from: start) + 5) % 7
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 7), spacing: 5) {
-            ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { Text($0).font(.system(size: 10)).foregroundStyle(Palette.muted) }
+            ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { Text($0).font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted) }
             ForEach(0..<(offset + count), id: \.self) { index in
                 if index < offset { Color.clear.frame(height: 36) }
                 else { dateCell(calendar.date(byAdding: .day, value: index - offset, to: start)!, data: data, showNumber: true) }
@@ -143,7 +144,7 @@ struct FootprintsView: View {
                         let days = (0..<7).map { calendar.date(byAdding: .day, value: week * 7 + $0, to: start)! }
                         VStack(spacing: 4) {
                             Text(days.first(where: { calendar.component(.day, from: $0) == 1 }).map { "\(calendar.component(.month, from: $0))月" } ?? " ")
-                                .font(.system(size: 8)).foregroundStyle(Palette.muted).frame(height: 16)
+                                .font(.system(size: 8)).foregroundStyle(appAppearance.palette.muted).frame(height: 16)
                             ForEach(days, id: \.self) { date in
                                 if date < data.interval.start || date >= yearEnd { Color.clear.frame(width: 24, height: 24) }
                                 else { dateCell(date, data: data, showNumber: false).frame(width: 24) }
@@ -153,41 +154,41 @@ struct FootprintsView: View {
                 }.padding(3)
             }.accessibilityIdentifier("activityYearGrid")
             Text("每列周一至周日 · 横向滑动查看全年 · 点日期查看明细")
-                .font(.system(size: 10)).foregroundStyle(Palette.muted)
+                .font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
         }
     }
     private func dateCell(_ date: Date, data: ActivityReport, showNumber: Bool) -> some View {
         let duration = data.total(in: data.dayInterval(date))
         return Button { selectedDate = date } label: {
             ZStack {
-                RoundedRectangle(cornerRadius: 5).fill(date > now ? Palette.line.opacity(0.2) : heatColor(duration))
-                if showNumber { Text("\(calendar.component(.day, from: date))").font(.system(size: 11)).foregroundStyle(duration > 30 * 60 ? .white : Palette.green) }
+                RoundedRectangle(cornerRadius: 5).fill(date > now ? appAppearance.palette.line.opacity(0.2) : heatColor(duration))
+                if showNumber { Text("\(calendar.component(.day, from: date))").font(.system(size: 11)).foregroundStyle(duration > 30 * 60 ? appAppearance.palette.onPrimary : appAppearance.palette.green) }
             }.frame(height: showNumber ? 36 : 24)
-                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(calendar.isDate(date, inSameDayAs: selectedDate) ? Palette.accent : .clear, lineWidth: 2))
+                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(calendar.isDate(date, inSameDayAs: selectedDate) ? appAppearance.palette.accent : .clear, lineWidth: 2))
         }.buttonStyle(.plain).disabled(date > now)
             .accessibilityLabel(date.formatted(.dateTime.month().day().locale(Locale(identifier: "zh_CN"))))
             .accessibilityValue(ActivityReport.duration(duration))
             .accessibilityIdentifier("activity-date-\(calendar.component(.day, from: date))\(showNumber ? "" : "-\(calendar.component(.month, from: date))")")
     }
     private func heatColor(_ seconds: TimeInterval) -> Color {
-        seconds == 0 ? Palette.line : Palette.green.opacity(seconds <= 900 ? 0.2 : seconds <= 1800 ? 0.4 : seconds <= 3600 ? 0.7 : 1)
+        seconds == 0 ? appAppearance.palette.line : appAppearance.palette.green.opacity(seconds <= 900 ? 0.2 : seconds <= 1800 ? 0.4 : seconds <= 3600 ? 0.7 : 1)
     }
     private var legend: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("颜色越深，阅读越久").font(.system(size: 10)).foregroundStyle(Palette.muted)
+            Text("颜色越深，阅读越久").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
             HStack(spacing: 6) {
                 ForEach(Array(zip([0.0, 600, 1200, 2400, 4000], ["0", "1–15", "16–30", "31–60", "60+"])), id: \.0) { value, label in
                     VStack(spacing: 5) { RoundedRectangle(cornerRadius: 3).fill(heatColor(value)).frame(height: 8); Text(label).font(.system(size: 8)) }
                 }
                 Text("分钟").font(.system(size: 8))
-            }.foregroundStyle(Palette.muted)
+            }.foregroundStyle(appAppearance.palette.muted)
         }
     }
     private func ranking(_ data: ActivityReport) -> some View {
         let totals = data.ranking()
         return AppSettingsCard("书籍时长排行", icon: "chart.bar.xaxis") {
-            Text("按本\(period.title)阅读时长排序").font(.system(size: 11)).foregroundStyle(Palette.muted).accessibilityIdentifier("activityRankingPeriod")
-            if totals.isEmpty { Text("这个周期还没有阅读记录。").font(.system(size: 12)).foregroundStyle(Palette.muted) }
+            Text("按本\(period.title)阅读时长排序").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted).accessibilityIdentifier("activityRankingPeriod")
+            if totals.isEmpty { Text("这个周期还没有阅读记录。").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted) }
             ForEach(Array((showAll ? totals : Array(totals.prefix(5))).enumerated()), id: \.element.id) { index, item in
                 if let book = store.books.first(where: { $0.id == item.id }) {
                     NavigationLink { ActivityBookView(book: book, report: data) } label: {
@@ -197,10 +198,10 @@ struct FootprintsView: View {
                             VStack(alignment: .leading, spacing: 7) {
                                 Text(book.title).font(.system(size: 13, weight: .medium))
                                 Text("\(ActivityReport.duration(item.seconds)) · \(Int((item.seconds / max(1, data.seconds) * 100).rounded()))%")
-                                    .font(.system(size: 10)).foregroundStyle(Palette.muted)
-                                ProgressView(value: item.seconds, total: max(1, data.seconds)).tint(Palette.green)
+                                    .font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
+                                ProgressView(value: item.seconds, total: max(1, data.seconds)).tint(appAppearance.palette.primary)
                             }
-                        }.foregroundStyle(Palette.green).padding(.vertical, 4)
+                        }.foregroundStyle(appAppearance.palette.green).padding(.vertical, 4)
                     }.buttonStyle(.plain).accessibilityIdentifier("activity-rank-\(index)")
                 }
             }
@@ -216,11 +217,11 @@ struct FootprintsView: View {
                 Button("今天") { selectedDate = calendar.startOfDay(for: now) }.font(.system(size: 11)).accessibilityIdentifier("activityToday")
             }
             Text(ActivityReport.duration(data.total(in: data.dayInterval(selectedDate)))).font(.system(size: 17, design: .serif)).accessibilityIdentifier("activityDayTotal")
-            if totals.isEmpty { Text("这一天留了白，下一页随时开始。").font(.system(size: 12)).foregroundStyle(Palette.muted) }
+            if totals.isEmpty { Text("这一天留了白，下一页随时开始。").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted) }
             ForEach(totals) { item in
                 if let book = store.books.first(where: { $0.id == item.id }) {
                     NavigationLink { ActivityBookView(book: book, report: data) } label: {
-                        HStack { Text(book.title); Spacer(); Text(ActivityReport.duration(item.seconds)).foregroundStyle(Palette.muted) }.font(.system(size: 12)).frame(minHeight: 44)
+                        HStack { Text(book.title); Spacer(); Text(ActivityReport.duration(item.seconds)).foregroundStyle(appAppearance.palette.muted) }.font(.system(size: 12)).frame(minHeight: 44)
                     }.accessibilityIdentifier("activity-book-\(book.id)")
                 }
             }
@@ -237,7 +238,7 @@ private struct ActivityBookView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 18) { BookCover(book: book, width: 75); AppPageHeader(title: book.title, subtitle: "本\(report.period.title) · \(store.isDemo ? "示例阅读记录" : "真实阅读记录")", icon: "clock") }
                 Text(ActivityReport.duration(report.total(in: report.interval, bookID: book.id))).font(.system(size: 25, design: .serif))
-                Button { store.read(book) } label: { Label("继续阅读", systemImage: "book") }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("activityResume")
+                Button { store.read(book) } label: { ThemeLabel("继续阅读", systemImage: "book") }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("activityResume")
                 ForEach(report.sessions.filter { $0.bookID == book.id && $0.duration(in: report.interval) > 0 }.sorted { $0.start > $1.start }, id: \.start) { session in
                     HStack {
                         Text(session.start, format: .dateTime.month().day().hour().minute().locale(Locale(identifier: "zh_CN")))

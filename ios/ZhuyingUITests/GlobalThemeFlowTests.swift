@@ -1,0 +1,105 @@
+import XCTest
+
+final class GlobalThemeFlowTests: XCTestCase {
+    @MainActor private func launch(preserve: Bool = false) -> XCUIApplication {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--global-theme-fixtures"] + (preserve ? ["--preserve-ui-test-state"] : [])
+        app.launch(); return app
+    }
+    @MainActor private func reveal(_ element: XCUIElement, app: XCUIApplication) {
+        for _ in 0..<12 {
+            if element.isHittable { return }
+            if element.exists && element.frame.minY < 100 { app.swipeDown() } else { app.swipeUp() }
+        }
+        XCTAssertTrue(element.isHittable, app.debugDescription)
+    }
+    @MainActor private func openThemes(_ app: XCUIApplication) {
+        app.tabBars.buttons["我的"].tap()
+        let entry = app.buttons["profileThemes"]; reveal(entry, app: app); entry.tap()
+        let global = app.buttons["globalThemeEntry"]; reveal(global, app: app); global.tap()
+        XCTAssertTrue(app.navigationBars["全局主题"].waitForExistence(timeout: 8))
+    }
+    @MainActor private func apply(_ app: XCUIApplication) {
+        let apply = app.buttons["globalThemeApply"]; reveal(apply, app: app); apply.tap()
+        let confirm = app.buttons["确认应用"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 4)); confirm.tap()
+        XCTAssertTrue(app.staticTexts["globalThemeResult"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["globalThemeResult"].label.contains("已应用"), app.debugDescription)
+    }
+    @MainActor private func backToManager(_ app: XCUIApplication) {
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["全局主题"].waitForExistence(timeout: 5))
+    }
+    @MainActor private func capture(_ app: XCUIApplication, _ name: String) {
+        let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
+    }
+    @MainActor func testGlobalThemeAppliesAcrossOriginalNavigationPersistsAndRestores() {
+        let app = launch(); openThemes(app)
+        let night = app.buttons["globalTheme-zhuying.builtin.night"]; reveal(night, app: app); night.tap()
+        XCTAssertTrue(app.otherElements["globalThemePreview"].waitForExistence(timeout: 4))
+        apply(app); backToManager(app)
+        XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, "幻想夜航")
+        capture(app, "竹影-全局主题-幻想夜航")
+        app.tabBars.buttons["书架"].tap()
+        XCTAssertTrue(app.buttons["shelfAddBook"].waitForExistence(timeout: 4))
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
+        capture(app, "竹影-夜航书架-原布局")
+        app.tabBars.buttons["搜索"].tap()
+        XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 4))
+        app.terminate()
+        let reopened = launch(preserve: true); openThemes(reopened)
+        XCTAssertEqual(reopened.staticTexts["globalThemeCurrent"].label, "幻想夜航")
+        let restore = reopened.buttons["globalThemeRestore"]; reveal(restore, app: reopened); restore.tap()
+        let current = reopened.staticTexts["globalThemeCurrent"]
+        let expected = NSPredicate(format: "label == %@", "竹影原色")
+        expectation(for: expected, evaluatedWith: current)
+        waitForExpectations(timeout: 8)
+    }
+    @MainActor func testThemeEditorKeepsExistingPagesAndCanSaveCustomInterface() {
+        let app = launch(); openThemes(app)
+        app.buttons["globalThemeCreate"].tap()
+        XCTAssertTrue(app.navigationBars["制作主题"].waitForExistence(timeout: 4))
+        let name = app.textFields.firstMatch
+        name.tap(); name.press(forDuration: 1)
+        if app.menuItems["全选"].exists { app.menuItems["全选"].tap() }
+        if app.buttons["Return"].exists { app.buttons["Return"].tap() }
+        app.swipeUp()
+        let save = app.buttons["globalThemeEditorSave"]; reveal(save, app: app); save.tap()
+        XCTAssertTrue(app.navigationBars["全局主题"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, "我的竹影配色")
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
+    }
+    @MainActor func testExportOffersThemePackageAndAIKitWithoutLeavingCurrentNavigation() {
+        let app = launch(); openThemes(app)
+        app.buttons["globalThemeExport"].tap()
+        XCTAssertTrue(app.navigationBars["打包分享"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["globalThemeGenerate"].exists)
+        let kit = app.buttons["globalThemeAuthoringKit"]; reveal(kit, app: app); kit.tap()
+        let save = app.buttons.matching(NSPredicate(format: "label IN %@", ["保存", "Save", "存储"])).firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 8), app.debugDescription)
+        capture(app, "竹影-AI主题制作资料导出")
+    }
+    @MainActor func testReceivedThemeCanBePreviewedSavedWithoutApplyingThenFullyApplied() {
+        let app = launch(); openThemes(app)
+        app.buttons["globalThemeImport"].tap()
+        let file = app.collectionViews["File View"].cells.matching(NSPredicate(format: "label BEGINSWITH %@", "竹影完整主题")).firstMatch
+        if !file.waitForExistence(timeout: 3) {
+            for labels in [["Browse", "浏览"], ["Browse", "浏览"], ["On My iPhone", "我的iPhone", "我的 iPhone"]] {
+                for label in labels {
+                    let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label)).firstMatch
+                    if item.exists && item.isHittable { item.tap(); break }
+                }
+            }
+            let folder = app.collectionViews["File View"].cells.matching(NSPredicate(format: "identifier IN %@", ["竹影, Container", "Zhuying, Container"])).firstMatch
+            if folder.waitForExistence(timeout: 4) { folder.tap() }
+        }
+        XCTAssertTrue(file.waitForExistence(timeout: 8), app.debugDescription); file.tap()
+        if app.buttons["Open"].waitForExistence(timeout: 1) { app.buttons["Open"].tap() }
+        else if app.buttons["打开"].exists { app.buttons["打开"].tap() }
+        let save = app.buttons["globalThemeSaveOnly"]; reveal(save, app: app); save.tap()
+        XCTAssertTrue(app.staticTexts["globalThemeResult"].label.contains("当前外观保留"))
+        apply(app)
+        capture(app, "竹影-收到主题包-完整应用")
+    }
+}

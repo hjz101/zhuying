@@ -43,6 +43,7 @@ enum ThemePreviewDocument {
 }
 
 struct ThemeStylePreview: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let theme: DemoTheme
     var title: ThemeAsset?
     var bubble: ThemeAsset?
@@ -57,7 +58,7 @@ struct ThemeStylePreview: View {
         PassiveThemeWebView(html: document) { ready in status = ready ? "预览就绪" : "无法预览"; readiness?(ready) }
             .overlay {
                 if status == "正在预览" { ProgressView().scaleEffect(compact ? 0.7 : 1) }
-                if status == "无法预览" { Label("无法预览此样式", systemImage: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(Palette.accent) }
+                if status == "无法预览" { ThemeLabel("无法预览此样式", systemImage: "exclamationmark.circle").font(.system(size: 11)).foregroundStyle(appAppearance.palette.accent) }
             }
             .frame(height: assetOnly == .bubble ? (compact ? 100 : 200) : assetOnly == .title ? (compact ? 120 : 230) : (compact ? 210 : 390))
             .background(Color(hex: theme.background)).clipShape(.rect(cornerRadius: 10))

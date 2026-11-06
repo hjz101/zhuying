@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct ReadingSettingsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     @Environment(\.dismiss) private var dismiss
     @State private var confirmReset = false
@@ -11,10 +12,10 @@ struct ReadingSettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("YOUR READING SPACE").font(.system(size: 9)).tracking(2).foregroundStyle(Palette.muted)
+                        Text("YOUR READING SPACE").font(.system(size: 9)).tracking(2).foregroundStyle(appAppearance.palette.muted)
                         Text("你的阅读，自成风格。").font(.system(size: 27, design: .serif))
                         Text("\(store.settings.preferences.colors?.name ?? store.settings.theme.title) · \(Int(store.settings.fontSize)) pt · \(store.settings.mode.title)")
-                            .font(.system(size: 11)).foregroundStyle(Palette.muted).accessibilityIdentifier("readingPreferenceSummary")
+                            .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted).accessibilityIdentifier("readingPreferenceSummary")
                     }.padding(.vertical, 9)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 11) {
                         NavigationLink { ReadingAppearanceView() } label: { category("主题与字体", "我的主题 · 本地字体", "paintpalette") }.accessibilityIdentifier("reading-category-appearance")
@@ -25,7 +26,7 @@ struct ReadingSettingsView: View {
                     Text("当前阅读效果").font(.system(size: 13, weight: .medium))
                     ReadingSettingsPreview(settings: store.settings)
                     HStack {
-                        Label("自动保存在当前设备", systemImage: "checkmark.circle").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                        ThemeLabel("自动保存在当前设备", systemImage: "checkmark.circle").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
                         Spacer()
                         Button("恢复默认") { confirmReset = true }.font(.system(size: 11)).accessibilityIdentifier("resetReadingSettings")
                     }
@@ -37,15 +38,15 @@ struct ReadingSettingsView: View {
                     Button("取消", role: .cancel) {}
                 } message: { Text("字号、排版和个人样式恢复默认，阅读位置与已导入的字体保留。") }
         }.environment(\.readingPreferenceDismiss, { dismiss() })
-            .appPageStyle().presentationBackground(Palette.background).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(26)
+            .appPageStyle().presentationBackground(appAppearance.palette.background).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(26)
     }
     private func category(_ title: String, _ detail: String, _ icon: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: icon).font(.system(size: 21, weight: .light))
+            ThemeIcon(systemName: icon).font(.system(size: 21, weight: .light))
             Text(title).font(.system(size: 14, weight: .medium))
-            Text(detail).font(.system(size: 10)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+            Text(detail).font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted).fixedSize(horizontal: false, vertical: true)
         }.frame(maxWidth: .infinity, minHeight: 114, alignment: .leading).padding(15)
-            .background(Palette.card, in: .rect(cornerRadius: 15)).contentShape(Rectangle())
+            .background(appAppearance.palette.card, in: .rect(cornerRadius: 15)).contentShape(Rectangle())
     }
 }
 
@@ -66,6 +67,7 @@ struct ReadingLayoutPreferencesView: View {
 }
 
 struct ReadingTypographyPreferencesView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     var body: some View {
         ReadingPreferencePage("正文排版与边距") {
@@ -84,7 +86,7 @@ struct ReadingTypographyPreferencesView: View {
                 ReadingValueSlider("右边距", value: margin(\.rightMargin, other: \.leftMargin), range: 8...56, id: "rightMarginSlider")
                 ReadingValueSlider("上边距", value: $store.settings.preferences.topMargin, range: 0...56, id: "topMarginSlider")
                 ReadingValueSlider("下边距", value: $store.settings.preferences.bottomMargin, range: 0...56, id: "bottomMarginSlider")
-                Text("关闭联动后可独立调整左右留白。行间距、段落间距与页面留白分别生效。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text("关闭联动后可独立调整左右留白。行间距、段落间距与页面留白分别生效。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
         }
     }
@@ -97,6 +99,7 @@ struct ReadingTypographyPreferencesView: View {
 }
 
 struct ReadingOperationPreferencesView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     @State private var showGestureGuide = false
     private var effect: Binding<String> {
@@ -111,15 +114,15 @@ struct ReadingOperationPreferencesView: View {
                 }.pickerStyle(.segmented).labelsHidden().accessibilityIdentifier("readingModePicker")
                 if store.settings.mode.isPaged {
                     Picker("翻页效果", selection: effect) { ForEach(effects, id: \.self) { Text($0).tag($0) } }.accessibilityIdentifier("readingEffectPicker")
-                } else { Text("连续滚动 · 正文随手指上下移动").font(.system(size: 12)).foregroundStyle(Palette.muted) }
+                } else { Text("连续滚动 · 正文随手指上下移动").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted) }
                 Text(store.settings.mode == .scroll ? "上滑继续阅读，下滑回看。" : store.settings.mode == .verticalPaged ? "上滑下一页，下滑上一页。" : "左滑下一页，右滑上一页。")
-                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
-                Text("滑动是触发方式，仿真、平移等是翻页效果；切换方向时分别记忆。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
+                Text("滑动是触发方式，仿真、平移等是翻页效果；切换方向时分别记忆。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
             ReadingTurnPreview(settings: store.settings)
             AppSettingsCard("单手操作", icon: "hand.tap") {
                 Toggle("轻触翻页", isOn: $store.settings.tapToTurn).accessibilityIdentifier("tapToTurnToggle")
-                Text("轻点左右两侧前进，中间显示／隐藏菜单。滚动模式前进约一屏。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text("轻点左右两侧前进，中间显示／隐藏菜单。滚动模式前进约一屏。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                 Toggle("轻微触觉反馈", isOn: $store.settings.haptics).accessibilityIdentifier("hapticsToggle")
                 Button { showGestureGuide = true } label: { ReadingPreferenceRow(title: "查看阅读手势", detail: "滑动与轻点操作") }.accessibilityIdentifier("readingGestureHelp")
             }
@@ -128,6 +131,7 @@ struct ReadingOperationPreferencesView: View {
 }
 
 struct ReadingTurnPreview: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let settings: ReadingSettings
     @EnvironmentObject private var store: LibraryStore
     @State private var page = 0
@@ -149,7 +153,7 @@ struct ReadingTurnPreview: View {
                 }
             }.frame(height: 240).background(paper).clipShape(.rect(cornerRadius: 12)).accessibilityIdentifier("readingTurnPreview")
             HStack {
-                Text("\(settings.mode.title) · \(settings.preferences.effect(for: settings.mode))").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text("\(settings.mode.title) · \(settings.preferences.effect(for: settings.mode))").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                 Spacer()
                 Button(settings.mode == .scroll ? "试滚动一屏" : "试翻下一页") { page += 1 }.font(.system(size: 12)).frame(minHeight: 36).accessibilityIdentifier("tryReadingTurn")
             }
@@ -292,14 +296,16 @@ struct ReadingPreferencePage<Content: View>: View {
 }
 
 struct ReadingPreferenceRow: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let title: String
     var detail: String = ""
     var body: some View {
-        HStack(spacing: 12) { VStack(alignment: .leading, spacing: 5) { Text(title).font(.system(size: 13)); if !detail.isEmpty { Text(detail).font(.system(size: 10)).foregroundStyle(Palette.muted) } }; Spacer(minLength: 3); Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted) }.frame(minHeight: 38).contentShape(Rectangle())
+        HStack(spacing: 12) { VStack(alignment: .leading, spacing: 5) { Text(title).font(.system(size: 13)); if !detail.isEmpty { Text(detail).font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted) } }; Spacer(minLength: 3); ThemeIcon(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted) }.frame(minHeight: 38).contentShape(Rectangle())
     }
 }
 
 struct ReadingValueSlider: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -308,7 +314,7 @@ struct ReadingValueSlider: View {
     init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String = "pt", id: String? = nil) { self.title = title; _value = value; self.range = range; self.unit = unit; self.id = id }
     var body: some View {
         VStack(spacing: 7) {
-            HStack { Text(title); Spacer(); Text("\(Int(value)) \(unit)").monospacedDigit().foregroundStyle(Palette.muted) }.font(.system(size: 12))
+            HStack { Text(title); Spacer(); Text("\(Int(value)) \(unit)").monospacedDigit().foregroundStyle(appAppearance.palette.muted) }.font(.system(size: 12))
             Slider(value: $value, in: range, step: 1).accessibilityLabel(title).accessibilityValue("\(Int(value)) \(unit)").accessibilityIdentifier(id ?? title)
         }
     }

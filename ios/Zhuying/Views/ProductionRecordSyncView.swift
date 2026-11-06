@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionRecordSyncView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @ObservedObject var controller: RecordSyncController
     @State private var pendingAccount: String?
     @State private var error: String?
@@ -15,7 +16,7 @@ struct ProductionRecordSyncView: View {
                     Button("立即同步") { controller.synchronize() }.disabled(!controller.enabled || controller.busy).accessibilityIdentifier("recordSyncNow")
                 }
                 if controller.busy { ProgressView("正在合并记录") }
-                if let message = error ?? controller.message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("recordSyncMessage") }
+                if let message = error ?? controller.message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("recordSyncMessage") }
                 if let state = controller.state,!state.conflicts.isEmpty {
                     AppSettingsCard("待确认的冲突",icon:"arrow.triangle.branch") {
                         Text("并发删除优先；其他值暂按设备序号确定。选择一个版本后会生成新的合并记录。").font(.system(size:12))
@@ -30,7 +31,7 @@ struct ProductionRecordSyncView: View {
                     }
                 }
                 Text("默认关闭。启用后，在前台且退出阅读时合并记录，约每 30 秒检查一次。当前位置与最远读过位置独立；删除保留标记，离线旧编辑不会自动复活。正文、PDF／漫画图片、字体和皮肤资源不随记录上传，新设备需要完整备份恢复；缺正文时保留章节身份和历史，不伪造内容。账号变化会停止自动同步并要求重新确认。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("记录同步").navigationBarTitleDisplayMode(.inline)
             .confirmationDialog("合并当前设备与此 iCloud 账号的记录？",isPresented:Binding(get:{pendingAccount != nil},set:{if !$0 { pendingAccount = nil }}),titleVisibility:.visible) {

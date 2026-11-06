@@ -12,33 +12,31 @@ enum Palette {
 
 /// App controls use the same palette as the shelf; reading paper is configured separately.
 extension View {
-    func appPageStyle() -> some View {
-        self.background(Palette.background)
-            .foregroundStyle(Palette.green)
-            .tint(Palette.green)
-            .toolbarBackground(Palette.background, for: .navigationBar)
-            .preferredColorScheme(.light)
+    func appPageStyle(role: String = "page") -> some View {
+        modifier(ThemePageStyle(role: role))
     }
 }
 
 struct AppPageHeader: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let title: String
     let subtitle: String
     let icon: String
     var body: some View {
         HStack(alignment: .top, spacing: 13) {
-            Image(systemName: icon).font(.system(size: 25, weight: .light))
-                .frame(width: 54, height: 54).background(Palette.soft, in: .rect(cornerRadius: 17))
+            ThemeIcon(systemName: icon).font(.system(size: 25, weight: .light))
+                .frame(width: 54, height: 54).background(appAppearance.palette.soft, in: .rect(cornerRadius: 17))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 9) {
                 Text(title).font(.system(size: 25, weight: .medium, design: .serif))
-                Text(subtitle).font(.system(size: 11)).foregroundStyle(Palette.muted).lineSpacing(5)
+                Text(subtitle).font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted).lineSpacing(5)
             }
-        }.foregroundStyle(Palette.green).frame(maxWidth: .infinity, alignment: .leading)
+        }.foregroundStyle(appAppearance.palette.green).frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 struct AppSettingsCard<Content: View>: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let title: String
     let icon: String
     let content: Content
@@ -47,13 +45,13 @@ struct AppSettingsCard<Content: View>: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label(title, systemImage: icon).font(.system(size: 16, weight: .medium, design: .serif))
-                .foregroundStyle(Palette.green)
+            ThemeLabel(title, systemImage: icon).font(.system(size: 16, weight: .medium, design: .serif))
+                .foregroundStyle(appAppearance.palette.green)
             content
         }
         .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.card, in: .rect(cornerRadius: 18))
-        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(Palette.line.opacity(0.55), lineWidth: 0.5) }
+        .background { ThemeSurface(role: "card").clipShape(.rect(cornerRadius: 18)) }
+        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(appAppearance.palette.line.opacity(0.55), lineWidth: 0.5) }
     }
 }
 
@@ -89,6 +87,7 @@ enum BookCoverPalette {
 }
 
 struct BookCover: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let book: Book
     var width: CGFloat = 150
     var titleLineLimit: Int? = nil
@@ -110,7 +109,7 @@ struct BookCover: View {
                 }
             }.accessibilityHidden(true).allowsHitTesting(false)
             VStack(spacing: 0) {
-                Text("阅 山 · 故 事 典 藏").font(.system(size: width * 0.042)).tracking(1.2).opacity(0.5).padding(.top, width * 0.13)
+                Text("竹 影 · 故 事 典 藏").font(.system(size: width * 0.042)).tracking(1.2).opacity(0.5).padding(.top, width * 0.13)
                 Spacer().frame(height: width * 0.2)
                 Text(book.title).font(.system(size: width * 0.18, weight: .medium, design: .serif)).tracking(width * 0.015).multilineTextAlignment(.center).lineSpacing(7)
                     .lineLimit(titleLineLimit).minimumScaleFactor(titleLineLimit == nil ? 1 : 0.7)
@@ -127,6 +126,17 @@ struct BookCover: View {
         }
         .foregroundStyle(Color(hex: colors.1))
         .frame(width: width, height: width * 1.38)
+        .overlay {
+            if savedCover == nil, let background = appAppearance.bundle.document.app.backgrounds["cover.default"], let image = appAppearance.image(background.path) {
+                Group {
+                    if background.mode == "tile" { Image(uiImage: image).resizable(resizingMode: .tile) }
+                    else if background.mode == "fit" { Image(uiImage: image).resizable().scaledToFit() }
+                    else { Image(uiImage: image).resizable().scaledToFill() }
+                }.frame(width: width, height: width * 1.38).clipped().opacity(background.opacity)
+                    .overlay(appAppearance.palette.background.opacity(background.overlayOpacity))
+                    .accessibilityHidden(true)
+            }
+        }
         .overlay { if let savedCover { Image(uiImage:savedCover).resizable().scaledToFill().frame(width:width,height:width * 1.38).clipped().accessibilityHidden(true) } }
         .clipShape(.rect(cornerRadius: 5))
         .contentShape(Rectangle())
@@ -142,6 +152,7 @@ struct BookCover: View {
 }
 
 struct BookSpine: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let book: Book
     let width: CGFloat
     var height: CGFloat = 184
@@ -192,7 +203,7 @@ struct BookSpine: View {
         .frame(width: width, height: height)
         .overlay(alignment: .topTrailing) {
             if hasUpdates {
-                SpineBookmark().fill(Palette.accent).frame(width: 7, height: 15).padding(.trailing, 8)
+                SpineBookmark().fill(appAppearance.palette.accent).frame(width: 7, height: 15).padding(.trailing, 8)
                     .accessibilityHidden(true).allowsHitTesting(false)
             }
         }
@@ -226,43 +237,47 @@ private struct SpineBookmark: Shape {
 }
 
 struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.themeAppearance) private var appAppearance
     var filled = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 14, weight: .medium))
             .frame(maxWidth: .infinity, minHeight: 49)
-            .background(filled ? Palette.green : Color.clear, in: .rect(cornerRadius: 12))
-            .foregroundStyle(filled ? .white : Palette.green)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(filled ? .clear : Palette.line, lineWidth: 1))
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .background(filled ? appAppearance.palette.primary : Color.clear, in: .rect(cornerRadius: 12))
+            .foregroundStyle(filled ? appAppearance.palette.onPrimary : appAppearance.palette.green)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(filled ? .clear : appAppearance.palette.line, lineWidth: 1))
+            .environment(\.themeControlState, configuration.isPressed ? "pressed" : "normal")
+            .opacity(configuration.isPressed ? appAppearance.bundle.document.app.motion.pressOpacity : 1)
     }
 }
 
 struct SectionHeading: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let title: String
     var subtitle: String? = nil
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title).font(.system(size: 19, weight: .semibold, design: .serif)).foregroundStyle(Palette.green)
+            Text(title).font(.system(size: 19, weight: .semibold, design: .serif)).foregroundStyle(appAppearance.palette.green)
             Spacer()
-            if let subtitle { Text(subtitle).font(.system(size: 10)).foregroundStyle(Palette.muted) }
+            if let subtitle { Text(subtitle).font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted) }
         }
     }
 }
 
 struct BookRow: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     let book: Book
     var body: some View {
         HStack(alignment: .top, spacing: 17) {
             BookCover(book: book, width: 77)
             VStack(alignment: .leading, spacing: 8) {
-                Text(book.title).font(.system(size: 17, weight: .semibold, design: .serif)).foregroundStyle(Palette.green)
-                Text("\(book.author) · \(book.genre)").font(.system(size: 11)).foregroundStyle(Palette.muted)
-                Text(book.intro).font(.system(size: 12)).lineSpacing(4).foregroundStyle(Palette.muted).lineLimit(2)
+                Text(book.title).font(.system(size: 17, weight: .semibold, design: .serif)).foregroundStyle(appAppearance.palette.green)
+                Text("\(book.author) · \(book.genre)").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
+                Text(book.intro).font(.system(size: 12)).lineSpacing(4).foregroundStyle(appAppearance.palette.muted).lineLimit(2)
                 HStack(spacing: 8) {
-                    Text(book.status).foregroundStyle(Palette.green.opacity(0.7))
-                    Text("\(book.words)字").foregroundStyle(Palette.muted)
-                    if store.isFavorite(book) { Spacer(); Image(systemName: "bookmark.fill").foregroundStyle(Palette.green) }
+                    Text(book.status).foregroundStyle(appAppearance.palette.green.opacity(0.7))
+                    Text("\(book.words)字").foregroundStyle(appAppearance.palette.muted)
+                    if store.isFavorite(book) { Spacer(); ThemeIcon(systemName: "bookmark.fill").foregroundStyle(appAppearance.palette.green) }
                 }.font(.system(size: 10)).padding(.top, 2)
             }.padding(.top, 2)
             Spacer(minLength: 0)

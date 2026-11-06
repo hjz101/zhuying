@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProfileView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     let onShelf: () -> Void
     @State private var showSettings = false
@@ -22,7 +23,7 @@ struct ProfileView: View {
                     else {
                         VStack(alignment: .leading, spacing: 14) {
                             Text("下一段故事，等你翻开。").font(.system(size: 23, design: .serif))
-                            Button(action: onShelf) { Label("去书架挑一本", systemImage: "arrow.right") }
+                            Button(action: onShelf) { ThemeLabel("去书架挑一本", systemImage: "arrow.right") }
                                 .font(.system(size: 13)).frame(minHeight: 44)
                         }.padding(.vertical, 12).accessibilityIdentifier("profileReadingEmpty")
                     }
@@ -58,13 +59,13 @@ struct ProfileView: View {
                     }.buttonStyle(.plain)
                 }
                 Text("竹影 · 让故事，继续发生").font(.system(size: 11, design: .serif))
-                    .tracking(2).foregroundStyle(Palette.muted).frame(maxWidth: .infinity).padding(.top, 2)
-            }.foregroundStyle(Palette.green).padding(.horizontal, 24).padding(.top, 18).padding(.bottom, 25)
+                    .tracking(2).foregroundStyle(appAppearance.palette.muted).frame(maxWidth: .infinity).padding(.top, 2)
+            }.foregroundStyle(appAppearance.palette.green).padding(.horizontal, 24).padding(.top, 18).padding(.bottom, 25)
                 .frame(maxWidth: 620, alignment: .leading).frame(maxWidth: .infinity)
-        }.appPageStyle().navigationTitle("我的").navigationBarTitleDisplayMode(.inline)
+        }.appPageStyle(role: "profile").navigationTitle("我的").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink { ProfileSettingsView() } label: { Image(systemName: "gearshape").frame(width: 44, height: 44) }
+                    NavigationLink { ProfileSettingsView() } label: { ThemeIcon(systemName: "gearshape").frame(width: 44, height: 44) }
                         .accessibilityLabel("设置").accessibilityIdentifier("profileSettings")
                 }
             }
@@ -75,29 +76,29 @@ struct ProfileView: View {
     private var masthead: some View {
         VStack(alignment: .leading, spacing: 17) {
             HStack {
-                Text("ZHUYING / MY SPACE").tracking(2).foregroundStyle(Palette.accent)
+                Text("ZHUYING / MY SPACE").tracking(2).foregroundStyle(appAppearance.palette.accent)
                 Spacer()
                 Text(now.formatted(.dateTime.month(.wide).locale(Locale(identifier: "zh_CN"))) + " · 阅读手记")
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(appAppearance.palette.muted)
             }.font(.system(size: 9))
             VStack(alignment: .leading, spacing: 1) {
                 Text("在书里，")
-                Text("找回") + Text("自己。").foregroundColor(Palette.accent)
+                Text("找回") + Text("自己。").foregroundColor(appAppearance.palette.accent)
             }.font(.system(size: 38, weight: .regular, design: .serif)).tracking(2)
                 .accessibilityElement(children: .combine).accessibilityIdentifier("profileEditorialTitle")
             HStack(spacing: 7) {
-                Text("山").font(.system(size: 12, design: .serif)).frame(width: 25, height: 25).background(Palette.soft, in: Circle())
-                Text("山间读者 · 你的私人阅读角落").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text("山").font(.system(size: 12, design: .serif)).frame(width: 25, height: 25).background(appAppearance.palette.soft, in: Circle())
+                Text("山间读者 · 你的私人阅读角落").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
         }
     }
     private func sectionRule(_ title: String, label: String) -> some View {
         VStack(spacing: 9) {
-            Rectangle().fill(Palette.green.opacity(0.8)).frame(height: 0.5)
+            Rectangle().fill(appAppearance.palette.primary.opacity(0.8)).frame(height: 0.5)
             HStack {
                 Text(title).font(.system(size: 10)).tracking(1)
                 Spacer(minLength: 5)
-                Text(label).font(.system(size: 9, design: .serif)).tracking(1).foregroundStyle(Palette.accent)
+                Text(label).font(.system(size: 9, design: .serif)).tracking(1).foregroundStyle(appAppearance.palette.accent)
             }
         }
     }
@@ -108,15 +109,15 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(book.title).font(.system(size: 22, weight: .medium, design: .serif))
                     .lineLimit(2).accessibilityIdentifier("profileCurrentBook")
-                Text("\(book.author) · \(book.genre)").font(.system(size: 10)).foregroundStyle(Palette.muted)
-                Text(book.subtitle).font(.system(size: 12, design: .serif)).foregroundStyle(Palette.muted)
+                Text("\(book.author) · \(book.genre)").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
+                Text(book.subtitle).font(.system(size: 12, design: .serif)).foregroundStyle(appAppearance.palette.muted)
                     .lineSpacing(4).lineLimit(2).padding(.vertical, 2)
                 Text("第\((store.progress[book.id]?.chapter ?? 0) + 1)章 · 已读 \(store.percent(book))%")
-                    .font(.system(size: 10)).foregroundStyle(Palette.muted).accessibilityIdentifier("profileCurrentProgress")
+                    .font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted).accessibilityIdentifier("profileCurrentProgress")
                 Button { store.read(book) } label: {
-                    HStack(spacing: 15) { Text("接着读"); Image(systemName: "arrow.right") }
+                    HStack(spacing: 15) { Text("接着读"); ThemeIcon(systemName: "arrow.right") }
                         .font(.system(size: 13)).frame(minHeight: 44)
-                        .overlay(alignment: .bottom) { Rectangle().fill(Palette.green).frame(height: 0.5) }
+                        .overlay(alignment: .bottom) { Rectangle().fill(appAppearance.palette.primary).frame(height: 0.5) }
                 }.buttonStyle(.plain).accessibilityIdentifier("profileContinueReading")
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -124,21 +125,22 @@ struct ProfileView: View {
     private func metric(_ value: String, unit: String, caption: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             (Text(value).font(.system(size: 25, design: .serif)) + Text(" \(unit)").font(.system(size: 10)))
-            Text(caption).font(.system(size: 10)).foregroundStyle(Palette.muted)
+            Text(caption).font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
         }.frame(maxWidth: .infinity, minHeight: 60, alignment: .leading).contentShape(Rectangle())
     }
     private func entry(_ title: String, icon: String) -> some View {
         HStack(spacing: 9) {
-            Image(systemName: icon).font(.system(size: 14, weight: .light)).frame(width: 18)
+            ThemeIcon(systemName: icon).font(.system(size: 14, weight: .light)).frame(width: 18)
             Text(title).font(.system(size: 12))
             Spacer(minLength: 2)
-            Image(systemName: "arrow.up.right").font(.system(size: 9)).foregroundStyle(Palette.muted)
+            ThemeIcon(systemName: "arrow.up.right").font(.system(size: 9)).foregroundStyle(appAppearance.palette.muted)
         }.frame(maxWidth: .infinity, minHeight: 49).contentShape(Rectangle())
-            .overlay(alignment: .bottom) { Rectangle().fill(Palette.line).frame(height: 0.5) }
+            .overlay(alignment: .bottom) { Rectangle().fill(appAppearance.palette.line).frame(height: 0.5) }
     }
 }
 
 private struct ProfileSettingsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @State private var showReadingSettings = false
     @State private var showGuide = false
     var body: some View {
@@ -163,20 +165,21 @@ private struct ProfileSettingsView: View {
                         .accessibilityIdentifier("profileAbout")
                 }
             }.padding(22)
-        }.appPageStyle().navigationTitle("设置").navigationBarTitleDisplayMode(.inline)
+        }.appPageStyle(role: "settings").navigationTitle("设置").navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showReadingSettings) { ReadingSettingsView() }
             .sheet(isPresented: $showGuide) { ReadingGestureGuideView(isFirstUse: false) }
     }
     private func settingsRow(_ title: String, icon: String) -> some View {
         HStack {
-            Label(title, systemImage: icon)
+            ThemeLabel(title, systemImage: icon)
             Spacer()
-            Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Palette.muted)
+            ThemeIcon(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
         }.font(.system(size: 13)).frame(minHeight: 44).contentShape(Rectangle())
     }
 }
 
 private struct DemoAboutView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     var body: some View {
         ScrollView {
@@ -186,12 +189,12 @@ private struct DemoAboutView: View {
                     if store.isDemo {
                     Text("这是 iOS 原生界面预览。8 本原创模拟小说，可体验搜索、收藏、选章、阅读和进度恢复。")
                     Text("阅读数据保存在当前设备，不连接真实书源。演示章节包含复用段落，书籍字数与状态仅用于界面展示。")
-                        .foregroundStyle(Palette.muted)
-                    Text("ZHUYING FOR iOS · DESIGN PREVIEW 0.3").font(.system(size: 9)).foregroundStyle(Palette.muted)
+                        .foregroundStyle(appAppearance.palette.muted)
+                    Text("ZHUYING FOR iOS · DESIGN PREVIEW 0.3").font(.system(size: 9)).foregroundStyle(appAppearance.palette.muted)
                     } else {
                         Text("原生文字阅读器，支持 TXT／文字 PDF、书山聚合固定接口、书架与稳定位置、本地备份。")
                         Text("在线可读性取决于书源；阅读时长来自实际前台会话。需要服务配置的能力及尚未接入的扩展会单独说明。")
-                        Text("ZHUYING FOR iOS · DEVELOPMENT CANDIDATE").font(.system(size: 9)).foregroundStyle(Palette.muted)
+                        Text("ZHUYING FOR iOS · DEVELOPMENT CANDIDATE").font(.system(size: 9)).foregroundStyle(appAppearance.palette.muted)
                     }
                 }.font(.system(size: 12)).lineSpacing(6)
             }.padding(22)

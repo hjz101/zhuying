@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ShushanLoginView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var account: ShushanAccountStore
     @State private var email = ""
     @State private var password = ""
@@ -26,7 +27,7 @@ struct ShushanLoginView: View {
                     }.font(.system(size: 13)).padding(.vertical, 6)
                 }.disabled(account.busy)
                 if let message = account.message {
-                    Text(message).font(.system(size: 12)).foregroundStyle(Palette.muted).textSelection(.disabled)
+                    Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted).textSelection(.disabled)
                         .accessibilityIdentifier("shushanLoginMessage")
                 }
                 Button {
@@ -42,7 +43,7 @@ struct ShushanLoginView: View {
                         .disabled(account.busy).accessibilityIdentifier("shushanLogout")
                 }
                 Text("密码仅用于此次登录；登录状态保存在设备钥匙串。退出登录会保留书架和阅读记录。")
-                    .font(.system(size: 11)).foregroundStyle(Palette.muted).lineSpacing(5)
+                    .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted).lineSpacing(5)
             }.padding(22)
         }.appPageStyle().navigationTitle("书源登录").navigationBarTitleDisplayMode(.inline)
             .onDisappear { loginTask?.cancel(); password = "" }

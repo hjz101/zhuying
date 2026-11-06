@@ -16,6 +16,7 @@ struct ReadingContentPreferencesView: View {
 }
 
 struct ReadingStyleRulesView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     @State private var editing: ReaderStyleRule?
     @State private var showImport = false
@@ -31,7 +32,7 @@ struct ReadingStyleRulesView: View {
             ForEach(Array(store.settings.preferences.rules.enumerated()), id: \.element.id) { index, rule in
                 AppSettingsCard(rule.name, icon: "highlighter") {
                     Toggle("启用规则", isOn: ruleEnabled(rule.id)).accessibilityIdentifier("reading-rule-enabled-\(rule.id)")
-                    Text("\(rule.match) → \(rule.presentation)").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Text("\(rule.match) → \(rule.presentation)").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                     HStack {
                         Button("编辑") { editing = rule }.accessibilityIdentifier("reading-rule-edit-\(rule.id)")
                         Spacer()
@@ -41,8 +42,8 @@ struct ReadingStyleRulesView: View {
                     }.font(.system(size: 12)).frame(minHeight: 38)
                 }
             }
-            if let importMessage { Text(importMessage).font(.system(size: 11)).foregroundStyle(Palette.accent).accessibilityIdentifier("readingRuleImportResult") }
-            Text(store.isDemo ? "从上到下决定同类样式的优先级；首字下沉是段落装饰，可与对话高亮叠加。规则作用于全部书籍。" : "书籍规则优先于书源及全局规则；同范围按列表顺序。样式不修改正文或文字位置。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            if let importMessage { Text(importMessage).font(.system(size: 11)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("readingRuleImportResult") }
+            Text(store.isDemo ? "从上到下决定同类样式的优先级；首字下沉是段落装饰，可与对话高亮叠加。规则作用于全部书籍。" : "书籍规则优先于书源及全局规则；同范围按列表顺序。样式不修改正文或文字位置。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
         }
         .sheet(item: $editing) { rule in
             NavigationStack {
@@ -81,6 +82,7 @@ struct ReadingStyleRulesView: View {
 }
 
 struct ReadingStyleRuleEditor: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let initial: ReaderStyleRule
     let onSave: (ReaderStyleRule) -> Void
     @EnvironmentObject private var store: LibraryStore
@@ -107,7 +109,7 @@ struct ReadingStyleRuleEditor: View {
                 }
                 Picker("呈现方式", selection: $draft.presentation) { ForEach(["文字高亮", "段落底色", "居中斜体", "首字下沉"], id: \.self) { Text($0) } }.accessibilityIdentifier("readingRulePresentation")
                 ColorPicker("样式颜色", selection: Binding(get: { Color(hex: draft.color) }, set: { draft.color = $0.readingPreferenceHex }), supportsOpacity: false)
-                if store.isDemo { Text("作用范围：全部书籍").font(.system(size:11)).foregroundStyle(Palette.muted) }
+                if store.isDemo { Text("作用范围：全部书籍").font(.system(size:11)).foregroundStyle(appAppearance.palette.muted) }
                 else {
                     Picker("作用范围",selection:$draft.scope) { ForEach(["全部书籍","当前书籍","当前书源"],id:\.self) { Text($0) } }.accessibilityIdentifier("readingRuleScope")
                     if draft.scope == "当前书籍" { Picker("作品",selection:Binding(get:{draft.bookID ?? ""},set:{draft.bookID = $0})) { Text("选择作品").tag(""); ForEach(store.books) { Text($0.title).tag($0.id) } } }
@@ -117,9 +119,9 @@ struct ReadingStyleRuleEditor: View {
             AppSettingsCard("匹配测试", icon: "checkmark.magnifyingglass") {
                 TextEditor(text: $testText).font(.system(size: 12)).frame(height: 100).accessibilityIdentifier("readingRuleTestText")
                 if let count = try? draft.ranges(in: testText).count { Text("命中 \(count) 处").font(.system(size: 12)).accessibilityIdentifier("readingRuleMatchCount") }
-                else { Text("匹配条件无效，请检查表达式。").font(.system(size: 11)).foregroundStyle(Palette.accent) }
+                else { Text("匹配条件无效，请检查表达式。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.accent) }
             }
-            if let error { Text(error).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("readingRuleError") }
+            if let error { Text(error).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("readingRuleError") }
             Button("保存规则") {
                 do {
                     if draft.scope == "当前书籍",draft.bookID?.isEmpty != false { throw ReaderPreferenceError.invalid("请选择作用的作品。") }
@@ -133,6 +135,7 @@ struct ReadingStyleRuleEditor: View {
 }
 
 struct ReadingCommentsPreferencesView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var store: LibraryStore
     var body: some View {
         ReadingPreferencePage("段评与神人评论") {
@@ -140,12 +143,12 @@ struct ReadingCommentsPreferencesView: View {
             AppSettingsCard("段尾气泡", icon: "bubble.right") {
                 Toggle("显示段评气泡", isOn: $store.settings.preferences.showCommentBubbles).accessibilityIdentifier("showReadingBubbles")
                 NavigationLink { ReadingCommentSkinView(kind: .bubble) } label: { ReadingPreferenceRow(title: "气泡皮肤", detail: store.settings.preferences.bubbleFollowsTheme ? "跟随当前主题" : store.settings.preferences.bubbleStyle) }.accessibilityIdentifier("reading-bubble-skin")
-                Text("气泡紧接段落末尾，显示该段评论数，点击打开该段评论。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text("气泡紧接段落末尾，显示该段评论数，点击打开该段评论。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
             AppSettingsCard("神人评论", icon: "quote.bubble") {
                 Toggle("显示神人评论", isOn: $store.settings.preferences.showGodComments).accessibilityIdentifier("showGodComments")
                 NavigationLink { ReadingCommentSkinView(kind: .god) } label: { ReadingPreferenceRow(title: "神评卡片皮肤", detail: store.settings.preferences.effectiveGodStyle) }.accessibilityIdentifier("reading-god-skin")
-                Text(store.isDemo ? "精选评论显示在对应段落下方。当前阅读器使用本地示例评论，不连接评论服务。" : "书山聚合·番茄的真实热门文字评论显示在对应段落下方，每章最多精选两段。需应用内登录并核对来源原文；无数据或不匹配时不显示，断网可用近期缓存。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text(store.isDemo ? "精选评论显示在对应段落下方。当前阅读器使用本地示例评论，不连接评论服务。" : "书山聚合·番茄的真实热门文字评论显示在对应段落下方，每章最多精选两段。需应用内登录并核对来源原文；无数据或不匹配时不显示，断网可用近期缓存。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
         }
     }
@@ -153,6 +156,7 @@ struct ReadingCommentsPreferencesView: View {
 
 enum ReadingCommentSkinKind { case bubble, god }
 struct ReadingCommentSkinView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let kind: ReadingCommentSkinKind
     @EnvironmentObject private var store: LibraryStore
     @State private var showImport = false
@@ -179,7 +183,7 @@ struct ReadingCommentSkinView: View {
                 Button("新建个人皮肤") { style.wrappedValue = "自定义" }.font(.system(size: 13)).frame(minHeight: 40).accessibilityIdentifier("createCommentSkin")
                 if !followsTheme.wrappedValue && style.wrappedValue == "自定义" { customControls }
                 Button("导入皮肤 JSON") { showImport = true }.font(.system(size: 13)).frame(minHeight: 44).accessibilityIdentifier("importCommentSkin")
-                if let error { Text(error).font(.system(size: 11)).foregroundStyle(Palette.accent) }
+                if let error { Text(error).font(.system(size: 11)).foregroundStyle(appAppearance.palette.accent) }
             }
         }.nativeFileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
             do {

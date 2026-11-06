@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionTextSearchView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var bookID: String?
     var onRead: ((Book, Int, Int, Int) -> Void)?
     @EnvironmentObject private var library: LibraryStore
@@ -21,7 +22,7 @@ struct ProductionTextSearchView: View {
                 if busy { ProgressView("正在检索正文") }
                 if let result {
                     Text("检索范围：\(result.indexed) 章本地／缓存正文；另有 \(result.uncached) 章未缓存。最多显示 200 个命中。")
-                        .font(.system(size: 11)).foregroundStyle(Palette.muted).accessibilityIdentifier("fulltextCoverage")
+                        .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted).accessibilityIdentifier("fulltextCoverage")
                     if result.hits.isEmpty && !query.isEmpty { Text("当前检索范围内没有命中，未缓存章节尚未检索。").font(.system(size: 12)) }
                     ForEach(result.hits) { hit in
                         if let book = library.books.first(where: { $0.id == hit.bookID }) {
@@ -29,12 +30,12 @@ struct ProductionTextSearchView: View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(book.title).font(.system(size: 13, weight: .medium))
                                     Text(String(hit.text.prefix(180))).font(.system(size: 12)).lineSpacing(5)
-                                }.frame(maxWidth: .infinity, alignment: .leading).padding(16).background(.white.opacity(0.7), in: .rect(cornerRadius: 10))
+                                }.frame(maxWidth: .infinity, alignment: .leading).padding(16).background(appAppearance.palette.card, in: .rect(cornerRadius: 10))
                             }.buttonStyle(.plain).accessibilityIdentifier("fulltext-hit-\(hit.id)")
                         }
                     }
                 }
-                if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent) }
+                if let message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent) }
             }.padding(22)
         }.appPageStyle().navigationTitle("全文搜索").navigationBarTitleDisplayMode(.inline)
             .task(id: query + String(currentOnly)) {

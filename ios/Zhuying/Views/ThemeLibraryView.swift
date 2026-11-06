@@ -5,6 +5,7 @@ private enum ThemeLibraryTab: String, CaseIterable { case bundles = "主题套�
 private enum ThemeLibraryFilter: String, CaseIterable { case all = "全部", light = "浅色", dark = "深色", favorites = "收藏", imported = "我的导入" }
 
 struct ThemeLibraryView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var store: LibraryStore
     @State private var tab = ThemeLibraryTab.bundles
@@ -15,7 +16,9 @@ struct ThemeLibraryView: View {
     @State private var showingFiles = false
     @State private var importMessage: String?
     @State private var previewReady: [String: Bool] = [:]
-    private var current: DemoTheme? { demo.themes.first { $0.id == demo.activeThemeID } }
+    private var current: DemoTheme? {
+        demo.themes.first { $0.id == demo.activeThemeID && $0.name == store.settings.preferences.colors?.name && $0.background == store.settings.preferences.colors?.background }
+    }
     private var kind: ThemeAssetKind { tab == .titles ? .title : .bubble }
     private var themes: [DemoTheme] {
         demo.themes.filter { theme in
@@ -34,37 +37,53 @@ struct ThemeLibraryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                NavigationLink { GlobalThemeManagerView() } label: {
+                    HStack(spacing: 12) {
+                        ThemeIcon(systemName: "paintpalette")
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("全局主题、制作与分享").font(.system(size: 14, weight: .medium))
+                            Text("配色 · 图标 · 背景 · 完整阅读套装").font(.system(size: 11))
+                        }
+                        Spacer(); ThemeIcon(systemName: "chevron.right")
+                    }.padding(15).background(appAppearance.palette.soft, in: .rect(cornerRadius: 14))
+                }.buttonStyle(.plain).accessibilityIdentifier("globalThemeEntry")
                 if store.settings.preferences.colors == nil {
                     let settings = store.settings
                     HStack(spacing: 12) {
-                        Circle().fill(settings.theme.background).frame(width: 30, height: 30).overlay(Circle().stroke(Palette.line))
+                        Circle().fill(settings.theme.background).frame(width: 30, height: 30).overlay(Circle().stroke(appAppearance.palette.line))
                         VStack(alignment: .leading, spacing: 5) {
                             Text("当前纸色 · \(settings.theme.title)").font(.system(size: 13, weight: .medium))
-                            Text("选择下方套装可应用完整主题").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                            Text("选择下方套装可应用完整主题").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
                         }
                         Spacer()
-                    }.padding(14).background(Palette.soft, in: .rect(cornerRadius: 12)).accessibilityElement(children: .combine).accessibilityIdentifier("activePaperCard")
+                    }.padding(14).background(appAppearance.palette.soft, in: .rect(cornerRadius: 12)).accessibilityElement(children: .combine).accessibilityIdentifier("activePaperCard")
                 } else if let current {
                     NavigationLink { ThemeBundleDetail(themeID: current.id, useCurrentMix: true) } label: {
                         HStack(spacing: 12) {
-                            Circle().fill(Color(hex: current.background)).frame(width: 30, height: 30).overlay(Circle().stroke(Palette.line))
+                            Circle().fill(Color(hex: current.background)).frame(width: 30, height: 30).overlay(Circle().stroke(appAppearance.palette.line))
                             VStack(alignment: .leading, spacing: 5) {
                                 Text("当前使用 · \(current.name)").font(.system(size: 13, weight: .medium))
                                 Text("\(assetName(demo.activeTitleStyleID)) · \(assetName(demo.activeBubbleStyleID))")
-                                    .font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(2)
+                                    .font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted).lineLimit(2)
                             }
-                            Spacer(); Image(systemName: "chevron.right").font(.system(size: 11))
-                        }.padding(14).background(Palette.soft, in: .rect(cornerRadius: 12))
+                            Spacer(); ThemeIcon(systemName: "chevron.right").font(.system(size: 11))
+                        }.padding(14).background(appAppearance.palette.soft, in: .rect(cornerRadius: 12))
                     }.buttonStyle(.plain).accessibilityIdentifier("activeThemeCard")
+                }
+                if current == nil, let colors = store.settings.preferences.colors {
+                    HStack(spacing: 12) {
+                        Circle().fill(Color(hex: colors.background)).frame(width: 30, height: 30)
+                        Text("当前阅读配色 · \(colors.name)").font(.system(size: 13))
+                    }.padding(14).background(appAppearance.palette.soft, in: .rect(cornerRadius: 12)).accessibilityIdentifier("activeGlobalReaderTheme")
                 }
                 Picker("样式资源", selection: $tab) {
                     ForEach(ThemeLibraryTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }.pickerStyle(.segmented).accessibilityIdentifier("themeLibraryTabs")
                 HStack {
                     Menu {
-                        Button("选择套装文件", systemImage: "doc") { showingFiles = true }
-                        Button("导入示例套装", systemImage: "sparkles") { _ = demo.importDemoThemes(); importMessage = demo.themeImportMessage }
-                    } label: { Label("导入套装 / 样式", systemImage: "square.and.arrow.down").font(.system(size: 12)) }.accessibilityIdentifier("themeImport")
+                        ThemeButton("选择套装文件", systemImage: "doc") { showingFiles = true }
+                        ThemeButton("导入示例套装", systemImage: "sparkles") { _ = demo.importDemoThemes(); importMessage = demo.themeImportMessage }
+                    } label: { ThemeLabel("导入套装 / 样式", systemImage: "square.and.arrow.down").font(.system(size: 12)) }.accessibilityIdentifier("themeImport")
                     Spacer()
                     Button(managing ? "完成" : "管理") { managing.toggle(); selection.removeAll() }.font(.system(size: 12)).accessibilityIdentifier("themeManage")
                 }
@@ -72,7 +91,7 @@ struct ThemeLibraryView: View {
                     HStack(spacing: 8) {
                         ForEach(tab == .bundles ? ThemeLibraryFilter.allCases : [.all, .favorites], id: \.self) { value in
                             Button(value.rawValue) { filter = value }.font(.system(size: 11)).padding(.horizontal, 14).frame(minHeight: 34)
-                                .background(filter == value ? Palette.green : Palette.soft, in: Capsule()).foregroundStyle(filter == value ? .white : Palette.green)
+                                .background(filter == value ? appAppearance.palette.green : appAppearance.palette.soft, in: Capsule()).foregroundStyle(filter == value ? appAppearance.palette.onPrimary : appAppearance.palette.green)
                                 .accessibilityIdentifier("theme-filter-\(String(describing: value))")
                         }
                     }
@@ -88,9 +107,9 @@ struct ThemeLibraryView: View {
                                     .buttonStyle(.plain).accessibilityIdentifier("theme-card-\(theme.id)")
                                     .accessibilityValue(previewReady[theme.id].map { $0 ? "预览就绪" : "无法预览" } ?? "正在预览")
                                     .contextMenu {
-                                        Button("应用整套", systemImage: "checkmark.circle") { demo.applyTheme(theme.id) }
-                                        Button(theme.favorite ? "取消收藏" : "收藏", systemImage: "heart") { demo.toggleThemeFavorite(theme.id) }
-                                        Button("删除套装", systemImage: "trash", role: .destructive) { demo.removeThemes([theme.id]) }
+                                        ThemeButton("应用整套", systemImage: "checkmark.circle") { demo.applyTheme(theme.id) }
+                                        ThemeButton(theme.favorite ? "取消收藏" : "收藏", systemImage: "heart") { demo.toggleThemeFavorite(theme.id) }
+                                        ThemeButton("删除套装", systemImage: "trash", role: .destructive) { demo.removeThemes([theme.id]) }
                                     }
                             }
                         }
@@ -105,16 +124,16 @@ struct ThemeLibraryView: View {
                                 NavigationLink { ThemeAssetDetail(assetID: asset.id) } label: { assetCard(asset) }
                                     .buttonStyle(.plain).accessibilityIdentifier("theme-asset-\(asset.id)")
                                     .contextMenu {
-                                        Button("用于当前搭配", systemImage: "checkmark.circle") { demo.applyThemeAsset(asset.id) }
-                                        Button(asset.favorite ? "取消收藏" : "收藏", systemImage: "heart") { demo.toggleThemeAssetFavorite(asset.id) }
-                                        Button("删除样式", systemImage: "trash", role: .destructive) { demo.removeThemeAssets([asset.id]) }
+                                        ThemeButton("用于当前搭配", systemImage: "checkmark.circle") { demo.applyThemeAsset(asset.id) }
+                                        ThemeButton(asset.favorite ? "取消收藏" : "收藏", systemImage: "heart") { demo.toggleThemeAssetFavorite(asset.id) }
+                                        ThemeButton("删除样式", systemImage: "trash", role: .destructive) { demo.removeThemeAssets([asset.id]) }
                                     }
                             }
                         }
                     }
                 }
                 Text(demo.readerThemeMessage ?? "主题库保存在本机。主题配色、兼容标题及气泡可应用到正文；章节 CSS 编辑集中在阅读偏好中。")
-                    .font(.system(size: 10)).foregroundStyle(Palette.muted)
+                    .font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
                 NavigationLink("导入格式与说明") { ThemeImportHelp() }.font(.system(size: 12))
             }.padding(22)
         }.appPageStyle().navigationTitle("主题管理").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
@@ -154,7 +173,7 @@ struct ThemeLibraryView: View {
                 }
             }
     }
-    private var empty: some View { ContentUnavailableView("没有找到样式", systemImage: "paintpalette", description: Text("试试其他关键词或筛选条件。")) }
+    private var empty: some View { ThemeUnavailableView("没有找到样式", systemImage: "paintpalette", description: Text("试试其他关键词或筛选条件。")) }
     private func toggle(_ id: String) { if selection.contains(id) { selection.remove(id) } else { selection.insert(id) } }
     private func assetName(_ id: String?) -> String { demo.themeAssets.first { $0.id == id }?.name ?? "默认样式" }
     private func favoriteSelected() {
@@ -166,27 +185,28 @@ struct ThemeLibraryView: View {
     private func bundleCard(_ theme: DemoTheme) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ThemeStylePreview(theme: theme, title: demo.themeAssets(theme, kind: .title).first, bubble: demo.themeAssets(theme, kind: .bubble).first, compact: true, readiness: { previewReady[theme.id] = $0 })
-            HStack { Text(theme.name).font(.system(size: 13, weight: .medium)); Spacer(); if theme.favorite { Image(systemName: "heart.fill").font(.system(size: 10)) } }
-            Text("标题 \(theme.titleStyleIDs.count) 款 · 气泡 \(theme.bubbleStyleIDs.count) 款").font(.system(size: 10)).foregroundStyle(Palette.muted)
-            Text(!theme.assetIssues.isEmpty ? "\(theme.assetIssues.count) 项样式无法预览" : theme.titleStyleIDs.isEmpty && theme.bubbleStyleIDs.isEmpty ? "未附带标题与气泡" : "\(theme.mode.title) · \(theme.id == demo.activeThemeID ? "使用中" : theme.source)")
-                .font(.system(size: 9)).foregroundStyle(Palette.muted).lineLimit(1)
-        }.padding(10).background(Palette.card, in: .rect(cornerRadius: 14)).overlay(alignment: .topTrailing) { selectionMark(theme.id) }
+            HStack { Text(theme.name).font(.system(size: 13, weight: .medium)); Spacer(); if theme.favorite { ThemeIcon(systemName: "heart.fill").font(.system(size: 10)) } }
+            Text("标题 \(theme.titleStyleIDs.count) 款 · 气泡 \(theme.bubbleStyleIDs.count) 款").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
+            Text(!theme.assetIssues.isEmpty ? "\(theme.assetIssues.count) 项样式无法预览" : theme.titleStyleIDs.isEmpty && theme.bubbleStyleIDs.isEmpty ? "未附带标题与气泡" : "\(theme.mode.title) · \(theme.id == current?.id ? "使用中" : theme.source)")
+                .font(.system(size: 9)).foregroundStyle(appAppearance.palette.muted).lineLimit(1)
+        }.padding(10).background(appAppearance.palette.card, in: .rect(cornerRadius: 14)).overlay(alignment: .topTrailing) { selectionMark(theme.id) }
     }
     private func assetCard(_ asset: ThemeAsset) -> some View {
         let palette = demo.themes.first { $0.id == asset.sourceThemeID } ?? current ?? demo.themes[0]
         return VStack(alignment: .leading, spacing: 8) {
             ThemeStylePreview(theme: palette, title: asset.kind == .title ? asset : nil, bubble: asset.kind == .bubble ? asset : nil, compact: true, assetOnly: asset.kind)
             Text(asset.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
-            Text("\(asset.kind == .title ? "CSS" : "SVG") · \(asset.sourceName)").font(.system(size: 9)).foregroundStyle(Palette.muted).lineLimit(1)
-            if asset.id == demo.activeTitleStyleID || asset.id == demo.activeBubbleStyleID { Text("使用中").font(.system(size: 9)).foregroundStyle(Palette.accent) }
-        }.padding(10).background(Palette.card, in: .rect(cornerRadius: 14)).overlay(alignment: .topTrailing) { selectionMark(asset.id) }
+            Text("\(asset.kind == .title ? "CSS" : "SVG") · \(asset.sourceName)").font(.system(size: 9)).foregroundStyle(appAppearance.palette.muted).lineLimit(1)
+            if asset.id == demo.activeTitleStyleID || asset.id == demo.activeBubbleStyleID { Text("使用中").font(.system(size: 9)).foregroundStyle(appAppearance.palette.accent) }
+        }.padding(10).background(appAppearance.palette.card, in: .rect(cornerRadius: 14)).overlay(alignment: .topTrailing) { selectionMark(asset.id) }
     }
     @ViewBuilder private func selectionMark(_ id: String) -> some View {
-        if managing { Image(systemName: selection.contains(id) ? "checkmark.circle.fill" : "circle").font(.system(size: 21)).padding(8).foregroundStyle(Palette.green).background(.regularMaterial, in: Circle()).padding(4) }
+        if managing { ThemeIcon(systemName: selection.contains(id) ? "checkmark.circle.fill" : "circle").font(.system(size: 21)).padding(8).foregroundStyle(appAppearance.palette.green).background(.regularMaterial, in: Circle()).padding(4) }
     }
 }
 
 private struct ThemeBundleDetail: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let themeID: String
     var useCurrentMix = false
     @EnvironmentObject private var demo: FeatureDemoStore
@@ -202,29 +222,29 @@ private struct ThemeBundleDetail: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack {
-                        VStack(alignment: .leading, spacing: 6) { Text(theme.name).font(.system(size: 23, design: .serif)); Text("\(theme.source) · v\(theme.version)").font(.system(size: 11)).foregroundStyle(Palette.muted) }
+                        VStack(alignment: .leading, spacing: 6) { Text(theme.name).font(.system(size: 23, design: .serif)); Text("\(theme.source) · v\(theme.version)").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted) }
                         Spacer()
-                        Button { demo.toggleThemeFavorite(themeID) } label: { Image(systemName: theme.favorite ? "heart.fill" : "heart").frame(width: 44, height: 44) }
+                        Button { demo.toggleThemeFavorite(themeID) } label: { ThemeIcon(systemName: theme.favorite ? "heart.fill" : "heart").frame(width: 44, height: 44) }
                             .accessibilityLabel("收藏套装").accessibilityIdentifier("themeFavorite")
                     }
                     ThemeStylePreview(theme: theme, title: asset(titleID), bubble: asset(bubbleID), longTitle: longTitle)
                     Text("正文实际效果").font(.system(size: 13, weight: .medium))
                     ThemeNativeReadingPreview(settings: didApply ? store.settings : demo.readerPreview(theme: theme, titleID: titleID, bubbleID: bubbleID), theme: theme)
-                    Text("上方套装预览展示原始 CSS／SVG；正文实际效果展示原生支持的标题样式。个人自定义标题和气泡会保留。 ").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Text("上方套装预览展示原始 CSS／SVG；正文实际效果展示原生支持的标题样式。个人自定义标题和气泡会保留。 ").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                     Toggle("预览长章节标题", isOn: $longTitle).font(.system(size: 12)).accessibilityIdentifier("themeLongTitle")
                     assetSelector(theme, kind: .title)
                     assetSelector(theme, kind: .bubble)
-                    if !theme.assetIssues.isEmpty { Text("无法预览：" + theme.assetIssues.joined(separator: "、")).font(.system(size: 12)).foregroundStyle(Palette.accent) }
+                    if !theme.assetIssues.isEmpty { Text("无法预览：" + theme.assetIssues.joined(separator: "、")).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent) }
                     Text("选择缩略图只改变预览；确认应用后才更新当前搭配。未附带的项目沿用当前样式。")
-                        .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                     if didApply { Text(demo.readerThemeMessage ?? "已应用到正文阅读器").font(.system(size: 12)).accessibilityIdentifier("themeApplied") }
                 }.padding(22)
             }.appPageStyle().navigationTitle("主题预览").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
                 .safeAreaInset(edge: .bottom) {
                     VStack(spacing: 8) {
                         if didApply {
-                            Label("已应用到正文 · \(store.settings.preferences.colors?.name ?? store.settings.theme.title)", systemImage: "checkmark.circle.fill")
-                                .font(.system(size: 12)).foregroundStyle(Palette.green)
+                            ThemeLabel("已应用到正文 · \(store.settings.preferences.colors?.name ?? store.settings.theme.title)", systemImage: "checkmark.circle.fill")
+                                .font(.system(size: 12)).foregroundStyle(appAppearance.palette.green)
                                 .accessibilityIdentifier("themeAppliedFeedback")
                         }
                         HStack(spacing: 10) {
@@ -234,7 +254,7 @@ private struct ThemeBundleDetail: View {
                                 .buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("themeApplyColors")
                             Button("自定义搭配") { showMixer = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("themeCustomize")
                         }
-                    }.padding(.horizontal, 22).padding(.vertical, 10).background(Palette.background)
+                    }.padding(.horizontal, 22).padding(.vertical, 10).background(ThemeSurface())
                 }
                 .onAppear {
                     if !initialized {
@@ -244,20 +264,20 @@ private struct ThemeBundleDetail: View {
                     }
                 }
                 .sheet(isPresented: $showMixer) { NavigationStack { ThemeMixer(initialThemeID: themeID, initialTitleID: titleID, initialBubbleID: bubbleID) }.environment(\.readingPreferenceDismiss, nil) }
-        } else { ContentUnavailableView("主题不存在", systemImage: "paintpalette") }
+        } else { ThemeUnavailableView("主题不存在", systemImage: "paintpalette") }
     }
     private func asset(_ id: String?) -> ThemeAsset? { demo.themeAssets.first { $0.id == id } }
     private func assetSelector(_ theme: DemoTheme, kind: ThemeAssetKind) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(kind == .title ? "附带章节标题 · CSS" : "附带段评气泡 · SVG").font(.system(size: 14, weight: .medium))
             let choices = demo.themeAssets(theme, kind: kind)
-            if choices.isEmpty { Text(theme.assetIssues.isEmpty ? "未附带，保留当前样式" : "未附带或导入失败，保留当前样式").font(.system(size: 12)).foregroundStyle(Palette.muted) }
+            if choices.isEmpty { Text(theme.assetIssues.isEmpty ? "未附带，保留当前样式" : "未附带或导入失败，保留当前样式").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted) }
             ForEach(choices) { choice in
                 Button { if kind == .title { titleID = choice.id } else { bubbleID = choice.id }; didApply = false } label: {
                     HStack {
                         ThemeStylePreview(theme: theme, title: kind == .title ? choice : nil, bubble: kind == .bubble ? choice : nil, compact: true, assetOnly: kind).frame(width: 130)
                         Text(choice.name).font(.system(size: 12)); Spacer()
-                        Image(systemName: (kind == .title ? titleID : bubbleID) == choice.id ? "checkmark.circle.fill" : "circle")
+                        ThemeIcon(systemName: (kind == .title ? titleID : bubbleID) == choice.id ? "checkmark.circle.fill" : "circle")
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityIdentifier("theme-choice-\(choice.id)")
             }
@@ -266,6 +286,7 @@ private struct ThemeBundleDetail: View {
 }
 
 private struct ThemeNativeReadingPreview: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let settings: ReadingSettings
     let theme: DemoTheme
     @State private var rendered: ReadingSettings?
@@ -273,10 +294,10 @@ private struct ThemeNativeReadingPreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ReadingSettingsPreview(settings: rendered ?? settings)
-            if let error { Text(error).font(.system(size: 11)).foregroundStyle(Palette.accent) }
+            if let error { Text(error).font(.system(size: 11)).foregroundStyle(appAppearance.palette.accent) }
             else if rendered == nil && settings.preferences.showCommentBubbles &&
                 (settings.preferences.bubbleFollowsTheme ? settings.preferences.bubbleSVG : settings.preferences.customBubbleSVG) != nil {
-                Text("正在生成 SVG 气泡的正文预览…").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text("正在生成 SVG 气泡的正文预览…").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }
         }.task(id: settings) {
             rendered = nil; error = nil
@@ -293,6 +314,7 @@ private struct ThemeNativeReadingPreview: View {
 }
 
 private struct ThemeAssetDetail: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let assetID: String
     @EnvironmentObject private var demo: FeatureDemoStore
     @State private var longTitle = false
@@ -305,7 +327,7 @@ private struct ThemeAssetDetail: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     Text(asset.name).font(.system(size: 23, design: .serif))
-                    Text("\(asset.sourceName) · \(asset.kind == .title ? "CSS 章节标题" : "SVG 段评气泡")").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Text("\(asset.sourceName) · \(asset.kind == .title ? "CSS 章节标题" : "SVG 段评气泡")").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted)
                     ThemeStylePreview(theme: palette, title: asset.kind == .title ? asset : nil, bubble: asset.kind == .bubble ? asset : nil, longTitle: longTitle, assetOnly: asset.kind)
                     if asset.kind == .title { Toggle("预览长章节标题", isOn: $longTitle).accessibilityIdentifier("assetLongTitle") }
                     else {
@@ -320,16 +342,17 @@ private struct ThemeAssetDetail: View {
                     HStack {
                         Button(asset.kind == .title ? "应用标题" : "应用气泡") { demo.applyThemeAsset(assetID); didApply = true }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("themeAssetApply")
                         Button("自定义搭配") { showMixer = true }.buttonStyle(PrimaryButtonStyle(filled: false))
-                    }.padding(16).background(Palette.background)
+                    }.padding(16).background(ThemeSurface())
                 }
                 .sheet(isPresented: $showMixer) {
                     NavigationStack { ThemeMixer(initialThemeID: current.id, initialTitleID: asset.kind == .title ? assetID : demo.activeTitleStyleID, initialBubbleID: asset.kind == .bubble ? assetID : demo.activeBubbleStyleID) }.environment(\.readingPreferenceDismiss, nil)
                 }
-        } else { ContentUnavailableView("样式不存在", systemImage: "paintpalette") }
+        } else { ThemeUnavailableView("样式不存在", systemImage: "paintpalette") }
     }
 }
 
 private struct ThemeMixer: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var demo: FeatureDemoStore
     @Environment(\.dismiss) private var dismiss
     @State private var themeID: String
@@ -361,7 +384,7 @@ private struct ThemeMixer: View {
                             ForEach(demo.themeAssets.filter { $0.kind == .bubble }) { Text($0.name).tag(Optional($0.id)) }
                         }.labelsHidden().accessibilityIdentifier("mixBubble")
                     }.font(.system(size: 13))
-                    Text("配色、章节标题、段评气泡独立选择，确认前不改变当前搭配。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    Text("配色、章节标题、段评气泡独立选择，确认前不改变当前搭配。").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                 }.padding(22)
             }
         }.appPageStyle().navigationTitle("自定义搭配").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionSubscriptionsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @State private var message: String?
     @State private var busy = false
@@ -15,7 +16,7 @@ struct ProductionSubscriptionsView: View {
                             Toggle(source.name,isOn:Binding(get:{library.subscribedSourceIDs.contains(source.id)},set:{library.subscribe(sourceID:source.id,enabled:$0)}))
                                 .disabled(!source.enabled || (source.id != "shushan" && (try? SourcePackages.rules(source)) == nil))
                             Text((try? SourcePackages.rules(source))?.discover != nil ? "支持分类发现和书架更新" : "分类发现未支持；可用来源支持书架更新检查")
-                                .font(.system(size:11)).foregroundStyle(Palette.muted)
+                                .font(.system(size:11)).foregroundStyle(appAppearance.palette.muted)
                         }
                     }
                 }
@@ -30,9 +31,9 @@ struct ProductionSubscriptionsView: View {
                     }
                 }.buttonStyle(PrimaryButtonStyle()).disabled(busy)
                 if busy { ProgressView(); Button("取消") { operation?.cancel(); busy = false } }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent) }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent) }
                 Text("本版仅在你主动点击时检查，退到后台取消；不承诺系统定时后台更新。只标记实际新增章节，回读和重复检查不会重复提醒。关闭订阅保留已有作品、历史和缓存。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                 ForEach(library.updatedBooks) { book in
                     NavigationLink { BookDetailView(book:book) } label: { HStack { Text(book.title); Spacer(); Text("新增 \(library.updateCount(book)) 章") }.font(.system(size:13)) }
                 }
@@ -44,6 +45,7 @@ struct ProductionSubscriptionsView: View {
 }
 
 struct SubscribedDiscoverySection: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let category: String
     @EnvironmentObject private var library: LibraryStore
     @State private var books: [LibraryBookRecord] = []
@@ -57,13 +59,13 @@ struct SubscribedDiscoverySection: View {
             SectionHeading(title:"已订阅的故事",subtitle:"\(books.count) 个来源版本")
             if busy { ProgressView("正在读取来源分类") }
             if library.subscribedSourceIDs.isEmpty {
-                ContentUnavailableView("还没有订阅来源",systemImage:"bell",description:Text("订阅支持分类发现的来源后，这里显示实际书籍。"))
+                ThemeUnavailableView("还没有订阅来源",systemImage:"bell",description:Text("订阅支持分类发现的来源后，这里显示实际书籍。"))
             }
             ForEach(books) { record in
                 NavigationLink { BookDetailView(book:record.presentation(chapters:[]),onlineRecord:record) } label: { BookRow(book:record.presentation(chapters:[])) }.buttonStyle(.plain)
             }
-            if partial { Text("部分来源未返回结果，已保留其他来源的书籍。").font(.system(size:11)).foregroundStyle(Palette.muted) }
-            if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.muted) }
+            if partial { Text("部分来源未返回结果，已保留其他来源的书籍。").font(.system(size:11)).foregroundStyle(appAppearance.palette.muted) }
+            if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.muted) }
             if let nextPage { Button("加载更多") { Task { await load(page:nextPage) } }.disabled(busy) }
         }.task(id:key) { books = []; nextPage = nil; message = nil; await load(page:1) }
     }

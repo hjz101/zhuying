@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ProductionArchiveView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var comicOnly = false
     var initialURL: URL? = nil
     @EnvironmentObject private var library: LibraryStore
@@ -35,13 +36,13 @@ struct ProductionArchiveView: View {
                     Button("导入选中文件") { importBooks() }.buttonStyle(PrimaryButtonStyle()).disabled(busy || selection.isEmpty).accessibilityIdentifier("archiveImportSelected")
                 }
                 if !images.isEmpty {
-                    Text("按文件名自然排序导入 \(images.count) 张图片；仅显示支持的栅格图片首帧。").font(.system(size:12)).foregroundStyle(Palette.muted)
+                    Text("按文件名自然排序导入 \(images.count) 张图片；仅显示支持的栅格图片首帧。").font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                     Button("将图片作为漫画导入") { importComic() }.buttonStyle(PrimaryButtonStyle()).disabled(busy).accessibilityIdentifier("archiveImportComic")
                 }
                 if busy { ProgressView("正在处理归档"); Button("取消处理") { operation?.cancel(); busy = false } }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("archiveMessage") }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("archiveMessage") }
                 Text("支持未加密、非分卷 ZIP／RAR／7z。单包 ≤ 20 MB，展开总量 ≤ 64 MB，最多 4000 项；禁止越界路径和链接。仅选中的 TXT／EPUB／PDF 入库，图片可按漫画导入；其他文件不会执行。取消保留已成功导入的作品，原包始终不改动。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle(comicOnly ? "漫画导入" : "压缩包支持").navigationBarTitleDisplayMode(.inline)
             .nativeFileImporter(isPresented:$choosing,allowedContentTypes:[.item]) { result in
@@ -100,6 +101,7 @@ struct ProductionArchiveView: View {
 }
 
 struct ProductionMediaLibrary: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let kind: MediaBookReference.Kind
     @EnvironmentObject private var library: LibraryStore
     @State private var importing = false
@@ -109,10 +111,10 @@ struct ProductionMediaLibrary: View {
             VStack(alignment:.leading,spacing:23) {
                 AppPageHeader(title:kind == .pdf ? "PDF 阅读" : "漫画阅读",subtitle:kind == .pdf ? "原版式 · 页码／坐标 · 文档目录" : "页漫／条漫 · 本地图片 · 页面书签",icon:kind == .pdf ? "doc.richtext" : "photo.on.rectangle")
                 Button(kind == .pdf ? "导入原版式 PDF" : "导入图片归档") { importing = true }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("mediaImport")
-                if books.isEmpty { ContentUnavailableView("还没有页面作品",systemImage:"doc",description:Text("导入自己的文件后开始阅读。")) }
+                if books.isEmpty { ThemeUnavailableView("还没有页面作品",systemImage:"doc",description:Text("导入自己的文件后开始阅读。")) }
                 ForEach(books) { book in Button { library.reader = .init(book:book,chapter:0,resume:true) } label: { HStack { Text(book.title); Spacer(); Text("\(book.chapters.count) 页").font(.system(size:12)) }.frame(minHeight:48) }.accessibilityIdentifier("open-media-\(book.id)") }
                 Text(kind == .pdf ? "原版式保留 PDF 页面，扫描文档可浏览；需要朗读和全文搜索时，请另选文字提取导入。" : "只加载可见页面及邻页；内存警告时清理可重建图片缓存。网络漫画需要独立来源能力，当前导入本地图片归档。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle(kind == .pdf ? "PDF 阅读" : "漫画阅读").navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented:$importing) { NavigationStack {

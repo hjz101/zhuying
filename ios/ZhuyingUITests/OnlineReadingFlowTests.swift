@@ -20,9 +20,12 @@ final class OnlineReadingFlowTests: XCTestCase {
                 if contents.frame.maxY < read.frame.minY - 8 && contents.isHittable { break }
                 app.swipeUp()
             }
-            XCTAssertTrue(contents.isHittable)
-            contents.tap()
-            XCTAssertTrue(app.navigationBars["章节目录"].waitForExistence(timeout: 5))
+            XCTAssertTrue(contents.isHittable, contents.debugDescription)
+            XCTAssertLessThan(contents.frame.maxY, read.frame.minY - 8, contents.debugDescription)
+            XCTAssertGreaterThanOrEqual(contents.frame.height, 44, contents.debugDescription)
+            // The center lies in the label's Spacer; it must open the directory too.
+            contents.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(app.navigationBars["章节目录"].waitForExistence(timeout: 5), app.debugDescription)
             XCTAssertTrue(app.buttons["chapter-3"].waitForExistence(timeout: 5)); XCTAssertFalse(app.buttons["chapter-3"].isEnabled)
             app.buttons["完成"].tap(); read.tap()
             if app.buttons["dismissGestureGuide"].waitForExistence(timeout: 2) { app.buttons["dismissGestureGuide"].tap() }

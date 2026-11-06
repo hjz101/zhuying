@@ -4,6 +4,8 @@ import XCTest
 final class ReleaseSourceDistributionTests: XCTestCase {
     func testDistributionMetadataRetainsImportedHTTPRoutesWithoutBundledSources() {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "ZhuyingBundledSources") as? Bool, false)
+        let build = Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0") ?? 0
+        XCTAssertGreaterThan(build, 15, "The new IPA must not reuse or downgrade the previously distributed build number")
         let transport = Bundle.main.object(forInfoDictionaryKey: "NSAppTransportSecurity") as? [String: Any]
         XCTAssertEqual(transport?["NSAllowsArbitraryLoads"] as? Bool, true)
     }

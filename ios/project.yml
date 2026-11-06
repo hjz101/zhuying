@@ -23,7 +23,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ''
     MARKETING_VERSION: '0.8.0'
-    CURRENT_PROJECT_VERSION: '15'
+    CURRENT_PROJECT_VERSION: '16'
     ZHUYING_SOURCE_REVISION: unrecorded
 targets:
   ZhuyingScriptCore:

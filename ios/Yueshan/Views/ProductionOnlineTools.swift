@@ -140,6 +140,7 @@ struct ProductionSourceDiagnosticsView: View {
         ScrollView {
             VStack(alignment:.leading,spacing:23) {
                 AppPageHeader(title:batch ? "批量测试" : "书源调试",subtitle:"搜索 → 详情 → 目录 → 正文 · 实际请求与分步结果",icon:batch ? "checklist" : "ladybug")
+                if !batch { NavigationLink("规则兼容测试") { ProductionRuleTesterView() }.accessibilityIdentifier("sourceRuleTester") }
                 AppSettingsCard("配置与选项",icon:"slider.horizontal.3") {
                     if !batch { Picker("书源",selection:$selection) { ForEach(library.sources) { Text($0.name).tag($0.id) } }; Picker("调试步骤",selection:$step) { ForEach(SourceDiagnostics.Step.allCases,id:\.self) { Text($0.rawValue).tag($0) } } }
                     TextField("测试关键词",text:$query).accessibilityIdentifier("sourceDiagnosticQuery")
@@ -166,6 +167,7 @@ struct ProductionSourceDiagnosticsView: View {
             var providers: [any BookSource] = []
             for source in library.sources where source.enabled && (batch || source.id == selection) {
                 if source.id == "shushan", let credential = shushan.credentialForRequests { providers.append(ShushanBookSource(credential:credential)) }
+                else if let rules = try? SourcePackages.rules(source),rules.extraction != nil,let provider = try? ExtractionBookSource(source:source) { providers.append(provider) }
                 else if let provider = try? ConfigurableBookSource(source:source) { providers.append(provider) }
                 else { reports.append(.init(sourceID:source.id,step:"配置",status:"未运行：需登录或规则未支持",milliseconds:0,count:0)) }
             }

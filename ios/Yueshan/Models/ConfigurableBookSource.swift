@@ -8,12 +8,14 @@ struct NativeSourceRules: Codable, Equatable, Sendable {
     var content: String
     var discover: String? = nil
     var categories: [String]? = nil
+    var extraction: NativeExtractionSet? = nil
     func validate() throws {
         guard version == 1 else { throw SourceImportError.message("不支持的原生书源规则版本。") }
         for value in [search,details,catalog,content] + [discover].compactMap({ $0 }) {
             guard !value.isEmpty, value.count <= 2000, !value.contains(".."), !value.contains("\\"), !value.contains("://"), !value.hasPrefix("//") else { throw ContentFailure.invalidResponse }
         }
         guard search.contains("{query}"), details.contains("{bookID}"), catalog.contains("{bookID}"), content.contains("{chapterID}") else { throw ContentFailure.invalidResponse }
+        try extraction?.validate()
     }
     static let example = NativeSourceRules(search: "search?q={query}&page={page}", details: "books/{bookID}", catalog: "books/{bookID}/chapters", content: "books/{bookID}/chapters/{chapterID}")
 }
@@ -25,10 +27,11 @@ enum SourcePackages {
     }
     static func rules(_ source: DemoSource) throws -> NativeSourceRules {
         guard let data = source.configuration, let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              object["adapter"] as? String == "json-v1", let value = object["endpoints"] else {
-            throw SourceImportError.message("该配置已保存，但规则格式尚不支持运行；当前支持书山和原生 JSON v1。")
+              ["json-v1","extract-v1"].contains(object["adapter"] as? String ?? ""), let value = object["endpoints"] else {
+            throw SourceImportError.message("该配置已保存，但规则格式尚不支持运行；当前支持书山、原生 JSON v1 和 extract-v1。")
         }
         let rules = try JSONDecoder().decode(NativeSourceRules.self, from: JSONSerialization.data(withJSONObject: value))
+        guard object["adapter"] as? String != "extract-v1" || rules.extraction != nil else { throw ContentFailure.invalidResponse }
         try rules.validate(); return rules
     }
     static func export(_ sources: [DemoSource]) throws -> Data {
@@ -64,7 +67,7 @@ enum SourcePackages {
                                     name: name, group: row["bookSourceGroup"] as? String ?? "导入书源", enabled: row["enabled"] as? Bool ?? true, detail: "已导入 · 规则未支持运行", url: host.absoluteString)
             source.configuration = config
             if source.id == "shushan" { source.detail = "固定原生适配器 · 需登录" }
-            else if (try? rules(source)) != nil { source.detail = "原生 JSON v1 · 待实测" }
+            else if let rules = try? rules(source) { source.detail = rules.extraction == nil ? "原生 JSON v1 · 待实测" : "原生解析规则 v1 · 待实测" }
             result.append(source)
         }
         return .init(sources: result, duplicates: duplicates, invalid: invalid)

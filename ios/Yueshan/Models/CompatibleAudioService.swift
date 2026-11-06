@@ -12,6 +12,7 @@ enum AudioServiceError: LocalizedError {
 }
 
 struct BoundedAudioHTTPTransport: HTTPTransport {
+    var maximumBytes = 12 * 1024 * 1024
     func send(_ request: URLRequest) async throws -> (Data,HTTPURLResponse) {
         let configuration = URLSessionConfiguration.ephemeral; configuration.urlCache = nil; configuration.httpCookieStorage = nil; configuration.httpShouldSetCookies = false
         configuration.timeoutIntervalForRequest = 30; configuration.timeoutIntervalForResource = 60
@@ -20,11 +21,11 @@ struct BoundedAudioHTTPTransport: HTTPTransport {
         let (stream,response) = try await session.bytes(for:request)
         guard let response = response as? HTTPURLResponse else { throw AudioServiceError.invalidResponse }
         guard (200..<300).contains(response.statusCode) else { throw AudioServiceError.rejected(response.statusCode) }
-        guard response.expectedContentLength <= 12 * 1024 * 1024 else { throw AudioServiceError.oversized }
+        guard response.expectedContentLength <= maximumBytes else { throw AudioServiceError.oversized }
         var bytes = Data()
         for try await byte in stream {
             if bytes.count % 65536 == 0 { try Task.checkCancellation() }
-            guard bytes.count < 12 * 1024 * 1024 else { throw AudioServiceError.oversized }; bytes.append(byte)
+            guard bytes.count < maximumBytes else { throw AudioServiceError.oversized }; bytes.append(byte)
         }
         try Task.checkCancellation(); return (bytes,response)
     }

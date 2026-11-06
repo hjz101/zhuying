@@ -9,6 +9,7 @@ extension ReadingTheme {
 
 struct ReaderView: View {
     @EnvironmentObject private var store: LibraryStore
+    @EnvironmentObject private var shushan: ShushanAccountStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -42,6 +43,7 @@ struct ReaderView: View {
     @State private var message: String?
     @State private var initialized = false
     @State private var commentParagraph: Int?
+    @StateObject private var comments = ReaderCommentsModel()
 
     init(book: Book, initialChapter: Int, resume: Bool = true, startingAnchor: ReadingAnchor? = nil, repository: (any ChapterDocumentLoading)? = nil) {
         self.book = book; self.resume = resume
@@ -56,6 +58,14 @@ struct ReaderView: View {
     private var readerInk: Color { Color(palette.ink) }
     private var readerSecondary: Color { Color(palette.secondary) }
     private var document: ReaderDocument { rendered ?? ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: [], isDemo: store.isDemo) }
+    private var commentContext: ShushanCommentContext? {
+        guard !store.isDemo,let metadata = store.remoteMetadata(book.id),let record = store.chapterRecord(bookID:book.id,index:chapter),let context = ShushanCommentContext(book:metadata,chapter:record),context.source == "fq" else { return nil }; return context
+    }
+    private var commentTaskID: String { StableContentID.make(loaded?.chapterID ?? "",loaded?.version ?? "",shushan.credentialForRequests.map{ShushanCommentsClient(credential:$0).cacheScope} ?? "signed-out",String(store.settings.preferences.showCommentBubbles)) }
+    private var paragraphCounts: [Int:Int] {
+        guard let loaded else { return [:] }
+        return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap { index,paragraph in guard let count = comments.counts[paragraph.id]?.count,count > 0 else { return nil }; return (index,count) })
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -63,7 +73,7 @@ struct ReaderView: View {
             let layout = ReaderLayout(settings: store.settings, size: geo.size)
             ZStack(alignment: .topLeading) {
                 if initialized && rendered != nil && store.settings.mode == .scroll {
-                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID + narrationRestoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { if store.isDemo { commentParagraph = $0 } })
+                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID + narrationRestoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { commentParagraph = $0 })
                         .frame(width: layout.scrollFrame.width, height: layout.scrollFrame.height)
                         .position(x: layout.scrollFrame.midX, y: layout.scrollFrame.midY)
                 } else if initialized && !ranges.isEmpty {
@@ -71,7 +81,7 @@ struct ReaderView: View {
                         PagedReaderText(text: document.pageText(in: ranges[page]), onTap: handleTap, onSwipe: { flip(forward: $0) },
                                         mode: store.settings.mode, effect: store.settings.preferences.effect(for: store.settings.mode),
                                         pageID: chapter * 100_000 + page, layoutID: key, paperColor: palette.background,
-                                        onComment: { if store.isDemo { commentParagraph = $0 } }, documentFrame: layout.textFrame)
+                                        onComment: { commentParagraph = $0 }, documentFrame: layout.textFrame)
                             .frame(width: geo.size.width, height: geo.size.height)
                     }
                 }
@@ -92,7 +102,7 @@ struct ReaderView: View {
             .task(id: key) {
                 guard initialized, let loaded else { return }
                 reflowing = true
-                let nextDocument = ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: loaded.paragraphs.map(\.text), isDemo: store.isDemo,sourceID:store.remoteMetadata(book.id)?.source?.sourceID)
+                let nextDocument = ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: loaded.paragraphs.map(\.text), isDemo: store.isDemo,sourceID:store.remoteMetadata(book.id)?.source?.sourceID,commentCounts:paragraphCounts)
                 rendered = nextDocument
                 if store.settings.mode.isPaged {
                     let newRanges = ReaderPaginator.ranges(document: nextDocument, size: layout.textFrame.size)
@@ -173,8 +183,19 @@ struct ReaderView: View {
                 }.toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { demoFeature = nil } } }
             }
         }
+        .task(id:commentTaskID) {
+            comments.reset()
+            if store.settings.preferences.showCommentBubbles,let credential = shushan.credentialForRequests,let context = commentContext,let loaded {
+                await comments.load(client:ShushanCommentsClient(credential:credential),context:context,document:loaded)
+            }
+        }
         .sheet(isPresented: Binding(get: { commentParagraph != nil }, set: { if !$0 { commentParagraph = nil } })) {
             NavigationStack {
+                if !store.isDemo,let credential = shushan.credentialForRequests,let context = commentContext,let loaded,let paragraph = loaded.paragraphs[safe:commentParagraph ?? -1],let count = comments.counts[paragraph.id] {
+                    ProductionCommentsView(client:ShushanCommentsClient(credential:credential),context:context,paragraph:count,documentVersion:loaded.version,originalText:paragraph.text)
+                        .id(commentTaskID + paragraph.id)
+                        .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("完成") { commentParagraph = nil } } }
+                } else if store.isDemo {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         Text("本地示例评论").font(.system(size: 23, weight: .medium, design: .serif))
@@ -188,6 +209,7 @@ struct ReaderView: View {
                     }.padding(22)
                 }.appPageStyle().navigationTitle("本段评论")
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { commentParagraph = nil } } }
+                } else { ContentUnavailableView("段评暂不可用",systemImage:"bubble.left",description:Text("请确认书源登录与当前段落数据。")) }
             }.presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showGestureGuide, onDismiss: { store.completeReadingGuide() }) {
@@ -292,7 +314,8 @@ struct ReaderView: View {
     private func layoutKey(_ size: CGSize) -> String {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let preferences = (try? encoder.encode(store.settings.preferences)).map { String($0.hashValue) } ?? ""
-        return "\(chapter)-\(Int(size.width))-\(Int(size.height))-\(store.settings.fontSize)-\(store.settings.lineSpacing)-\(theme.rawValue)-\(store.settings.mode.rawValue)-\(preferences)-\(restoreID)-\(initialized)-\(loaded?.version ?? "")"
+        let countsVersion = StableContentID.list(paragraphCounts.keys.sorted().map{"\($0):\(paragraphCounts[$0]!)"})
+        return "\(chapter)-\(Int(size.width))-\(Int(size.height))-\(store.settings.fontSize)-\(store.settings.lineSpacing)-\(theme.rawValue)-\(store.settings.mode.rawValue)-\(preferences)-\(restoreID)-\(initialized)-\(loaded?.version ?? "")-\(countsVersion)"
     }
     private func updateAnchor(_ value: ReaderAnchor) {
         guard initialized, !reflowing, loading.phase == .readable else { return }

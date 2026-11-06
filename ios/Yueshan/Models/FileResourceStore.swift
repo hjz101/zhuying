@@ -3,8 +3,8 @@ import CryptoKit
 
 struct ResourceFileReference: Codable, Hashable, Sendable {
     enum Kind: String, Codable, Sendable {
-        case font, css, svg, png
-        var limit: Int { self == .font ? 20 * 1024 * 1024 : self == .png ? 512_000 : 60_000 }
+        case font, css, svg, png, pdf, image
+        var limit: Int { switch self { case .font,.pdf: 20 * 1024 * 1024;case .image:8 * 1024 * 1024;case .png:512_000;default:60_000 } }
     }
     let digest: String
     let bytes: Int
@@ -38,7 +38,9 @@ final class FileResourceStore: @unchecked Sendable {
         return try verified(reference)
     }
     private func verified(_ reference: ResourceFileReference) throws -> Data {
-        let data = try Data(contentsOf: url(for: reference))
+        let path = try url(for:reference)
+        guard (try path.resourceValues(forKeys:[.fileSizeKey]).fileSize) == reference.bytes else { throw ContentFailure.storageFailure }
+        let data = try Data(contentsOf:path)
         guard data.count == reference.bytes, Self.digest(data) == reference.digest else { throw ContentFailure.storageFailure }
         return data
     }

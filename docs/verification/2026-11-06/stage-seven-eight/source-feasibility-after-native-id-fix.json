@@ -1,0 +1,414 @@
+{
+  "events" : [
+    {
+      "count" : 592,
+      "query" : "西游记",
+      "result" : "page-1-partial",
+      "stage" : "search"
+    },
+    {
+      "count" : 45,
+      "query" : "西游记",
+      "result" : "AU文学,QQ阅读,七猫小说,万相书城,中华诗词,久久小说,书旗,书耽网,二三中文,企鹅看书,全本,八零小说,台湾,夜伴书屋,寒武纪年,小说狂人,得奇,得间,思兔,新笔趣阁,无忧书城,星星,晋江,江湖小说,淘小说,爱下电子书,番茄小说,疯读,百度,看书网,知乎,穿越小说,笔仙阁,笔趣阁55,笔趣阁78,米读,耽美小说,茶马,西瓜小说,追书神器,追光阅读,速读谷,错层小说,阅友,阅读网",
+      "stage" : "available-providers"
+    },
+    {
+      "count" : 24,
+      "query" : "西游记",
+      "result" : "全本:readable=24,restricted=0,volumes=0",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "西游记",
+      "result" : "全本:restricted",
+      "stage" : "candidate-failure"
+    },
+    {
+      "query" : "西游记",
+      "result" : "新笔趣阁:unavailable",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 104,
+      "query" : "西游记",
+      "result" : "番茄小说:readable=103,restricted=0,volumes=1",
+      "stage" : "catalog"
+    },
+    {
+      "count" : 580,
+      "query" : "西游记",
+      "result" : "page-2-has-new-results",
+      "stage" : "pagination"
+    },
+    {
+      "count" : 566,
+      "query" : "红楼梦",
+      "result" : "page-1-partial",
+      "stage" : "search"
+    },
+    {
+      "count" : 38,
+      "query" : "红楼梦",
+      "result" : "AU文学,QQ阅读,七猫小说,万相书城,书旗,书耽网,二三中文,企鹅看书,全本,八零小说,台湾,夜伴书屋,寒武纪年,小说狂人,得奇,得间,思兔,新笔趣阁,无忧书城,星星,晋江,江湖小说,淘小说,爱下电子书,番茄小说,疯读,百度,看书网,穿越小说,笔趣阁55,笔趣阁78,米读,西瓜小说,追书神器,追光阅读,错层小说,阅友,阅读网",
+      "stage" : "available-providers"
+    },
+    {
+      "count" : 24,
+      "query" : "红楼梦",
+      "result" : "全本:readable=24,restricted=0,volumes=0",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "红楼梦",
+      "result" : "全本:restricted",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 213,
+      "query" : "红楼梦",
+      "result" : "爱下电子书:readable=213,restricted=0,volumes=0",
+      "stage" : "catalog"
+    },
+    {
+      "query" : "红楼梦",
+      "result" : "爱下电子书:restricted",
+      "stage" : "candidate-failure"
+    },
+    {
+      "count" : 124,
+      "query" : "红楼梦",
+      "result" : "番茄小说:readable=123,restricted=0,volumes=1",
+      "stage" : "catalog"
+    },
+    {
+      "count" : 558,
+      "query" : "红楼梦",
+      "result" : "page-2-has-new-results",
+      "stage" : "pagination"
+    },
+    {
+      "result" : "search-allows-no-credential",
+      "stage" : "authentication-probe"
+    }
+  ],
+  "host" : "https:\/\/v1.vossc.com",
+  "requests" : [
+    {
+      "businessResult" : "partial-error-with-data",
+      "endpoint" : "search",
+      "httpStatus" : 200,
+      "method" : "GET",
+      "milliseconds" : 10910.947625059634,
+      "responseBytes" : 469830,
+      "shape" : "{other:number\/bool,data:[650:{author:…,book_url:…,cover:…,desc:…,other:…,source:…,tab:…,other:…,title:…,other:…}],error:string,other:number\/bool}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 436.3258336670697,
+      "responseBytes" : 404,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,title:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 1089.2838751897216,
+      "responseBytes" : 3127,
+      "shape" : "{code:number\/bool,data:[24:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 201,
+      "method" : "POST",
+      "milliseconds" : 583.1442498601973,
+      "responseBytes" : 126,
+      "shape" : "{data:{content:string},other:number\/bool};status=201;content-length=32;message-flags=会员;parameter-formats=cid:digits-1,url:opaque-40,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 404,
+      "method" : "POST",
+      "milliseconds" : 567.8530419245362,
+      "responseBytes" : 231,
+      "shape" : "null\/other"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 155.4008750244975,
+      "responseBytes" : 1663,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,bookid:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,other:string,title:string,other:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 160.56908341124654,
+      "responseBytes" : 23301,
+      "shape" : "{code:number\/bool,data:[104:{cid:…,isPay:…,isVip:…,isVolume:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 431.6449170000851,
+      "responseBytes" : 226,
+      "shape" : "{code:number\/bool,data:{content:string,other:null\/other,source:string,tab:string}};content-length=51;message-flags=授权;parameter-formats=book_id:digits-19,item_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 462.8996248356998,
+      "responseBytes" : 2898,
+      "shape" : "{code:number\/bool,data:{content:string,other:null\/other,source:string,tab:string}};content-length=938;message-flags=版本;parameter-formats=book_id:digits-19,item_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 927.6043334975839,
+      "responseBytes" : 21518,
+      "shape" : "{code:number\/bool,data:{content:string,other:null\/other,source:string,tab:string}};content-length=7628;message-flags=;parameter-formats=book_id:digits-19,item_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 1266.135333571583,
+      "responseBytes" : 21127,
+      "shape" : "{code:number\/bool,data:{content:string,other:null\/other,source:string,tab:string}};content-length=7027;message-flags=;parameter-formats=book_id:digits-19,item_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "partial-error-with-data",
+      "endpoint" : "search",
+      "httpStatus" : 200,
+      "method" : "GET",
+      "milliseconds" : 10257.78245832771,
+      "responseBytes" : 439783,
+      "shape" : "{other:number\/bool,data:[638:{author:…,book_url:…,cover:…,desc:…,other:…,source:…,tab:…,other:…,title:…,other:…}],error:string,other:number\/bool}"
+    },
+    {
+      "businessResult" : "partial-error-with-data",
+      "endpoint" : "search",
+      "httpStatus" : 200,
+      "method" : "GET",
+      "milliseconds" : 10262.935041449964,
+      "responseBytes" : 454453,
+      "shape" : "{other:number\/bool,data:[623:{author:…,book_url:…,cover:…,desc:…,other:…,source:…,tab:…,other:…,title:…,other:…}],error:string,other:number\/bool}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 925.1405000686646,
+      "responseBytes" : 442,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,title:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 589.17500032112,
+      "responseBytes" : 3375,
+      "shape" : "{code:number\/bool,data:[24:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 201,
+      "method" : "POST",
+      "milliseconds" : 348.13795844092965,
+      "responseBytes" : 126,
+      "shape" : "{data:{content:string},other:number\/bool};status=201;content-length=32;message-flags=会员;parameter-formats=cid:digits-1,url:opaque-40,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 558.1110832281411,
+      "responseBytes" : 991,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,other:string,title:string,other:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 510.23916667327285,
+      "responseBytes" : 23046,
+      "shape" : "{code:number\/bool,data:[213:{cid:…,isPay:…,isVip:…,isVolume:…,other:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 201,
+      "method" : "POST",
+      "milliseconds" : 362.85558342933655,
+      "responseBytes" : 126,
+      "shape" : "{data:{content:string},other:number\/bool};status=201;content-length=32;message-flags=会员;parameter-formats=cid:digits-1,url:opaque-44,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "details",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 751.06883328408,
+      "responseBytes" : 1540,
+      "shape" : "{code:number\/bool,data:{author:string,other:string,book_url:string,bookid:string,cover:string,desc:string,other:number\/bool,other:string,source:string,tab:string,other:string,title:string,other:string},message:string}"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "catalog",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 747.076166793704,
+      "responseBytes" : 28738,
+      "shape" : "{code:number\/bool,data:[124:{cid:…,isPay:…,isVip:…,isVolume:…,title:…}],message:string};cid-format=digits-1"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 760.2278334088624,
+      "responseBytes" : 286,
+      "shape" : "{code:number\/bool,data:{content:string,other:null\/other,source:string,tab:string}};content-length=87;message-flags=授权;parameter-formats=book_id:digits-19,item_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 816.8315417133272,
+      "responseBytes" : 4151,
+      "shape" : "{code:number\/bool,data:{content:string,other:null\/other,source:string,tab:string}};content-length=1364;message-flags=;parameter-formats=book_id:digits-19,item_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 851.694458629936,
+      "responseBytes" : 6542,
+      "shape" : "{code:number\/bool,data:{content:string,other:null\/other,source:string,tab:string}};content-length=4027;message-flags=;parameter-formats=book_id:digits-19,item_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "no-error",
+      "endpoint" : "content",
+      "httpStatus" : 200,
+      "method" : "POST",
+      "milliseconds" : 877.4044583551586,
+      "responseBytes" : 24074,
+      "shape" : "{code:number\/bool,data:{content:string,other:null\/other,source:string,tab:string}};content-length=8334;message-flags=目录;parameter-formats=book_id:digits-19,item_id:digits-19,cid:digits-1,version:digits-2"
+    },
+    {
+      "businessResult" : "partial-error-with-data",
+      "endpoint" : "search",
+      "httpStatus" : 200,
+      "method" : "GET",
+      "milliseconds" : 10246.230583172292,
+      "responseBytes" : 437395,
+      "shape" : "{other:number\/bool,data:[615:{author:…,book_url:…,cover:…,desc:…,other:…,source:…,tab:…,other:…,title:…,other:…}],error:string,other:number\/bool}"
+    },
+    {
+      "businessResult" : "partial-error-with-data",
+      "endpoint" : "search",
+      "httpStatus" : 200,
+      "method" : "GET",
+      "milliseconds" : 10238.253249786794,
+      "responseBytes" : 469830,
+      "shape" : "{other:number\/bool,data:[650:{author:…,book_url:…,cover:…,desc:…,other:…,source:…,tab:…,other:…,title:…,other:…}],error:string,other:number\/bool}"
+    }
+  ],
+  "schemaVersion" : 1,
+  "sourceID" : "shushan",
+  "startedAt" : "2026-11-06T07:09:30Z",
+  "status" : "passed",
+  "works" : [
+    {
+      "catalogCount" : 104,
+      "chapters" : [
+        {
+          "contentHash" : "fa2cdf24a20f491f9bd9ac204e316f55fb3527f1ea6cd2f33776db9e1d3e9c7e",
+          "id" : "1a6a4ecfbb1b8850bd5e38fc17b63a5d585173fec192f87d4e0c2a75aea62412",
+          "order" : 2,
+          "paragraphCount" : 3,
+          "title" : "出版说明",
+          "utf16Count" : 936
+        },
+        {
+          "contentHash" : "99ecbb1be49abaa188a025ce9db823303adc728f02c86a718a9f3030dfac47bc",
+          "id" : "61fc6f5675f7700db82aaeb59bc2eff7a6f4f54443a24406b65e49ae605a0374",
+          "order" : 3,
+          "paragraphCount" : 60,
+          "title" : "第一回 灵根育孕源流出 心性修持大道生",
+          "utf16Count" : 7569
+        },
+        {
+          "contentHash" : "826c45af7f93443139180e9064c2a89a4ff0216ce9df567f8604766444af286c",
+          "id" : "6cd64e3d2b909b416f6ebba0fcb539e9878b3b6c13ad1f151e9b21b793f26c34",
+          "order" : 4,
+          "paragraphCount" : 41,
+          "title" : "第二回 悟彻菩提真妙理 断魔归本合元神",
+          "utf16Count" : 6987
+        }
+      ],
+      "id" : "remote-32fe3df0eaa17ff1837f319502776102960e22faa055508da070e33900f66268",
+      "provider" : "番茄小说",
+      "restrictedCount" : 0,
+      "title" : "西游记",
+      "volumeCount" : 1
+    },
+    {
+      "catalogCount" : 124,
+      "chapters" : [
+        {
+          "contentHash" : "b3b3040550fd6d47088ff89183a8726f21d83066f0148ecb949ac55a59a6a335",
+          "id" : "b7b82b08873b2e02d36bffb58d8139bad9e2879e4ebbafc13c91a04778bef1e6",
+          "order" : 2,
+          "paragraphCount" : 8,
+          "title" : "出版说明",
+          "utf16Count" : 1357
+        },
+        {
+          "contentHash" : "c4720871d8cbf66fc39f053e9b524a4b3d3c22cd07022afeed4ea0d334d80b29",
+          "id" : "53883850faba434c686f8fba121ea9f7cf5141ec7a7970ac75a641615129374e",
+          "order" : 3,
+          "paragraphCount" : 24,
+          "title" : "金陵十二钗",
+          "utf16Count" : 4004
+        },
+        {
+          "contentHash" : "33ceeda993356602efc5f6a4a3250b689f39a799b538f9230f40c3f4e5d0b3c3",
+          "id" : "df06f7d838794b4541ee3ddb86ccf0a9ca2c9d4c4069486de57fd96660713742",
+          "order" : 4,
+          "paragraphCount" : 54,
+          "title" : "第一回 甄士隐梦幻识通灵 贾雨村风尘怀闺秀",
+          "utf16Count" : 8281
+        }
+      ],
+      "id" : "remote-d782254cdc9d46d9117fa6e1855af0d4e2663b81210f94f2e06f4c7aab4ce2e8",
+      "provider" : "番茄小说",
+      "restrictedCount" : 0,
+      "title" : "红楼梦",
+      "volumeCount" : 1
+    }
+  ]
+}

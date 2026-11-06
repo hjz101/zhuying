@@ -57,7 +57,7 @@ struct LibraryBackup: Codable, Sendable {
               documents.allSatisfy({ !$0.paragraphs.isEmpty && $0 == ChapterDocument(chapterID: $0.chapterID, paragraphs: $0.paragraphs.map(\.text)) }) else { throw ContentFailure.invalidResponse }
         for file in resources {
             let components = file.path.split(separator: "/", omittingEmptySubsequences: false)
-            guard components.count == 2, ["fonts", "themes"].contains(components[0]),
+            guard components.count == 2, ["fonts", "themes","media"].contains(components[0]),
                   !components[1].contains(".."), !components[1].contains("\\"), !file.data.isEmpty,
                   FileResourceStore.digest(file.data) == file.digest else { throw ContentFailure.invalidResponse }
             if components[0] == "fonts" && components[1] == "fonts.json" {
@@ -72,7 +72,18 @@ struct LibraryBackup: Codable, Sendable {
                 guard let kind = ResourceFileReference.Kind(rawValue: suffix),
                       String(components[1]) == file.digest + "." + kind.rawValue,
                       ResourceFileReference(digest: file.digest, bytes: file.data.count, kind: kind).isValid,
-                      components[0] == "fonts" ? kind == .font : [.css, .svg, .png].contains(kind) else { throw ContentFailure.invalidResponse }
+                      components[0] == "fonts" ? kind == .font : components[0] == "media" ? [.pdf,.image].contains(kind) : [.css, .svg, .png].contains(kind) else { throw ContentFailure.invalidResponse }
+            }
+        }
+        let requiredMedia = Set(database.books.flatMap { ($0.media?.resources ?? []) + [$0.cover].compactMap{$0} })
+        guard Set(resources.filter{$0.path.hasPrefix("media/")}.map(\.path)) == Set(requiredMedia.map{"media/" + $0.filename}) else { throw ContentFailure.invalidResponse }
+        for book in database.books {
+            if let media = book.media { try media.validate(); guard database.chapters.filter({$0.bookID == book.id}).count == media.pageCount else { throw ContentFailure.invalidResponse } }
+            for ref in (book.media?.resources ?? []) + [book.cover].compactMap({$0}) {
+                guard let file = resources.first(where:{$0.path == "media/" + ref.filename}),file.data.count == ref.bytes else { throw ContentFailure.invalidResponse }
+                if ref.kind == .image { try MediaBookImporter.validateImage(file.data) }
+                else if ref.kind == .pdf { let parsed = try MediaBookImporter.originalPDF(file.data,name:book.title); guard parsed.book.media?.pageCount == book.media?.pageCount else { throw ContentFailure.invalidResponse } }
+                else { throw ContentFailure.invalidResponse }
             }
         }
         if let data = resources.first(where: { $0.path == "fonts/fonts.json" })?.data {
@@ -116,7 +127,7 @@ final class LibraryWorkspace: @unchecked Sendable {
             for resource in backup.resources {
                 try Task.checkCancellation()
                 let components = resource.path.split(separator: "/")
-                let directory = components[0] == "fonts" ? folder.appendingPathComponent("fonts", isDirectory: true) : database.appendingPathComponent("resources/themes", isDirectory: true)
+                let directory = components[0] == "fonts" ? folder.appendingPathComponent("fonts", isDirectory: true) : database.appendingPathComponent("resources/" + components[0], isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 try writer.write(resource.data, to: directory.appendingPathComponent(String(components[1])))
             }

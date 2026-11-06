@@ -1,6 +1,6 @@
 # 原生兼容书源 v1
 
-正式版可导入 HTTPS 链接或 JSON 文件，预览确认后保存；也可编辑和导出。未知规则保留但不运行。当前没有通用 CSS、XPath、JavaScript 或任意阅读 3.0 宿主，不将 JSON 语法通过视为兼容。
+正式版可导入 HTTPS 链接或 JSON 文件，预览确认后保存；也可编辑和导出。未知规则保留但不运行。支持原生 JSON v1 和下述 extract-v1；CSS／XPath／JSONPath／正则均按明确版本与子集执行，不将 JSON 语法通过视为任意阅读 3.0 方言兼容。
 
 单个来源示例（域名仅为占位，不能用于可读性验收）：
 
@@ -36,3 +36,18 @@
 导出外层为 `{"format":"yueshan-sources","version":1,"sources":[...]}`，也接受单个对象或对象数组。凭据字段会剔除。书山可用 `adapter: "shushan"` 和对应 HTTPS 主机表示，恢复后需重新登录。
 
 搜索默认最多并发 3 个来源。一源失败保留其他结果；同名同作者仅分组为候选，保留各版本的独立身份。换源必须取得新正文并确认位置，无法唯一定位时用户明确选章／同意章首；原来源的历史和书签保留。主动下载独立于近期缓存，最大 256 MiB、最多同时下载 2 章；后台暂停，不承诺 iOS 无限后台下载。
+
+## extract-v1
+
+将 `adapter` 设为 `extract-v1`，保留相同的 `endpoints` 路由，并添加 `endpoints.extraction`。该对象的 `version` 为 1，包含 `search`、`catalog`、`detailTitle`、`paragraphs`，可选 `nextPage`、`detailAuthor`、`detailSummary`。`search` 和 `catalog` 均有 `rows`、`id`、`title` 规则，可选 `author`。先对响应执行 `rows`，再对每项执行字段规则。搜索条目最多 500，解析输出最多 2000 项。
+
+规则示例：`{"version":1,"kind":"css","expression":"article","projection":"html","capture":0}`。提取属性使用 `projection:"attribute"` 和 `attribute:"data-id"`。默认输出 `text`；JSON 对象／数组条目序列化为 JSON，再供字段规则处理。正则捕获使用 `capture:0...20`。
+
+| 类型 | v1 支持 | 显式不支持 |
+| --- | --- | --- |
+| CSS | 元素、class、id、属性及后代／子代／相邻／兄弟选择 | 伪类、转义选择器 |
+| XPath | 元素路径、属性／位置谓词；属性通过 projection 提取 | 函数、轴、联合和外部文档 |
+| JSONPath | `$`、`.key`、`[数字]`、`[*]`、`["键名"]` | 递归、过滤脚本、切片 |
+| 正则 | ICU 表达式、UTF-16 捕获；0.2 秒进度中止、取消 | 无限执行和无上限输出 |
+
+输入仅接受 UTF-8，单响应 ≤ 2 MiB、标记树 ≤ 8000 个标记；合计输出 ≤ 2 MiB。不解析外部实体，不执行网页或导入规则中的 JavaScript、Cookie、自定义鉴权。其他编码和宿主 API 需独立适配。内置“书源调试 → 规则兼容测试”可直接验证用户输入，测试过程不联网。

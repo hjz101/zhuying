@@ -15,10 +15,12 @@ struct Book: Codable, Identifiable, Hashable, Sendable {
     let tags: [String]
     let chapters: [String]
     let content: [[String]]
+    var media: MediaBookReference? = nil
+    var cover: ResourceFileReference? = nil
 
     func metadataOnly() -> Book {
         .init(id: id, title: title, author: author, genre: genre, category: category, status: status, words: words,
-              color: color, subtitle: subtitle, intro: intro, tags: tags, chapters: chapters, content: Array(repeating: [], count: chapters.count))
+              color: color, subtitle: subtitle, intro: intro, tags: tags, chapters: chapters, content: Array(repeating: [], count: chapters.count),media:media,cover:cover)
     }
 
     func chapterTitle(_ index: Int) -> String {
@@ -145,6 +147,8 @@ struct LibrarySnapshot: Codable {
     var subscribedSourceIDs: [String]? = nil
     var narrationSettings: NarrationSettings? = nil
     var narrationAnchor: ReadingAnchor? = nil
+    var mediaLocations: [String:MediaReadingLocation]? = nil
+    var mediaBookmarks: [MediaBookmark]? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -192,6 +196,8 @@ final class LibraryStore: ObservableObject {
     @Published var narrationSettings = NarrationSettings() { didSet { if oldValue != narrationSettings { audioCoordinator?.updateSettings(); persist() } } }
     var narrationAnchor: ReadingAnchor? { didSet { if oldValue != narrationAnchor { persist() } } }
     @Published private(set) var followingNarrationAnchor: ReadingAnchor?
+    @Published private(set) var mediaLocations: [String:MediaReadingLocation] = [:]
+    @Published private(set) var mediaBookmarks: [MediaBookmark] = []
     private var audioCoordinator: LibraryAudioCoordinator?
     var audio: LibraryAudioCoordinator {
         if let audioCoordinator { return audioCoordinator }
@@ -269,6 +275,7 @@ final class LibraryStore: ObservableObject {
             hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
             activitySessions = snapshot.activitySessions ?? []
             narrationSettings = snapshot.narrationSettings ?? .init(); narrationAnchor = snapshot.narrationAnchor
+            mediaLocations = snapshot.mediaLocations ?? [:]; mediaBookmarks = snapshot.mediaBookmarks ?? []
             var seen = Set<String>()
             let ids = Set(books.map(\.id))
             importedGroups = (snapshot.importedGroups ?? [:]).filter { ids.contains($0.key) }
@@ -484,8 +491,8 @@ final class LibraryStore: ObservableObject {
     }
 
     private var snapshot: LibrarySnapshot {
-        .init(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates,
-              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted(),narrationSettings:narrationSettings,narrationAnchor:narrationAnchor)
+        .init(favorites: favorites, progress: progress.filter{mediaLocations[$0.key] == nil}, settings: settings, sort: sort, updates: updates,
+              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted(),narrationSettings:narrationSettings,narrationAnchor:narrationAnchor,mediaLocations:mediaLocations,mediaBookmarks:mediaBookmarks)
     }
 
     func bootstrapProductionIfNeeded(prepareAppearance: (() throws -> AppearanceMigrationInput)? = nil, forceReload: Bool = false) async {
@@ -516,6 +523,9 @@ final class LibraryStore: ObservableObject {
             hasSeenReadingGuide = restored.snapshot.hasSeenReadingGuide ?? false
             activitySessions = restored.snapshot.activitySessions ?? []
             narrationSettings = restored.snapshot.narrationSettings ?? .init(); narrationAnchor = restored.snapshot.narrationAnchor
+            mediaLocations = (restored.snapshot.mediaLocations ?? [:]).filter { id,_ in books.contains(where:{$0.id == id && $0.media != nil}) }
+            mediaBookmarks = (restored.snapshot.mediaBookmarks ?? []).filter { mark in books.contains(where:{$0.id == mark.bookID && $0.media != nil}) }
+            for (id,location) in mediaLocations { if let media = books.first(where:{$0.id == id})?.media { let saved = location.validated(pages:media.pageCount); mediaLocations[id] = saved; progress[id] = .init(chapter:saved.page,paragraph:0,updatedAt:saved.updatedAt) } }
             subscribedSourceIDs = Set(restored.snapshot.subscribedSourceIDs ?? [])
             updates = restored.snapshot.updates ?? [:]
             themeLibrary = restored.themeLibrary
@@ -575,6 +585,7 @@ final class LibraryStore: ObservableObject {
     }
     func chapterAccess(_ book: Book, chapter: Int) -> ChapterRecord.Access { chapterCatalogs[book.id]?[safe: chapter]?.access ?? .readable }
     func remoteMetadata(_ id: String) -> LibraryBookRecord? { remoteBooks[id] }
+    func chapterRecord(bookID: String,index: Int) -> ChapterRecord? { chapterCatalogs[bookID]?[safe:index] }
     func trackReading(_ bookID: String?, foreground: Bool? = nil, interacted: Bool = false,
                       now: Date = Date(), uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         guard !isDemo else { return }
@@ -602,7 +613,7 @@ final class LibraryStore: ObservableObject {
     struct SearchResult { let hits: [TextSearchHit]; let indexed: Int; let uncached: Int }
     func searchText(_ query: String, bookID: String? = nil) async throws -> SearchResult {
         var indexed: [IndexedChapter] = [], missing = 0
-        for book in books where bookID == nil || book.id == bookID {
+        for book in books where book.media == nil && (bookID == nil || book.id == bookID) {
             for chapter in book.chapters.indices {
                 try Task.checkCancellation()
                 let request = try chapterRequest(for: book, chapter: chapter)
@@ -677,7 +688,11 @@ final class LibraryStore: ObservableObject {
         }
         #endif
         let source = sources.first { $0.id == "shushan" && $0.enabled && $0.kind == .novel }
-        var providers: [any BookSource] = sources.filter { $0.enabled && $0.kind == .novel && $0.id != "shushan" }.compactMap { try? ConfigurableBookSource(source: $0) }
+        var providers: [any BookSource] = sources.filter { $0.enabled && $0.kind == .novel && $0.id != "shushan" }.compactMap { source -> (any BookSource)? in
+            guard let rules = try? SourcePackages.rules(source) else { return nil }
+            if rules.extraction != nil { return try? ExtractionBookSource(source:source) }
+            return try? ConfigurableBookSource(source:source)
+        }
         if let source, let credential, (try? ShushanClient.host(source.url)) == credential.host, !expired {
             providers.append(ShushanBookSource(credential: credential))
         }
@@ -739,7 +754,7 @@ final class LibraryStore: ObservableObject {
         try await backend.renameBook(id: id, title: title)
         if let index = books.firstIndex(where: { $0.id == id }) {
             let book = books[index]
-            books[index] = .init(id: id, title: title, author: book.author, genre: book.genre, category: book.category, status: book.status, words: book.words, color: book.color, subtitle: book.subtitle, intro: book.intro, tags: book.tags, chapters: book.chapters, content: book.content)
+            books[index] = .init(id: id, title: title, author: book.author, genre: book.genre, category: book.category, status: book.status, words: book.words, color: book.color, subtitle: book.subtitle, intro: book.intro, tags: book.tags, chapters: book.chapters, content: book.content,media:book.media,cover:book.cover)
         }
     }
     func restoreBackup(_ backup: LibraryBackup) async throws {
@@ -852,6 +867,7 @@ final class LibraryStore: ObservableObject {
             self.chapterCatalogs.removeValue(forKey: id); self.stableProgress.removeValue(forKey: id)
             self.remoteBooks.removeValue(forKey: id)
             self.activitySessions.removeAll { $0.bookID == id }
+            self.mediaLocations.removeValue(forKey:id); self.mediaBookmarks.removeAll{$0.bookID == id}
             if self.narrationAnchor?.bookID == id { self.narrationAnchor = nil }
             if self.followingNarrationAnchor?.bookID == id { self.followingNarrationAnchor = nil }
             if self.reader?.book.id == id { self.reader = nil }
@@ -862,8 +878,8 @@ final class LibraryStore: ObservableObject {
     }
 
     @discardableResult
-    func importBookDurably(_ book: Book, group: String = "未分组") async throws -> Bool {
-        guard usesProductionStorage else { return try importBook(book, group: group) }
+    func importBookDurably(_ book: Book, group: String = "未分组",resources: [ResourceFileReference:Data] = [:]) async throws -> Bool {
+        guard usesProductionStorage else { guard book.media == nil else { throw BookImportError.message("请在正式模式中导入原版式 PDF 与漫画。") }; return try importBook(book, group: group) }
         guard let backend = productionPersistence else { throw ContentFailure.storageFailure }
         guard loadState == .ready else { throw ContentFailure.storageFailure }
         enqueueSave()
@@ -871,7 +887,7 @@ final class LibraryStore: ObservableObject {
         let operation = Task { @MainActor in
             await previous?.value
             guard !self.books.contains(where: { $0.id == book.id }) else { return false }
-            let imported = try await backend.importBook(book, group: group)
+            let imported = try await backend.importBook(book, group: group,resources:resources)
             if imported {
                 self.books.append(book.metadataOnly()); self.importedBooks.append(book.metadataOnly())
                 self.chapterCatalogs[book.id] = book.chapters.indices.map { EmbeddedChapterRepository.chapter(book, index: $0) }
@@ -883,6 +899,29 @@ final class LibraryStore: ObservableObject {
         writeTail = Task { _ = await operation.result }
         return try await operation.value
     }
+
+    func mediaURL(_ reference: ResourceFileReference) async throws -> URL {
+        guard let backend = productionPersistence else { throw ContentFailure.storageFailure }; return try await backend.mediaURL(reference)
+    }
+    func saveCover(bookID: String,data: Data?) async throws {
+        guard let backend = productionPersistence,loadState == .ready,await flushPendingWrites(),books.contains(where:{$0.id == bookID}) else { throw ContentFailure.storageFailure }
+        let reference = try await backend.saveCover(bookID:bookID,data:data)
+        if let index = books.firstIndex(where:{$0.id == bookID}) { books[index].cover = reference }
+        if let index = importedBooks.firstIndex(where:{$0.id == bookID}) { importedBooks[index].cover = reference }
+        remoteBooks[bookID]?.cover = reference
+    }
+    func recordMedia(_ book: Book,location: MediaReadingLocation) {
+        guard let media = book.media,books.contains(where:{$0.id == book.id}) else { return }
+        let valid = location.validated(pages:media.pageCount); mediaLocations[book.id] = valid
+        progress[book.id] = .init(chapter:valid.page,paragraph:0,updatedAt:valid.updatedAt)
+        trackReading(book.id,interacted:true); persist()
+    }
+    func saveMediaBookmark(_ book: Book) {
+        guard let location = mediaLocations[book.id] else { return }
+        let id = StableContentID.make(book.id,"media",String(location.page),String(Int(location.x * 1000)),String(Int(location.y * 1000)))
+        mediaBookmarks.removeAll{$0.id == id}; mediaBookmarks.append(.init(id:id,bookID:book.id,title:"第 \(location.page + 1) 页",location:location)); persist()
+    }
+    func removeMediaBookmark(_ id: String) { mediaBookmarks.removeAll{$0.id == id}; persist() }
 
     private func scheduleSave() {
         guard pendingSave == nil, !saveQueued, hasPendingChanges else { return }

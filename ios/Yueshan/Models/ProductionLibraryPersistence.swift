@@ -31,6 +31,8 @@ private struct LibraryViewPreferences: Codable {
     var updates: [String:UpdateNotice]? = nil
     var narrationSettings: NarrationSettings? = nil
     var narrationAnchor: ReadingAnchor? = nil
+    var mediaLocations: [String:MediaReadingLocation]? = nil
+    var mediaBookmarks: [MediaBookmark]? = nil
     init(_ snapshot: LibrarySnapshot) {
         settings = snapshot.settings; sort = snapshot.sort
         if settings.preferences.bubbleSVG != nil { settings.preferences.bubbleImageData = nil }
@@ -40,6 +42,7 @@ private struct LibraryViewPreferences: Codable {
         activitySessions = snapshot.activitySessions
         subscribedSourceIDs = snapshot.subscribedSourceIDs; updates = snapshot.updates
         narrationSettings = snapshot.narrationSettings; narrationAnchor = snapshot.narrationAnchor
+        mediaLocations = snapshot.mediaLocations; mediaBookmarks = snapshot.mediaBookmarks
     }
 }
 
@@ -56,6 +59,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
     private let records: SQLiteLibraryRepository
     private let files: FileChapterRepository
     private let themes: ThemeLibraryRepository?
+    private var media: MediaResourceStore?
     private var tail: Task<Void, Never>?
     private var documents = ChapterMemoryCache()
     private var savedAnchors: [String: ReadingAnchor] = [:]
@@ -66,6 +70,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         records = try SQLiteLibraryRepository(url: directory.appendingPathComponent("library.sqlite"))
         files = try FileChapterRepository(directory: directory.appendingPathComponent("chapters"), writer: writer)
         themes = ThemeLibraryRepository(directory: directory.appendingPathComponent("resources/themes"), writer: writer)
+        media = MediaResourceStore(directory:directory.appendingPathComponent("resources/media"),writer:writer)
     }
 
     // Dependency injection also permits testing a failed metadata commit after files stage.
@@ -95,8 +100,27 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         }
     }
 
-    func importBook(_ book: Book, group: String) async throws -> Bool {
-        try await serialized { try await $0.performImport(book, group: group) }
+    func importBook(_ book: Book, group: String,resources: [ResourceFileReference:Data] = [:]) async throws -> Bool {
+        try await serialized { try await $0.performImport(book, group: group,resources:resources) }
+    }
+    func mediaURL(_ reference: ResourceFileReference) throws -> URL {
+        guard let media else { throw ContentFailure.storageFailure }; _ = try media.files.read(reference); return try media.files.url(for:reference)
+    }
+    func saveCover(bookID: String,data: Data?) async throws -> ResourceFileReference? {
+        try await serialized { try await $0.performSaveCover(bookID:bookID,data:data) }
+    }
+    private func performSaveCover(bookID: String,data: Data?) async throws -> ResourceFileReference? {
+            guard let media else { throw ContentFailure.storageFailure }
+            var created = Set<ResourceFileReference>()
+            do {
+                let reference: ResourceFileReference?
+                if let data {
+                    try MediaBookImporter.validateImage(data)
+                    let staged = try media.files.stage(data,kind:.image); reference = staged.reference
+                    if staged.created { created.insert(staged.reference) }
+                } else { reference = nil }
+                try await records.setCover(bookID:bookID,reference:reference); return reference
+            } catch { media.files.discard(created); throw error }
     }
 
     func saveState(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot? = nil, sources: [DemoSource]? = nil, confirmedAnchors: [ReadingAnchor]? = nil) async throws {
@@ -111,7 +135,9 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
     }
     private func performSaveRemoteBook(_ book: LibraryBookRecord, chapters: [ChapterRecord]) async throws {
         guard book.source != nil, !chapters.isEmpty else { throw ContentFailure.invalidResponse }
-        try await records.save(book: book.withDisplayMetadata(), chapters: chapters)
+        var saved = book
+        if let previous = try await records.books().first(where:{$0.id == book.id}) { saved.cover = previous.cover }
+        try await records.save(book: saved.withDisplayMetadata(), chapters: chapters)
         catalogs[book.id] = chapters
     }
     func confirmRemoteAnchor(_ anchor: ReadingAnchor, document: ChapterDocument) async throws {
@@ -138,7 +164,9 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         var result: [LocalBookFile] = []
         for book in try await records.books() where book.source == nil {
             let catalog = try await catalog(book.id)
-            result.append(.init(id: book.id, name: book.title, bytes: try await files.byteCount(chapterIDs: Set(catalog.map(\.id))), chapters: catalog.count))
+            let refs = Set((book.media?.resources ?? []) + [book.cover].compactMap{$0})
+            let resourceBytes = refs.reduce(0) { total,ref in total + ((try? media?.files.url(for:ref).resourceValues(forKeys:[.fileSizeKey]).fileSize) ?? 0) }
+            result.append(.init(id: book.id, name: book.title, bytes: try await files.byteCount(chapterIDs: Set(catalog.map(\.id))) + resourceBytes, chapters: catalog.count))
         }
         return result
     }
@@ -146,7 +174,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         try await serialized { backend in try await backend.performExportText(bookID: bookID) }
     }
     private func performExportText(bookID: String) async throws -> Data {
-        guard let book = try await records.books().first(where: { $0.id == bookID }), book.source == nil else { throw ContentFailure.invalidResponse }
+        guard let book = try await records.books().first(where: { $0.id == bookID }), book.source == nil,book.media == nil else { throw BookImportError.message("原版式 PDF 与漫画请使用原始资源备份，不导出页面索引为小说正文。") }
         var text: [String] = []
         for chapter in try await catalog(bookID) { text.append(chapter.title); text.append(contentsOf: try await cachedDocument(chapter.id).paragraphs.map(\.text)); text.append("") }
         return Data(text.joined(separator: "\n").utf8)
@@ -163,6 +191,8 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         var content: [ChapterDocument] = []
         for chapter in archive.chapters where localIDs.contains(chapter.bookID) { content.append(try await cachedDocument(chapter.id)) }
         var resources = try themes?.backupResources() ?? []
+        let mediaReferences = Set(archive.books.flatMap { ($0.media?.resources ?? []) + [$0.cover].compactMap{$0} })
+        if !mediaReferences.isEmpty { guard let media else { throw ContentFailure.storageFailure }; resources.append(contentsOf:try media.backup(mediaReferences)) }
         let manifestURL = fontDirectory.appendingPathComponent("fonts.json")
         if FileManager.default.fileExists(atPath: manifestURL.path) {
             let data = try Data(contentsOf: manifestURL)
@@ -222,7 +252,11 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         try await records.deleteBook(id: id, preferences: [Self.unresolvedKey: try JSONEncoder().encode(unresolved.sorted())])
         catalogs.removeValue(forKey: id); savedAnchors.removeValue(forKey: id)
         for chapter in chapters { documents.removeValue(forKey: chapter.id) }
-        do { try await files.removeBatch(Set(chapters.map(\.id))); return true }
+        do {
+            try await files.removeBatch(Set(chapters.map(\.id)))
+            if let media { let books = try await records.books(); try media.files.collect(referenced:Set(books.flatMap{($0.media?.resources ?? []) + [$0.cover].compactMap{$0}})) }
+            return true
+        }
         catch { return false }
     }
 
@@ -293,9 +327,14 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
               book.content.allSatisfy({ !$0.isEmpty && $0.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }) else { throw ContentFailure.invalidResponse }
     }
 
-    private func performImport(_ book: Book, group: String) async throws -> Bool {
+    private func performImport(_ book: Book, group: String,resources: [ResourceFileReference:Data] = [:]) async throws -> Bool {
         try Self.validate(book)
         if try await records.books().contains(where: { $0.id == book.id }) { return false }
+        if let reference = book.media { try reference.validate(); guard reference.pageCount == book.chapters.count else { throw ContentFailure.invalidResponse } }
+        if let cover = book.cover,cover.kind != .image { throw ContentFailure.invalidResponse }
+        let required = (book.media?.resources ?? []) + [book.cover].compactMap{$0}
+        var stagedMedia = Set<ResourceFileReference>()
+        if !required.isEmpty { guard let media else { throw ContentFailure.storageFailure }; stagedMedia = try media.stage(resources,required:required) }
         let chapters = book.chapters.enumerated().map { index, title in
             ChapterRecord(id: StableContentID.make(book.id, "local-v1", String(index)), bookID: book.id,
                           nativeChapterID: String(index), title: title, order: index, access: .readable)
@@ -304,7 +343,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         let existing = await files.chapterIDs()
         let created = Set(content.map(\.chapterID)).subtracting(existing)
         let metadata = LibraryBookRecord(id: book.id, title: book.title, author: book.author, summary: book.intro, addedAt: Date(),
-            display: .init(genre: book.genre, category: book.category, status: book.status, words: book.words, color: book.color, subtitle: book.subtitle, tags: book.tags))
+            display: .init(genre: book.genre, category: book.category, status: book.status, words: book.words, color: book.color, subtitle: book.subtitle, tags: book.tags),media:book.media,cover:book.cover)
         do {
             try await files.saveBatch(content)
             try Task.checkCancellation()
@@ -312,6 +351,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         } catch {
             // A failed rollback leaves unreferenced entries, reclaimed at the next open.
             try? await files.removeBatch(created)
+            media?.files.discard(stagedMedia)
             throw error
         }
         catalogs[book.id] = chapters
@@ -323,6 +363,10 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         let valid = try await records.allChapterIDs()
         let staged = await files.chapterIDs()
         try await files.removeBatch(staged.subtracting(valid))
+        if let media {
+            let books = try await records.books()
+            try media.files.collect(referenced:Set(books.flatMap { ($0.media?.resources ?? []) + [$0.cover].compactMap { $0 } }))
+        }
     }
 
     private func catalog(_ bookID: String) async throws -> [ChapterRecord] {
@@ -394,7 +438,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             guard let display = record.display else { throw ContentFailure.storageFailure }
             books.append(Book(id: record.id, title: record.title, author: record.author, genre: display.genre, category: display.category,
                               status: display.status, words: display.words, color: display.color, subtitle: display.subtitle,
-                              intro: record.summary, tags: display.tags, chapters: chapters.map(\.title), content: Array(repeating: [], count: chapters.count)))
+                              intro: record.summary, tags: display.tags, chapters: chapters.map(\.title), content: Array(repeating: [], count: chapters.count),media:record.media,cover:record.cover))
         }
         var snapshot = LibrarySnapshot(favorites: try await records.favoriteIDs(), progress: [:], importedGroups: try await records.groups())
         if let data = try await records.preference(key: Self.viewKey) {
@@ -405,6 +449,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             snapshot.activitySessions = view.activitySessions
             snapshot.subscribedSourceIDs = view.subscribedSourceIDs; snapshot.updates = view.updates
             snapshot.narrationSettings = view.narrationSettings; snapshot.narrationAnchor = view.narrationAnchor
+            snapshot.mediaLocations = view.mediaLocations; snapshot.mediaBookmarks = view.mediaBookmarks
         }
         var unresolved = Set<String>()
         if let data = try await records.preference(key: Self.unresolvedKey) {

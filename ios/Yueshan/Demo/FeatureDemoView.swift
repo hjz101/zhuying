@@ -51,6 +51,11 @@ struct FeatureDemoView: View {
             else if !library.isDemo && feature.id == "fulltext" { ProductionTextSearchView(bookID: bookID, onRead: onRead) }
             else if !library.isDemo && feature.id == "statistics" { FootprintsView(title: feature.title) }
             else if !library.isDemo && feature.id == "links" { ShareImportView() }
+            else if !library.isDemo && feature.id == "pdf" { ProductionMediaLibrary(kind:.pdf) }
+            else if !library.isDemo && feature.id == "comic" { ProductionMediaLibrary(kind:.comic) }
+            else if !library.isDemo && feature.id == "archive" { ProductionArchiveView() }
+            else if !library.isDemo && feature.id == "covers" { ProductionCoverSearchView(bookID:bookID) }
+            else if !library.isDemo && feature.id == "icloud" { ProductionCloudView() }
             else if !library.isDemo && feature.id == "aiConfig" { ProductionAudioServiceView() }
             else if !library.isDemo && feature.id == "aiRoles" { ProductionRolesView(bookID:bookID) }
             else if !library.isDemo && ["systemTTS","onlineTTS","backgroundAudio"].contains(feature.id) { ProductionNarrationView(bookID:bookID,mode:feature.id == "backgroundAudio" ? nil : feature.id == "onlineTTS" ? .online : .system,title:feature.title) }

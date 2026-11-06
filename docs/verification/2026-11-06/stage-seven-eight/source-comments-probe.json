@@ -1,0 +1,231 @@
+{
+  "credentialAvailable" : true,
+  "physicalDeviceAccepted" : false,
+  "requests" : 28,
+  "sampleKind" : "live-app-read-only-comments",
+  "samples" : [
+    {
+      "book" : "f383b318f011bf91fe5673b34318a898a09a0fe9e3ef0dd3feefadd54f4e2be5",
+      "catalogItems" : 2040,
+      "nativeIdentifierSamples" : [
+        {
+          "hasChapterIDPattern" : false,
+          "hasItemIDPattern" : true,
+          "parameterKeys" : [
+            "book_id",
+            "cid",
+            "item_id",
+            "source",
+            "version"
+          ],
+          "requestIDPresent" : true
+        },
+        {
+          "hasChapterIDPattern" : false,
+          "hasItemIDPattern" : true,
+          "parameterKeys" : [
+            "book_id",
+            "cid",
+            "item_id",
+            "source",
+            "version"
+          ],
+          "requestIDPresent" : true
+        }
+      ],
+      "provider" : "番茄小说",
+      "remoteIDPresent" : true
+    },
+    {
+      "bodyReadable" : true,
+      "book" : "f383b318f011bf91fe5673b34318a898a09a0fe9e3ef0dd3feefadd54f4e2be5",
+      "chapter" : "11031eb93f3ea19547e9b4c6d7db3e6935608820319d90d217aef69f0c390239",
+      "comments" : 130557,
+      "countsStatus" : "passed",
+      "endpointPaths" : [
+
+      ],
+      "mappedParagraphs" : 112,
+      "paragraphs" : 113,
+      "provider" : "fq",
+      "shellBytes" : 61444,
+      "shellMIME" : "text\/html"
+    },
+    {
+      "bodyReadable" : true,
+      "book" : "f383b318f011bf91fe5673b34318a898a09a0fe9e3ef0dd3feefadd54f4e2be5",
+      "chapter" : "9d4ae06c321bc83f01306b8a63df30823f9c30ae8d9a92fd1b0dd30f54953614",
+      "comments" : 35560,
+      "countsStatus" : "passed",
+      "endpointPaths" : [
+
+      ],
+      "mappedParagraphs" : 71,
+      "paragraphs" : 72,
+      "provider" : "fq",
+      "shellBytes" : 61444,
+      "shellMIME" : "text\/html"
+    },
+    {
+      "book" : "2e58014f4d5ac5959e8542dc64acd2b21fb93bfe10f157ccb51170dde57f7d71",
+      "catalogItems" : 24,
+      "nativeIdentifierSamples" : [
+        {
+          "hasChapterIDPattern" : true,
+          "hasItemIDPattern" : false,
+          "parameterKeys" : [
+            "chapterId",
+            "cid",
+            "novelId",
+            "source",
+            "url",
+            "version"
+          ],
+          "requestIDPresent" : true
+        },
+        {
+          "hasChapterIDPattern" : true,
+          "hasItemIDPattern" : false,
+          "parameterKeys" : [
+            "chapterId",
+            "cid",
+            "novelId",
+            "source",
+            "url",
+            "version"
+          ],
+          "requestIDPresent" : true
+        }
+      ],
+      "provider" : "晋江",
+      "remoteIDPresent" : true
+    },
+    {
+      "book" : "2e58014f4d5ac5959e8542dc64acd2b21fb93bfe10f157ccb51170dde57f7d71",
+      "chapter" : "105548ee7519f4a3f6dbf1506e0f0cd537f054796e5dd02c14629f3c19efa33f",
+      "countsStatus" : "unavailable",
+      "provider" : "jj"
+    },
+    {
+      "book" : "2e58014f4d5ac5959e8542dc64acd2b21fb93bfe10f157ccb51170dde57f7d71",
+      "chapter" : "6f67d4cf1a2640da270d9c930ac93594a8a3411ed97b62ef11054e08597488a8",
+      "countsStatus" : "unavailable",
+      "provider" : "jj"
+    },
+    {
+      "book" : "a7a8d206fc1fc854633d91372a5b1ecae69644e63f53720f303bf891c2e1bce0",
+      "catalogItems" : 104,
+      "nativeIdentifierSamples" : [
+        {
+          "hasChapterIDPattern" : false,
+          "hasItemIDPattern" : true,
+          "parameterKeys" : [
+            "book_id",
+            "cid",
+            "item_id",
+            "source",
+            "version"
+          ],
+          "requestIDPresent" : true
+        },
+        {
+          "hasChapterIDPattern" : false,
+          "hasItemIDPattern" : true,
+          "parameterKeys" : [
+            "book_id",
+            "cid",
+            "item_id",
+            "source",
+            "version"
+          ],
+          "requestIDPresent" : true
+        }
+      ],
+      "provider" : "番茄小说",
+      "remoteIDPresent" : true
+    },
+    {
+      "bodyReadable" : true,
+      "book" : "a7a8d206fc1fc854633d91372a5b1ecae69644e63f53720f303bf891c2e1bce0",
+      "chapter" : "a59a63465ad43afb7a3c1bbb72fe07fa1ba0103fa3a454a25d71efbb84e6c022",
+      "comments" : 0,
+      "countsStatus" : "passed",
+      "mappedParagraphs" : 0,
+      "paragraphs" : 0,
+      "provider" : "fq"
+    },
+    {
+      "bodyReadable" : true,
+      "book" : "a7a8d206fc1fc854633d91372a5b1ecae69644e63f53720f303bf891c2e1bce0",
+      "chapter" : "d3ddd200cb69d115bda36818388ebe987b4fd3eb060f4fdd8cc480cd1f4961a1",
+      "comments" : 11,
+      "countsStatus" : "passed",
+      "endpointPaths" : [
+
+      ],
+      "mappedParagraphs" : 2,
+      "paragraphs" : 2,
+      "provider" : "fq",
+      "shellBytes" : 61444,
+      "shellMIME" : "text\/html"
+    },
+    {
+      "book" : "64477c569eaca0d41c3437b7ac691a92b1dbbad39e680e161675f725faf7e2a3",
+      "catalogItems" : 103,
+      "nativeIdentifierSamples" : [
+        {
+          "hasChapterIDPattern" : false,
+          "hasItemIDPattern" : true,
+          "parameterKeys" : [
+            "book_id",
+            "cid",
+            "item_id",
+            "source",
+            "version"
+          ],
+          "requestIDPresent" : true
+        },
+        {
+          "hasChapterIDPattern" : false,
+          "hasItemIDPattern" : true,
+          "parameterKeys" : [
+            "book_id",
+            "cid",
+            "item_id",
+            "source",
+            "version"
+          ],
+          "requestIDPresent" : true
+        }
+      ],
+      "provider" : "番茄小说",
+      "remoteIDPresent" : true
+    },
+    {
+      "bodyReadable" : true,
+      "book" : "64477c569eaca0d41c3437b7ac691a92b1dbbad39e680e161675f725faf7e2a3",
+      "chapter" : "3161d1fbca39adab6f8ed00e5d2bbd3495824a3d61e91f97d8fe6245fdaa59f2",
+      "comments" : 0,
+      "countsStatus" : "passed",
+      "mappedParagraphs" : 0,
+      "paragraphs" : 0,
+      "provider" : "fq"
+    },
+    {
+      "bodyReadable" : true,
+      "book" : "64477c569eaca0d41c3437b7ac691a92b1dbbad39e680e161675f725faf7e2a3",
+      "chapter" : "afa259cae7a7afa6f81fd576d3f1ca873a6adeb5ac55c899129a1256284d8f3b",
+      "comments" : 1,
+      "countsStatus" : "passed",
+      "endpointPaths" : [
+
+      ],
+      "mappedParagraphs" : 1,
+      "paragraphs" : 1,
+      "provider" : "fq",
+      "shellBytes" : 61445,
+      "shellMIME" : "text\/html"
+    }
+  ],
+  "schemaVersion" : 1
+}

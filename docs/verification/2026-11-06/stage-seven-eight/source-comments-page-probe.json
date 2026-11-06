@@ -1,0 +1,72 @@
+{
+  "credentialAvailable" : true,
+  "physicalDeviceAccepted" : false,
+  "requests" : 8,
+  "sampleKind" : "live-app-read-only-comments",
+  "samples" : [
+    {
+      "book" : "f383b318f011bf91fe5673b34318a898a09a0fe9e3ef0dd3feefadd54f4e2be5",
+      "catalogItems" : 2040,
+      "nativeIdentifierSamples" : [
+        {
+          "hasChapterIDPattern" : false,
+          "hasItemIDPattern" : true,
+          "parameterKeys" : [
+            "book_id",
+            "cid",
+            "item_id",
+            "source",
+            "version"
+          ],
+          "requestIDPresent" : true
+        },
+        {
+          "hasChapterIDPattern" : false,
+          "hasItemIDPattern" : true,
+          "parameterKeys" : [
+            "book_id",
+            "cid",
+            "item_id",
+            "source",
+            "version"
+          ],
+          "requestIDPresent" : true
+        }
+      ],
+      "provider" : "番茄小说",
+      "remoteIDPresent" : true
+    },
+    {
+      "bodyReadable" : true,
+      "book" : "f383b318f011bf91fe5673b34318a898a09a0fe9e3ef0dd3feefadd54f4e2be5",
+      "chapter" : "11031eb93f3ea19547e9b4c6d7db3e6935608820319d90d217aef69f0c390239",
+      "comments" : 130557,
+      "countsStatus" : "passed",
+      "distinctPageIDs" : true,
+      "endpointPaths" : [
+
+      ],
+      "hasNextPage" : true,
+      "mappedParagraphs" : 112,
+      "pageDataKeys" : [
+        "data_list",
+        "para_src_content"
+      ],
+      "pageItems" : 20,
+      "pageResponseCode" : -999,
+      "pageRootKeys" : [
+        "common_list_info",
+        "data"
+      ],
+      "pageStatus" : "passed",
+      "paragraphs" : 113,
+      "provider" : "fq",
+      "quoteMatchesMappedParagraph" : true,
+      "quotePresent" : true,
+      "secondPageItems" : 20,
+      "shellBytes" : 61444,
+      "shellMIME" : "text\/html"
+    }
+  ],
+  "schemaVersion" : 1
+}

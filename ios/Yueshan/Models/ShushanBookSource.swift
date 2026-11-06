@@ -69,7 +69,14 @@ struct ShushanBookSource: BookSource {
             guard seen.insert(id).inserted else { throw ContentFailure.invalidResponse }
             var parameters = ["cid": cid.isEmpty ? nativeID : cid, "source": source.provider, "version": Self.contentRequestVersion]
             let queryItems = URLComponents(string: address)?.queryItems ?? []
-            func value(_ name: String) -> String? { queryItems.first { $0.name == name }?.value }
+            func value(_ name: String) -> String? {
+                if let value = queryItems.first(where:{$0.name == name})?.value { return value }
+                // Reference v5.61 also accepts bare query fragments, not only
+                // complete URLs. Keep native IDs out of the positional cid.
+                let pattern = "(?:^|[?&])" + NSRegularExpression.escapedPattern(for:name) + "=([0-9]+)"
+                guard let regex = try? NSRegularExpression(pattern:pattern),let match = regex.firstMatch(in:address,range:NSRange(address.startIndex...,in:address)) else { return nil }
+                return (address as NSString).substring(with:match.range(at:1))
+            }
             if ["番茄小说", "番茄短剧", "番茄听书", "番茄畅听"].contains(source.provider) {
                 parameters["book_id"] = source.remoteBookID
                 parameters["item_id"] = value("item_id")

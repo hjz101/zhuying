@@ -7,6 +7,7 @@ private enum ImportSource: String, CaseIterable { case local = "本地文件", l
 struct SmartImportView: View {
     var openPickerOnAppear = false
     var initialInput: BookImportInput? = nil
+    var originalPDFMode = false
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var demo: FeatureDemoStore
     @Environment(\.dismiss) private var dismiss
@@ -17,6 +18,7 @@ struct SmartImportView: View {
     @State private var link = ""
     @State private var group = "未分组"
     @State private var encoding = ImportEncoding.automatic
+    @State private var pdfOriginal = false
 
     var body: some View {
         ScrollView {
@@ -43,7 +45,8 @@ struct SmartImportView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Picker("TXT 编码", selection: $encoding) { ForEach(ImportEncoding.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
                             .font(.system(size: 13)).accessibilityIdentifier("importEncoding")
-                        Text("编码用于下一次识别或重试；TXT 自动识别章节，PDF 按提取出的正文阅读。")
+                        if !library.isDemo { Toggle("PDF 保留原版式",isOn:$pdfOriginal).accessibilityIdentifier("importPDFOriginal") }
+                        Text(library.isDemo ? "编码用于下一次识别或重试；TXT 自动识别章节，PDF 按提取出的正文阅读。" : "编码用于下一次识别或重试；TXT 自动识别章节。PDF 可选择原版式或提取文字；扫描页原版式可读，不执行 OCR。")
                             .font(.system(size: 11)).foregroundStyle(Palette.muted)
                     }.padding(.top, 10)
                 }.font(.system(size: 13)).disabled(session.busy)
@@ -60,7 +63,7 @@ struct SmartImportView: View {
                     if (error as NSError).code != NSUserCancelledError { session.message = "未能选择文件：\(error.localizedDescription)" }
                 }
             }
-            .onAppear { if openPickerOnAppear { showingFiles = true }; if let initialInput,session.items.isEmpty { add([initialInput]) } }
+            .onAppear { if originalPDFMode && session.items.isEmpty { pdfOriginal = true }; if openPickerOnAppear { showingFiles = true }; if let initialInput,session.items.isEmpty { add([initialInput]) } }
             .onDisappear { session.cancel() }
             .onChange(of: source) { _, _ in session.message = nil }
             .sheet(isPresented: $showingHelp) { help }
@@ -76,7 +79,7 @@ struct SmartImportView: View {
                     Text("从“文件”选择，可浏览我的 iPhone、iCloud 等位置。")
                         .font(.system(size: 11)).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
                     Button("选择文件") { showingFiles = true }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("importChooseFiles")
-                    Text("可多选 · TXT / EPUB / 文字 PDF · 单个文件 ≤ 20 MB")
+                    Text(library.isDemo ? "可多选 · TXT / EPUB / 文字 PDF · 单个文件 ≤ 20 MB" : "可多选 · TXT / EPUB / PDF · 单个文件 ≤ 20 MB；归档请用“压缩包支持”。")
                         .font(.system(size: 10)).foregroundStyle(Palette.muted)
                 }.frame(maxWidth: .infinity).padding(22).background(Palette.card, in: .rect(cornerRadius: 16))
             } else {
@@ -191,7 +194,7 @@ struct SmartImportView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("选择 → 预览 → 导入").font(.system(size: 23, design: .serif))
                     Text("本地文件通过系统“文件”选择，可多选；iCloud 文件需要先完成下载。取消选择不会改变书架。")
-                    Text("TXT 支持 UTF-8、UTF-16 和 GB18030；EPUB 支持未加密可重排文字和本地 PNG／JPEG 插图，使用当前阅读样式；PDF 提取文字。固定版式、出版社复杂样式、扫描版、加密内容、漫画与独立压缩包暂不支持。")
+                    Text(library.isDemo ? "TXT 支持 UTF-8、UTF-16 和 GB18030；EPUB 支持未加密可重排文字和本地 PNG／JPEG 插图，使用当前阅读样式；PDF 提取文字。固定版式、出版社复杂样式、扫描版、加密内容、漫画与独立压缩包暂不支持。" : "TXT 支持 UTF-8、UTF-16 和 GB18030；EPUB 支持未加密可重排文字和本地 PNG／JPEG 插图。PDF 可在更多选项中选择保留原版式或提取文字；原版式可浏览扫描页，不执行 OCR。ZIP／RAR／7z 与图片漫画请从“压缩包支持”导入；加密、分卷和固定版式 EPUB 不支持。")
                     Text("重复内容会跳过。确认导入后，正文保存在 App 内，阅读进度在重启后保留。移除预览只影响本次清单，不删除原文件。")
                     Text("书源、主题等专用内容，请从对应的管理页面导入。")
                 }.font(.system(size: 14)).lineSpacing(6).padding(22)
@@ -200,7 +203,7 @@ struct SmartImportView: View {
         }
     }
 
-    private func add(_ inputs: [BookImportInput]) { Task { await session.add(inputs, encoding: encoding, library: library) } }
+    private func add(_ inputs: [BookImportInput]) { let inputs = inputs.map { pdfOriginal && ($0.name as NSString).pathExtension.lowercased() == "pdf" ? BookImportInput.originalPDF($0) : $0 }; Task { await session.add(inputs, encoding: encoding, library: library) } }
     private func retry() { Task { await session.retry(encoding: encoding, library: library) } }
     private func recognizeLink() {
         do { add([.remote(try BookImporter.remoteURL(link))]) } catch { session.message = error.localizedDescription }

@@ -61,6 +61,9 @@ struct YueshanApp: App {
             }
             var rejectFirstOpen = testing && ProcessInfo.processInfo.arguments.contains("--storage-retry-fixture")
             #if DEBUG
+            if testing && ProcessInfo.processInfo.arguments.contains("--media-fixtures") {
+                try MediaDevelopmentFixtures.write(to:manager.urls(for:.documentDirectory,in:.userDomainMask)[0])
+            }
             if testing && ProcessInfo.processInfo.arguments.contains("--source-package-fixtures") {
                 let documents = manager.urls(for:.documentDirectory,in:.userDomainMask)[0]
                 try manager.createDirectory(at:documents,withIntermediateDirectories:true)
@@ -136,6 +139,7 @@ struct RootView: View {
                 if let prepared = try? BookImporter.prepare(data:Data(prose.utf8),name:"原创朗读测试.txt") { _ = try? await store.importBookDurably(prepared.book); store.completeReadingGuide() }
             }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-native-narration") { try? await NativeNarrationValidation.run() }
+            if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-source-comments") { try? await SourceCommentValidation.run(credential:shushan.credentialForRequests) }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--measure-native-performance") {
                 let readyMS = (ProcessInfo.processInfo.systemUptime - NativePerformanceValidation.processStarted) * 1000
                 try? NativePerformanceValidation.writeReport(readyMS: readyMS)
@@ -171,7 +175,8 @@ struct RootView: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showPlayer = false } } } }
         }
         .fullScreenCover(item: $store.reader) { session in
-            ReaderView(book: session.book, initialChapter: session.chapter, resume: session.resume, startingAnchor: session.anchor, repository: store.chapterRepository(for: session.book)).id(session.id).environmentObject(store)
+            if session.book.media != nil { ProductionMediaReader(book:session.book).id(session.id).environmentObject(store) }
+            else { ReaderView(book: session.book, initialChapter: session.chapter, resume: session.resume, startingAnchor: session.anchor, repository: store.chapterRepository(for: session.book)).id(session.id).environmentObject(store) }
         }
         .alert("本地记录提示", isPresented: Binding(get: { store.storageMessage != nil }, set: { if !$0 { store.storageMessage = nil } })) {
             if !store.isDemo { Button("重试") { Task { await store.retryStorage() } } }

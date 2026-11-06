@@ -81,7 +81,7 @@ struct ReaderDocument {
     let text: NSAttributedString
     let paragraphRanges: [NSRange]
 
-    init(book: Book, chapter: Int, settings: ReadingSettings, paragraphs: [String]? = nil, isDemo: Bool = true,sourceID: String? = nil) {
+    init(book: Book, chapter: Int, settings: ReadingSettings, paragraphs: [String]? = nil, isDemo: Bool = true,sourceID: String? = nil,commentCounts: [Int:Int] = [:]) {
         let text = NSMutableAttributedString(string: "")
         let preferences = settings.preferences
         let palette = ReaderPalette(settings: settings)
@@ -128,9 +128,9 @@ struct ReaderDocument {
             let body = NSMutableAttributedString(string: paragraph, attributes: [.font: font, .foregroundColor: palette.ink, .paragraphStyle: style, .kern: 0.6])
             ReaderTypography.applyRules(ReaderStyleRule.effective(preferences.rules,bookID:book.id,sourceID:sourceID), to: body, paragraph: paragraphIndex, settings: settings)
             text.append(body)
-            if isDemo && preferences.showCommentBubbles {
+            if preferences.showCommentBubbles && (isDemo || (commentCounts[paragraphIndex] ?? 0) > 0) {
                 let attachment = ReaderResponsiveCommentAttachment()
-                attachment.image = ReaderCommentArtwork.bubble(settings: settings)
+                attachment.image = ReaderCommentArtwork.bubble(settings: settings,count:isDemo ? nil : commentCounts[paragraphIndex])
                 attachment.bounds = CGRect(x: 3, y: -3, width: 42, height: 22)
                 let badge = NSMutableAttributedString(attachment: attachment)
                 badge.addAttribute(.readerCommentParagraph, value: paragraphIndex, range: NSRange(location: 0, length: badge.length))
@@ -265,20 +265,23 @@ enum ReaderCommentArtwork {
     private static func remember(_ image: UIImage, key: NSString) -> UIImage {
         cache.setObject(image, forKey: key, cost: (image.cgImage?.bytesPerRow ?? 0) * (image.cgImage?.height ?? 0)); return image
     }
-    static func bubble(settings: ReadingSettings) -> UIImage {
-        let key = key("bubble", settings: settings)
+    static func bubble(settings: ReadingSettings,count: Int? = nil) -> UIImage {
+        let key = key("bubble-\(count.map(String.init) ?? "demo")", settings: settings)
         if let cached = cache.object(forKey: key) { return cached }
         let importedData = settings.preferences.bubbleFollowsTheme ? settings.preferences.bubbleImageData : settings.preferences.customBubbleImageData
-        if let data = importedData, let image = UIImage(data: data) { return remember(image, key: key) }
+        if let data = importedData, let image = UIImage(data: data),count == nil { return remember(image, key: key) }
         let palette = ReaderPalette(settings: settings)
         let image = UIGraphicsImageRenderer(size: CGSize(width: 42, height: 22)).image { _ in
             let style = settings.preferences.bubbleFollowsTheme ? "胶囊" : settings.preferences.bubbleStyle
             let radius: CGFloat = style == "自定义" ? settings.preferences.bubbleRadius : style == "圆角方形" ? 4 : 10
             let accent = (style == "自定义" ? settings.preferences.bubbleColor : nil).map { UIColor(readerHex: $0) } ?? palette.accent
+            if let data = importedData,let artwork = UIImage(data:data) { artwork.draw(in:CGRect(x:0,y:0,width:42,height:22)) }
             let path = UIBezierPath(roundedRect: CGRect(x: 1, y: 1, width: 40, height: 20), cornerRadius: radius)
             if style == "描边" { accent.setStroke(); path.lineWidth = 1; path.stroke() }
             else { accent.withAlphaComponent(0.14).setFill(); path.fill() }
-            ("12·例" as NSString).draw(at: CGPoint(x: 7, y: 4), withAttributes: [.font: UIFont.systemFont(ofSize: 10), .foregroundColor: accent])
+            let label = count.map{ $0 > 99 ? "99+" : String($0) } ?? "12·例"
+            if importedData != nil && count != nil { palette.background.setFill(); UIBezierPath(roundedRect:CGRect(x:8,y:3,width:27,height:16),cornerRadius:4).fill() }
+            (label as NSString).draw(at: CGPoint(x: 7, y: 4), withAttributes: [.font: UIFont.systemFont(ofSize: 10), .foregroundColor: accent])
         }
         return remember(image, key: key)
     }

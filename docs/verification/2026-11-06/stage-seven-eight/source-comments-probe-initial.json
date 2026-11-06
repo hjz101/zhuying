@@ -1,0 +1,8 @@
+{
+  "credentialAvailable": true,
+  "physicalDeviceAccepted": false,
+  "requests": 10,
+  "sampleKind": "live-app-read-only-comments",
+  "samples": [],
+  "schemaVersion": 1
+}

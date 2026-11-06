@@ -67,6 +67,8 @@ struct LibraryBookRecord: Codable, Identifiable, Equatable, Sendable {
     var source: SourceBookReference?
     var addedAt: Date
     var display: BookDisplayMetadata? = nil
+    var media: MediaBookReference? = nil
+    var cover: ResourceFileReference? = nil
 }
 
 /// Presentation metadata retained when migrating the existing Demo book model.

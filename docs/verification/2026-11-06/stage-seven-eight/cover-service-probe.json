@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "provider": "Open Library",
+  "search": {
+    "httpStatus": 200,
+    "query": "Pride and Prejudice",
+    "results": 5,
+    "resultsWithCover": 5
+  },
+  "chineseSearch": {
+    "query": "西游记",
+    "results": 5,
+    "resultsWithCover": 2
+  },
+  "selectedImage": {
+    "httpStatus": 200,
+    "mime": "image/jpeg",
+    "bytes": 8814
+  },
+  "automaticSelection": false
+}

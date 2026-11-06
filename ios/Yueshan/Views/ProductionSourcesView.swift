@@ -93,7 +93,7 @@ struct ProductionSourceRuleEditor: View {
             VStack(alignment: .leading, spacing: 23) {
                 AppPageHeader(title: "书源编辑", subtitle: "基本信息 · 规则字段 · JSON 校验", icon: "square.and.pencil")
                 AppSettingsCard("JSON 源码", icon: "curlybraces") { TextEditor(text: $json).frame(minHeight: 300).font(.system(size: 12, design: .monospaced)).accessibilityIdentifier("sourceRulesJSON") }
-                Text("当前运行原生 JSON v1 的四个接口；其他规则可以保存和导出，但不会执行。修改后需点击保存，返回即取消。")
+                Text("支持原生 JSON v1 和 extract-v1 的搜索、详情、目录、正文接口；解析规则支持 CSS／XPath／JSONPath／正则的已声明子集。其他阅读器方言可以保存导出，不会自动执行。修改后需点击保存，返回即取消。")
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
                 Button("校验 JSON") { validate(save: false) }.buttonStyle(PrimaryButtonStyle(filled: false))
                 Button("保存书源") { validate(save: true) }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("sourceRulesSave")

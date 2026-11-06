@@ -92,6 +92,8 @@ struct BookCover: View {
     let book: Book
     var width: CGFloat = 150
     var titleLineLimit: Int? = nil
+    @EnvironmentObject private var library: LibraryStore
+    @State private var savedCover: UIImage?
     private var colors: (UInt32, UInt32, UInt32) { BookCoverPalette.colors(for: book) }
     var body: some View {
         ZStack {
@@ -125,11 +127,17 @@ struct BookCover: View {
         }
         .foregroundStyle(Color(hex: colors.1))
         .frame(width: width, height: width * 1.38)
+        .overlay { if let savedCover { Image(uiImage:savedCover).resizable().scaledToFill().frame(width:width,height:width * 1.38).clipped().accessibilityHidden(true) } }
         .clipShape(.rect(cornerRadius: 5))
         .contentShape(Rectangle())
         .overlay(RoundedRectangle(cornerRadius: 5).stroke(.black.opacity(0.04), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.09), radius: 5, x: 1, y: 4)
         .accessibilityLabel("\(book.title)封面")
+        .task(id:book.cover?.digest) {
+            savedCover = nil
+            guard let reference = book.cover else { return }
+            do { let url = try await library.mediaURL(reference); let data = try await Task.detached { try Data(contentsOf:url) }.value; try Task.checkCancellation(); savedCover = UIImage(data:data) } catch { }
+        }
     }
 }
 

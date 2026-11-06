@@ -33,6 +33,9 @@ struct UbiquitousDocuments: CloudDocumentTransport {
     let enabled: Bool
     init(containerIdentifier: String = Bundle.main.object(forInfoDictionaryKey:"YueshanCloudContainer") as? String ?? "iCloud.com.yueshan.reader",enabled: Bool = Bundle.main.object(forInfoDictionaryKey:"YueshanCloudEnabled") as? Bool ?? false) { self.containerIdentifier = containerIdentifier; self.enabled = enabled }
     func account() async throws -> String {
+        try accountSnapshot()
+    }
+    private func accountSnapshot() throws -> String {
         guard enabled else { throw CloudAccessError.notConfigured }
         guard let token = FileManager.default.ubiquityIdentityToken else { throw CloudAccessError.notSignedIn }
         let data = try NSKeyedArchiver.archivedData(withRootObject:token,requiringSecureCoding:true)
@@ -53,38 +56,49 @@ struct UbiquitousDocuments: CloudDocumentTransport {
         let list = try FileManager.default.contentsOfDirectory(at:root,includingPropertiesForKeys:[.fileSizeKey,.contentModificationDateKey,.ubiquitousItemDownloadingStatusKey,.isSymbolicLinkKey])
         guard list.count <= 4096 else { throw CloudAccessError.quota }
         let files = try list.compactMap { url -> CloudFile? in
-            let id = url.deletingPathExtension().lastPathComponent
-            guard url.pathExtension == "json",UUID(uuidString:id) != nil else { return nil }
+            let placeholder = url.lastPathComponent.hasPrefix(".") && url.lastPathComponent.hasSuffix(".json.icloud")
+            let name = placeholder ? String(url.lastPathComponent.dropFirst().dropLast(7)) : url.lastPathComponent
+            let id = (name as NSString).deletingPathExtension
+            guard (name as NSString).pathExtension == "json",UUID(uuidString:id) != nil else { return nil }
             let value = try url.resourceValues(forKeys:[.fileSizeKey,.contentModificationDateKey,.ubiquitousItemDownloadingStatusKey,.isSymbolicLinkKey])
             guard value.isSymbolicLink != true else { throw CloudAccessError.invalidData }
-            return .init(id:id,bytes:value.fileSize ?? 0,modified:value.contentModificationDate ?? .distantPast,downloaded:value.ubiquitousItemDownloadingStatus != .notDownloaded)
+            return .init(id:id,bytes:placeholder ? 0 : value.fileSize ?? 0,modified:value.contentModificationDate ?? .distantPast,downloaded:!placeholder && value.ubiquitousItemDownloadingStatus != .notDownloaded)
         }
         guard try await account() == expected else { throw CloudAccessError.accountChanged }; return files.sorted { $0.modified > $1.modified }
     }
     func read(folder: String,id: String,maximumBytes: Int,account expected: String) async throws -> Data {
         let root = try await directory(folder,account:expected),url = try file(id,in:root)
         try FileManager.default.startDownloadingUbiquitousItem(at:url)
-        let bytes = try await Task.detached {
+        guard try url.resourceValues(forKeys:[.ubiquitousItemDownloadingStatusKey]).ubiquitousItemDownloadingStatus != .notDownloaded else { throw CloudAccessError.unavailable }
+        let coordination = CloudFileCoordination()
+        let worker = Task.detached {
+            try Task.checkCancellation()
             var error: NSError?,result: Result<Data,Error>?
-            NSFileCoordinator().coordinate(readingItemAt:url,options:[],error:&error) { coordinated in
+            coordination.value.coordinate(readingItemAt:url,options:[],error:&error) { coordinated in
                 result = Result {
+                    try Task.checkCancellation(); guard try accountSnapshot() == expected else { throw CloudAccessError.accountChanged }
                     let values = try coordinated.resourceValues(forKeys:[.fileSizeKey,.isSymbolicLinkKey,.ubiquitousItemDownloadingStatusKey])
                     guard values.isSymbolicLink != true,values.ubiquitousItemDownloadingStatus != .notDownloaded,let size = values.fileSize,size > 0,size <= maximumBytes else { throw CloudAccessError.unavailable }
                     return try Data(contentsOf:coordinated)
                 }
             }
             if let error { throw error }; guard let result else { throw CloudAccessError.unavailable }; return try result.get()
-        }.value
+        }
+        let bytes = try await withTaskCancellationHandler(operation:{try await worker.value},onCancel:{coordination.value.cancel(); worker.cancel()})
         try Task.checkCancellation(); guard try await account() == expected else { throw CloudAccessError.accountChanged }; return bytes
     }
     func write(_ data: Data,folder: String,id: String,account expected: String) async throws {
         guard data.count <= LibraryBackup.maximumBytes else { throw CloudAccessError.quota }
         let root = try await directory(folder,account:expected),url = try file(id,in:root)
-        try await Task.detached {
+        let coordination = CloudFileCoordination()
+        let worker = Task.detached {
+            try Task.checkCancellation()
             var error: NSError?,failure: Error?
-            NSFileCoordinator().coordinate(writingItemAt:url,options:.forReplacing,error:&error) { coordinated in do { try data.write(to:coordinated,options:.atomic) } catch { failure = error } }
+            coordination.value.coordinate(writingItemAt:url,options:.forReplacing,error:&error) { coordinated in do { try Task.checkCancellation(); guard try accountSnapshot() == expected else { throw CloudAccessError.accountChanged }; try data.write(to:coordinated,options:.atomic) } catch { failure = error } }
             if let error { throw error }; if let failure { throw failure }
-        }.value
+        }
+        try await withTaskCancellationHandler(operation:{try await worker.value},onCancel:{coordination.value.cancel(); worker.cancel()})
+        try Task.checkCancellation()
         guard try await account() == expected else { throw CloudAccessError.accountChanged }
     }
     func remove(folder: String,id: String,account expected: String) async throws {
@@ -95,6 +109,7 @@ struct UbiquitousDocuments: CloudDocumentTransport {
         guard try await account() == expected else { throw CloudAccessError.accountChanged }
     }
 }
+private final class CloudFileCoordination: @unchecked Sendable { let value = NSFileCoordinator() }
 
 actor CloudBackupStore {
     let transport: any CloudDocumentTransport
@@ -217,9 +232,9 @@ actor CloudRecordStore {
             try await transport.write(JSONEncoder().encode(journal),folder:"Records-v1",id:UUID().uuidString,account:account)
         }
         guard try await transport.account() == account else { throw CloudAccessError.accountChanged }
+        let encoded = try JSONEncoder().encode(state); guard encoded.count <= 32 * 1024 * 1024 else { throw CloudAccessError.quota }
         try await apply(state)
         guard try await transport.account() == account else { throw CloudAccessError.accountChanged }
-        let encoded = try JSONEncoder().encode(state); guard encoded.count <= 32 * 1024 * 1024 else { throw CloudAccessError.quota }
         try writer.write(encoded,to:file); return state
     }
 }

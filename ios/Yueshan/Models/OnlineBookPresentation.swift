@@ -7,7 +7,7 @@ extension LibraryBookRecord {
         return .init(id: id, title: title, author: author.isEmpty ? "作者未提供" : author, genre: display.genre,
                      category: display.category, status: display.status, words: display.words, color: display.color,
                      subtitle: display.subtitle, intro: summary.isEmpty ? "书源未提供简介。" : summary, tags: display.tags,
-                     chapters: chapters.map(\.title), content: Array(repeating: [], count: chapters.count))
+                     chapters: chapters.map(\.title), content: Array(repeating: [], count: chapters.count),media:media,cover:cover)
     }
     func withDisplayMetadata() -> LibraryBookRecord {
         var value = self

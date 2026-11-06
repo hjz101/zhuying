@@ -248,6 +248,14 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
             try db.execute(sql: "UPDATE book_records SET payload=? WHERE id=?", arguments: [try JSONEncoder().encode(book), id])
         }
     }
+    func setCover(bookID: String,reference: ResourceFileReference?) throws {
+        guard reference == nil || reference?.kind == .image && reference?.isValid == true else { throw ContentFailure.invalidResponse }
+        try database.write { db in
+            guard let data = try Data.fetchOne(db,sql:"SELECT payload FROM book_records WHERE id=?",arguments:[bookID]) else { throw ContentFailure.missingChapter }
+            var book = try JSONDecoder().decode(LibraryBookRecord.self,from:data); book.cover = reference
+            try db.execute(sql:"UPDATE book_records SET payload=? WHERE id=?",arguments:[try JSONEncoder().encode(book),bookID])
+        }
+    }
     /// A different source is a separate edition. Retain the original catalog,
     /// bookmarks and reading anchor; transfer the shelf slot only after the new
     /// edition's content and anchor have been validated.

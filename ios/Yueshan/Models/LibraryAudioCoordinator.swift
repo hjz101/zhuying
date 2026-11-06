@@ -60,6 +60,7 @@ import Combine
     }
     func start(bookID: String,mode: NarrationMode) throws {
         guard let library,let book = library.books.first(where: { $0.id == bookID }) else { throw ContentFailure.missingChapter }
+        guard book.media == nil else { throw BookImportError.message("原版式 PDF 与漫画使用页面阅读；朗读请导入文字提取版本。") }
         if mode != .system { _ = try client() }
         self.mode = mode; rolesPlaybackBegan = false
         let anchor = library.narrationAnchor?.bookID == bookID ? library.narrationAnchor : nil

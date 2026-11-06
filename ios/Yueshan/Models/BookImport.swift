@@ -14,14 +14,17 @@ struct PreparedBookImport: Sendable {
     let book: Book
     let bytes: Int
     let encoding: String
+    var resources: [ResourceFileReference:Data] = [:]
 }
 
 enum BookImportInput: Sendable {
     case file(URL), remote(URL), text(String)
+    indirect case originalPDF(BookImportInput)
     var name: String {
         switch self {
         case .file(let url), .remote(let url): return url.lastPathComponent.isEmpty ? "链接文件" : url.lastPathComponent
         case .text: return "剪贴板文本.txt"
+        case .originalPDF(let input): return input.name
         }
     }
 }
@@ -39,6 +42,15 @@ enum BookImporter {
 
     static func load(_ input: BookImportInput, encoding: ImportEncoding, downloader: any BookImportDownloading = BoundedBookDownloader()) async throws -> PreparedBookImport {
         switch input {
+        case .originalPDF(let original):
+            switch original {
+            case .file(let url):
+                let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
+                try validateSize(try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0)
+                return try MediaBookImporter.originalPDF(Data(contentsOf:url),name:url.lastPathComponent)
+            case .remote(let url): let file = try await downloader.fetch(url); return try MediaBookImporter.originalPDF(file.data,name:file.suggestedName ?? url.lastPathComponent)
+            default: throw BookImportError.message("原版式 PDF 需要本地文件或 HTTPS 文件链接。")
+            }
         case .text(let text): return try prepare(data: Data(text.utf8), name: input.name, encoding: .utf8)
         case .file(let url):
             let access = url.startAccessingSecurityScopedResource()
@@ -216,8 +228,8 @@ final class BookImportSession: ObservableObject {
             progressText = "正在保存 \(items[index].input.name)"
             await Task.yield()
             if cancelRequested || Task.isCancelled { break }
-            guard let book = items[index].prepared?.book else { continue }
-            do { items[index].status = try await library.importBookDurably(book, group: group) ? .imported : .duplicate }
+            guard let prepared = items[index].prepared else { continue }
+            do { items[index].status = try await library.importBookDurably(prepared.book, group: group,resources:prepared.resources) ? .imported : .duplicate }
             catch { items[index].status = .failed("保存失败：\(error.localizedDescription)") }
         }
         selection = selection.filter { id in items.contains { $0.id == id && $0.status == .ready } }

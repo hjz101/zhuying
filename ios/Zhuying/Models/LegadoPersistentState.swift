@@ -10,7 +10,7 @@ struct LegadoStateScope: Codable, Equatable, Sendable {
     var id: String { StableContentID.make("legado-state-v2", libraryProfile, sourceID, accountID) }
 }
 enum LegadoStateError: LocalizedError, Equatable {
-    case corrupt, vaultUnavailable, limit, referenceMissing, referenceNeedsRefresh
+    case corrupt, vaultUnavailable, limit, referenceMissing, referenceNeedsRefresh, migrationConflict
     var errorDescription: String? {
         switch self {
         case .corrupt: "书源会话数据无法验证，原数据已保留，请重试或重置此账号。"
@@ -18,6 +18,7 @@ enum LegadoStateError: LocalizedError, Equatable {
         case .limit: "书源会话、缓存或内部引用超过存储额度。"
         case .referenceMissing: "内部引用暂不可用，请刷新这本书的详情与目录。"
         case .referenceNeedsRefresh: "登录会话已改变，请刷新书籍详情与目录以获取新的请求凭据；阅读位置已保留。"
+        case .migrationConflict: "目标资料库已有独立书源会话，未覆盖任何登录数据。"
         }
     }
 }
@@ -59,6 +60,7 @@ final class LegadoPersistentState: @unchecked Sendable {
     private struct Manifest: Codable {
         var version = 2
         var scopeID: String
+        var scopeIdentity: LegadoStateScope? = nil
         var revision: UInt64 = 0
         var authEpoch: UInt64 = 0
         var status = LegadoAuthStatus.signedOut
@@ -90,6 +92,7 @@ final class LegadoPersistentState: @unchecked Sendable {
     }
     private struct Secrets: Codable {
         var scopeID: String
+        var scopeIdentity: LegadoStateScope? = nil
         var loginInfo = ""
         var cookies: [CookieRecord] = []
         var references: [String: ReferenceRecord] = [:]
@@ -154,6 +157,44 @@ final class LegadoPersistentState: @unchecked Sendable {
         try reload()
         Self.latest[url.path] = manifest.revision
     }
+
+    /// Only a caller that knows the complete former profile namespace can
+    /// authorize this association. The exact tuple must reproduce the old
+    /// filename, authenticated envelope and Keychain key; files are never
+    /// selected by count, modification time or trying unrelated source IDs.
+    /// Stop old source operations before migration and reopen the new session.
+    @discardableResult
+    static func migrateLegacyScope(from legacy: LegadoStateScope, to target: LegadoStateScope, directory: URL,
+                                   vault: any LegadoSecretVault = LegadoKeychainVault(),
+                                   writer: any AtomicFileWriting = AtomicFileWriter()) throws -> Bool {
+        guard legacy.sourceID == target.sourceID, legacy.accountID == target.accountID, legacy.id != target.id,
+              directory.isFileURL else { throw LegadoStateError.migrationConflict }
+        guard [legacy.sourceID, legacy.accountID, legacy.libraryProfile, target.libraryProfile].allSatisfy({ !$0.isEmpty && $0.utf8.count <= 512 }) else { throw LegadoStateError.limit }
+        Self.lock.lock(); defer { Self.lock.unlock() }
+        let root = directory.resolvingSymlinksInPath(), previousFile = root.appendingPathComponent(legacy.id + ".sealed"), targetFile = root.appendingPathComponent(target.id + ".sealed")
+        guard FileManager.default.fileExists(atPath: previousFile.path) else { return false }
+        guard !FileManager.default.fileExists(atPath: targetFile.path) else { throw LegadoStateError.migrationConflict }
+        let previous = try Self(sourceID: legacy.sourceID, accountID: legacy.accountID, libraryProfile: legacy.libraryProfile, directory: directory, vault: vault, writer: writer)
+        let destination = try Self(sourceID: target.sourceID, accountID: target.accountID, libraryProfile: target.libraryProfile, directory: directory, vault: vault, writer: writer)
+        var next = previous.manifest, secret = previous.secrets
+        next.scopeID = target.id; next.scopeIdentity = target; next.secretID = nil
+        secret.scopeID = target.id; secret.scopeIdentity = target
+        let oldDeviceID = "installation." + legacy.id, newDeviceID = "installation." + target.id
+        let oldDevice = try vault.read(id: oldDeviceID), newDevice = try vault.read(id: newDeviceID)
+        if let oldDevice {
+            guard let value = String(data: oldDevice, encoding: .utf8), value.count == 32, value.allSatisfy({ $0.isHexDigit }) else { throw LegadoStateError.corrupt }
+        }
+        if let oldDevice, let newDevice, oldDevice != newDevice { throw LegadoStateError.migrationConflict }
+        let copiedDevice = oldDevice != nil && newDevice == nil
+        do {
+            if let oldDevice, copiedDevice { try vault.save(oldDevice, id: newDeviceID) }
+            try destination.commit(next, secret)
+        } catch {
+            if copiedDevice { try? vault.remove(id: newDeviceID) }
+            throw error
+        }
+        return true
+    }
     private func reload() throws {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         guard (try url.resourceValues(forKeys: [.fileSizeKey, .isSymbolicLinkKey])).isSymbolicLink != true,
@@ -164,12 +205,12 @@ final class LegadoPersistentState: @unchecked Sendable {
         do { bytes = try AES.GCM.open(AES.GCM.SealedBox(combined: envelope.sealed), using: key, authenticating: Data(scope.id.utf8)) }
         catch { throw LegadoStateError.corrupt }
         let loaded = try JSONDecoder().decode(Manifest.self, from: bytes)
-        guard loaded.version == 2, loaded.scopeID == scope.id else { throw LegadoStateError.corrupt }
+        guard loaded.version == 2, loaded.scopeID == scope.id, loaded.scopeIdentity == nil || loaded.scopeIdentity == scope else { throw LegadoStateError.corrupt }
         var secret = Secrets(scopeID: scope.id)
         if let id = loaded.secretID {
             guard id.hasPrefix("snapshot." + scope.id + "."), let bytes = try vault.read(id: id), bytes.count <= 8 * 1024 * 1024 else { throw LegadoStateError.vaultUnavailable }
             secret = try JSONDecoder().decode(Secrets.self, from: bytes)
-            guard secret.scopeID == scope.id else { throw LegadoStateError.corrupt }
+            guard secret.scopeID == scope.id, secret.scopeIdentity == nil || secret.scopeIdentity == scope else { throw LegadoStateError.corrupt }
         }
         try validate(loaded, secrets: secret)
         if loaded.authEpoch != manifest.authEpoch { memory = [:] }
@@ -179,6 +220,8 @@ final class LegadoPersistentState: @unchecked Sendable {
         if Self.latest[url.path] != manifest.revision { try reload(); Self.latest[url.path] = manifest.revision }
     }
     private func validate(_ value: Manifest, secrets: Secrets) throws {
+        guard value.scopeID == scope.id, secrets.scopeID == scope.id,
+              value.scopeIdentity == nil || value.scopeIdentity == scope, secrets.scopeIdentity == nil || secrets.scopeIdentity == scope else { throw LegadoStateError.corrupt }
         guard value.variables.count <= 512, value.variables.reduce(0, { $0 + $1.key.utf8.count + $1.value.utf8.count }) <= 512 * 1024,
               value.variables.allSatisfy({ $0.key.utf8.count <= 1024 && $0.value.utf8.count <= 128 * 1024 }), value.cache.count <= 128,
               value.cache.reduce(0, { $0 + $1.key.utf8.count + $1.value.value.utf8.count }) <= 512 * 1024, value.origins.count <= 128,
@@ -188,7 +231,8 @@ final class LegadoPersistentState: @unchecked Sendable {
         for item in value.cache.values { guard item.value.utf8.count <= 128 * 1024, item.touched.timeIntervalSince1970.isFinite, item.expiresAt?.timeIntervalSince1970.isFinite ?? true else { throw LegadoStateError.corrupt } }
     }
     private func commit(_ nextManifest: Manifest, _ nextSecrets: Secrets, writeSecrets: Bool = true) throws {
-        var value = nextManifest; value.revision = manifest.revision &+ 1
+        var value = nextManifest, nextSecrets = nextSecrets
+        value.revision = manifest.revision &+ 1; value.scopeIdentity = scope; nextSecrets.scopeIdentity = scope
         try validate(value, secrets: nextSecrets)
         var stagedSecret: String?
         do {

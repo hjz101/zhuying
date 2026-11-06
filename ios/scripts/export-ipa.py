@@ -154,10 +154,12 @@ def main():
             invoke(['security','unlock-keychain','-p',keychain_password,str(keychain)],label='Temporary keychain unlock')
             compatible = mac_compatible_p12(args.material,work,openssl,keychain_password)
             invoke(['security','import',str(compatible),'-k',str(keychain),'-P',keychain_password,'-T','/usr/bin/codesign'],label='P12 keychain import')
-            # Import the official issuing certificate only into the temporary keychain.
+            fingerprint = hashlib.sha1(certificate).hexdigest().upper()
+            trusted = invoke(['security','find-identity','-v','-p','codesigning',str(keychain)],label='Initial signing trust').decode()
+            # Import an issuer only when the local trusted chain is unavailable.
             detail = invoke([openssl,'x509','-noout','-text'],data=pem,label='Certificate issuer metadata').decode()
             match = re.search(r'CA Issuers - URI:(https?://[^\s]+)',detail)
-            if match:
+            if match and fingerprint not in trusted:
                 url = urllib.parse.urlsplit(match.group(1))
                 if url.hostname != 'certs.apple.com' or url.username or url.password:
                     raise ValueError('Unexpected certificate issuer URL')

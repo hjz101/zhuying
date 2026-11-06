@@ -159,6 +159,7 @@ struct RootView: View {
         .onChange(of: store.sources) { _, _ in configureSource() }
         .onReceive(NotificationCenter.default.publisher(for:.contentProcessingChanged)) { _ in if !store.isDemo { store.audio.stop() } }
         .onReceive(NotificationCenter.default.publisher(for:.sourceBrowserSessionsChanged)) { _ in configureSource() }
+        .onReceive(NotificationCenter.default.publisher(for:.remoteBackendChanged)) { _ in configureSource() }
         .onReceive(NotificationCenter.default.publisher(for:.sourceNetworkChanged)) { _ in configureSource() }
         .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.onlineService?.downloads?.pauseForBackground(); await store.saveBeforeSuspending() } } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await store.onlineService?.downloads?.returnToForeground() } } }

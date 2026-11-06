@@ -73,4 +73,15 @@ final class ExtensionToolsFlowTests: XCTestCase {
         for _ in 0..<7 { if message.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(message.waitForExistence(timeout:5)); XCTAssertTrue(message.label.contains("HTTPS")); XCTAssertFalse(app.buttons["importConfirm"].exists)
     }
+    @MainActor func testBackendStartsOffAndRequiresConfirmationAndValidCredentials() {
+        let app = open("backend",title:"远程后端")
+        let enabled = app.switches["backendEnabled"]; XCTAssertTrue(enabled.waitForExistence(timeout:5)); XCTAssertEqual(enabled.value as? String,"0")
+        XCTAssertEqual(app.switches["backendFallback"].value as? String,"0"); enabled.tap()
+        let save = app.buttons["backendSave"]; for _ in 0..<5 { if save.isHittable { break }; app.swipeUp() }; save.tap()
+        XCTAssertTrue(app.buttons["确认并保存"].waitForExistence(timeout:5)); if app.buttons["取消"].exists { app.buttons["取消"].tap() } else { app.coordinate(withNormalizedOffset:CGVector(dx:0.95,dy:0.15)).tap() }
+        XCTAssertFalse(app.staticTexts["backendMessage"].exists); save.tap(); app.buttons["确认并保存"].tap()
+        let message = app.staticTexts["backendMessage"]; for _ in 0..<5 { if message.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(message.waitForExistence(timeout:5)); XCTAssertTrue(message.label.contains("无效"))
+    }
+
 }

@@ -219,12 +219,20 @@ final class LibraryStore: ObservableObject {
     lazy var cloudSync = RecordSyncController(library:self,directory:managedSettingsDirectory.appendingPathComponent("CloudSync-v1"),defaults:defaults)
     lazy var browserSessions = SourceBrowserSessions(defaults:defaults)
     lazy var networkProfiles = SourceNetworkProfiles(defaults:defaults)
+    lazy var backendProfiles = RemoteBackendProfiles(defaults:defaults,vault:ServiceKeychain(service:"com.yueshan.backend." + (ProcessInfo.processInfo.arguments.contains("--ui-testing") ? "tests" : "production")))
     func networkTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> SourceNetworkTransport {
         let origin = try ShushanClient.host(source.url),profile = try networkProfiles.profile(sourceID:source.id,origin:origin)
         return try SourceNetworkTransport(origin:origin,profile:profile,maximumBytes:maximumBytes)
     }
+    func requestTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> any HTTPTransport {
+        let origin = try ShushanClient.host(source.url),profile = try backendProfiles.profile(sourceID:source.id,origin:origin)
+        let direct = try networkTransport(for:source,maximumBytes:maximumBytes)
+        guard profile.enabled else { return direct }
+        guard direct.profile.mode == .system else { throw RemoteBackendError.conflictingRoute }
+        return RemoteBackendTransport(sourceID:source.id,origin:origin,profile:profile,key:try backendProfiles.key(sourceID:source.id,origin:origin,profile:profile),direct:direct)
+    }
     func sourceTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> any HTTPTransport {
-        BrowserSessionTransport(sourceID:source.id,origin:try ShushanClient.host(source.url),sessions:browserSessions,base:try networkTransport(for:source,maximumBytes:maximumBytes))
+        BrowserSessionTransport(sourceID:source.id,origin:try ShushanClient.host(source.url),sessions:browserSessions,base:try requestTransport(for:source,maximumBytes:maximumBytes))
     }
     func commentClient(credential: ShushanCredential) -> ShushanCommentsClient? {
         guard let source = sources.first(where:{$0.id == "shushan" && $0.enabled}),let host = try? ShushanClient.host(source.url),host == credential.host,let transport = try? sourceTransport(for:source,maximumBytes:2 * 1024 * 1024) else { return nil }

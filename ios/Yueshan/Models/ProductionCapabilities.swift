@@ -8,6 +8,7 @@ enum ProductionCapabilities {
         if id == "engine" { return "原生 v1 子集" }
         if id == "purify" { return nil }
         if id == "browser" { return nil }
+        if id == "backend" { return "需自建服务" }
         if id == "network" { return "原生 v1" }
         if ["systemTTS","backgroundAudio","aiConfig","links","pdf","comic","archive","covers"].contains(id) { return nil }
         if live.contains(id) { return nil }

@@ -41,7 +41,7 @@ struct ProductionScriptTesterView: View {
         let account = sourceID == "shushan" ? shushan.credentialForRequests.map{StableContentID.version($0.apiKey)} ?? "signed-out" : "public"
         let policy = ScriptHostPolicy(sourceID:sourceID.isEmpty ? "local-preview" : sourceID,origin:origin,accountID:account,network:network && origin != nil,timeout:network ? 5 : 1.5),program = script
         let transport: any HTTPTransport
-        do { if let source { transport = try library.networkTransport(for:source,maximumBytes:1024 * 1024) } else { transport = BoundedAudioHTTPTransport(maximumBytes:1024 * 1024) } } catch { message = error.localizedDescription; return }
+        do { if let source { transport = try library.requestTransport(for:source,maximumBytes:1024 * 1024) } else { transport = BoundedAudioHTTPTransport(maximumBytes:1024 * 1024) } } catch { message = error.localizedDescription; return }
         let runner = NativeScriptHost(transport:transport); host = runner; busy = true; output = nil; message = nil
         operation = Task {
             defer { if !Task.isCancelled { busy = false; host = nil } }

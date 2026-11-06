@@ -47,6 +47,10 @@ final class SourceDiagnosticsTests: XCTestCase {
         let issue = SourceDiagnosticIssue.classify(LegadoRequestError.unsupported("脚本宿主方法 secret-script-password"))
         XCTAssertEqual(issue.code, .unsupportedHost)
         XCTAssertFalse(String(decoding: try JSONEncoder().encode(issue), as: UTF8.self).contains("secret"))
+        let script = SourceDiagnosticIssue.classify(QuickJSScriptError.javascript("TypeError: cannot read property 'private-token' of undefined"))
+        XCTAssertEqual(script.code, .scriptFailure); XCTAssertEqual(script.recoveries, [.rules, .login, .retry])
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(script), as: UTF8.self).contains("private-token"))
+        XCTAssertEqual(SourceDiagnosticIssue.classify(LegadoInteractionError.unsupported).code, .unsupportedHost)
     }
     func testImportedIssueOriginsAreReducedToCredentialFreeHTTPSOrigins() throws {
         let data = Data(#"{"code":"hostNotAllowed","origin":"https://fixture.test/private?token=secret"}"#.utf8)

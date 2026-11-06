@@ -2,7 +2,7 @@ import Foundation
 
 struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
     enum Code: String, Codable, Sendable {
-        case loginRequired, loginExpired, hostNotAllowed, unsupportedRule, unsupportedHost, timedOut, cancelled
+        case loginRequired, loginExpired, hostNotAllowed, unsupportedRule, unsupportedHost, scriptFailure, timedOut, cancelled
         case noSearchResults, emptyCatalog, emptyContent, restricted, unavailable, invalidResponse, sourceDisabled, stateUnavailable, incompleteAcceptance, resourceLimit, busy
     }
     enum Recovery: String, Codable, Sendable { case login, network, rules, retry }
@@ -26,6 +26,7 @@ struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
         case .hostNotAllowed: "请求主机尚未允许。请到该书源的网络配置添加需要使用的 HTTPS 主机。"
         case .unsupportedRule: "当前规则包含尚未支持的解析能力。请检查书源规则或选择其他来源。"
         case .unsupportedHost: "脚本调用了尚未支持的宿主能力。请查看规则兼容测试结果。"
+        case .scriptFailure: "规则脚本执行失败。请检查规则与返回内容后重新调试。"
         case .timedOut: "此步骤等待超时。可检查网络或调整超时后重新调试。"
         case .cancelled: "调试已取消。已完成步骤保留，未把本次运行标记为成功。"
         case .noSearchResults: "没有搜索结果。请换一个关键词或检查搜索规则。"
@@ -45,7 +46,7 @@ struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
         switch code {
         case .loginRequired, .loginExpired, .restricted: [.login, .retry]
         case .hostNotAllowed, .unavailable, .timedOut: [.network, .retry]
-        case .unsupportedRule, .unsupportedHost, .invalidResponse, .emptyContent, .emptyCatalog: [.rules, .login, .retry]
+        case .unsupportedRule, .unsupportedHost, .scriptFailure, .invalidResponse, .emptyContent, .emptyCatalog: [.rules, .login, .retry]
         default: [.retry]
         }
     }
@@ -98,7 +99,8 @@ struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
             case .timedOut, .memoryBudgetTimedOut: return .init(code: .timedOut)
             case .memoryLimit, .bridgeLimit: return .init(code: .resourceLimit)
             case .busy: return .init(code: .busy)
-            default: return .init(code: .unsupportedHost)
+            case .javascript: return .init(code: .scriptFailure)
+            case .invalidInput, .mainThread: return .init(code: .invalidResponse)
             }
         }
         if error is LegadoStateError { return .init(code: .stateUnavailable) }

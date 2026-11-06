@@ -21,6 +21,11 @@ final class LegadoRuleExecutionErrorTests: XCTestCase {
         XCTAssertEqual(SourceDiagnosticIssue.classify(LegadoRuleExecutionError(field: .content, cause: QuickJSScriptError.timedOut)).code, .timedOut)
         XCTAssertEqual(SourceDiagnosticIssue.classify(LegadoRuleExecutionError(field: .searchBookList, cause: QuickJSScriptError.memoryLimit)).code, .resourceLimit)
         XCTAssertNil(SourceDiagnosticJavaScriptSummary.from(auth))
+        let script = LegadoRuleExecutionError(field: .bookInfoIntro, cause: QuickJSScriptError.javascript("TypeError: cannot read property 'private-user' of undefined"))
+        XCTAssertEqual(SourceDiagnosticIssue.classify(script).code, .scriptFailure)
+        XCTAssertEqual(SourceDiagnosticJavaScriptSummary.from(script)?.reason, .undefinedProperty)
+        let host = LegadoRuleExecutionError(field: .bookInfoIntro, cause: LegadoRequestError.unsupported("脚本宿主方法 private-method"))
+        XCTAssertEqual(SourceDiagnosticIssue.classify(host).code, .unsupportedHost)
     }
     func testFixedJavaScriptCategoriesDiscardPrivateDetailsAndStack() throws {
         let cases: [(String, SourceDiagnosticJavaScriptSummary.Kind, SourceDiagnosticJavaScriptSummary.Reason)] = [

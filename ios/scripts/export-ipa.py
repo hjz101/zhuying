@@ -5,6 +5,7 @@ import datetime as dt
 import fnmatch
 import hashlib
 import json
+import os
 from pathlib import Path
 import plistlib
 import re
@@ -77,13 +78,26 @@ def archive_payload(payload, output):
 
 
 def mac_compatible_p12(material, work, openssl, temporary_password):
-    """Normalize legacy P12 MAC/PBE compatibility without a plaintext key file."""
+    """Re-encode a P12 through anonymous pipes; never write a plaintext key."""
     password = (material/'password').read_bytes()
-    private_pem = invoke([openssl,'pkcs12','-in',str(material/'identity.p12'),'-passin','stdin','-nodes'],data=password+b'\n',label='Private identity decode')
-    secret_file = work/'import-password';secret_file.write_text(temporary_password);secret_file.chmod(0o600)
-    encoded = invoke([openssl,'pkcs12','-export','-in','/dev/stdin','-passout','file:'+str(secret_file),'-keypbe','PBE-SHA1-3DES','-certpbe','PBE-SHA1-3DES','-macalg','sha1'],data=private_pem,label='Compatible identity encoding')
-    output = work/'compatible.p12';output.write_bytes(encoded);output.chmod(0o600)
-    return output
+    pem = invoke([openssl,'pkcs12','-in',str(material/'identity.p12'),'-passin','stdin','-nodes'],data=password+bytes([10]),label='Private identity decode')
+    key = re.search(b'-----BEGIN PRIVATE KEY-----.*?-----END PRIVATE KEY-----',pem,re.S)
+    certificates = re.findall(b'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----',pem,re.S)
+    if key is None or not certificates: raise ValueError('Incomplete private identity')
+    secret = work/'import-password';secret.write_text(temporary_password);secret.chmod(0o600)
+    read_fd,write_fd = os.pipe()
+    try:
+        key_bytes = key.group(0)+bytes([10])
+        if len(key_bytes)>8192:raise ValueError('Private key exceeds supported size')
+        os.write(write_fd,key_bytes);os.close(write_fd);write_fd = None
+        args = [openssl,'pkcs12','-export','-in','/dev/stdin','-inkey','/dev/fd/'+str(read_fd),'-passout','file:'+str(secret),'-keypbe','PBE-SHA1-3DES','-certpbe','PBE-SHA1-3DES','-macalg','sha1']
+        result = subprocess.run(args,input=bytes([10]).join(certificates)+bytes([10]),pass_fds=(read_fd,),capture_output=True)
+        if result.returncode:raise RuntimeError('Compatible identity encoding failed')
+        output = work/'compatible.p12';output.write_bytes(result.stdout);output.chmod(0o600)
+        return output
+    finally:
+        os.close(read_fd)
+        if write_fd is not None:os.close(write_fd)
 
 
 def main():

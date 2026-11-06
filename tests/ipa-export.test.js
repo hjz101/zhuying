@@ -30,6 +30,11 @@ test('P12 compatibility conversion retains the certificate and leaves no plainte
   const code = String.raw`
 import importlib.util,tempfile,pathlib,subprocess,shutil
 s=importlib.util.spec_from_file_location('ipa','ios/scripts/export-ipa.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+def synthetic_invoke(args,**kw):
+ r=subprocess.run(args,input=kw.get('data'),capture_output=True)
+ if r.returncode:raise RuntimeError('synthetic: '+r.stderr.decode())
+ return r.stdout
+m.invoke=synthetic_invoke
 openssl=shutil.which('openssl')
 with tempfile.TemporaryDirectory() as tmp:
  root=pathlib.Path(tmp);source=root/'source';source.mkdir();work=root/'converted';work.mkdir()

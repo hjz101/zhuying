@@ -177,6 +177,8 @@ struct ProductionSourceDiagnosticsView: View {
                 if selection.isEmpty { selection = sourceID.flatMap { id in library.sources.contains(where: { $0.id == id }) ? id : nil } ?? library.sources.first?.id ?? "" }
             }
             .task(id: selection) { await loadCheckpoint() }
+            .onReceive(library.$sources) { _ in Task { await loadCheckpoint() } }
+            .onReceive(NotificationCenter.default.publisher(for: .legadoPersistentStateChanged)) { _ in Task { await loadCheckpoint() } }
             .onDisappear { if busy { cancel() } }
             .sheet(item: $export) { file in NativeFileExporter(file: file) { _ in export = nil } }
     }
@@ -261,16 +263,22 @@ struct ProductionSourceDiagnosticsView: View {
         #endif
         return (scope, auth, kind)
     }
+    private func currentScope(_ sourceID: String) throws -> SourceDiagnosticScope {
+        guard let source = library.sources.first(where: { $0.id == sourceID && $0.enabled }) else { throw ContentFailure.sourceDisabled }
+        return try context(source).0
+    }
     private func loadCheckpoint() async {
-        guard !batch, !busy, let source = library.sources.first(where: { $0.id == selection }) else { return }
+        guard !batch, !busy else { return }
         acceptance = nil
-        let selected = selection
+        guard let source = library.sources.first(where: { $0.id == selection && $0.enabled }) else { return }
+        let selected = selection, token = revision
         do {
             let (scope, _, _) = try context(source)
             let saved = try await checkpointStore.load(scope: scope)
-            guard selection == selected, !busy else { return }
+            guard selection == selected, revision == token, !busy, !Task.isCancelled else { return }
+            try SourceAcceptanceRunner.requireCurrentContext(scope, currentScope(selected))
             acceptance = saved
-        } catch { if selection == selected { message = SourceDiagnosticIssue.classify(error).message } }
+        } catch { if selection == selected, revision == token, !busy, !Task.isCancelled { message = SourceDiagnosticIssue.classify(error).message } }
     }
     private func cancel() {
         guard busy else { return }
@@ -284,6 +292,7 @@ struct ProductionSourceDiagnosticsView: View {
         if let override { selection = override }
         let token = UUID(); revision = token; busy = true; reports = []; message = nil
         let currentMode = mode, baseline = acceptance, selectedID = selection
+        if currentMode == "完整验收" || restart { acceptance = nil }
         operation = Task { @MainActor in
             defer { if revision == token { busy = false; operation = nil } }
             var providers: [any BookSource] = [], configuration: [SourceDiagnosticResult] = []
@@ -309,7 +318,12 @@ struct ProductionSourceDiagnosticsView: View {
                         await MainActor.run { if revision == token { reports = configuration + rows } }
                     }
                     try Task.checkCancellation(); guard revision == token else { return }
-                    try await checkpointStore.save(report, scope: scope); acceptance = report
+                    let fresh = try currentScope(selectedID)
+                    try SourceAcceptanceRunner.requireCurrentContext(scope, fresh)
+                    try await checkpointStore.save(report, scope: fresh)
+                    try Task.checkCancellation(); guard revision == token else { return }
+                    try SourceAcceptanceRunner.requireCurrentContext(scope, currentScope(selectedID))
+                    acceptance = report
                     message = report.issue?.message ?? acceptanceStatus(report)
                 } else {
                     let values: [SourceDiagnosticResult]

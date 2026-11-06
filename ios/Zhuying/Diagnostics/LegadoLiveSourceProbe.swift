@@ -25,6 +25,16 @@ import Foundation
         }
     }
 
+    static func currentScope(library: LibraryStore, sourceID: String) throws -> SourceDiagnosticScope {
+        guard let source = library.sources.first(where: { $0.id == sourceID && $0.enabled }),
+              (try? SourcePackages.legadoDefinition(source)) != nil else { throw ContentFailure.sourceDisabled }
+        let state = try library.legadoLoginState(for: source)
+        var scope = SourceDiagnosticScope(sourceID: source.id, accountID: state.scope.accountID, libraryProfile: state.scope.libraryProfile)
+        scope.sessionEpoch = state.sessionRevision
+        scope.configurationHash = StableContentID.make(source.configuration?.base64EncodedString() ?? "", source.url)
+        return scope
+    }
+
     static func run(library: LibraryStore, input: Input, outputDirectory: URL) async throws {
         var reports: [SourceDiagnosticResult] = []
         var before: LegadoAuthStatus?, after: LegadoAuthStatus?
@@ -37,9 +47,7 @@ import Foundation
             let state = try library.legadoLoginState(for: source); before = state.authStatus
             let provider = try library.configuredDiagnosticBookSource(source)
             if input.fullAcceptance {
-                var scope = SourceDiagnosticScope(sourceID: source.id, accountID: state.scope.accountID, libraryProfile: state.scope.libraryProfile)
-                scope.sessionEpoch = state.sessionRevision
-                scope.configurationHash = StableContentID.make(source.configuration?.base64EncodedString() ?? "", source.url)
+                let scope = try currentScope(library: library, sourceID: source.id)
                 let store = SourceAcceptanceStore(directory: library.sourceDiagnosticsDirectory)
                 let baseline: SourceAcceptanceReport?
                 if input.verifyRestart {
@@ -49,7 +57,12 @@ import Foundation
                 var kind = SourceDiagnosticEvidenceKind.nativeNetwork
                 if LegadoDevelopmentFixtures.isEnabled(source) || SourceDiagnosticDevelopmentFixtures.isEnabled(source) { kind = .controlledFixture }
                 let result = try await SourceAcceptanceRunner.run(source: provider, query: input.query, scope: scope, evidenceKind: kind, timeout: 30, authStatus: before, baseline: baseline)
-                try await store.save(result, scope: scope); acceptance = result
+                let fresh = try currentScope(library: library, sourceID: source.id)
+                try SourceAcceptanceRunner.requireCurrentContext(scope, fresh)
+                try await store.save(result, scope: fresh)
+                try Task.checkCancellation()
+                try SourceAcceptanceRunner.requireCurrentContext(scope, currentScope(library: library, sourceID: source.id))
+                acceptance = result
                 reports = (input.verifyRestart ? result.verificationSteps : result.initialSteps).map { $0.result(sourceID: source.id) }
             } else {
                 reports = try await SourceDiagnostics.run(source: provider, query: input.query, through: .content, timeout: 30, authStatus: before)

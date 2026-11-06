@@ -16,6 +16,18 @@ struct SourceNetworkProfile: Codable, Equatable, Sendable {
     var mode: Mode = .system
     var server = ""
     var port = 7890
+    static func supportedModes(for origin: URL) -> [Mode] {
+        switch origin.scheme?.lowercased() {
+        case "http": return [.system, .proxy]
+        case "https": return Mode.allCases
+        default: return []
+        }
+    }
+    func validate(origin: URL) throws {
+        try validate()
+        guard let canonical = try? LegadoSourcePolicy.canonicalOrigin(origin),
+              Self.supportedModes(for: canonical).contains(mode) else { throw SourceNetworkError.invalid }
+    }
     func validate() throws {
         guard version == 1,(1...65535).contains(port),server.utf8.count <= 253 else { throw SourceNetworkError.invalid }
         switch mode {
@@ -31,9 +43,9 @@ struct SourceNetworkProfile: Codable, Equatable, Sendable {
     private func key(_ sourceID: String,_ origin: URL) -> String { "source.network.v1." + StableContentID.make(sourceID,origin.absoluteString) }
     func profile(sourceID: String,origin: URL) throws -> SourceNetworkProfile {
         guard let data = defaults.data(forKey:key(sourceID,origin)) else { return .init() }
-        let profile = try JSONDecoder().decode(SourceNetworkProfile.self,from:data); try profile.validate(); return profile
+        let profile = try JSONDecoder().decode(SourceNetworkProfile.self,from:data); try profile.validate(origin: origin); return profile
     }
-    func save(_ profile: SourceNetworkProfile,sourceID: String,origin: URL) throws { try profile.validate(); defaults.set(try JSONEncoder().encode(profile),forKey:key(sourceID,origin)); NotificationCenter.default.post(name:.sourceNetworkChanged,object:nil) }
+    func save(_ profile: SourceNetworkProfile,sourceID: String,origin: URL) throws { try profile.validate(origin: origin); defaults.set(try JSONEncoder().encode(profile),forKey:key(sourceID,origin)); NotificationCenter.default.post(name:.sourceNetworkChanged,object:nil) }
     func reset(sourceID: String,origin: URL) { defaults.removeObject(forKey:key(sourceID,origin)); NotificationCenter.default.post(name:.sourceNetworkChanged,object:nil) }
 }
 extension Notification.Name { static let sourceNetworkChanged = Notification.Name("sourceNetworkChanged") }

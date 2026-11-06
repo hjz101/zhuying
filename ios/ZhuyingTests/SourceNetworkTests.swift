@@ -76,3 +76,38 @@ final class SourceNetworkTests: XCTestCase {
         do { _ = try await source.send(URLRequest(url:URL(string:"https://another.test")!)); XCTFail("Source origin") } catch ContentFailure.sourceDisabled {}
     }
 }
+
+
+extension SourceNetworkTests {
+    func testHTTPNetworkModesExcludeTLSOnlyRoutesAndKeepHTTPSModes() throws {
+        let http = URL(string: "http://source.test:8080/")!, https = URL(string: "https://source.test/")!
+        XCTAssertEqual(SourceNetworkProfile.supportedModes(for: http), [.system, .proxy])
+        XCTAssertEqual(SourceNetworkProfile.supportedModes(for: https), SourceNetworkProfile.Mode.allCases)
+        try SourceNetworkProfile().validate(origin: http)
+        try SourceNetworkProfile(mode: .proxy, server: "127.0.0.1", port: 7890).validate(origin: http)
+        for mode: SourceNetworkProfile.Mode in [.fixedIP, .dns] {
+            let profile = SourceNetworkProfile(mode: mode, server: "192.0.2.1")
+            XCTAssertThrowsError(try profile.validate(origin: http))
+            XCTAssertNoThrow(try profile.validate(origin: https))
+        }
+        XCTAssertThrowsError(try SourceNetworkProfile().validate(origin: URL(string: "http://user:secret@source.test/")!))
+        XCTAssertThrowsError(try SourceNetworkProfile().validate(origin: URL(string: "file:///tmp/book")!))
+    }
+
+    @MainActor func testSavingUnsupportedHTTPRouteDoesNotReplaceValidProfile() throws {
+        let domain = UUID().uuidString, defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let store = SourceNetworkProfiles(defaults: defaults), origin = URL(string: "http://source.test/")!
+        let valid = SourceNetworkProfile(mode: .proxy, server: "127.0.0.1", port: 7890)
+        try store.save(valid, sourceID: "http-source", origin: origin)
+        for mode: SourceNetworkProfile.Mode in [.fixedIP, .dns] {
+            XCTAssertThrowsError(try store.save(.init(mode: mode, server: "192.0.2.1"), sourceID: "http-source", origin: origin))
+            XCTAssertEqual(try store.profile(sourceID: "http-source", origin: origin), valid)
+        }
+        let key = "source.network.v1." + StableContentID.make("http-source", origin.absoluteString)
+        defaults.set(try JSONEncoder().encode(SourceNetworkProfile(mode: .dns, server: "192.0.2.1")), forKey: key)
+        XCTAssertThrowsError(try store.profile(sourceID: "http-source", origin: origin))
+        store.reset(sourceID: "http-source", origin: origin)
+        XCTAssertEqual(try store.profile(sourceID: "http-source", origin: origin).mode, .system)
+    }
+}

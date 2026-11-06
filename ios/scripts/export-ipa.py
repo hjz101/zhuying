@@ -64,6 +64,11 @@ def entitlements(profile, bundle_id, certificate_der, now=None):
             'get-task-allow':bool(allowed.get('get-task-allow', False)),
             'keychain-access-groups':[group]}
 
+def signed_entitlements(app):
+    result = plistlib.loads(invoke(['codesign','--display','--entitlements','-','--xml',str(app)],label='Signed entitlements'))
+    if not isinstance(result,dict):raise ValueError('Invalid signed entitlements')
+    return result
+
 
 def archive_payload(payload, output):
     if output.exists():
@@ -186,7 +191,7 @@ def main():
                 invoke(['codesign','--force','--sign',fingerprint,'--keychain',str(keychain),'--timestamp=none',str(target)],label='Nested code signing')
             invoke(['codesign','--force','--sign',fingerprint,'--keychain',str(keychain),'--timestamp=none','--entitlements',str(entitlement_file),'--generate-entitlement-der',str(app)],label='Application signing')
             invoke(['codesign','--verify','--deep','--strict',str(app)],label='Application signature verification')
-            signed = plistlib.loads(invoke(['codesign','--display','--entitlements','-',str(app)],label='Signed entitlements'))
+            signed = signed_entitlements(app)
             if signed != entitlement:
                 raise ValueError('Signed entitlements do not match the verified profile')
             args.output.parent.mkdir(parents=True,exist_ok=True)

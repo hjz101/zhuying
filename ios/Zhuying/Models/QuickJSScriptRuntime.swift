@@ -28,6 +28,7 @@ enum QuickJSScriptError: LocalizedError, Equatable {
     case memoryLimit
     case timedOut
     case bridgeLimit
+    case busy
 
     var errorDescription: String? {
         switch self {
@@ -37,6 +38,7 @@ enum QuickJSScriptError: LocalizedError, Equatable {
         case .memoryLimit: "Legado 脚本超过内存额度，已停止执行。"
         case .timedOut: "Legado 脚本执行超时，已停止执行。"
         case .bridgeLimit: "Legado 脚本的宿主调用次数或数据量超过额度。"
+        case .busy: "Legado 脚本会话正在执行，不能并发或重入同一个运行环境。"
         }
     }
 }
@@ -51,6 +53,11 @@ enum QuickJSScriptRuntime {
     static func evaluate(_ script: String, bindings: [String: Any], library: String = "",
                          policy: LegadoScriptPolicy = .init(),
                          host: (String, [Any]) throws -> Any) throws -> Any {
+        try evaluateInSession(nil, script: script, bindings: bindings, library: library, policy: policy, host: host)
+    }
+
+    fileprivate static func evaluateInSession(_ session: OpaquePointer?, script: String, bindings: [String: Any], library: String,
+                                              policy: LegadoScriptPolicy, host: (String, [Any]) throws -> Any) throws -> Any {
         guard !Thread.isMainThread else { throw QuickJSScriptError.mainThread }
         guard policy.timeoutSeconds.isFinite, (0.01...30).contains(policy.timeoutSeconds),
               (256 * 1024...128 * 1024 * 1024).contains(policy.memoryLimitBytes),
@@ -63,7 +70,7 @@ enum QuickJSScriptRuntime {
         if policy.cancelled() { throw CancellationError() }
         // Values are data, never interpolated into JavaScript source. Protect
         // the intrinsic names used by the fixed host shim from input collisions.
-        let reserved: Set<String> = ["__zhuyingHost", "globalThis", "Object", "Array", "JSON", "Proxy", "Reflect"]
+        let reserved: Set<String> = ["__zhuyingHost", "globalThis", "Object", "Array", "JSON", "Proxy", "Reflect", "eval"]
         guard Set(bindings.keys).isDisjoint(with: reserved),
               let bytes = try? JSONSerialization.data(withJSONObject: bindings, options: [.sortedKeys]),
               bytes.count <= policy.maximumBridgeBytes,
@@ -78,8 +85,12 @@ enum QuickJSScriptRuntime {
             var result = script.withCString { scriptBytes in
                 library.withCString { libraryBytes in
                     json.withCString { bindingBytes in
-                        ZYQuickJSEvaluate(scriptBytes, script.utf8.count, libraryBytes, library.utf8.count,
-                                          bindingBytes, bytes.count, limits, invokeHost, isCancelled, opaque)
+                        if let session {
+                            return ZYQuickJSSessionEvaluate(session, scriptBytes, script.utf8.count, libraryBytes, library.utf8.count,
+                                                          bindingBytes, bytes.count, limits, invokeHost, isCancelled, opaque)
+                        }
+                        return ZYQuickJSEvaluate(scriptBytes, script.utf8.count, libraryBytes, library.utf8.count,
+                                                bindingBytes, bytes.count, limits, invokeHost, isCancelled, opaque)
                     }
                 }
             }
@@ -97,6 +108,7 @@ enum QuickJSScriptRuntime {
             case ZYQJS_TIMED_OUT: throw QuickJSScriptError.timedOut
             case ZYQJS_MEMORY_LIMIT: throw QuickJSScriptError.memoryLimit
             case ZYQJS_BRIDGE_LIMIT: throw QuickJSScriptError.bridgeLimit
+            case ZYQJS_BUSY: throw QuickJSScriptError.busy
             case ZYQJS_SCRIPT_EXCEPTION:
                 throw QuickJSScriptError.javascript(result.message.map { String(cString: $0) } ?? "未知异常")
             default: throw QuickJSScriptError.invalidInput
@@ -141,5 +153,54 @@ enum QuickJSScriptRuntime {
         guard let opaque else { return 1 }
         let callbacks = Unmanaged<Callbacks>.fromOpaque(opaque).takeUnretainedValue()
         return Task.isCancelled || callbacks.policy.cancelled() ? 1 : 0
+    }
+}
+
+/// One owner keeps one session per source/account. Successful evaluations share
+/// the library's global scope; rule-local var/let/const live in a fresh child
+/// scope. Bindings, host closures, cancellation and quotas are refreshed for
+/// every call. The VM can move threads only between serialized evaluations.
+final class QuickJSScriptSession: @unchecked Sendable {
+    private let execution = NSLock()
+    private let lifecycle = NSLock()
+    private var generation = 0
+    private var loadedGeneration = 0
+    private var active: LegadoScriptCancellation?
+    private var pointer: OpaquePointer?
+
+    deinit { discard() }
+
+    func evaluate(_ script: String, bindings: [String: Any], library: String = "",
+                  policy: LegadoScriptPolicy = .init(), host: (String, [Any]) throws -> Any) throws -> Any {
+        guard !Thread.isMainThread else { throw QuickJSScriptError.mainThread }
+        guard execution.try() else { throw QuickJSScriptError.busy }
+        defer { execution.unlock() }
+        let cancellation = LegadoScriptCancellation()
+        lifecycle.lock(); active = cancellation; let revision = generation; lifecycle.unlock()
+        defer { lifecycle.lock(); active = nil; lifecycle.unlock() }
+        if revision != loadedGeneration { discard(); loadedGeneration = revision }
+        var scopedPolicy = policy
+        scopedPolicy.cancelled = { cancellation.isCancelled || policy.cancelled() }
+        do {
+            if pointer == nil { pointer = ZYQuickJSCreateSession() }
+            guard let pointer else { throw QuickJSScriptError.memoryLimit }
+            return try QuickJSScriptRuntime.evaluateInSession(pointer, script: script, bindings: bindings, library: library,
+                                                            policy: scopedPolicy, host: host)
+        } catch {
+            discard()
+            throw error
+        }
+    }
+
+    /// Reset never waits for a script/network callback on the caller's thread.
+    /// An active call is cancelled; its VM is discarded after it unwinds.
+    func reset() {
+        lifecycle.lock(); generation &+= 1; active?.cancel(); lifecycle.unlock()
+        if execution.try() { discard(); execution.unlock() }
+    }
+
+    private func discard() {
+        if let pointer { ZYQuickJSDestroySession(pointer) }
+        pointer = nil
     }
 }

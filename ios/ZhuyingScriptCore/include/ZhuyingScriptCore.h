@@ -15,7 +15,8 @@ typedef enum {
     ZYQJS_TIMED_OUT = 3,
     ZYQJS_CANCELLED = 4,
     ZYQJS_MEMORY_LIMIT = 5,
-    ZYQJS_BRIDGE_LIMIT = 6
+    ZYQJS_BRIDGE_LIMIT = 6,
+    ZYQJS_BUSY = 7
 } ZYQJSStatus;
 
 typedef struct {
@@ -38,6 +39,24 @@ typedef struct {
     char *json;
     char *message;
 } ZYQJSResult;
+
+typedef struct ZYQuickJSSession ZYQuickJSSession;
+
+/* A source/account owner serializes calls. The runtime may move between
+   threads between calls, never while an evaluation is running. A changed
+   library or heap budget rebuilds the VM. Every failed evaluation discards it.
+   Bindings and callbacks are refreshed for each call; callbacks are not kept
+   after the call returns. Rule declarations have a fresh child scope, while
+   library globals and explicit globalThis assignments survive successful calls. */
+ZYQuickJSSession *ZYQuickJSCreateSession(void);
+ZYQJSResult ZYQuickJSSessionEvaluate(ZYQuickJSSession *session,
+                                   const char *script, size_t script_length,
+                                   const char *library, size_t library_length,
+                                   const char *bindings_json, size_t bindings_length,
+                                   ZYQJSLimits limits, ZYQJSHostCallback host,
+                                   ZYQJSCancelCallback cancelled, void *opaque);
+void ZYQuickJSResetSession(ZYQuickJSSession *session);
+void ZYQuickJSDestroySession(ZYQuickJSSession *session);
 
 /* Each call creates and destroys its own runtime. Script completion values are
    returned synchronously; promises and modules are deliberately unsupported. */

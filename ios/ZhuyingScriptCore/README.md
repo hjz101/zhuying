@@ -1,8 +1,8 @@
 # 竹影同步脚本桥
 
-`ZhuyingScriptCore` is a static C module. The Swift facade is
-`Zhuying/Models/QuickJSScriptRuntime.swift`; each evaluation owns an independent
-QuickJS runtime and must execute on a background thread. The existing
+`ZhuyingScriptCore` is a static C module. The Swift facades are in
+`Zhuying/Models/QuickJSScriptRuntime.swift`. Evaluation must execute on a
+background thread. The existing
 `NativeScriptHost` and its asynchronous Worker protocol are separate.
 
 Compile `QuickJSScriptBridge.c` and these unmodified upstream sources:
@@ -19,12 +19,56 @@ Public headers/module map live in `include/`. Add `include` and
 The application depends on the static target and imports `ZhuyingScriptCore`.
 Neither `quickjs-libc.c` nor command-line tools belong in the target.
 
-The bridge preserves synchronous script completion values and the shared scope
-of one source library plus its rule. `java.*`, `cookie.*` and the supported
+`QuickJSScriptRuntime.evaluate` creates an independent VM for each call.
+`QuickJSScriptSession.evaluate` reuses one VM for one source/account. It loads
+the source's library once, preserves library globals/functions and explicit
+`globalThis` assignments, and refreshes bindings and host closures on every
+call. Rule scripts run as direct eval inside a fresh child function scope:
+their completion value is returned, and ordinary `var`/`let`/`const`
+declarations do not leak into subsequent rules. This implements that subset of
+Rhino child scope behavior; it does not claim identical Rhino object semantics.
+Cached library references to `source`, `book` and `chapter` read the current
+request's data and delegate methods through the current host.
+
+The C lifecycle API is `ZYQuickJSCreateSession`,
+`ZYQuickJSSessionEvaluate`, `ZYQuickJSResetSession` and
+`ZYQuickJSDestroySession`. C owners must serialize all access, including reset
+and destruction. The Swift session rejects concurrent or nested same-session
+evaluation with `.busy`. Its `reset()` cancels an active call without waiting
+for blocked native I/O, and discards the VM after that call unwinds. Idle reset,
+library changes, heap-budget changes and any failed evaluation discard the
+VM. Host callbacks are never retained after an evaluation returns. Serialized
+VMs may move between background threads; stack top and actual available stack
+are refreshed before execution and cleanup.
+
+The bridge preserves synchronous script completion values. Known `java.*`,
+`cookie.*`, `cache.*` and the supported
 `source`/`book`/`chapter` object methods call a supplied synchronous host. HTTP
 response dictionaries (`body`, `statusCode`, `headers`, `url`) gain Legado-style
 `body()`, `code()`, `header()`, `headers()` and `url()` methods. `toJSON()` keeps
 the original response representation when returning it to Swift.
+
+Source login methods (`getLoginInfo`, `getLoginInfoMap`, `putLoginInfo`,
+`getLoginHeader`, `setLoginHeader`, `getHeaderMap`, `deleteLoginInfo`) and cache
+methods delegate to the host. Unknown source get/set methods also delegate so
+unsupported operations produce a clear host error. Unknown Java methods return
+`undefined`, preserving `typeof` capability checks; directly calling one raises
+a JavaScript TypeError. Android-only `reLoginView` is not advertised.
+
+`java.createSymmetricCrypto` returns a chainable descriptor wrapper for
+`encrypt`, `decrypt`, `encryptBase64`, `encryptHex`, `decryptBase64`,
+`decryptHex`, `decryptStr` and `setIv`. It delegates encryption/decryption as
+`crypto.encrypt/decrypt([descriptor,data])`, where the descriptor has
+`algorithm`, `key` and optional `iv`; native code owns crypto validation.
+String ciphertext is passed unchanged so the host can distinguish hex/Base64.
+`decryptStr` delegates decoding to `crypto.decodeText([bytes,charset])`.
+The explicitly supported Java package is `Packages.android.util.Base64`:
+`encodeToString` and `decode` delegate to `android.base64Encode/Decode` with
+the original flags. The frozen source's AES/Android Base64 invocation shape was
+verified against its original JSON and the upstream
+[JsEncodeUtils.kt API](https://github.com/gedoor/legado/blob/fd026e0/app/src/main/java/io/legado/app/help/JsEncodeUtils.kt).
+Other Java packages fail explicitly; no reflection runtime is installed.
+Device ID methods remain callable and also support string/JSON coercion.
 
 The C API uses public memory, stack and interrupt controls. Its allocator caps
 runtime allocations including initialization; native host buffers separately
@@ -32,6 +76,14 @@ have bridge/output quotas. Cancellation/deadlines are checked before and after
 every host callback. A blocked network callback must separately enforce its
 deadline, cancel its URLSession task and wake its waiter. An interrupt cannot
 stop arbitrary blocking native code. Blocking `Atomics.wait` is disabled.
+
+Waiting inside `java.startBrowserAwait`, `showBrowser`, `startBrowser`,
+`showReadingBrowser`, `startBrowserDp` and `reLoginView` is excluded from the
+script deadline. These exact host method names are the only exemptions; normal
+network waits still consume the script budget. The interaction host must own
+its own timeout and cancellation. A failed interaction invalidates the VM even
+if the source catches its JavaScript exception. Per-call host/bridge quotas and
+cancellation still apply to interactive calls.
 
 Input values are JSON data; invalid/intrinsic binding names are rejected.
 Undefined completion maps to `NSNull`; Promise completions are rejected, and

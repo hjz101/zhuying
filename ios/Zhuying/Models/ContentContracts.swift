@@ -209,6 +209,14 @@ protocol BookSource: Sendable {
 
 protocol ChapterDocumentLoading: Sendable {
     func document(chapterID: String) async throws -> ChapterDocument?
+    func refreshedDocument(chapterID: String) async throws -> ChapterDocument?
+}
+extension ChapterDocumentLoading {
+    /// Local and embedded books reload through their existing repository;
+    /// online repositories override this to explicitly bypass disposable caches.
+    func refreshedDocument(chapterID: String) async throws -> ChapterDocument? {
+        try await document(chapterID: chapterID)
+    }
 }
 protocol ChapterContentRepository: ChapterDocumentLoading {
     func save(_ document: ChapterDocument) async throws

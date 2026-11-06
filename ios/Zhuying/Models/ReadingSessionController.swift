@@ -6,6 +6,7 @@ struct ReadingChapterRequest: Equatable, Sendable {
     let chapter: ChapterRecord
     var anchor: ReadingAnchor? = nil
     var atEnd = false
+    var refresh = false
 }
 
 @MainActor
@@ -35,7 +36,10 @@ final class ReadingSessionController: ObservableObject {
             phase = .failed(ContentFailure.restricted.localizedDescription); operation = nil; return false
         }
         let repository = repository
-        let task = Task { try await repository.document(chapterID: request.chapter.id) }
+        let task = Task {
+            if request.refresh { return try await repository.refreshedDocument(chapterID: request.chapter.id) }
+            return try await repository.document(chapterID: request.chapter.id)
+        }
         operation = task
         do {
             let loaded = try await withTaskCancellationHandler(operation: { try await task.value }, onCancel: { task.cancel() })

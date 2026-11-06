@@ -126,6 +126,18 @@ actor OfflineDownloadStore {
             try save(next); return nil
         }
     }
+    /// Keep an explicitly downloaded chapter consistent with a successful
+    /// user refresh without creating a new download task or changing progress.
+    func replaceDownloaded(_ document: ChapterDocument, book: LibraryBookRecord, chapter: ChapterRecord) async throws {
+        guard tasks.contains(where: { $0.book.id == book.id && $0.book.source == book.source && $0.completed.contains(chapter.id) && $0.chapters.contains(chapter) }) else { return }
+        guard document.chapterID == chapter.id else { throw ContentFailure.invalidResponse }
+        let existing = try await files.document(chapterID: chapter.id)
+        let previousBytes = try existing.map { try JSONEncoder().encode($0).count } ?? 0
+        guard try await usage() - previousBytes + JSONEncoder().encode(document).count <= quota else { throw ContentFailure.storageFailure }
+        try await files.save(document)
+        try await files.collectUnreferenced()
+    }
+
     private func start() throws {
         guard foreground, !changingTasks, operation == nil, connected, let fetch, let task = tasks.first(where: { $0.status == .queued && (!$0.wifiOnly || wifi) }) else { return }
         if task.completed.count == task.chapters.count {

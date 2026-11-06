@@ -34,3 +34,39 @@ final class OnlineReadingFlowTests: XCTestCase {
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "Online-Fixture-Offline-Restored"; attachment.lifetime = .keepAlways; add(attachment)
     }
 }
+
+
+extension OnlineReadingFlowTests {
+    @MainActor func testReaderRefreshAndBothCacheActionsKeepCurrentChapterReadable() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--production", "--online-fixtures"]; app.launch()
+        app.tabBars.buttons["搜索"].tap()
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("原生联调")
+        let result = app.buttons["online-result-remote-ui-fixture-1"]
+        XCTAssertTrue(result.waitForExistence(timeout: 10)); result.tap()
+        let read = app.buttons["detailRead"]
+        XCTAssertTrue(read.waitForExistence(timeout: 10))
+        let ready = expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: read); wait(for: [ready], timeout: 10)
+        read.tap()
+        if app.buttons["dismissGestureGuide"].waitForExistence(timeout: 2) { app.buttons["dismissGestureGuide"].tap() }
+        XCTAssertTrue(app.textViews["continuousText"].waitForExistence(timeout: 10))
+        let chapter = app.staticTexts["chapterTitle"].label
+        app.buttons["readerMoreTools"].tap()
+        app.buttons["readerRefreshChapter"].tap()
+        XCTAssertTrue(app.staticTexts["正文已刷新"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
+        app.buttons["readerMoreTools"].tap(); app.buttons["readerClearCache"].tap()
+        XCTAssertTrue(app.staticTexts["本书临时正文缓存已清除"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
+        XCTAssertTrue(app.textViews["continuousText"].exists)
+        app.buttons["readerContents"].tap()
+        XCTAssertTrue(app.buttons["contentsTools"].waitForExistence(timeout: 5))
+        app.buttons["contentsTools"].tap(); app.buttons["contentsClearCache"].tap()
+        XCTAssertTrue(app.staticTexts["contentsCacheFeedback"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["chapter-0"].exists)
+        app.buttons["完成"].tap()
+        XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
+        XCTAssertTrue(app.textViews["continuousText"].exists)
+    }
+}

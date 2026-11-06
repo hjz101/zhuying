@@ -148,4 +148,8 @@ struct ProcessedChapterRepository: ChapterDocumentLoading {
         guard let raw = try await base.document(chapterID:chapterID) else { return nil }
         return try await processor.process(raw,bookID:bookID,sourceID:sourceID,useReplaceRule:useReplaceRule).document
     }
+    func refreshedDocument(chapterID: String) async throws -> ChapterDocument? {
+        guard let raw = try await base.refreshedDocument(chapterID:chapterID) else { return nil }
+        return try await processor.process(raw,bookID:bookID,sourceID:sourceID,useReplaceRule:useReplaceRule).document
+    }
 }

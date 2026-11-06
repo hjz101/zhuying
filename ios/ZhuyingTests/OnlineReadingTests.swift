@@ -6,6 +6,8 @@ private actor OnlineFixtureSource: BookSource {
     var failing = false
     var expired = false
     var calls: [String] = []
+    var revision = ""
+    func updateBody(_ value: String) { revision = value }
     func fail(_ value: Bool) { failing = value }
     func expire() { expired = true }
     func search(query: String, page: Int) async throws -> BookSearchPage {
@@ -27,7 +29,7 @@ private actor OnlineFixtureSource: BookSource {
     func document(for chapter: ChapterRecord, book: LibraryBookRecord) async throws -> ChapterDocument {
         calls.append(chapter.id)
         if failing { throw ContentFailure.unavailable }
-        return .init(chapterID: chapter.id, paragraphs: ["\(chapter.title)的真实测试正文。位置与作品必须对应。", "第二段👩🏽‍🚀。"])
+        return .init(chapterID: chapter.id, paragraphs: ["\(chapter.title)的真实测试正文。位置与作品必须对应。" + revision, "第二段👩🏽‍🚀。"])
     }
 }
 
@@ -215,5 +217,80 @@ final class OnlineReadingTests: XCTestCase {
         XCTAssertTrue(reopened.unresolvedBookIDs.contains(book.id)); XCTAssertNil(reopened.progress[book.id])
         let records = try SQLiteLibraryRepository(url: root.appendingPathComponent("db/library.sqlite"))
         let preserved = try await records.progress(bookID: book.id); XCTAssertEqual(preserved?.chapterID, catalog[1].id)
+    }
+}
+
+
+private actor PendingCacheSource: BookSource {
+    nonisolated let sourceID = "shushan"
+    private var pending: CheckedContinuation<ChapterDocument, Error>?
+    func isWaiting() -> Bool { pending != nil }
+    func finish(_ chapter: ChapterRecord) { pending?.resume(returning: .init(chapterID: chapter.id, paragraphs: ["清除后才返回的旧请求"])); pending = nil }
+    func search(query: String, page: Int) -> BookSearchPage { .init(books: [], nextPage: nil) }
+    func details(for book: LibraryBookRecord) -> LibraryBookRecord { book }
+    func chapters(for book: LibraryBookRecord) -> [ChapterRecord] { [] }
+    func document(for chapter: ChapterRecord, book: LibraryBookRecord) async throws -> ChapterDocument {
+        try await withCheckedThrowingContinuation { pending = $0 }
+    }
+}
+
+extension OnlineReadingTests {
+    func testExplicitRefreshBypassesFreshCacheAndKeepsOldContentOnFailure() async throws {
+        let cache = try RecentChapterCache(directory: root()), service = OnlineReadingService(cache: cache), source = OnlineFixtureSource()
+        let book = OnlineFixtureSource.book(), chapter = OnlineFixtureSource.catalog(book)[0]
+        await service.configure(source: source)
+        let old = try await service.document(book: book, chapter: chapter)
+        await source.updateBody("更新的正文")
+        let hit = try await service.document(book: book, chapter: chapter)
+        XCTAssertEqual(hit, old)
+        await source.fail(true)
+        do { _ = try await service.refreshDocument(book: book, chapter: chapter); XCTFail("A failed refresh must report its failure") }
+        catch { XCTAssertEqual(error as? ContentFailure, .unavailable) }
+        let preserved = try await service.cachedDocument(book: book, chapter: chapter)
+        XCTAssertEqual(preserved, old)
+        await source.fail(false)
+        let fresh = try await service.refreshDocument(book: book, chapter: chapter)
+        XCTAssertNotEqual(fresh.version, old.version)
+        let cached = try await service.document(book: book, chapter: chapter)
+        XCTAssertEqual(cached, fresh)
+    }
+
+    func testClearingOneBookKeepsOtherBooksAndRejectsLateCacheWrites() async throws {
+        let cache = try RecentChapterCache(directory: root()), source = PendingCacheSource(), service = OnlineReadingService(cache: cache)
+        let book = OnlineFixtureSource.book(), chapter = OnlineFixtureSource.catalog(book)[0], other = OnlineFixtureSource.book("other")
+        let otherChapter = OnlineFixtureSource.catalog(other)[0]
+        let otherDocument = ChapterDocument(chapterID: otherChapter.id, paragraphs: ["另一本书的缓存"])
+        _ = try await cache.save(otherDocument, bookID: other.id, fingerprint: RecentChapterCache.fingerprint(book: other, chapter: otherChapter), protecting: nil)
+        await service.configure(source: source)
+        let pending = Task { try await service.document(book: book, chapter: chapter) }
+        for _ in 0..<1000 { if await source.isWaiting() { break }; try await Task.sleep(for: .milliseconds(1)) }
+        let waiting = await source.isWaiting(); XCTAssertTrue(waiting)
+        try await service.clearCache(bookID: book.id)
+        await source.finish(chapter); _ = try await pending.value
+        let removed = try await service.cachedDocument(book: book, chapter: chapter)
+        let retained = try await service.cachedDocument(book: other, chapter: otherChapter)
+        XCTAssertNil(removed); XCTAssertEqual(retained, otherDocument)
+    }
+
+    func testRefreshingDownloadedChapterPersistsNewVersionAndClearOnlyRemovesTemporaryCache() async throws {
+        let directory = try root(), downloads = try OfflineDownloadStore(directory: directory.appendingPathComponent("downloads"))
+        let cache = try RecentChapterCache(directory: directory.appendingPathComponent("cache")), service = OnlineReadingService(cache: cache, downloads: downloads)
+        let book = OnlineFixtureSource.book(), chapter = OnlineFixtureSource.catalog(book)[0], source = OnlineFixtureSource()
+        await downloads.configure { _, chapter in .init(chapterID: chapter.id, paragraphs: ["旧的下载正文"]) }
+        await downloads.connectivity(connected: true, wifi: true)
+        _ = try await downloads.enqueue(book: book, chapters: [chapter], wifiOnly: false)
+        for _ in 0..<1000 { if await downloads.list().first?.status == .completed { break }; try await Task.sleep(for: .milliseconds(1)) }
+        let downloaded = try await service.document(book: book, chapter: chapter)
+        XCTAssertEqual(downloaded.paragraphs.first?.text, "旧的下载正文")
+        await service.configure(source: source)
+        let fresh = try await service.refreshDocument(book: book, chapter: chapter)
+        XCTAssertNotEqual(fresh.version, downloaded.version)
+        try await service.clearCache(bookID: book.id)
+        let usage = await service.cacheUsage(); XCTAssertEqual(usage.chapters, 0)
+        let reopened = try OfflineDownloadStore(directory: directory.appendingPathComponent("downloads"))
+        let kept = try await reopened.document(book: book, chapter: chapter)
+        XCTAssertEqual(kept, fresh)
+        let task = await reopened.list().first
+        XCTAssertEqual(task?.status, .completed); XCTAssertEqual(task?.completed, [chapter.id])
     }
 }

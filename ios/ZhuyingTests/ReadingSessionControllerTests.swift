@@ -71,3 +71,35 @@ private actor ControlledChapterRepository: ChapterContentRepository {
         let requested = await repository.isWaiting(chapter.id); XCTAssertFalse(requested)
     }
 }
+
+
+private actor RefreshingReaderRepository: ChapterDocumentLoading {
+    let original = ChapterDocument(chapterID: "a", paragraphs: ["保留的阅读位置与正文。"])
+    private(set) var refreshed = false
+    func document(chapterID: String) -> ChapterDocument? { original }
+    func refreshedDocument(chapterID: String) -> ChapterDocument? {
+        refreshed = true
+        return .init(chapterID: chapterID, paragraphs: ["新加入的前置段落。", original.paragraphs[0].text])
+    }
+}
+
+extension ReadingSessionControllerTests {
+    func testExplicitRefreshPassesThroughPurificationAndRecoversReadingAnchor() async throws {
+        let repository = RefreshingReaderRepository()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let processor = ContentProcessingStore(directory: root)
+        try await processor.save([.init(name: "净化", pattern: "正文", replacement: "故事", enabled: true)])
+        let session = ReadingSessionController(repository: ProcessedChapterRepository(base: repository, processor: processor, bookID: "b", sourceID: nil))
+        let loaded = await session.load(request("a")); XCTAssertTrue(loaded)
+        let original = try XCTUnwrap(session.document)
+        let saved = try ReadingAnchor(bookID: "b", document: original, paragraph: 0, offset: 4)
+        var refreshing = request("a", anchor: saved); refreshing.refresh = true
+        let accepted = await session.load(refreshing)
+        XCTAssertTrue(accepted)
+        let forwarded = await repository.refreshed; XCTAssertTrue(forwarded)
+        XCTAssertEqual(session.confirmed?.paragraphIndex, 1); XCTAssertEqual(session.confirmed?.utf16Offset, 4)
+        XCTAssertEqual(session.document?.paragraphs.last?.text, "保留的阅读位置与故事。")
+        XCTAssertEqual(session.phase, .readable)
+    }
+}

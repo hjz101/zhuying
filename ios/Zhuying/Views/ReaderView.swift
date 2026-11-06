@@ -25,6 +25,7 @@ struct ReaderView: View {
     @State private var pendingNarrationChapter = false
     @State private var requestedChapter: Int?
     @State private var requestedResume = false
+    @State private var requestedRefresh = false
     @State private var requestedAtEnd = false
     @State private var requestedLocation: ReadingAnchor?
     @State private var chapter: Int
@@ -43,6 +44,7 @@ struct ReaderView: View {
     @State private var reflowing = false
     @State private var turn = 0
     @State private var message: String?
+    @State private var clearingCache = false
     @State private var initialized = false
     @State private var commentParagraph: Int?
     @State private var showShelfPrompt = false
@@ -106,7 +108,7 @@ struct ReaderView: View {
                         ThemeLabel("章节暂时无法打开", systemImage: "doc.text.magnifyingglass")
                     } description: { Text(reason) }
                     actions: {
-                        Button("重试") { goChapter(requestedChapter ?? chapter, resume: requestedResume, atEnd: requestedAtEnd, location: requestedLocation) }.accessibilityIdentifier("retryChapter")
+                        Button("重试") { goChapter(requestedChapter ?? chapter, resume: requestedResume, atEnd: requestedAtEnd, location: requestedLocation, refresh: requestedRefresh) }.accessibilityIdentifier("retryChapter")
                         if !store.isDemo { Button("从本章开头打开") { goChapter(requestedChapter ?? chapter,resume:false) } }
                     }
                     .background(readerBackground.opacity(0.97))
@@ -269,6 +271,13 @@ struct ReaderView: View {
             Spacer(minLength: 0)
             Menu {
                 Section {
+                    ThemeButton("刷新正文", systemImage: "arrow.clockwise") { refreshChapter() }
+                        .disabled(loading.phase == .loading).accessibilityIdentifier("readerRefreshChapter")
+                    ThemeButton(clearingCache ? "正在清除缓存" : "清除缓存", systemImage: "trash") { clearBookCache() }
+                        .disabled(clearingCache || store.isDemo || store.remoteMetadata(book.id) == nil)
+                        .accessibilityIdentifier("readerClearCache")
+                }
+                Section {
                     Button {
                         let added = store.toggleFavorite(book)
                         haptic()
@@ -367,21 +376,29 @@ struct ReaderView: View {
         guard initialized, loading.phase == .readable else { return }
         store.record(book, chapter: chapter, paragraph: anchor.paragraph, characterOffset: anchor.offset)
     }
-    private func goChapter(_ target: Int, resume: Bool = false, atEnd: Bool = false, location: ReadingAnchor? = nil, following: Bool = false) {
+    private func goChapter(_ target: Int, resume: Bool = false, atEnd: Bool = false, location: ReadingAnchor? = nil, following: Bool = false, refresh: Bool = false) {
         let forward = target >= chapter
         guard let target = store.readableChapterIndex(for: book, startingAt: target, direction: forward ? 1 : -1) else { showMessage(forward ? (store.isDemo ? "已读完全部示例章节" : "已经是最后一章") : "已经是第一章"); return }
         chapterTask?.cancel()
         pendingNarrationChapter = following
-        chapterTask = Task { await loadChapter(target, resume: resume, atEnd: atEnd, location: location, following: following) }
+        chapterTask = Task { await loadChapter(target, resume: resume, atEnd: atEnd, location: location, following: following, refresh: refresh) }
     }
-    private func loadChapter(_ target: Int, resume: Bool, atEnd: Bool, location: ReadingAnchor? = nil, following: Bool = false) async {
+    private func loadChapter(_ target: Int, resume: Bool, atEnd: Bool, location: ReadingAnchor? = nil, following: Bool = false, refresh: Bool = false) async {
         guard let target = store.readableChapterIndex(for: book, startingAt: target, direction: atEnd ? -1 : 1) else { return }
         store.trackReading(nil)
-        requestedChapter = target; requestedResume = resume; requestedAtEnd = atEnd
+        requestedChapter = target; requestedResume = resume; requestedAtEnd = atEnd; requestedRefresh = refresh
         requestedLocation = location
         guard var request = try? store.chapterRequest(for: book, chapter: target, resume: resume, atEnd: atEnd) else { return }
         if let location { request.anchor = location }
-        guard await loading.load(request), let content = loading.document, let location = loading.confirmed else { return }
+        request.refresh = refresh
+        guard await loading.load(request), let content = loading.document, let location = loading.confirmed else {
+            if refresh, initialized, !Task.isCancelled {
+                if case let .failed(reason) = loading.phase { showMessage("刷新未完成：" + reason) }
+                loading.cancel(); requestedChapter = nil
+                store.trackReading(book.id, interacted: true)
+            }
+            return
+        }
         guard !following || !store.audio.readerDetached else { loading.cancel(); return }
         pendingNarrationChapter = false
         reflowing = true
@@ -393,6 +410,21 @@ struct ReaderView: View {
         store.trackReading(book.id, interacted: true)
         showGestureGuide = !store.hasSeenReadingGuide
         haptic()
+        if refresh { showMessage("正文已刷新") }
+    }
+    private func refreshChapter() {
+        save(); detachNarration()
+        let location = loaded.flatMap { try? ReadingAnchor(bookID: book.id, document: $0, paragraph: anchor.paragraph, offset: anchor.offset) }
+        goChapter(chapter, location: location, refresh: true)
+    }
+    private func clearBookCache() {
+        guard !clearingCache, !store.isDemo, store.remoteMetadata(book.id) != nil, let service = store.onlineService else { return }
+        save(); clearingCache = true
+        Task { @MainActor in
+            defer { clearingCache = false }
+            do { try await service.clearCache(bookID: book.id); showMessage("本书临时正文缓存已清除") }
+            catch { showMessage("清除未完成：" + error.localizedDescription) }
+        }
     }
     private func flip(forward: Bool) {
         detachNarration()
@@ -477,6 +509,8 @@ struct ContentsView: View {
     let onSelect: (Int) -> Void
     @State private var query = ""
     @State private var reversed = false
+    @State private var clearingCache = false
+    @State private var cacheMessage: String?
     private var visibleChapters: [Int] {
         (reversed ? Array(book.chapters.indices.reversed()) : Array(book.chapters.indices))
             .filter { query.isEmpty || book.chapterTitle($0).contains(query) }
@@ -516,7 +550,41 @@ struct ContentsView: View {
             .navigationTitle("章节目录").navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: "搜索章节")
             .toolbar { ToolbarItem(placement: .topBarLeading) { ThemeButton(reversed ? "倒序" : "正序", systemImage: "arrow.up.arrow.down") { reversed.toggle() } } }
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Menu {
+                        ThemeButton(clearingCache ? "正在清除缓存" : "清除缓存", systemImage: "trash") { clearBookCache() }
+                            .disabled(clearingCache || library.isDemo || library.remoteMetadata(book.id) == nil)
+                            .accessibilityIdentifier("contentsClearCache")
+                    } label: { ThemeIcon(systemName: "ellipsis").frame(width: 44, height: 44) }
+                        .accessibilityLabel("目录工具").accessibilityIdentifier("contentsTools")
+                    Button("完成") { dismiss() }
+                }
+            }
+            .overlay(alignment: .top) {
+                if let cacheMessage {
+                    Text(cacheMessage).font(.system(size: 13)).foregroundStyle(appAppearance.palette.green)
+                        .padding(14).background(.regularMaterial, in: Capsule())
+                        .padding(.horizontal, 22).padding(.top, 8).allowsHitTesting(false)
+                        .accessibilityIdentifier("contentsCacheFeedback")
+                }
+            }
         }.appPageStyle().presentationBackground(appAppearance.palette.background).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(26)
+    }
+}
+
+
+private extension ContentsView {
+    func clearBookCache() {
+        guard !clearingCache, !library.isDemo, library.remoteMetadata(book.id) != nil, let service = library.onlineService else { return }
+        clearingCache = true
+        Task { @MainActor in
+            defer { clearingCache = false }
+            do { try await service.clearCache(bookID: book.id); cacheMessage = "本书临时正文缓存已清除" }
+            catch { cacheMessage = "清除未完成：" + error.localizedDescription }
+            let shown = cacheMessage
+            try? await Task.sleep(for: .seconds(3))
+            if cacheMessage == shown { cacheMessage = nil }
+        }
     }
 }

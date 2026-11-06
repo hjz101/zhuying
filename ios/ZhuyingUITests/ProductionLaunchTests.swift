@@ -3,22 +3,26 @@ import XCTest
 final class ProductionLaunchTests: XCTestCase {
     @MainActor func testProductionSourceBasicEditAndDisableSurviveRestart() {
         continueAfterFailure = false
-        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--production"]; app.launch()
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--production", "--native-source-fixtures"]; app.launch()
         func openSources() {
             app.tabBars.buttons["我的"].tap()
             let source = app.buttons["profileSources"]
             for _ in 0..<8 { if source.isHittable { break }; app.swipeUp() }
             source.tap(); XCTAssertTrue(app.buttons["source-row-shushan"].waitForExistence(timeout: 5))
         }
-        openSources(); app.buttons["source-row-shushan"].tap()
+        openSources()
+        XCTAssertTrue(app.buttons["source-row-shushan"].label.contains("用户配置测试源"))
+        app.buttons["source-row-shushan"].tap()
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "书源编辑")).firstMatch.tap()
         let name = app.textFields["sourceConfigName"]; XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap()
-        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4) + "我的书山")
+        XCTAssertEqual(name.value as? String, "用户配置测试源")
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "用户配置测试源".count) + "我的接口")
         app.switches["启用书源"].tap(); app.buttons["sourceConfigSave"].tap()
         XCTAssertTrue(app.staticTexts["已保存书源基本信息。"].waitForExistence(timeout: 5))
-        app.terminate(); app.launchArguments = ["--ui-testing", "--production", "--preserve-ui-test-state"]; app.launch()
+        app.terminate(); app.launchArguments = ["--ui-testing", "--production", "--native-source-fixtures", "--preserve-ui-test-state"]; app.launch()
         openSources()
-        XCTAssertTrue(app.buttons["source-row-shushan"].label.contains("我的书山"))
+        XCTAssertTrue(app.buttons["source-row-shushan"].label.contains("我的接口"))
+        XCTAssertFalse(app.buttons["source-row-shushan"].label.contains("用户配置测试源"), "Preserving state must not reapply the launch fixture")
         XCTAssertTrue(app.buttons["source-row-shushan"].label.contains("已停用"))
     }
     @MainActor func testProductionStatisticsAndAudioEntriesKeepTruthfulEmptyStates() {
@@ -118,8 +122,9 @@ final class ProductionLaunchTests: XCTestCase {
     }
     @MainActor
     func testProductionSourceLoginHasRealFieldsAndEmptyToolsDoNotCrash() {
+        continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--production"]
+        app.launchArguments = ["--ui-testing", "--production", "--native-source-fixtures"]
         app.launch()
         let groups = app.buttons["shelf-feature-shelf"]
         XCTAssertTrue(groups.waitForExistence(timeout: 10))
@@ -131,6 +136,7 @@ final class ProductionLaunchTests: XCTestCase {
         if !sources.isHittable { app.swipeUp() }
         sources.tap()
         XCTAssertTrue(app.buttons["source-row-shushan"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["source-row-shushan"].label.contains("用户配置测试源"))
         XCTAssertTrue(app.buttons["sourceManage"].exists)
         app.buttons["source-row-shushan"].tap()
         XCTAssertTrue(app.buttons["sourceDetailLogin"].waitForExistence(timeout: 5))
@@ -141,7 +147,7 @@ final class ProductionLaunchTests: XCTestCase {
         XCTAssertFalse(app.buttons["shushanLogin"].isEnabled)
         XCTAssertFalse(app.staticTexts["界面演示 · 示例数据，本页不连接外部服务"].exists)
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Production-Shushan-Login"
+        attachment.name = "Production-Native-User-Source-Login"
         attachment.lifetime = .keepAlways
         add(attachment)
     }

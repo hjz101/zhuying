@@ -99,6 +99,56 @@ final class LegadoPersistentStateTests: XCTestCase {
         XCTAssertEqual(try first.getLoginInfoMap()["密码"], "committed")
         XCTAssertEqual(try state().getLoginInfoMap()["密码"], "committed")
     }
+    func testExplicitSameCredentialRetryLeavesExpiredStatusWithoutClaimingVerifiedLogin() throws {
+        let first = try state(), values = ["邮箱": "reader", "密码": "original"]
+        try first.setLoginInfo(values); try first.markVerified(); try first.expire()
+        let expiredEpoch = first.sessionRevision
+        // A script merely re-saving the same data does not constitute a retry.
+        try first.setLoginInfo(values)
+        XCTAssertEqual(first.authStatus, .expired); XCTAssertEqual(first.sessionRevision, expiredEpoch)
+        try first.beginLoginAttempt(values)
+        XCTAssertEqual(first.authStatus, .unverified); XCTAssertEqual(first.sessionRevision, expiredEpoch + 1)
+        XCTAssertEqual(try first.getLoginInfoMap(), values)
+        let reopened = try state()
+        XCTAssertEqual(reopened.authStatus, .unverified); XCTAssertEqual(reopened.sessionRevision, first.sessionRevision)
+    }
+    func testSameCredentialAttemptInvalidatesOldResponsesButRetainsAccountConfiguration() throws {
+        let first = try state(), values = ["邮箱": "reader", "密码": "original"], origin = URL(string: "https://fixture.test/")!
+        try first.setLoginInfo(values); try first.markVerified()
+        try first.setVariable("saved-configuration", key: "config"); try first.cachePut("saved", key: "cache")
+        let cookie = try XCTUnwrap(HTTPCookie(properties: [.name: "sid", .value: "existing", .domain: "fixture.test", .path: "/"]))
+        try first.setCookies([cookie], for: origin)
+        let worker = try state(), oldEpoch = worker.sessionRevision
+        try first.beginLoginAttempt(values)
+        XCTAssertEqual(worker.authStatus, .unverified); XCTAssertEqual(worker.sessionRevision, oldEpoch + 1)
+        XCTAssertEqual(try worker.getVariable("config"), "saved-configuration"); XCTAssertEqual(try worker.cacheGet("cache"), "saved")
+        XCTAssertEqual(try worker.cookies(for: origin).first?.value, "existing")
+        XCTAssertThrowsError(try worker.setCookies([cookie], for: origin, expectedSessionRevision: oldEpoch)) { XCTAssertTrue($0 is CancellationError) }
+        var called = false
+        XCTAssertThrowsError(try worker.withSessionMutation(expectedSessionRevision: oldEpoch) { called = true }) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertFalse(called)
+    }
+    func testChangedCredentialAttemptAdvancesOneEpochAndClearsOnlyItsOwnOldTokens() throws {
+        let first = try state(), other = try state(account: "independent")
+        try first.setLoginInfo(["邮箱": "first"]); try first.setVariable("old-token", key: "config"); try first.cachePut("old-token", key: "cache")
+        try other.setVariable("independent-value", key: "config")
+        let epoch = first.sessionRevision
+        try first.beginLoginAttempt(["邮箱": "second"])
+        XCTAssertEqual(first.sessionRevision, epoch + 1); XCTAssertEqual(first.authStatus, .unverified)
+        XCTAssertEqual(try first.getVariable("config"), ""); XCTAssertNil(try first.cacheGet("cache"))
+        XCTAssertEqual(try first.getLoginInfoMap()["邮箱"], "second")
+        XCTAssertEqual(try other.getVariable("config"), "independent-value")
+    }
+    func testFailedExplicitAttemptPreservesExpiredStateEpochAndVaultSnapshot() throws {
+        let writer = LegadoStateWriter(), first = try state(writer: writer), values = ["邮箱": "reader", "密码": "committed"]
+        try first.setLoginInfo(values); try first.expire()
+        let epoch = first.sessionRevision, revision = first.revision, slots = Set(vault.values.keys)
+        writer.fails = true
+        XCTAssertThrowsError(try first.beginLoginAttempt(values))
+        XCTAssertEqual(first.authStatus, .expired); XCTAssertEqual(first.sessionRevision, epoch); XCTAssertEqual(first.revision, revision)
+        XCTAssertEqual(Set(vault.values.keys), slots); XCTAssertEqual(try first.getLoginInfoMap(), values)
+        XCTAssertEqual(try state().sessionRevision, epoch)
+    }
     func testTwoProviderInstancesDoNotOverwriteMoreRecentUIChanges() throws {
         let worker = try state(), UI = try state()
         try UI.setVariable("from-UI", key: "server")

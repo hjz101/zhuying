@@ -264,16 +264,22 @@ final class LegadoPersistentState: @unchecked Sendable {
         guard let values = try JSONSerialization.jsonObject(with: Data(info.utf8)) as? [String: String] else { throw LegadoStateError.corrupt }; return values
     }
     func setLoginInfo(_ values: [String: String]) throws { try putLoginInfo(String(decoding: JSONSerialization.data(withJSONObject: values, options: [.sortedKeys]), as: UTF8.self)) }
-    func putLoginInfo(_ json: String) throws {
+    /// An explicit retry starts a new unverified session even when its saved
+    /// credentials are unchanged. Script saves retain their existing semantics.
+    func beginLoginAttempt(_ values: [String: String]) throws {
+        try putLoginInfo(String(decoding: JSONSerialization.data(withJSONObject: values, options: [.sortedKeys]), as: UTF8.self), startingAttempt: true)
+    }
+    func putLoginInfo(_ json: String) throws { try putLoginInfo(json, startingAttempt: false) }
+    private func putLoginInfo(_ json: String, startingAttempt: Bool) throws {
         Self.lock.lock(); defer { Self.lock.unlock() }; try refresh()
         guard json.utf8.count <= 128 * 1024, let object = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: String], object.count <= 128 else { throw LegadoStateError.limit }
         let canonical = String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
         var next = manifest; var secret = secrets
         let changed = secret.loginInfo != canonical
-        if changed {
+        if changed || startingAttempt {
             next.status = .unverified; next.authEpoch &+= 1
-            if !secret.loginInfo.isEmpty { secret.cookies = []; next.variables = [:]; next.cache = [:] }
         }
+        if changed, !secret.loginInfo.isEmpty { secret.cookies = []; next.variables = [:]; next.cache = [:] }
         secret.loginInfo = canonical; try commit(next, secret)
         if changed { memory = [:] }
     }

@@ -90,7 +90,7 @@ struct LegadoBrowserInteractionView: View {
         opening = Task { @MainActor in
             defer { finishing = false }
             do {
-                let finalURL = webView.url?.scheme == "https" ? webView.url : (request.html != nil ? request.url : nil)
+                let finalURL = ["http", "https"].contains(webView.url?.scheme ?? "") ? webView.url : (request.html != nil ? request.url : nil)
                 guard let finalURL else { throw LegadoInteractionError.navigationFailed("尚未加载可返回的网页") }
                 let html = try await webView.evaluateJavaScript("document.documentElement.outerHTML.slice(0,2097153)") as? String ?? ""
                 guard html.utf8.count <= 2 * 1024 * 1024 else { throw LegadoRequestError.limit }

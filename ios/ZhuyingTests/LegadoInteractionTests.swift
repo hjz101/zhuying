@@ -140,7 +140,7 @@ private final class LoginMemoryVault: LegadoSecretVault {
         browser.close()
     }
 
-    func testAllowedNetworkOriginsSupportOpaqueIdentityAndRejectInsecureAdditionsAtomically() throws {
+    func testAllowedNetworkOriginsSupportOpaqueIdentityAndRejectCredentialAdditionsAtomically() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let state = try state(root)
@@ -153,7 +153,7 @@ private final class LoginMemoryVault: LegadoSecretVault {
         XCTAssertTrue(origins.contains { $0.host == "source.test" })
         XCTAssertEqual(try LegadoNetworkOrigins.allow("https://additional.test/books", source: source, state: state).absoluteString, "https://additional.test/")
         let saved = try state.allowedOrigins()
-        XCTAssertThrowsError(try LegadoNetworkOrigins.allow("http://unsafe.test/", source: source, state: state))
+        XCTAssertThrowsError(try LegadoNetworkOrigins.allow("http://user:password@unsafe.test/", source: source, state: state))
         XCTAssertEqual(try state.allowedOrigins(), saved)
     }
 

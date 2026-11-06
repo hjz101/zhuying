@@ -211,7 +211,7 @@ export function auditPackage(bytes, raw, capability = capabilities()) {
       return { index, requiredShape: required.every(field => fields.some(row => row.field === field && row.type === 'string' && row.bytes > 0)),
         identityKind: typeof source.bookSourceUrl === 'string' && /^https:\/\//i.test(source.bookSourceUrl) ? 'https-url' : 'opaque-or-missing',
         fields, unknownRuleFields, directCalls: [...grouped.values()], dynamicMemberSites, embeddedScripts, embeddedPageFragments,
-        literalOriginCandidates: [...originCandidates].sort().map(origin => ({ origin, policy: origin.startsWith('https:') ? 'requires-source-origin-policy' : 'http-unsupported' })), scanErrors: errors };
+        literalOriginCandidates: [...originCandidates].sort().map(origin => ({ origin, policy: 'requires-source-origin-policy' })), scanErrors: errors };
     })
   };
 }

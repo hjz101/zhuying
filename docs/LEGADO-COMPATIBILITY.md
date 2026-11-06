@@ -7,7 +7,7 @@
 ## 接入与结构
 
 - `LegadoSourceDefinition` 读取原版搜索、详情、目录、正文、请求头、`jsLib`、登录等字段，验证必要配置。来源身份可以是字符串标识，实际请求主机由规则产生。
-- `LegadoSourcePolicy` 通过词法扫描收集静态 HTTPS 候选主机，另接受用户在书源网络设置中明确添加的主机。候选列表不替规则选择线路，也不自动允许未知主机。
+- `LegadoSourcePolicy` 通过词法扫描收集静态 HTTP(S) 候选主机，另接受用户在书源网络设置中明确添加的主机。候选列表不替规则选择线路，也不自动允许未知主机。
 - `LegadoRuleEngine` 解析规则、模板、组合、替换和脚本片段。不对同步 `java.ajax` 做 `await` 文本替换；顺序执行的脚本保留中间值类型。
 - `QuickJSScriptSession` 在来源会话的后台队列串行执行。库函数、库全局状态和显式 `globalThis` 状态可跨规则保留；每条规则的普通局部声明使用独立子作用域。请求绑定和宿主闭包逐次更新。
 - `QuickJSScriptMemoryBudget` 按各 VM 的配置堆上限预留全进程额度；`withLease` 固定整个来源操作使用的 VM，空闲 VM 才参与 LRU 或内存压力回收。
@@ -24,7 +24,7 @@
 | 组合与处理 | `&&`、`\|\|`、`%%`、`##` 替换、`@get`／`@put`、`{{...}}` 模板。规则处理与脚本按顺序执行，JSON 字符串不冒充数组。 |
 | JavaScript | `@js:`、`<js>...</js>`、共享 `jsLib` 和登录程序，以及 `result`／`src`／`baseUrl`／`key`／`page`／`source`／`book`／`chapter`。完整 HTTP 响应为字符串，JSON 条目保留结构化语义。 |
 | 常用宿主 | 同步 `java.ajax`／`connect`／网络 `get`／`post`／`head`、规则提取、来源／书籍／章节变量、缓存、Cookie、编码、MD5、Hex、时间格式等已实现子集。未知调用明确失败。 |
-| 请求 | 已声明或用户明确允许的 HTTPS 主机；GET／POST／HEAD、请求选项和已验证的字符集。URL 中 `{{key}}` 百分号编码；字符串表单 body 的特殊字符仍由规则编码。 |
+| 请求 | 已声明或用户明确允许的 HTTP(S) 主机；GET／POST／HEAD、请求选项和已验证的字符集。URL 中 `{{key}}` 百分号编码；字符串表单 body 的特殊字符仍由规则编码。 |
 | 内部引用 | 有界解析 `data:;base64,<载荷>,{请求选项}`，保留完整请求描述、body 和载荷。识别冻结样本的 qingtian 书籍／目录／章节身份字段；未知引用不猜测删除 URL 查询参数。 |
 | 登录表单 | 原生呈现 `loginUi` 的文本、密码和按钮子集，按钮动作在对应来源会话执行。保存输入、收到 Cookie、脚本返回或网页完成都不自动变成“已验证登录”。 |
 | 网页交互 | 已实现的 `startBrowserAwait`、`startBrowser`、`showBrowser` 等接口可打开受限浏览器，返回页面结果和按主机隔离的 Cookie。用户取消、关闭、超时、注销及过期有明确结果。 |
@@ -37,7 +37,7 @@
 
 ## 来源身份、主机与凭据
 
-不透明来源标识与网络地址分开保存。动态脚本必须先产生实际 HTTPS URL，再通过来源主机策略校验；没有静态起始 URL 时不会虚构一个网络 origin。未声明主机需要用户在书源网络设置中添加。HTTP 明文和跨主机重定向仍明确拒绝；多线路切换应由规则返回明确地址。
+不透明来源标识与网络地址分开保存。动态脚本必须先产生实际 HTTP(S) URL，再通过来源主机策略校验；没有静态起始 URL 时不会虚构一个网络 origin。未声明主机需要用户在书源网络设置中添加。HTTP 仅接受来源已声明或用户手动添加的主机，协议及端口仍隔离；跨主机重定向仍明确拒绝；多线路切换应由规则返回明确地址。
 
 Cookie 按来源、账号、书库配置和请求主机隔离。来源级继承请求头绑定其主机；跨主机只继承 `Accept`、`Accept-Language`、`User-Agent`、`Content-Type` 等公开协商字段。规则在某次 URL 请求选项中明确设置的头按该次请求处理，不会因此自动复制其他主机的凭据。
 
@@ -56,7 +56,7 @@ WebKit 数据存储同样包含来源、账号、书库配置和主机范围。�
 ## 明确边界
 
 - 不运行 Android 界面、任意 Java／Rhino 对象或反射。`Packages.*` 仅限已实现的 Android Base64 对象；`JavaImporter` 的任意构造参数、其他 Java 类和硬件接口不支持。
-- 不支持 HTTP 明文、任意跨主机重定向、音频／漫画书源或无限后台运行。多主机允许列表不等于允许自动跨主机复制凭据。
+- HTTP 支持系统网络和 HTTP CONNECT 代理；指定 IP／DNS 仅支持 HTTPS。不支持任意跨主机重定向、音频／漫画书源或无限后台运行。多主机允许列表不等于允许自动跨主机复制凭据。
 - 原生登录按钮和受限网页交互已接入；网页内部的同步 Android 宿主桥尚未实现。依赖它的内嵌设置页、验证流程可能明确报未支持。
 - 依赖 `webJs`、正文独立 `replaceRegex`、`sourceRegex`、`payAction` 等高级字段时，对应步骤明确报未支持；已实现的规则内 `##` 替换继续可用。
 - 不等同于完整 jsoup、Java 正则、XPath／JSONPath 或 Rhino 对象语义；少见复杂模板仍可能明确解析失败。Promise 和任意动态模块不作为同步宿主能力提供。
@@ -95,3 +95,14 @@ WebKit 数据存储同样包含来源、账号、书库配置和主机范围。�
 冻结样本为先前 HTTP 200 获取的 157,920 字节，SHA-256 `e5e81f26de9b39d87d6ebde860ddecef373be78860b65c58101825b6f026f0ae`；原包及其潜在账号数据未提交仓库。离线初始化不代表该包已能在真实服务完整搜索阅读。
 
 参考：[阅读规则基线](https://raw.githubusercontent.com/gedoor/legado/fd026e0/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeRule.kt)、[宿主接口基线](https://raw.githubusercontent.com/gedoor/legado/fd026e0/app/src/main/java/io/legado/app/help/JsExtensions.kt)、[QuickJS 文档](https://bellard.org/quickjs/quickjs.html)。
+
+
+## 阅读与发现操作补充
+
+正文右上角和目录提供当前书的临时正文缓存清理；刷新正文绕过近期缓存与持久下载，成功后更新当前版本，失败保留原正文和阅读位置。已下载内容与阅读记录不会随临时缓存清理删除。
+
+书源列表右滑支持登录、刷新运行状态和内置浏览器，左滑原编辑入口保留。刷新重新创建当前来源适配器与脚本运行环境，保留导入规则和登录资料；不等同于重新下载书源订阅包。登录反馈显示在视口顶部并自动消失。
+
+发现页右上角可切换简洁／丰富模式。丰富模式按来源加载原版 `exploreUrl` 分类及 `ruleExplore` 作品，支持动态脚本分类、分页和来源切换；支持封面、作者、简介和原详情阅读路径。精准搜索仅显示规范化后书名或作者完全相等的结果，开关可关闭且保留下一页入口。详情右上角刷新实际详情与目录。
+
+HTTP 兼容需要构建中的 ATS 例外；其他原生服务仍由各自 URL 校验约束为 HTTPS。TLS 证书验证保持系统默认处理，Secure Cookie 不发送到 HTTP，同一主机的 HTTP／HTTPS／不同端口互不共用 Cookie。

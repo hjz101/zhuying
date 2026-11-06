@@ -6,7 +6,7 @@ enum LegadoNetworkOrigins {
         return try LegadoSourcePolicy(sourceID: source.id, declaredOrigins: definition.policy.allowedOrigins, additionalOrigins: state.allowedOrigins()).allowedOrigins
     }
     @discardableResult static func allow(_ address: String, source: DemoSource, state: LegadoPersistentState) throws -> URL {
-        guard let url = URL(string: address.trimmingCharacters(in: .whitespacesAndNewlines)) else { throw LegadoCompatibilityError.invalid("HTTPS 主机") }
+        guard let url = URL(string: address.trimmingCharacters(in: .whitespacesAndNewlines)) else { throw LegadoCompatibilityError.invalid("HTTP(S) 主机") }
         let origin = try LegadoSourcePolicy.canonicalOrigin(url)
         _ = try LegadoSourcePolicy(sourceID: source.id, declaredOrigins: LegadoSourceDefinition.decode(source).policy.allowedOrigins,
                                    additionalOrigins: state.allowedOrigins() + [origin])

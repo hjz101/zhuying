@@ -12,8 +12,8 @@ enum BrowserDownloadFiles {
     }
 }
 enum BrowserInput {
-    static func url(_ text: String) throws -> URL {
-        guard text.utf8.count <= 8192,let url = URL(string:text.trimmingCharacters(in:.whitespacesAndNewlines)),url.scheme == "https",url.host != nil,url.user == nil,url.password == nil else { throw ContentFailure.invalidResponse }; return url
+    static func url(_ text: String, allowHTTP: Bool = false) throws -> URL {
+        guard text.utf8.count <= 8192,let url = URL(string:text.trimmingCharacters(in:.whitespacesAndNewlines)),(url.scheme == "https" || allowHTTP && url.scheme == "http"),url.host != nil,url.user == nil,url.password == nil else { throw ContentFailure.invalidResponse }; return url
     }
     static func downloadFilename(response: URLResponse,suggested: String) throws -> String {
         guard let response = response as? HTTPURLResponse,(200...299).contains(response.statusCode),response.expectedContentLength <= BookImporter.maximumBytes else { throw BookImportError.message("下载响应失败或超过20 MB，请检查网页链接。") }
@@ -61,7 +61,7 @@ enum BrowserInput {
     }
     func open(_ value: String) {
         do {
-            let url = try BrowserInput.url(value)
+            let url = try BrowserInput.url(value, allowHTTP: allowsHTTP)
             guard allowed(url) else {
                 if allowedOrigins.contains(where: { SourceBrowserSessions.sameOrigin(url, $0) }) { requestedOriginURL = url }
                 else { external = url }
@@ -69,7 +69,7 @@ enum BrowserInput {
             }
             message = nil; webView?.load(URLRequest(url:url))
         }
-        catch { message = "请输入完整 HTTPS 网页地址；不接受账号或密码内嵌的链接。" }
+        catch { message = "请输入完整且由书源声明的网页地址；不接受账号或密码内嵌的链接。" }
     }
     func openHTML(_ html: String, baseURL: URL) throws {
         let offline = baseURL.absoluteString == "about:blank" && origin == nil
@@ -102,7 +102,13 @@ enum BrowserInput {
     func networkFailed(_ error: Error) { message = error.localizedDescription }
     func discardImport() { if let imported { try? FileManager.default.removeItem(at:imported.url.deletingLastPathComponent()) }; imported = nil }
     func clearSession() async { close(); if let origin,let sessions { await sessions.clear(sourceID:sourceID,origin:origin) }; message = "此书源的本地浏览器会话已清除。" }
-    private func allowed(_ url: URL) -> Bool { (try? BrowserInput.url(url.absoluteString)) != nil && (origin.map{SourceBrowserSessions.sameOrigin(url,$0)} ?? !restrictToDeclaredOrigins) }
+    func allowsSubframe(_ url: URL) -> Bool {
+        if (try? BrowserInput.url(url.absoluteString)) != nil { return true }
+        return (try? BrowserInput.url(url.absoluteString, allowHTTP: true)) != nil &&
+            allowedOrigins.contains { SourceBrowserSessions.sameOrigin(url, $0) }
+    }
+    private var allowsHTTP: Bool { allowedOrigins.contains { $0.scheme == "http" } }
+    private func allowed(_ url: URL) -> Bool { (try? BrowserInput.url(url.absoluteString, allowHTTP: allowsHTTP)) != nil && (origin.map{SourceBrowserSessions.sameOrigin(url,$0)} ?? !restrictToDeclaredOrigins) }
     private func refresh() { canBack = webView?.canGoBack ?? false; canForward = webView?.canGoForward ?? false; loading = webView?.isLoading ?? false; title = webView?.title ?? "网页浏览" }
     func webView(_ webView: WKWebView,didFinish navigation: WKNavigation!) { refresh() }
     func webView(_ webView: WKWebView,didFail navigation: WKNavigation!,withError error: Error) { refresh(); if (error as NSError).code != NSURLErrorCancelled { message = "网页加载失败，可检查地址后重试。" } }
@@ -111,7 +117,9 @@ enum BrowserInput {
     func webView(_ webView: WKWebView,decidePolicyFor navigationAction: WKNavigationAction,decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
         if url.absoluteString == "about:blank" { decisionHandler(.allow); return }
-        if navigationAction.targetFrame?.isMainFrame == false,(try? BrowserInput.url(url.absoluteString)) != nil { decisionHandler(.allow); return }
+        if navigationAction.targetFrame?.isMainFrame == false {
+            decisionHandler(allowsSubframe(url) ? .allow : .cancel); return
+        }
         guard allowed(url) else {
             if allowedOrigins.contains(where: { SourceBrowserSessions.sameOrigin(url, $0) }) { requestedOriginURL = url }
             else if url.scheme == "https" { external = url }
@@ -120,7 +128,7 @@ enum BrowserInput {
         decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
     }
     func webView(_ webView: WKWebView,decidePolicyFor navigationResponse: WKNavigationResponse,decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        guard let url = navigationResponse.response.url,allowed(url) || !navigationResponse.isForMainFrame && (try? BrowserInput.url(url.absoluteString)) != nil else { decisionHandler(.cancel); return }
+        guard let url = navigationResponse.response.url,allowed(url) || !navigationResponse.isForMainFrame && allowsSubframe(url) else { decisionHandler(.cancel); return }
         let attachment = (navigationResponse.response as? HTTPURLResponse)?.value(forHTTPHeaderField:"Content-Disposition")?.lowercased().contains("attachment") == true
         if attachment || !navigationResponse.canShowMIMEType {
             guard !downloading,navigationResponse.response.expectedContentLength <= BookImporter.maximumBytes else { message = "下载超过 20 MB 或已有任务正在处理。"; decisionHandler(.cancel); return }; decisionHandler(.download)

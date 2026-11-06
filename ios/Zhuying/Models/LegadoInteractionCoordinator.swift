@@ -37,10 +37,8 @@ struct LegadoBrowserRequest: Identifiable, Sendable {
     var browserScopeID: String { SourceBrowserSessions.legadoScope(sourceID: sourceID, accountID: accountID, libraryProfile: libraryProfile) }
     var isOffline: Bool { url.absoluteString == "about:blank" && html != nil }
     static func origin(_ url: URL) throws -> URL {
-        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), parts.scheme == "https", parts.host != nil,
-              parts.user == nil, parts.password == nil else { throw LegadoInteractionError.invalidRequest }
-        parts.path = "/"; parts.query = nil; parts.fragment = nil
-        guard let origin = parts.url else { throw LegadoInteractionError.invalidRequest }; return origin
+        do { return try LegadoSourcePolicy.canonicalOrigin(url) }
+        catch { throw LegadoInteractionError.invalidRequest }
     }
     func validate() throws {
         if !isOffline { _ = try Self.origin(url) }

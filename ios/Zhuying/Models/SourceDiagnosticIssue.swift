@@ -23,7 +23,7 @@ struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
         switch code {
         case .loginRequired: "需要登录此书源。请完成登录后重新调试。"
         case .loginExpired: "此书源的登录已过期。请重新登录后重试。"
-        case .hostNotAllowed: "请求主机尚未允许。请到该书源的网络配置添加需要使用的 HTTPS 主机。"
+        case .hostNotAllowed: "请求主机尚未允许。请到该书源的网络配置添加需要使用的 HTTP(S) 主机。"
         case .unsupportedRule: "当前规则包含尚未支持的解析能力。请检查书源规则或选择其他来源。"
         case .unsupportedHost: "脚本调用了尚未支持的宿主能力。请查看规则兼容测试结果。"
         case .scriptFailure: "规则脚本执行失败。请检查规则与返回内容后重新调试。"

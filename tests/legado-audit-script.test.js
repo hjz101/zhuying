@@ -52,9 +52,9 @@ test('dynamic members and incomplete lexical scans remain explicit rather than i
   assert.throws(() => tokenize('x'.repeat(2 * 1024 * 1024 + 1)), /text-limit/);
 });
 
-test('literal URL candidates preserve only origins and keep HTTP visibly unsupported', () => {
+test('literal URL candidates preserve only origins and require source policy for HTTP and HTTPS', () => {
   const report = audit(packageFixture({ jsLib: 'const urls=["https://example.test/path?api_key=hidden#secret","http://plain.test/auth?token=hidden","https://name:private@credential.test/"];' }));
-  assert.deepEqual(report.sources[0].literalOriginCandidates, [{ origin: 'http://plain.test', policy: 'http-unsupported' }, { origin: 'https://example.test', policy: 'requires-source-origin-policy' }]);
+  assert.deepEqual(report.sources[0].literalOriginCandidates, [{ origin: 'http://plain.test', policy: 'requires-source-origin-policy' }, { origin: 'https://example.test', policy: 'requires-source-origin-policy' }]);
   for (const secret of ['api_key', 'hidden', 'secret', 'private', 'credential.test']) assert.ok(!JSON.stringify(report).includes(secret));
 });
 

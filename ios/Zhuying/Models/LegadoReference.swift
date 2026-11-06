@@ -37,8 +37,8 @@ struct LegadoReference: Codable, Equatable, Sendable {
                   let decoded = Data(base64Encoded: String(address[address.index(after: comma)...])), decoded.count <= 128 * 1024 else { throw LegadoCompatibilityError.invalid("data: 内部引用需要有界 Base64 载荷") }
             return .init(descriptor: descriptor, address: address, optionsJSON: optionsJSON, kind: .inline, requestURL: nil, inlineData: decoded)
         }
-        guard let url = URL(string: address, relativeTo: baseURL)?.absoluteURL, url.scheme?.lowercased() == "https",
-              url.host?.isEmpty == false, url.user == nil, url.password == nil else { throw LegadoCompatibilityError.unsupported("内部引用或完整 HTTPS 请求地址") }
+        guard let url = URL(string: address, relativeTo: baseURL)?.absoluteURL, ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              url.host?.isEmpty == false, url.user == nil, url.password == nil else { throw LegadoCompatibilityError.unsupported("内部引用或完整 HTTP(S) 请求地址") }
         _ = try LegadoSourcePolicy.canonicalOrigin(url)
         return .init(descriptor: descriptor, address: address, optionsJSON: optionsJSON, kind: .https, requestURL: url, inlineData: nil)
     }

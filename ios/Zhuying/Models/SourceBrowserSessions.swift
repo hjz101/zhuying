@@ -25,7 +25,7 @@ import WebKit
         while order.count > 8 { stores.removeValue(forKey:order.removeFirst()) }; return store
     }
     func knownOrigins(sourceID: String) -> [URL] {
-        (defaults.stringArray(forKey: "browser.origins." + StableContentID.make(sourceID)) ?? []).compactMap(URL.init(string:)).filter { $0.scheme == "https" }
+        (defaults.stringArray(forKey: "browser.origins." + StableContentID.make(sourceID)) ?? []).compactMap(URL.init(string:)).filter { ["http", "https"].contains($0.scheme ?? "") }
     }
     func usesNativeCookies(sourceID: String,origin: URL) -> Bool { sourceID != "shushan" && defaults.bool(forKey:"browser.native-cookies." + Self.scope(sourceID:sourceID,origin:origin)) }
     func setNativeCookies(_ value: Bool,sourceID: String,origin: URL) {
@@ -42,14 +42,14 @@ import WebKit
         let selected = Self.matching(cookies,url:url),header = HTTPCookie.requestHeaderFields(with:selected)["Cookie"]
         guard (header?.utf8.count ?? 0) <= 16 * 1024 else { throw ContentFailure.invalidResponse }; return header
     }
-    nonisolated static func sameOrigin(_ first: URL,_ second: URL) -> Bool { first.scheme == "https" && first.scheme == second.scheme && first.host == second.host && (first.port ?? 443) == (second.port ?? 443) && first.user == nil && first.password == nil }
+    nonisolated static func sameOrigin(_ first: URL,_ second: URL) -> Bool { ["http", "https"].contains(first.scheme ?? "") && first.scheme == second.scheme && first.host?.lowercased() == second.host?.lowercased() && (first.port ?? (first.scheme == "https" ? 443 : 80)) == (second.port ?? (second.scheme == "https" ? 443 : 80)) && first.user == nil && first.password == nil && second.user == nil && second.password == nil }
     nonisolated static func matching(_ cookies: [HTTPCookie],url: URL,now: Date = Date()) -> [HTTPCookie] {
-        guard url.scheme == "https",let host = url.host?.lowercased() else { return [] }
+        guard ["http", "https"].contains(url.scheme ?? ""),let host = url.host?.lowercased() else { return [] }
         return cookies.filter { cookie in
             let domain = cookie.domain.lowercased(),plain = domain.hasPrefix(".") ? String(domain.dropFirst()) : domain,path = url.path.isEmpty ? "/" : url.path
             let domainMatches = host == plain || domain.hasPrefix(".") && host.hasSuffix("." + plain)
             let pathMatches = path == cookie.path || path.hasPrefix(cookie.path) && (cookie.path.hasSuffix("/") || path.dropFirst(cookie.path.count).hasPrefix("/"))
-            return domainMatches && pathMatches && (cookie.expiresDate.map{$0 > now} ?? true)
+            return domainMatches && pathMatches && (!cookie.isSecure || url.scheme == "https") && (cookie.expiresDate.map{$0 > now} ?? true)
         }.sorted{ $0.path.count > $1.path.count }
     }
 }

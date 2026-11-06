@@ -140,7 +140,8 @@ actor SourceNetworkTransport: HTTPTransport {
     private var routing: [ProxyConfiguration] = []
     private let maximumBytes: Int
     init(origin: URL,profile: SourceNetworkProfile,maximumBytes: Int = 20 * 1024 * 1024) throws {
-        try profile.validate(); guard origin.scheme == "https",origin.host?.isEmpty == false,origin.user == nil,origin.password == nil,(1...20 * 1024 * 1024).contains(maximumBytes) else { throw SourceNetworkError.invalid }
+        try profile.validate(); guard ["http", "https"].contains(origin.scheme ?? ""),
+              (origin.scheme == "https" || profile.mode == .system || profile.mode == .proxy),origin.host?.isEmpty == false,origin.user == nil,origin.password == nil,(1...20 * 1024 * 1024).contains(maximumBytes) else { throw SourceNetworkError.invalid }
         self.origin = origin; self.profile = profile; self.maximumBytes = maximumBytes
     }
     func send(_ request: URLRequest) async throws -> (Data,HTTPURLResponse) {

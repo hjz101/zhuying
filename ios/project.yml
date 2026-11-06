@@ -64,6 +64,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ZhuyingSourceRevision: $(ZHUYING_SOURCE_REVISION)
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         UTExportedTypeDeclarations:

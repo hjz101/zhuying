@@ -33,7 +33,7 @@ final class LegadoReferenceTests: XCTestCase {
     func testMalformedAndOversizedDataReferencesFailBeforeUse() throws {
         XCTAssertThrowsError(try LegadoReference.parse("data:;base64,not-base64,{\"type\":\"qingtian\"}"))
         XCTAssertThrowsError(try LegadoReference.parse("data:text/plain,unencoded"))
-        XCTAssertThrowsError(try LegadoReference.parse("http://fixture.test/book"))
+        XCTAssertEqual(try LegadoReference.parse("http://fixture.test/book").requestURL?.scheme, "http")
         XCTAssertThrowsError(try LegadoReference.parse("/book/relative"))
         XCTAssertThrowsError(try LegadoReference.parse("data:;base64," + Data(repeating: 65, count: 128 * 1024 + 1).base64EncodedString()))
     }

@@ -85,7 +85,11 @@ final class LegadoPersistentState: @unchecked Sendable {
         let httpOnly: Bool
         let expires: Date?
         var cookie: HTTPCookie? {
-            var values: [HTTPCookiePropertyKey: Any] = [.name: name, .value: value, .domain: domain, .path: path, .secure: secure ? "TRUE" : "FALSE", .init("HttpOnly"): httpOnly ? "TRUE" : "FALSE"]
+            var values: [HTTPCookiePropertyKey: Any] = [.name: name, .value: value, .domain: domain, .path: path]
+            // CFNetwork treats a present Secure attribute as enabled, including
+            // the string "FALSE". Omit absent flags when rebuilding cookies.
+            if secure { values[.secure] = "TRUE" }
+            if httpOnly { values[.init("HttpOnly")] = "TRUE" }
             if let expires { values[.expires] = expires }
             return HTTPCookie(properties: values)
         }
@@ -389,7 +393,7 @@ final class LegadoPersistentState: @unchecked Sendable {
     }
     private static func matches(_ cookie: HTTPCookie, url: URL) -> Bool {
         let path = url.path.isEmpty ? "/" : url.path
-        return domainMatches(cookie.domain, host: url.host ?? "") && (path == cookie.path || path.hasPrefix(cookie.path) && (cookie.path.hasSuffix("/") || path.dropFirst(cookie.path.count).hasPrefix("/")))
+        return (!cookie.isSecure || url.scheme == "https") && domainMatches(cookie.domain, host: url.host ?? "") && (path == cookie.path || path.hasPrefix(cookie.path) && (cookie.path.hasSuffix("/") || path.dropFirst(cookie.path.count).hasPrefix("/")))
     }
 }
 extension Notification.Name { static let legadoPersistentStateChanged = Notification.Name("legadoPersistentStateChanged") }

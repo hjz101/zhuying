@@ -31,7 +31,7 @@ final class LegadoSourceDefinitionTests: XCTestCase {
         let dynamic = try definition(value)
         XCTAssertNil(dynamic.baseURL); XCTAssertTrue(dynamic.policy.allowedOrigins.isEmpty)
         value["bookSourceUrl"] = "http://fixture.test"; value["searchUrl"] = "/search"
-        XCTAssertNil(try definition(value).baseURL)
+        XCTAssertEqual(try definition(value).baseURL?.absoluteString, "http://fixture.test/")
     }
     func testMissingRequiredPipelineFieldsAndWrongTypesCannotBeLabelledRunnable() throws {
         for key in ["searchUrl", "ruleSearch", "ruleToc", "ruleContent"] {

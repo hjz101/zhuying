@@ -60,10 +60,7 @@ struct LegadoSourceDefinition {
         for (key, value) in required where value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { throw LegadoCompatibilityError.invalid(key) }
         let address = string("bookSourceUrl").isEmpty ? source.url : string("bookSourceUrl")
         func origin(_ value: String) -> URL? {
-            guard var parts = URLComponents(string: value), parts.scheme?.lowercased() == "https",
-                  let host = parts.host, !host.isEmpty, parts.user == nil, parts.password == nil else { return nil }
-            parts.scheme = "https"; parts.host = host.lowercased(); parts.path = "/"; parts.query = nil; parts.fragment = nil
-            return parts.url
+            URL(string: value).flatMap { try? LegadoSourcePolicy.canonicalOrigin($0) }
         }
         // A dynamic source has no initial network route. Its declared literal
         // candidates are checked only after its script produces an actual URL.

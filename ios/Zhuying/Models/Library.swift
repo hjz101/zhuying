@@ -225,13 +225,24 @@ final class LibraryStore: ObservableObject {
     lazy var browserSessions = SourceBrowserSessions(defaults:defaults)
     lazy var networkProfiles = SourceNetworkProfiles(defaults:defaults)
     lazy var backendProfiles = RemoteBackendProfiles(defaults:defaults,vault:ServiceKeychain(service:"com.zhuying.backend." + (ProcessInfo.processInfo.arguments.contains("--ui-testing") ? "tests" : "production")))
+    private func sourceNetworkOrigin(_ source: DemoSource) throws -> URL {
+        if source.id != "shushan", let definition = try? SourcePackages.legadoDefinition(source), let url = URL(string: source.url) {
+            let state = try legadoLoginState(for: source)
+            let policy = try LegadoSourcePolicy(sourceID: source.id, declaredOrigins: definition.policy.allowedOrigins, additionalOrigins: state.allowedOrigins())
+            return try policy.requireOrigin(for: url)
+        }
+        return try ShushanClient.host(source.url)
+    }
     func networkTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> SourceNetworkTransport {
-        let origin = try ShushanClient.host(source.url),profile = try networkProfiles.profile(sourceID:source.id,origin:origin)
+        let origin = try sourceNetworkOrigin(source),profile = try networkProfiles.profile(sourceID:source.id,origin:origin)
         return try SourceNetworkTransport(origin:origin,profile:profile,maximumBytes:maximumBytes)
     }
     func requestTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> any HTTPTransport {
-        let origin = try ShushanClient.host(source.url),profile = try backendProfiles.profile(sourceID:source.id,origin:origin)
+        let origin = try sourceNetworkOrigin(source)
         let direct = try networkTransport(for:source,maximumBytes:maximumBytes)
+        // Legacy source routes may explicitly declare HTTP. The relay remains HTTPS-only.
+        if origin.scheme == "http" { return direct }
+        let profile = try backendProfiles.profile(sourceID:source.id,origin:origin)
         guard profile.enabled else { return direct }
         guard direct.profile.mode == .system else { throw RemoteBackendError.conflictingRoute }
         return RemoteBackendTransport(sourceID:source.id,origin:origin,profile:profile,key:try backendProfiles.key(sourceID:source.id,origin:origin,profile:profile),direct:direct)
@@ -331,6 +342,17 @@ final class LibraryStore: ObservableObject {
         let transport = try sourceTransport(for: source, maximumBytes: rules.extraction == nil ? 4 * 1024 * 1024 : 2 * 1024 * 1024)
         if rules.extraction != nil { return try ExtractionBookSource(source: source, transport: transport) }
         return try ConfigurableBookSource(source: source, transport: transport)
+    }
+    /// Rebuild the selected adapter without discarding protected login state,
+    /// imported rules, reading history, or downloaded chapters.
+    func refreshSourceRuntime(sourceID: String, credential: ShushanCredential?, expired: Bool = false) async throws {
+        guard let source = sources.first(where: { $0.id == sourceID && $0.enabled }) else { throw ContentFailure.sourceDisabled }
+        guard SourcePackages.isRunnable(source) else { throw SourceImportError.message("此书源规则暂不支持运行，请检查书源配置。") }
+        legadoAdapters.removeValue(forKey: sourceID)?.1.resetRuntime()
+        if source.id != "shushan" { _ = try configuredBookSource(source) }
+        try Task.checkCancellation()
+        await configureOnline(credential: credential, expired: expired)
+        try Task.checkCancellation()
     }
     func commentClient(credential: ShushanCredential) -> ShushanCommentsClient? {
         guard let source = sources.first(where:{$0.id == "shushan" && $0.enabled}),let host = try? ShushanClient.host(source.url),host == credential.host,let transport = try? sourceTransport(for:source,maximumBytes:2 * 1024 * 1024) else { return nil }
@@ -866,6 +888,9 @@ final class LibraryStore: ObservableObject {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--ui-testing") && arguments.contains("--online-fixtures") {
+            if arguments.contains("--discovery-fixtures"), sources.isEmpty {
+                sources = [DemoSource(id: "shushan", name: "竹影发现测试源", detail: "原创测试来源", url: "https://fixture.invalid")]
+            }
             await service.configure(source: OnlineDevelopmentFixtures()); await service.prepareDownloads(); onlineRevision += 1; return
         }
         #endif

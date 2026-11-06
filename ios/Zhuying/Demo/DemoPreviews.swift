@@ -494,18 +494,14 @@ struct SourceImportView: View {
         }.appPageStyle().navigationTitle("书源导入导出").navigationBarTitleDisplayMode(.inline)
             .onChange(of: method) { _, _ in clearPreview(); filename = nil; linkFocused = false }
             .onChange(of: address) { _, _ in clearPreview() }
-            .fileImporter(isPresented: $showFiles, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
+            .nativeFileImporter(isPresented: $showFiles, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
                 switch result {
                 case .success(let urls):
                     guard let url = urls.first else { return }
-                    let access = url.startAccessingSecurityScopedResource()
-                    defer { if access { url.stopAccessingSecurityScopedResource() } }
                     do {
-                        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-                        guard size <= 5 * 1024 * 1024 else { throw SourceImportError.message("文件超过 5 MB，请拆分后重试。") }
-                        load(try Data(contentsOf: url), name: url.lastPathComponent)
+                        load(try ImportedFileReader.read(url, maximumBytes: 5 * 1024 * 1024), name: url.lastPathComponent)
                     } catch { clearPreview(); filename = nil; self.error = error.localizedDescription }
-                case .failure(let error): clearPreview(); self.error = error.localizedDescription
+                case .failure(let error): if (error as NSError).code != NSUserCancelledError { clearPreview(); self.error = error.localizedDescription }
                 }
             }
     }

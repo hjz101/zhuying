@@ -44,10 +44,13 @@ struct ProductionArchiveView: View {
                     .font(.system(size:12)).foregroundStyle(Palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle(comicOnly ? "漫画导入" : "压缩包支持").navigationBarTitleDisplayMode(.inline)
-            .fileImporter(isPresented:$choosing,allowedContentTypes:[.item]) { result in
-                if case .success(let url) = result { load(url) }
+            .nativeFileImporter(isPresented:$choosing,allowedContentTypes:[.item]) { result in
+                switch result {
+                case .success(let url): load(url)
+                case .failure(let error): if (error as NSError).code != NSUserCancelledError { message = error.localizedDescription }
+                }
             }
-            .onDisappear { operation?.cancel(); members = [] }
+            .onDisappear { if !choosing { operation?.cancel(); members = [] } }
             .task { if let initialURL,members.isEmpty { load(initialURL) } }
     }
     private func load(_ url: URL) {
@@ -56,9 +59,7 @@ struct ProductionArchiveView: View {
             defer { if !Task.isCancelled { busy = false } }
             do {
                 let worker = Task.detached { () throws -> [ArchiveMember] in
-                    let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                    try BookImporter.validateSize(try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0)
-                    return try BoundedArchive.read(Data(contentsOf:url))
+                    return try BoundedArchive.read(ImportedFileReader.read(url, maximumBytes: BookImporter.maximumBytes))
                 }
                 let result = try await withTaskCancellationHandler(operation:{try await worker.value},onCancel:{worker.cancel()})
                 try Task.checkCancellation(); members = result; selection = Set(supported.prefix(20).map(\.id))

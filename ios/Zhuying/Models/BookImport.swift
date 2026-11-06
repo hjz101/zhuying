@@ -45,20 +45,13 @@ enum BookImporter {
         case .originalPDF(let original):
             switch original {
             case .file(let url):
-                let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                try validateSize(try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0)
-                return try MediaBookImporter.originalPDF(Data(contentsOf:url),name:url.lastPathComponent)
+                return try MediaBookImporter.originalPDF(ImportedFileReader.read(url, maximumBytes: maximumBytes),name:url.lastPathComponent)
             case .remote(let url): let file = try await downloader.fetch(url); return try MediaBookImporter.originalPDF(file.data,name:file.suggestedName ?? url.lastPathComponent)
             default: throw BookImportError.message("原版式 PDF 需要本地文件或 HTTPS 文件链接。")
             }
         case .text(let text): return try prepare(data: Data(text.utf8), name: input.name, encoding: .utf8)
         case .file(let url):
-            let access = url.startAccessingSecurityScopedResource()
-            defer { if access { url.stopAccessingSecurityScopedResource() } }
-            let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-            guard values.isRegularFile == true else { throw BookImportError.message("请选择文件，文件夹暂不支持导入。") }
-            try validateSize(values.fileSize ?? 0)
-            return try prepare(data: Data(contentsOf: url), name: url.lastPathComponent, encoding: encoding)
+            return try prepare(data: ImportedFileReader.read(url, maximumBytes: maximumBytes), name: url.lastPathComponent, encoding: encoding)
         case .remote(let url):
             let downloaded = try await downloader.fetch(url)
             let suggested = downloaded.suggestedName ?? url.lastPathComponent

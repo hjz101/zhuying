@@ -53,11 +53,9 @@ struct ReadingStyleRulesView: View {
                 }
             }.environment(\.readingPreferenceDismiss, nil)
         }
-        .fileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
+        .nativeFileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
             do {
-                let url = try result.get(); let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                let data = try Data(contentsOf: url)
-                guard data.count <= 128_000 else { throw ReaderPreferenceError.invalid("规则文件超过 128 KB。") }
+                let data = try ImportedFileReader.read(result.get(), maximumBytes: 128_000)
                 let decoder = JSONDecoder()
                 let rules: [ReaderStyleRule]
                 if let list = try? decoder.decode([ReaderStyleRule].self, from: data) { rules = list }
@@ -66,7 +64,7 @@ struct ReadingStyleRulesView: View {
                 for rule in rules { try rule.validate(); if rule.scope == "当前书籍", rule.bookID == nil { throw ReaderPreferenceError.invalid("书籍规则缺少作品标识。") }; if rule.scope == "当前书源",rule.sourceID == nil { throw ReaderPreferenceError.invalid("来源规则缺少书源标识。") } }
                 for var rule in rules { rule.id = UUID().uuidString; store.settings.preferences.rules.append(rule) }
                 importMessage = "已导入 \(rules.count) 条规则。"
-            } catch { importMessage = error.localizedDescription }
+            } catch { if (error as NSError).code != NSUserCancelledError { importMessage = error.localizedDescription } }
         }
     }
     private func ruleEnabled(_ id: String) -> Binding<Bool> {
@@ -183,17 +181,16 @@ struct ReadingCommentSkinView: View {
                 Button("导入皮肤 JSON") { showImport = true }.font(.system(size: 13)).frame(minHeight: 44).accessibilityIdentifier("importCommentSkin")
                 if let error { Text(error).font(.system(size: 11)).foregroundStyle(Palette.accent) }
             }
-        }.fileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
+        }.nativeFileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
             do {
-                let url = try result.get(); let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                let data = try Data(contentsOf: url)
-                guard data.count < 32_000, let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], let value = object["style"] as? String, (styles + ["自定义"]).contains(value) else { throw ReaderPreferenceError.invalid("请选择包含有效 style 名称的皮肤 JSON。") }
+                let data = try ImportedFileReader.read(result.get(), maximumBytes: 31_999)
+                guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], let value = object["style"] as? String, (styles + ["自定义"]).contains(value) else { throw ReaderPreferenceError.invalid("请选择包含有效 style 名称的皮肤 JSON。") }
                 style.wrappedValue = value
                 if let radius = object["radius"] as? Double { if kind == .bubble { store.settings.preferences.bubbleRadius = min(30, max(0, radius)) } else { store.settings.preferences.godRadius = min(30, max(0, radius)) } }
                 if let hex = object["background"] as? String, let color = UInt32(hex.replacingOccurrences(of: "#", with: ""), radix: 16) { if kind == .bubble { store.settings.preferences.bubbleColor = color & 0xFFFFFF } else { store.settings.preferences.godBackground = color & 0xFFFFFF } }
                 if let hex = object["border"] as? String, let color = UInt32(hex.replacingOccurrences(of: "#", with: ""), radix: 16), kind == .god { store.settings.preferences.godBorder = color & 0xFFFFFF }
                 error = nil
-            } catch { self.error = error.localizedDescription }
+            } catch { if (error as NSError).code != NSUserCancelledError { self.error = error.localizedDescription } }
         }
     }
     private var styleOptions: [String] {

@@ -184,13 +184,12 @@ struct ReadingTitlePreferencesView: View {
                 Text("支持标题字号、对齐、颜色、背景、字距、上下留白、字重及下划线；不支持的属性会明确提示，预览保留上次有效样式。").font(.system(size: 11)).foregroundStyle(Palette.muted)
             }
         }.onAppear { setEditor(ReadingPreferencePresentation.titleEditorCSS(settings: store.settings)) }
-            .fileImporter(isPresented: $showFiles, allowedContentTypes: [.plainText, UTType(filenameExtension: "css") ?? .plainText]) { result in
+            .nativeFileImporter(isPresented: $showFiles, allowedContentTypes: [.plainText, UTType(filenameExtension: "css") ?? .plainText]) { result in
                 do {
-                    let url = try result.get(); let allowed = url.startAccessingSecurityScopedResource(); defer { if allowed { url.stopAccessingSecurityScopedResource() } }
-                    let data = try Data(contentsOf: url)
-                    guard data.count <= 60_000, let text = String(data: data, encoding: .utf8) else { throw CocoaError(.fileReadCorruptFile) }
+                    let data = try ImportedFileReader.read(result.get(), maximumBytes: 60_000)
+                    guard let text = String(data: data, encoding: .utf8) else { throw CocoaError(.fileReadCorruptFile) }
                     apply(text)
-                } catch { self.error = error.localizedDescription }
+                } catch { if (error as NSError).code != NSUserCancelledError { self.error = error.localizedDescription } }
             }
     }
     private var sourceBinding: Binding<Bool> {

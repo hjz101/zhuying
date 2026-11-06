@@ -88,15 +88,13 @@ struct ReadingFontManagerView: View {
                 }
             }.padding(22)
         }.appPageStyle().navigationTitle("字体管理").navigationBarTitleDisplayMode(.inline).readingPreferenceDoneToolbar()
-            .fileImporter(isPresented: $showingFiles, allowedContentTypes: ["ttf", "otf", "ttc"].compactMap { UTType(filenameExtension: $0) }, allowsMultipleSelection: false) { result in
+            .nativeFileImporter(isPresented: $showingFiles, allowedContentTypes: ["ttf", "otf", "ttc"].compactMap { UTType(filenameExtension: $0) }, allowsMultipleSelection: false) { result in
                 do {
                     guard let url = try result.get().first else { return }
-                    let access = url.startAccessingSecurityScopedResource()
-                    defer { if access { url.stopAccessingSecurityScopedResource() } }
                     let added = try fonts.importFont(at: url)
                     store.settings.preferences.fontName = added.first?.postScriptName
                     store.settings.preferences.fontResourceHash = added.first?.resource?.digest
-                } catch { self.error = error.localizedDescription }
+                } catch { if (error as NSError).code != NSUserCancelledError { self.error = error.localizedDescription } }
             }
             .alert("字体导入", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("知道了") { error = nil } } message: { Text(error ?? "") }
     }

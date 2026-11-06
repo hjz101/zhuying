@@ -14,6 +14,7 @@ struct SmartImportView: View {
     @StateObject private var session = BookImportSession()
     @State private var source = ImportSource.local
     @State private var showingFiles = false
+    @State private var initialized = false
     @State private var showingHelp = false
     @State private var link = ""
     @State private var group = "未分组"
@@ -56,15 +57,20 @@ struct SmartImportView: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) {
                 Button { showingHelp = true } label: { Image(systemName: "questionmark.circle") }.accessibilityLabel("导入帮助")
             } }
-            .fileImporter(isPresented: $showingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            .nativeFileImporter(isPresented: $showingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
                 switch result {
                 case .success(let urls): if !urls.isEmpty { add(urls.map { .file($0) }) }
                 case .failure(let error):
                     if (error as NSError).code != NSUserCancelledError { session.message = "未能选择文件：\(error.localizedDescription)" }
                 }
             }
-            .onAppear { if originalPDFMode && session.items.isEmpty { pdfOriginal = true }; if openPickerOnAppear { showingFiles = true }; if let initialInput,session.items.isEmpty { add([initialInput]) } }
-            .onDisappear { session.cancel() }
+            .onAppear {
+                guard !initialized else { return }; initialized = true
+                if originalPDFMode { pdfOriginal = true }
+                if openPickerOnAppear { showingFiles = true }
+                if let initialInput { add([initialInput]) }
+            }
+            .onDisappear { if !showingFiles && !showingHelp { session.cancel() } }
             .onChange(of: source) { _, _ in session.message = nil }
             .sheet(isPresented: $showingHelp) { help }
     }

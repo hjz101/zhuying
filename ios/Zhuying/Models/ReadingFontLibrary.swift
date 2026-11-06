@@ -112,9 +112,7 @@ final class ReadingFontLibrary: ObservableObject {
         message = entries.count == saved.count ? nil : "部分字体文件缺失或校验失败，正文将暂用系统字体；可重新导入修复。"
     }
     @discardableResult func importFont(at url: URL) throws -> [ReadingFontEntry] {
-        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-        guard size > 0, size <= 20 * 1024 * 1024 else { throw ReadingFontError.invalid("请选择 20 MB 以内的 TTF、OTF 或 TTC 文件。") }
-        return try importFont(data: Data(contentsOf: url), originalName: url.lastPathComponent)
+        return try importFont(data: ImportedFileReader.read(url, maximumBytes: 20 * 1024 * 1024), originalName: url.lastPathComponent)
     }
     @discardableResult func importFont(data: Data, originalName: String) throws -> [ReadingFontEntry] {
         guard !data.isEmpty, data.count <= 20 * 1024 * 1024,

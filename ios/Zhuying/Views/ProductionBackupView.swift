@@ -38,14 +38,11 @@ struct ProductionBackupView: View {
                     }
                 }
             }
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.item]) { result in
+            .nativeFileImporter(isPresented: $importing, allowedContentTypes: [.item]) { result in
                 switch result {
                 case .success(let url):
                     Task { await perform {
-                        let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                        let bytes = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-                        guard bytes > 0, bytes <= LibraryBackup.maximumBytes else { throw ContentFailure.invalidResponse }
-                        let data = try Data(contentsOf: url)
+                        let data = try await Task.detached { try ImportedFileReader.read(url, maximumBytes: LibraryBackup.maximumBytes) }.value
                         pending = try await Task.detached { try LibraryBackup.decode(data) }.value
                     } }
                 case .failure(let error): if (error as NSError).code != NSUserCancelledError { message = error.localizedDescription }

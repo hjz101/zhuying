@@ -66,6 +66,23 @@ final class SmartImportFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["选择 → 预览 → 导入"].exists)
     }
 
+    @MainActor func testShelfAutomaticPickerCancelAndReopenOnlyImportsSelectedFileOnce() {
+        let app = launch(production: true)
+        app.buttons["shelfAddBook"].tap()
+        app.buttons["本地导入"].tap()
+        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5) || app.buttons["取消"].exists)
+        if app.buttons["Cancel"].exists { app.buttons["Cancel"].tap() } else { app.buttons["取消"].tap() }
+        XCTAssertTrue(app.buttons["importChooseFiles"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["importConfirm"].exists)
+        app.buttons["importChooseFiles"].tap()
+        chooseFile("导入测试", app: app)
+        XCTAssertTrue(app.buttons["importConfirm"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["importConfirm"].label.contains("1"))
+        XCTAssertFalse(app.buttons["Cancel"].exists)
+        XCTAssertFalse(app.buttons["取消"].exists)
+        XCTAssertTrue(app.staticTexts["importStatus-导入测试.txt"].exists)
+    }
+
     @MainActor func testActualFileImportReadingDuplicateAndRestart() {
         let app = launch(); openImport(app)
         app.buttons["importChooseFiles"].tap(); chooseFile("导入测试", app: app)

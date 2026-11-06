@@ -41,10 +41,9 @@ struct ProductionContentRulesView: View {
             .task { do { rules = try await library.contentProcessor.rules(); message = await library.contentProcessor.message } catch { message = "规则未载入，原文件保留：\(error.localizedDescription)" } }
             .sheet(item:$editing) { rule in NavigationStack { ContentRuleEditor(rule:rule) { value in var next = rules; if let index = next.firstIndex(where:{$0.id == value.id}) { next[index] = value } else { next.append(value) }; try await save(next) } } }
             .sheet(item:$export) { file in NativeFileExporter(file:file) { _ in export = nil } }
-            .fileImporter(isPresented:$importing,allowedContentTypes:[.json]) { result in
-                if case .success(let url) = result {
-                    do { let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }; guard (try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? Int.max) <= 512 * 1024 else { throw RuleExtractionError.limit }; pending = try ContentProcessingStore.decode(Data(contentsOf:url)) } catch { message = error.localizedDescription }
-                }
+            .nativeFileImporter(isPresented:$importing,allowedContentTypes:[.json]) { result in
+                do { pending = try ContentProcessingStore.decode(ImportedFileReader.read(result.get(), maximumBytes: 512 * 1024)) }
+                catch { if (error as NSError).code != NSUserCancelledError { message = error.localizedDescription } }
             }
             .confirmationDialog("导入 \(pending?.count ?? 0) 条净化规则？",isPresented:Binding(get:{pending != nil},set:{if !$0 { pending = nil }}),titleVisibility:.visible) {
                 Button("导入并保持停用") { guard let pending else { return }; self.pending = nil; let known = Set(rules.map(\.id)),added = pending.filter{!known.contains($0.id)}.map { value in var item = value; item.enabled = false; return item }; commit(rules + added) }

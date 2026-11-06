@@ -81,7 +81,7 @@ struct ReaderDocument {
     let text: NSAttributedString
     let paragraphRanges: [NSRange]
 
-    init(book: Book, chapter: Int, settings: ReadingSettings, paragraphs: [String]? = nil, isDemo: Bool = true) {
+    init(book: Book, chapter: Int, settings: ReadingSettings, paragraphs: [String]? = nil, isDemo: Bool = true,sourceID: String? = nil) {
         let text = NSMutableAttributedString(string: "")
         let preferences = settings.preferences
         let palette = ReaderPalette(settings: settings)
@@ -126,7 +126,7 @@ struct ReaderDocument {
             style.paragraphSpacing = preferences.paragraphSpacing
             style.firstLineHeadIndent = preferences.firstLineIndent ? settings.fontSize * 2 : 0
             let body = NSMutableAttributedString(string: paragraph, attributes: [.font: font, .foregroundColor: palette.ink, .paragraphStyle: style, .kern: 0.6])
-            ReaderTypography.applyRules(preferences.rules, to: body, paragraph: paragraphIndex, settings: settings)
+            ReaderTypography.applyRules(ReaderStyleRule.effective(preferences.rules,bookID:book.id,sourceID:sourceID), to: body, paragraph: paragraphIndex, settings: settings)
             text.append(body)
             if isDemo && preferences.showCommentBubbles {
                 let attachment = ReaderResponsiveCommentAttachment()

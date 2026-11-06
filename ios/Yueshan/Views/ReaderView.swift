@@ -92,7 +92,7 @@ struct ReaderView: View {
             .task(id: key) {
                 guard initialized, let loaded else { return }
                 reflowing = true
-                let nextDocument = ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: loaded.paragraphs.map(\.text), isDemo: store.isDemo)
+                let nextDocument = ReaderDocument(book: book, chapter: chapter, settings: store.settings, paragraphs: loaded.paragraphs.map(\.text), isDemo: store.isDemo,sourceID:store.remoteMetadata(book.id)?.source?.sourceID)
                 rendered = nextDocument
                 if store.settings.mode.isPaged {
                     let newRanges = ReaderPaginator.ranges(document: nextDocument, size: layout.textFrame.size)

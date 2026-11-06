@@ -6,6 +6,7 @@ private enum ImportSource: String, CaseIterable { case local = "本地文件", l
 
 struct SmartImportView: View {
     var openPickerOnAppear = false
+    var initialInput: BookImportInput? = nil
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var demo: FeatureDemoStore
     @Environment(\.dismiss) private var dismiss
@@ -59,7 +60,7 @@ struct SmartImportView: View {
                     if (error as NSError).code != NSUserCancelledError { session.message = "未能选择文件：\(error.localizedDescription)" }
                 }
             }
-            .onAppear { if openPickerOnAppear { showingFiles = true } }
+            .onAppear { if openPickerOnAppear { showingFiles = true }; if let initialInput,session.items.isEmpty { add([initialInput]) } }
             .onDisappear { session.cancel() }
             .onChange(of: source) { _, _ in session.message = nil }
             .sheet(isPresented: $showingHelp) { help }

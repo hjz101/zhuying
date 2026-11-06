@@ -96,7 +96,7 @@ struct ReaderPreferences: Codable, Equatable {
             }
             value.name = String(value.name.prefix(80))
             value.color &= 0xFFFFFF
-            if value.scope != "全部书籍" || (try? value.validate()) == nil { value.enabled = false }
+            if (value.scope == "当前书籍" && value.bookID?.isEmpty != false) || (value.scope == "当前书源" && value.sourceID?.isEmpty != false) || (try? value.validate()) == nil { value.enabled = false }
             return value
         }
         if var colors { colors.background &= 0xFFFFFF; colors.ink &= 0xFFFFFF; colors.accent &= 0xFFFFFF; self.colors = colors }
@@ -210,6 +210,16 @@ struct ReaderStyleRule: Identifiable, Codable, Equatable {
     var color: UInt32 = 0x8F5442
     var enabled = false
     var scope = "全部书籍"
+    var bookID: String? = nil
+    var sourceID: String? = nil
+    func applies(bookID: String?,sourceID: String?) -> Bool {
+        switch scope { case "当前书籍": return self.bookID != nil && self.bookID == bookID
+        case "当前书源": return self.sourceID != nil && self.sourceID == sourceID
+        default: return scope == "全部书籍" }
+    }
+    static func effective(_ rules: [Self],bookID: String?,sourceID: String?) -> [Self] {
+        ["当前书籍","当前书源","全部书籍"].flatMap { scope in rules.filter { $0.scope == scope && $0.applies(bookID:bookID,sourceID:sourceID) } }
+    }
 
     static let templates = [
         ReaderStyleRule(id: "dialogue", name: "人物对话"),
@@ -232,7 +242,8 @@ struct ReaderStyleRule: Identifiable, Codable, Equatable {
 
     func ranges(in text: String) throws -> [NSRange] {
         try validate()
-        guard !text.isEmpty, scope == "全部书籍" else { return [] }
+        guard !text.isEmpty else { return [] }
+        if scope == "当前书籍" && bookID?.isEmpty != false || scope == "当前书源" && sourceID?.isEmpty != false { return [] }
         if match == "章节首段" { return [(text as NSString).rangeOfComposedCharacterSequence(at: 0)] }
         let source: String
         switch match {

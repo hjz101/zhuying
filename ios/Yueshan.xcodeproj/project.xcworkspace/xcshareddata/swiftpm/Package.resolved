@@ -1,6 +1,15 @@
 {
-  "originHash" : "ef32dc02c3a369f34b78cd1078fe1e845c880699d4afb2be18db3609d3eae5d0",
+  "originHash" : "b5cd763fc757868e1fecd5ac83c9542803c66c222cd5aec38f51755e4f4ff2af",
   "pins" : [
+    {
+      "identity" : "fuzi",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/cezheng/Fuzi.git",
+      "state" : {
+        "revision" : "f08c8323da21e985f3772610753bcfc652c2103f",
+        "version" : "3.1.3"
+      }
+    },
     {
       "identity" : "grdb.swift",
       "kind" : "remoteSourceControl",
@@ -8,6 +17,15 @@
       "state" : {
         "revision" : "92a554cd0d5e8d67cb18993c6054e73fe42c066c",
         "version" : "7.12.0"
+      }
+    },
+    {
+      "identity" : "libarchive-for-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/matteo-pacini/libarchive-for-swift.git",
+      "state" : {
+        "revision" : "e8b70b7f0e15108a828362fe696e63898d5be916",
+        "version" : "1.0.0"
       }
     },
     {

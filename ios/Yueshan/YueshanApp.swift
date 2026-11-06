@@ -103,6 +103,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = AppTab.shelf
     @State private var showPlayer = false
+    @State private var sharedImport: ShareImportRequest?
 
     var body: some View {
         navigationTabs
@@ -157,6 +158,11 @@ struct RootView: View {
         .onReceive(shushan.$credential) { demo.updateShushanAccount($0, host: shushan.hostText); configureSource() }
         .onChange(of: shushan.expired) { _, _ in configureSource() }
         .tint(Palette.green)
+        .onOpenURL { url in
+            do { let request = try ShareImportRequest.parse(url); if sharedImport?.id != request.id { sharedImport = request } }
+            catch { store.storageMessage = error.localizedDescription }
+        }
+        .sheet(item:$sharedImport) { request in NavigationStack { ShareImportView(request:request).toolbar { ToolbarItem(placement:.topBarTrailing) { Button("完成") { sharedImport = nil } } } } }
         .preferredColorScheme(.light)
         .onReceive(NotificationCenter.default.publisher(for: .showImportedShelf)) { _ in selectedTab = .shelf }
         .onChange(of: navigation.visibleTabs) { _, _ in selectedTab = navigation.validSelection(selectedTab) }

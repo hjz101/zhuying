@@ -42,7 +42,7 @@ struct ReadingStyleRulesView: View {
                 }
             }
             if let importMessage { Text(importMessage).font(.system(size: 11)).foregroundStyle(Palette.accent).accessibilityIdentifier("readingRuleImportResult") }
-            Text("从上到下决定同类样式的优先级；首字下沉是段落装饰，可与对话高亮叠加。规则作用于全部书籍。").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            Text(store.isDemo ? "从上到下决定同类样式的优先级；首字下沉是段落装饰，可与对话高亮叠加。规则作用于全部书籍。" : "书籍规则优先于书源及全局规则；同范围按列表顺序。样式不修改正文或文字位置。").font(.system(size: 11)).foregroundStyle(Palette.muted)
         }
         .sheet(item: $editing) { rule in
             NavigationStack {
@@ -63,7 +63,7 @@ struct ReadingStyleRulesView: View {
                 if let list = try? decoder.decode([ReaderStyleRule].self, from: data) { rules = list }
                 else { rules = [try decoder.decode(ReaderStyleRule.self, from: data)] }
                 guard !rules.isEmpty, rules.count + store.settings.preferences.rules.count <= 64 else { throw ReaderPreferenceError.invalid("最多保存 64 条规则。") }
-                for rule in rules { try rule.validate(); guard rule.scope == "全部书籍" else { throw ReaderPreferenceError.invalid("当前仅支持全部书籍的规则。") } }
+                for rule in rules { try rule.validate(); if rule.scope == "当前书籍", rule.bookID == nil { throw ReaderPreferenceError.invalid("书籍规则缺少作品标识。") }; if rule.scope == "当前书源",rule.sourceID == nil { throw ReaderPreferenceError.invalid("来源规则缺少书源标识。") } }
                 for var rule in rules { rule.id = UUID().uuidString; store.settings.preferences.rules.append(rule) }
                 importMessage = "已导入 \(rules.count) 条规则。"
             } catch { importMessage = error.localizedDescription }
@@ -94,7 +94,7 @@ struct ReadingStyleRuleEditor: View {
     private var previewSettings: ReadingSettings {
         var settings = store.settings
         settings.preferences.rules.removeAll { $0.id == draft.id }
-        var preview = draft; preview.enabled = true
+        var preview = draft; preview.enabled = true; preview.scope = "全部书籍"
         settings.preferences.rules.insert(preview, at: 0)
         return settings
     }
@@ -109,7 +109,12 @@ struct ReadingStyleRuleEditor: View {
                 }
                 Picker("呈现方式", selection: $draft.presentation) { ForEach(["文字高亮", "段落底色", "居中斜体", "首字下沉"], id: \.self) { Text($0) } }.accessibilityIdentifier("readingRulePresentation")
                 ColorPicker("样式颜色", selection: Binding(get: { Color(hex: draft.color) }, set: { draft.color = $0.readingPreferenceHex }), supportsOpacity: false)
-                Text("作用范围：全部书籍").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                if store.isDemo { Text("作用范围：全部书籍").font(.system(size:11)).foregroundStyle(Palette.muted) }
+                else {
+                    Picker("作用范围",selection:$draft.scope) { ForEach(["全部书籍","当前书籍","当前书源"],id:\.self) { Text($0) } }.accessibilityIdentifier("readingRuleScope")
+                    if draft.scope == "当前书籍" { Picker("作品",selection:Binding(get:{draft.bookID ?? ""},set:{draft.bookID = $0})) { Text("选择作品").tag(""); ForEach(store.books) { Text($0.title).tag($0.id) } } }
+                    if draft.scope == "当前书源" { Picker("书源",selection:Binding(get:{draft.sourceID ?? ""},set:{draft.sourceID = $0})) { Text("选择书源").tag(""); ForEach(store.sources) { Text($0.name).tag($0.id) } } }
+                }
             }
             AppSettingsCard("匹配测试", icon: "checkmark.magnifyingglass") {
                 TextEditor(text: $testText).font(.system(size: 12)).frame(height: 100).accessibilityIdentifier("readingRuleTestText")
@@ -118,7 +123,11 @@ struct ReadingStyleRuleEditor: View {
             }
             if let error { Text(error).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("readingRuleError") }
             Button("保存规则") {
-                do { draft.scope = "全部书籍"; try draft.validate(); onSave(draft) }
+                do {
+                    if draft.scope == "当前书籍",draft.bookID?.isEmpty != false { throw ReaderPreferenceError.invalid("请选择作用的作品。") }
+                    if draft.scope == "当前书源",draft.sourceID?.isEmpty != false { throw ReaderPreferenceError.invalid("请选择作用的书源。") }
+                    try draft.validate(); onSave(draft)
+                }
                 catch { self.error = error.localizedDescription }
             }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("saveReadingRule")
         }.toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { dismiss() } } }

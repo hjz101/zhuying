@@ -21,7 +21,7 @@ final class SourceHTTPTransport: HTTPTransport, @unchecked Sendable {
     private var cachedSession: URLSession?
     private let makeSession: @Sendable () -> URLSession
     init(makeSession: (@Sendable () -> URLSession)? = nil) {
-        self.makeSession = makeSession ?? Self.makeDefaultSession
+        self.makeSession = makeSession ?? { Self.makeDefaultSession() }
     }
     deinit { cachedSession?.invalidateAndCancel() }
     private static func makeDefaultSession() -> URLSession {

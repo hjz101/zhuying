@@ -36,7 +36,11 @@ final class SourceHTTPTransportTests: XCTestCase {
         try await withThrowingTaskGroup(of: Data.self) { group in
             for index in 0..<8 {
                 let source = transport!
-                group.addTask { try await source.send(URLRequest(url: URL(string: "https://transport.test/\(index)")!)).0 }
+                group.addTask {
+                    let (body, response) = try await source.send(URLRequest(url: URL(string: "https://transport.test/\(index)")!))
+                    XCTAssertEqual(response.statusCode, 200)
+                    return body
+                }
             }
             var bodies = Set<String>()
             for try await bytes in group { bodies.insert(String(decoding: bytes, as: UTF8.self)) }

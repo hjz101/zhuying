@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "date": "2026-11-06",
-  "sourceDigest": "78e5036e0704819bbc6a1a7e6c1e862ad5347d423e195ec2e479bb12eea36e41",
+  "sourceDigest": "cf37a127ec05ff6201fd049b3320ddc125a7b6275cced82c944243e77ffa59a1",
   "performanceReport": "performance.json",
   "launchReport": "launch.json",
   "nativeDiagnosticReport": "native-app.json",
@@ -14,8 +14,8 @@
     "demoSnapshotChecks": 7,
     "performanceCorrectnessTests": 3,
     "coverageStrategy": "Previous complete 67-flow regression plus new navigation flow and affected network, theme, reader and small-screen reruns; not a second full 68-flow run.",
-    "unitLog": "yueshan-stage-four-resources-final.log",
-    "performanceLog": "yueshan-stage-four-final-performance.log",
+    "unitLog": "yueshan-stage-four-factory-final.log",
+    "performanceLog": "yueshan-stage-four-factory-performance.log",
     "uiReruns": [
       {
         "log": "yueshan-lazy-network-validation.log",
@@ -56,6 +56,9 @@
           "ReaderFlowTests.testShelfReaderContentsAndPreferences"
         ]
       }
+    ],
+    "notes": [
+      "Final closure spelling explicitly preserves the Sendable session-factory type; the complete unit target was rerun after this compiler-warning fix."
     ]
   },
   "liveApp": {

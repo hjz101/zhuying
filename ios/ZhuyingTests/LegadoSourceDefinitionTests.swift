@@ -16,7 +16,7 @@ final class LegadoSourceDefinitionTests: XCTestCase {
     }
     func testDecodesOriginalFieldsAndCanonicalOriginWithoutChangingRawRules() throws {
         let value = try definition(row())
-        XCTAssertEqual(value.name, "竹影原创规则"); XCTAssertEqual(value.baseURL.absoluteString, "https://source.test/")
+        XCTAssertEqual(value.name, "竹影原创规则"); XCTAssertEqual(value.baseURL?.absoluteString, "https://source.test/")
         XCTAssertEqual(value.sourceURL, "https://SOURCE.test/api")
         XCTAssertEqual(value.search["bookList"], "class.book")
         XCTAssertEqual(value.content["content"], "id.content@html")
@@ -26,11 +26,12 @@ final class LegadoSourceDefinitionTests: XCTestCase {
     func testOpaqueIdentityNeedsExplicitStaticHTTPSRequestOrigin() throws {
         var value = row(); value["bookSourceUrl"] = "原创规则ID"
         value["searchUrl"] = "https://fixture.test/search?q={{key}}"
-        XCTAssertEqual(try definition(value).baseURL.absoluteString, "https://fixture.test/")
+        XCTAssertEqual(try definition(value).baseURL?.absoluteString, "https://fixture.test/")
         value["searchUrl"] = "<js>source.getVariable()</js>"
-        XCTAssertThrowsError(try definition(value))
+        let dynamic = try definition(value)
+        XCTAssertNil(dynamic.baseURL); XCTAssertTrue(dynamic.policy.allowedOrigins.isEmpty)
         value["bookSourceUrl"] = "http://fixture.test"; value["searchUrl"] = "/search"
-        XCTAssertThrowsError(try definition(value))
+        XCTAssertNil(try definition(value).baseURL)
     }
     func testMissingRequiredPipelineFieldsAndWrongTypesCannotBeLabelledRunnable() throws {
         for key in ["searchUrl", "ruleSearch", "ruleToc", "ruleContent"] {

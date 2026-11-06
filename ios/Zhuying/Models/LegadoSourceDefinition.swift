@@ -16,7 +16,8 @@ enum LegadoCompatibilityError: LocalizedError, Equatable {
 struct LegadoSourceDefinition {
     let name: String
     let sourceURL: String
-    let baseURL: URL
+    let baseURL: URL?
+    let policy: LegadoSourcePolicy
     let searchURL: String
     let header: String
     let jsLib: String
@@ -64,12 +65,13 @@ struct LegadoSourceDefinition {
             parts.scheme = "https"; parts.host = host.lowercased(); parts.path = "/"; parts.query = nil; parts.fragment = nil
             return parts.url
         }
-        // Opaque legacy identities need a static request origin. Script-only
-        // origins cannot be inferred or invented while labelling a source ready.
+        // A dynamic source has no initial network route. Its declared literal
+        // candidates are checked only after its script produces an actual URL.
         let searchPrefix = string("searchUrl").prefix { $0 != "," && $0 != "{" && !$0.isWhitespace }
-        guard let base = origin(address) ?? origin(String(searchPrefix)) else { throw LegadoCompatibilityError.unsupported("缺少明确的 HTTPS 请求主机") }
+        let base = origin(address) ?? origin(String(searchPrefix))
+        let policy = try LegadoSourcePolicy.declared(sourceID: source.id, raw: raw)
         guard string("jsLib").utf8.count <= 256 * 1024 else { throw LegadoCompatibilityError.limit }
-        return .init(name: source.name, sourceURL: address, baseURL: base, searchURL: string("searchUrl"), header: string("header"), jsLib: string("jsLib"),
+        return .init(name: source.name, sourceURL: address, baseURL: base, policy: policy, searchURL: string("searchUrl"), header: string("header"), jsLib: string("jsLib"),
                      loginURL: string("loginUrl"), exploreURL: string("exploreUrl"), search: search, bookInfo: bookInfo, toc: toc, content: content,
                      explore: try rules("ruleExplore"), raw: raw)
     }

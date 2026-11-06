@@ -1,0 +1,29 @@
+{
+  "themes": [
+    {
+      "id": "zhuying-qingzhu-reader",
+      "name": "竹影·青竹阅读",
+      "version": "1.0.0",
+      "mode": "light",
+      "background": "#F7FAF8",
+      "ink": "#182B25",
+      "accent": "#16876A",
+      "summary": "当前 JSON 格式示例：阅读配色、原生兼容标题与气泡，不携带全局换肤、阅读布局或字体。",
+      "godStyle": "纯色",
+      "chapterTitles": [
+        {
+          "id": "main",
+          "name": "青竹章首",
+          "css": ".chapter-title { font-size:26pt; font-weight:medium; text-align:center; color:#182B25; letter-spacing:1pt; padding-top:12pt; padding-bottom:18pt; }"
+        }
+      ],
+      "commentBubbles": [
+        {
+          "id": "main",
+          "name": "青竹气泡",
+          "svg": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 44'><path d='M12 3H60Q69 3 69 12V29Q69 36 60 36H24L14 42V36H12Q3 36 3 27V12Q3 3 12 3Z' fill='{{accent}}'/><text x='36' y='25' text-anchor='middle' font-size='16' fill='{{background}}'>{{count}}</text></svg>"
+        }
+      ]
+    }
+  ]
+}

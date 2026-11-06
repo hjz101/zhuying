@@ -1,6 +1,7 @@
 import XCTest
 import ZIPFoundation
 import UIKit
+import Darwin
 @testable import Zhuying
 
 @MainActor
@@ -348,5 +349,68 @@ final class GlobalThemeTests: XCTestCase {
             XCTAssertEqual(library.settings.preferences.effectiveGodStyle, "画框")
             XCTAssertEqual(library.settings.mode, behavior); XCTAssertEqual(library.settings.tapToTurn, tap); XCTAssertEqual(library.settings.haptics, haptics)
         }
+    }
+
+    func testThemeZIPReadsUnicodeResourcesUnderCLocaleWithoutChangingLocale() throws {
+        let locale = try XCTUnwrap(newlocale(LC_CTYPE_MASK, "C", nil))
+        let previous = uselocale(locale)
+        defer { uselocale(previous); freelocale(locale) }
+        var value = bundle()
+        value.resources["assets/reader/章首.css"] = value.resources.removeValue(forKey: "assets/reader/title.css")
+        value.document.reader!.resources["title"] = .init(path: "assets/reader/章首.css")
+        let decoded = try GlobalThemePackage.decode(GlobalThemePackage.encode(value))
+        XCTAssertEqual(decoded.document, value.document)
+        XCTAssertEqual(uselocale(nil), locale)
+        for mode in ["浅色", "深色"] { XCTAssertNoThrow(try GlobalThemePackage.decode(inkMountainPackage(mode))) }
+    }
+
+    private func zipUInt16(_ data: Data, at: Int) -> UInt16 { UInt16(data[at]) | UInt16(data[at + 1]) << 8 }
+    private func zipUInt32(_ data: Data, at: Int) -> UInt32 { UInt32(zipUInt16(data, at: at)) | UInt32(zipUInt16(data, at: at + 2)) << 16 }
+    private func putZipUInt16(_ value: UInt16, in data: inout Data, at: Int) {
+        data.replaceSubrange(at..<at + 2, with: [UInt8(truncatingIfNeeded: value), UInt8(truncatingIfNeeded: value >> 8)])
+    }
+    private func putZipUInt32(_ value: UInt32, in data: inout Data, at: Int) {
+        data.replaceSubrange(at..<at + 4, with: (0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) })
+    }
+    private func zipCentralOffsets(_ data: Data) -> [Int] {
+        let end = data.count - 22
+        var cursor = Int(zipUInt32(data, at: end + 16)), result: [Int] = []
+        for _ in 0..<Int(zipUInt16(data, at: end + 10)) {
+            result.append(cursor)
+            cursor += 46 + Int(zipUInt16(data, at: cursor + 28)) + Int(zipUInt16(data, at: cursor + 30)) + Int(zipUInt16(data, at: cursor + 32))
+        }
+        return result
+    }
+    func testThemeZIPRejectsTruncationEncryptedTailAndMismatchedHeaders() throws {
+        let original = try GlobalThemePackage.encode(bundle())
+        XCTAssertThrowsError(try GlobalThemePackage.decode(original.dropLast(15))) { error in
+            XCTAssertTrue(error.localizedDescription.contains("中央目录"))
+        }
+        let last = try XCTUnwrap(zipCentralOffsets(original).last)
+        var encrypted = original
+        putZipUInt16(zipUInt16(original, at: last + 8) | 1, in: &encrypted, at: last + 8)
+        XCTAssertThrowsError(try GlobalThemePackage.decode(encrypted)) { XCTAssertTrue($0.localizedDescription.contains("加密")) }
+        var badName = original
+        let local = Int(zipUInt32(original, at: last + 42))
+        badName[local + 30] ^= 1
+        XCTAssertThrowsError(try GlobalThemePackage.decode(badName)) { XCTAssertTrue($0.localizedDescription.contains("文件头")) }
+        var badCount = original
+        let count = zipUInt16(original, at: original.count - 12) + 1
+        putZipUInt16(count, in: &badCount, at: original.count - 14)
+        putZipUInt16(count, in: &badCount, at: original.count - 12)
+        XCTAssertThrowsError(try GlobalThemePackage.decode(badCount))
+    }
+    func testThemeZIPChecksActualCRCAndRejectsUnsupportedCompression() throws {
+        let original = try GlobalThemePackage.encode(bundle())
+        let first = try XCTUnwrap(zipCentralOffsets(original).first)
+        let local = Int(zipUInt32(original, at: first + 42))
+        var badCRC = original
+        let checksum = zipUInt32(original, at: first + 16) ^ 1
+        putZipUInt32(checksum, in: &badCRC, at: first + 16)
+        putZipUInt32(checksum, in: &badCRC, at: local + 14)
+        XCTAssertThrowsError(try GlobalThemePackage.decode(badCRC)) { XCTAssertTrue($0.localizedDescription.contains("CRC")) }
+        var unsupported = original
+        putZipUInt16(12, in: &unsupported, at: first + 10)
+        XCTAssertThrowsError(try GlobalThemePackage.decode(unsupported)) { XCTAssertTrue($0.localizedDescription.contains("Deflate")) }
     }
 }

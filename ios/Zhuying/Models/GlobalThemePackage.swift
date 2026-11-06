@@ -225,7 +225,7 @@ enum GlobalThemePackage {
     }
     static func decode(_ data: Data) throws -> GlobalThemeBundle {
         guard !data.isEmpty, data.count <= maximumBytes, try BoundedArchive.identify(data) == .zip else { throw GlobalThemeError.invalid("请选择不超过 20 MB 的竹影主题包。") }
-        let entries = try BoundedArchive.read(data)
+        let entries = try ThemeZIPArchive.read(data)
         guard entries.count <= 512 else { throw GlobalThemeError.invalid("主题包文件超过 512 项。") }
         var files: [String: Data] = [:]
         for entry in entries where !entry.directory {
@@ -398,5 +398,107 @@ enum GlobalThemePackage {
             result.append(.init(path: "global-themes/" + digest + ".zhuyingtheme", data: bytes))
         }
         return result
+    }
+}
+
+/// Theme v1 only needs bounded Store/Deflate ZIPs. Keep this path independent
+/// of libarchive's POSIX locale/iconv setup, which differs on physical iOS.
+private enum ThemeZIPArchive {
+    private struct Record {
+        let bytes: UInt32
+        let checksum: UInt32
+    }
+    private static func invalid(_ reason: String) -> GlobalThemeError {
+        .invalid("主题 ZIP 无法读取：\(reason)。原包未改动。")
+    }
+    static func read(_ data: Data) throws -> [ArchiveMember] {
+        let records = try directory(data)
+        let archive: Archive
+        do { archive = try Archive(data: data, accessMode: .read) }
+        catch { throw invalid("中央目录或文件头损坏") }
+        let iterator = archive.makeIterator()
+        var result: [ArchiveMember] = [], seen = Set<String>(), total = 0
+        for record in records {
+            try Task.checkCancellation()
+            guard let entry = iterator.next() else { throw invalid("包含加密条目或不完整文件头") }
+            guard entry.type != .symlink else { throw invalid("不支持符号链接") }
+            let isDirectory = entry.type == .directory
+            let path = entry.path
+            let clean = isDirectory && path.hasSuffix("/") ? String(path.dropLast()) : path
+            guard GlobalThemePackage.safePath(clean), seen.insert(clean.precomposedStringWithCanonicalMapping.lowercased()).inserted else {
+                throw invalid("包含不安全或重复路径")
+            }
+            guard entry.uncompressedSize == UInt64(record.bytes), entry.checksum == record.checksum else { throw invalid("文件头与目录不一致") }
+            guard !isDirectory || record.bytes == 0 else { throw invalid("目录条目包含文件数据") }
+            var payload = Data()
+            let checksum: UInt32
+            do {
+                checksum = try archive.extract(entry, bufferSize: 65_536, skipCRC32: false) { chunk in
+                    try Task.checkCancellation()
+                    guard payload.count + chunk.count <= Int(record.bytes), total + chunk.count <= BoundedArchive.maximumExpanded else {
+                        throw invalid("解压数据超过声明大小或 64 MB 限制")
+                    }
+                    payload.append(chunk); total += chunk.count
+                }
+            } catch is CancellationError { throw CancellationError() }
+            catch let error as GlobalThemeError { throw error }
+            catch { throw invalid("压缩数据损坏或压缩方式不支持") }
+            guard payload.count == Int(record.bytes), checksum == record.checksum else { throw invalid("文件 CRC 或大小校验失败") }
+            result.append(.init(path: path, data: payload, directory: isDirectory))
+        }
+        guard iterator.next() == nil else { throw invalid("条目数量与目录不一致") }
+        return result
+    }
+    private static func directory(_ data: Data) throws -> [Record] {
+        // This small preflight also prevents ZIPFoundation's iterator from
+        // silently stopping on an encrypted or malformed central-directory entry.
+        let bytes = [UInt8](data)
+        guard bytes.count >= 22 else { throw invalid("文件未完整下载") }
+        func u16(_ at: Int) -> UInt16 { UInt16(bytes[at]) | UInt16(bytes[at + 1]) << 8 }
+        func u32(_ at: Int) -> UInt32 { UInt32(u16(at)) | UInt32(u16(at + 2)) << 16 }
+        let minimum = max(0, bytes.count - 22 - 65_535)
+        guard let end = stride(from: bytes.count - 22, through: minimum, by: -1).first(where: {
+            u32($0) == 0x06054b50 && $0 + 22 + Int(u16($0 + 20)) == bytes.count
+        }) else { throw invalid("缺少完整中央目录，请重新下载主题文件") }
+        let count = Int(u16(end + 10)), start = Int(u32(end + 16)), size = Int(u32(end + 12))
+        guard u16(end + 4) == 0, u16(end + 6) == 0, Int(u16(end + 8)) == count else { throw invalid("不支持分卷 ZIP") }
+        guard count > 0, count <= 512, start <= end, size == end - start else { throw invalid("目录大小、条目数量或 ZIP64 格式不受支持") }
+        var cursor = start, total: UInt64 = 0, records: [Record] = [], ranges: [Range<Int>] = []
+        for _ in 0..<count {
+            guard cursor + 46 <= end, u32(cursor) == 0x02014b50 else { throw invalid("中央目录条目损坏") }
+            let flags = u16(cursor + 8), method = u16(cursor + 10), checksum = u32(cursor + 16)
+            let compressed = Int(u32(cursor + 20)), expanded = u32(cursor + 24)
+            let name = Int(u16(cursor + 28)), extra = Int(u16(cursor + 30)), comment = Int(u16(cursor + 32))
+            let local = Int(u32(cursor + 42)), next = cursor + 46 + name + extra + comment
+            guard flags & 0x2041 == 0 else { throw invalid("不支持加密主题") }
+            guard [0, 8].contains(method) else { throw invalid("仅支持 Store 或 Deflate 压缩") }
+            guard name > 0, next <= end, u16(cursor + 34) == 0 else { throw invalid("文件名或分卷信息无效") }
+            guard expanded <= BookImporter.maximumBytes else { throw invalid("单个资源超过 20 MB") }
+            total += UInt64(expanded)
+            guard total <= BoundedArchive.maximumExpanded else { throw invalid("解包总量超过 64 MB") }
+            let host = u16(cursor + 4) >> 8, kind = (u32(cursor + 38) >> 16) & 0o170000
+            if host == 3 || host == 19 {
+                guard [0, 0o100000, 0o040000].contains(kind) else { throw invalid("不支持链接或特殊文件") }
+            }
+            guard local + 30 <= start, u32(local) == 0x04034b50 else { throw invalid("本地文件头缺失") }
+            let localName = Int(u16(local + 26)), localExtra = Int(u16(local + 28))
+            let body = local + 30 + localName + localExtra, bodyEnd = body + compressed
+            guard localName == name, body <= start, bodyEnd <= start,
+                  u16(local + 6) == flags, u16(local + 8) == method,
+                  bytes[(local + 30)..<(local + 30 + localName)].elementsEqual(bytes[(cursor + 46)..<(cursor + 46 + name)]) else {
+                throw invalid("本地文件头与中央目录不匹配")
+            }
+            if flags & 8 == 0 {
+                guard u32(local + 14) == checksum, Int(u32(local + 18)) == compressed, u32(local + 22) == expanded else { throw invalid("本地 CRC 或大小与目录不匹配") }
+            }
+            ranges.append(local..<bodyEnd)
+            records.append(.init(bytes: expanded, checksum: checksum)); cursor = next
+        }
+        guard cursor == end else { throw invalid("中央目录包含多余或缺失数据") }
+        let ordered = ranges.sorted { $0.lowerBound < $1.lowerBound }
+        for index in ordered.indices.dropFirst() {
+            guard ordered[index - 1].upperBound <= ordered[index].lowerBound else { throw invalid("文件数据范围重叠") }
+        }
+        return records
     }
 }

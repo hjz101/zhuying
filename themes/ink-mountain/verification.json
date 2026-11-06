@@ -32,8 +32,18 @@
     "reproducedByteForByte": true,
     "iconPointSize": 20,
     "retinaIconPixelsAt3x": 60,
-    "minimumRecommendedBuild": 12,
+    "minimumRecommendedBuild": 13,
     "environment": "iPhone 17 Pro / iOS 26.5 Simulator",
     "resultBundle": "/tmp/zhuying-ink-mountain-verified.xcresult"
+  },
+  "importCompatibilityFix": {
+    "build": 13,
+    "reader": "ZIPFoundation with bounded ZIP preflight and CRC verification",
+    "nativeUnitTestsPassed": 408,
+    "scriptTestsPassed": 86,
+    "uiFlowsPassed": 2,
+    "resultBundle": "/tmp/zhuying-theme-zip-compatibility.xcresult",
+    "physicalUserDeviceVerified": false,
+    "themePackageBytesUnchanged": true
   }
 }

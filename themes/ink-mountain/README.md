@@ -5,7 +5,7 @@
 - [浅色主题](水墨山水-孤舟-浅色.zhuyingtheme)
 - [深色主题](水墨山水-孤舟-深色.zhuyingtheme)
 
-在竹影 **我的 → 主题管理 → 导入主题包** 选择其中一份，预览后选择「完整应用主题」。两份分别是独立完整主题，均包含界面与阅读配置；不依赖另一份包。建议使用本次修正外部位图图标尺寸的未签名 build 12；旧版虽然能解析主题包，但原生 Tab 可能把高分辨率图片放大。
+在竹影 **我的 → 主题管理 → 导入主题包** 选择其中一份，预览后选择「完整应用主题」。两份分别是独立完整主题，均包含界面与阅读配置；不依赖另一份包。建议使用未签名 build 13，包含外部位图图标尺寸及主题 ZIP 读取兼容修复。旧版本在部分环境可能出现归档读取失败，或在原生 Tab 放大图片。
 
 ## 保留与适配
 
@@ -36,3 +36,5 @@ python3 ios/scripts/convert-ink-mountain-theme.py \
 本次同时修复外部位图在原生 Tab 内被放大的问题：图标具有 20 pt 固有大小，并保留 3× 下的 60×60 像素；原始背景和原素材不缩小。回归验证同时检查图标尺寸、Retina 像素和背景仍为 2048 px。最终结果包：`/tmp/zhuying-ink-mountain-verified.xcresult`。
 
 实际原生截图：[浅色书架](screenshots/light-shelf.png)、[浅色阅读](screenshots/light-reader.png)、[深色书架](screenshots/dark-shelf.png)、[深色阅读](screenshots/dark-reader.png)。这些是竹影运行截图，原包的 MOCKUP 未用作验证证据。字节数与 SHA-256 见 [验证清单](verification.json)。
+
+后续针对用户真机归档报错，更换为不依赖 POSIX locale 的 ZIPFoundation 读取路径，完整保留大小、路径、CRC 和 SHA-256 校验；408 项原生单元与 2 个相关界面流程通过。该次仍为模拟器验证，用户真机有待新构建确认。两份主题的字节和哈希不变。详见 [读取兼容修复记录](../../docs/verification/2026-11-06-theme-zip-compatibility.md)。

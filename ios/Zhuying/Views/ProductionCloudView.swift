@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionCloudView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @State private var files: [CloudFile] = []
     @State private var account: String?
@@ -25,17 +26,17 @@ struct ProductionCloudView: View {
                     ForEach(files) { file in
                         VStack(alignment:.leading,spacing:10) {
                             Text(file.modified,style:.date).font(.system(size:14))
-                            Text("\(ByteCountFormatter.string(fromByteCount:Int64(file.bytes),countStyle:.file)) · \(file.downloaded ? "可读取" : "待下载")").font(.system(size:11)).foregroundStyle(Palette.muted)
+                            Text("\(ByteCountFormatter.string(fromByteCount:Int64(file.bytes),countStyle:.file)) · \(file.downloaded ? "可读取" : "待下载")").font(.system(size:11)).foregroundStyle(appAppearance.palette.muted)
                             HStack { Button("下载并校验") { prepare(file) }.disabled(busy); Spacer(); Button("删除",role:.destructive) { deleting = file }.disabled(busy) }
                         }.padding(.vertical,7)
                     }
                 }
                 if busy { ProgressView("正在处理云端文件"); Button("取消") { operation?.cancel(); busy = false } }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("cloudMessage") }
-                NavigationLink { ProductionBackupView() } label: { Label("本地备份与恢复",systemImage:"externaldrive") }
-                NavigationLink { ProductionRecordSyncView(controller:library.cloudSync) } label: { Label("记录同步",systemImage:"arrow.triangle.2.circlepath.icloud") }.accessibilityIdentifier("cloudRecordSync")
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("cloudMessage") }
+                NavigationLink { ProductionBackupView() } label: { ThemeLabel("本地备份与恢复",systemImage:"externaldrive") }
+                NavigationLink { ProductionRecordSyncView(controller:library.cloudSync) } label: { ThemeLabel("记录同步",systemImage:"arrow.triangle.2.circlepath.icloud") }.accessibilityIdentifier("cloudRecordSync")
                 Text("备份包含正文、页面资源、书架、进度、书签、主题与字体，不包含登录凭据和服务密钥。下载完成并通过完整校验后，仍需确认才替换本地书库；旧书库保留为回滚版本。记录同步单独开关，正文和资源通过显式备份恢复。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("iCloud").navigationBarTitleDisplayMode(.inline)
             .onAppear { refresh() }.onDisappear { operation?.cancel() }

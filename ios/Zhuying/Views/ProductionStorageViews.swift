@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionCacheView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var bookID: String? = nil
     @EnvironmentObject private var library: LibraryStore
     @State private var bytes = 0
@@ -17,15 +18,15 @@ struct ProductionCacheView: View {
             VStack(alignment: .leading, spacing: 23) {
                 AppPageHeader(title: "缓存管理", subtitle: "近期正文与一章预取 · 可重建内容", icon: "internaldrive")
                 AppSettingsCard("空间占用", icon: "chart.pie") {
-                    HStack { Label("章节", systemImage: "doc.text"); Spacer(); Text(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) }.accessibilityIdentifier("actualCacheUsage")
+                    HStack { ThemeLabel("章节", systemImage: "doc.text"); Spacer(); Text(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) }.accessibilityIdentifier("actualCacheUsage")
                     HStack { Text("已缓存章节"); Spacer(); Text("\(chapters)") }
-                    HStack { Label("图片内存", systemImage: "photo"); Spacer(); Text(ByteCountFormatter.string(fromByteCount:Int64(imageBytes),countStyle:.file)) }.accessibilityIdentifier("actualImageCacheUsage")
+                    HStack { ThemeLabel("图片内存", systemImage: "photo"); Spacer(); Text(ByteCountFormatter.string(fromByteCount:Int64(imageBytes),countStyle:.file)) }.accessibilityIdentifier("actualImageCacheUsage")
                     HStack { Text("段评与脚本缓存"); Spacer(); Text(extensionBytes.map{ByteCountFormatter.string(fromByteCount:Int64($0),countStyle:.file)} ?? "无法统计") }.accessibilityIdentifier("actualExtensionCacheUsage")
-                    HStack { Label("音频", systemImage: "waveform"); Spacer(); Text(ByteCountFormatter.string(fromByteCount:Int64(audioBytes),countStyle:.file)) }.accessibilityIdentifier("actualAudioCacheUsage")
+                    HStack { ThemeLabel("音频", systemImage: "waveform"); Spacer(); Text(ByteCountFormatter.string(fromByteCount:Int64(audioBytes),countStyle:.file)) }.accessibilityIdentifier("actualAudioCacheUsage")
                 }.font(.system(size: 12))
                 Text("近期缓存最多 60 章、32 MiB；联网时超过 24 小时尝试更新，断网仍可读已缓存正文。当前章优先，预取失败不阻塞阅读。清理近期缓存会保留主动下载、导入正文、进度、收藏、书签、字体和主题。")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
-                NavigationLink { ProductionDownloadView(bookID:bookID) } label: { Label("管理主动下载",systemImage:"arrow.down.circle") }.font(.system(size:13))
+                    .font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted)
+                NavigationLink { ProductionDownloadView(bookID:bookID) } label: { ThemeLabel("管理主动下载",systemImage:"arrow.down.circle") }.font(.system(size:13))
                 Button(bookID == nil ? "清理近期章节缓存" : "清理当前作品缓存") { clearingAudio = false; clearingExtensions = false; confirming = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("clearRecentCache")
                 Button("停止朗读并清理音频缓存") { clearingAudio = true; clearingExtensions = false; confirming = true }.buttonStyle(PrimaryButtonStyle(filled:false)).accessibilityIdentifier("clearAudioCache")
                 Button("清理图片、段评与脚本缓存") { clearingAudio = false; clearingExtensions = true; confirming = true }.buttonStyle(PrimaryButtonStyle(filled:false)).accessibilityIdentifier("clearExtensionCache")
@@ -53,6 +54,7 @@ struct ProductionCacheView: View {
 }
 
 struct ProductionFilesView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @State private var files: [LocalBookFile] = []
     @State private var message: String?
@@ -69,21 +71,21 @@ struct ProductionFilesView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(file.name).font(.system(size: 14))
-                            Text("\(file.chapters) 章 · \(ByteCountFormatter.string(fromByteCount: Int64(file.bytes), countStyle: .file))").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                            Text("\(file.chapters) 章 · \(ByteCountFormatter.string(fromByteCount: Int64(file.bytes), countStyle: .file))").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         Menu {
                             Button("阅读") { if let book = library.books.first(where: { $0.id == file.id }) { library.read(book) } }
                             Button("重命名") { newName = file.name; renaming = file }
                             Button("导出正文 TXT") { Task { await perform { exportFile = try ExportFile.prepare(try await library.exportLocalText(id: file.id), filename: safeFilename(file.name) + ".txt") } } }
                             Button("永久删除", role: .destructive) { deleting = file }
-                        } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }.accessibilityIdentifier("file-actions-\(file.id)")
-                    }.padding(13).background(.white.opacity(0.7), in: .rect(cornerRadius: 10))
+                        } label: { ThemeIcon(systemName: "ellipsis").frame(width: 44, height: 44) }.accessibilityIdentifier("file-actions-\(file.id)")
+                    }.padding(13).background(appAppearance.palette.card, in: .rect(cornerRadius: 10))
                 }
-                if files.isEmpty { ContentUnavailableView("还没有导入文件", systemImage: "folder") }
+                if files.isEmpty { ThemeUnavailableView("还没有导入文件", systemImage: "folder") }
                 if busy { ProgressView() }
-                if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("fileMessage") }
+                if let message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("fileMessage") }
                 Text("PDF 可选择文字提取或保留原版式；原版式与漫画不导出虚构 TXT。永久删除同时移除该作品的书架、历史、书签和正文；仅移出收藏请使用书架管理。")
-                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("文件管理").navigationBarTitleDisplayMode(.inline).disabled(busy)
             .task { await refresh() }

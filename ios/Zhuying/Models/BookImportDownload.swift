@@ -19,14 +19,14 @@ private final class HTTPSImportRedirectDelegate: NSObject, URLSessionTaskDelegat
 /// Stream a bounded response. Cancelling parsing also cancels its network
 /// session; no unbounded download or abandoned temporary file is left behind.
 struct BoundedBookDownloader: BookImportDownloading {
-    enum Format: Sendable { case book, sourceJSON }
+    enum Format: Sendable { case book, sourceJSON, themePackage }
     let maximumBytes: Int
     let format: Format
     let configuration: @Sendable () -> URLSessionConfiguration
     init(maximumBytes: Int? = nil,format: Format = .book, configuration: @escaping @Sendable () -> URLSessionConfiguration = { .ephemeral }) {
         self.maximumBytes = maximumBytes ?? (format == .sourceJSON ? 5 * 1024 * 1024 : BookImporter.maximumBytes); self.format = format; self.configuration = configuration
     }
-    private var acceptedTypes: [String] { (format == .sourceJSON ? ["application/json","text/json","text/plain"] : ["text/plain","text/txt","application/pdf","application/epub+zip"]) + ["application/octet-stream","binary/octet-stream"] }
+    private var acceptedTypes: [String] { (format == .themePackage ? ["application/zip", "application/x-zip-compressed", "application/json", "text/json", "text/plain"] : format == .sourceJSON ? ["application/json","text/json","text/plain"] : ["text/plain","text/txt","application/pdf","application/epub+zip"]) + ["application/octet-stream","binary/octet-stream"] }
     func fetch(_ url: URL) async throws -> DownloadedBookFile {
         _ = try BookImporter.remoteURL(url.absoluteString)
         try Task.checkCancellation()

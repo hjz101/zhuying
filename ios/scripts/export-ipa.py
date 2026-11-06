@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export a device App using local P12/profile/password files; never publish keys."""
+"""Export an unsigned device IPA or sign with private local certificate files."""
 import argparse
 import datetime as dt
 import fnmatch
@@ -86,7 +86,7 @@ def device_info_bytes(info):
     return plistlib.dumps(info, fmt=plistlib.FMT_BINARY)
 
 
-def validate_ipa(output):
+def validate_ipa(output, *, require_signature=True):
     with zipfile.ZipFile(output) as archive:
         entries = archive.infolist()
         names = [entry.filename for entry in entries]
@@ -120,7 +120,12 @@ def validate_ipa(output):
         executable = info['CFBundleExecutable']
         if '/' in executable or '\\' in executable or executable in ('.', '..'):
             raise ValueError('Invalid application executable name')
-        for path in [app + executable, app + 'embedded.mobileprovision', app + '_CodeSignature/CodeResources']:
+        required_paths = [app + executable]
+        if require_signature:
+            required_paths += [app + 'embedded.mobileprovision', app + '_CodeSignature/CodeResources']
+        elif any('_CodeSignature' in PurePosixPath(n).parts or PurePosixPath(n).name == 'embedded.mobileprovision' for n in names):
+            raise ValueError('Unsigned IPA must not contain signature resources or provisioning profiles')
+        for path in required_paths:
             if path not in names or archive.getinfo(path).file_size == 0:
                 raise ValueError('Missing application executable, provisioning profile or signature resources')
         with archive.open(app + executable) as executable_file:
@@ -131,6 +136,25 @@ def validate_ipa(output):
             raise ValueError('IPA requires an arm64 device Mach-O executable')
         if not ((archive.getinfo(app + executable).external_attr >> 16) & stat.S_IXUSR):
             raise ValueError('Application executable permission is missing')
+        if not require_signature:
+            command_count, command_bytes = struct.unpack_from('<II', header, 16)
+            if command_count > 4096 or command_bytes > 16 * 1024 * 1024:
+                raise ValueError('Invalid Mach-O load commands')
+            with archive.open(app + executable) as stream:
+                stream.read(32)
+                commands = stream.read(command_bytes)
+            offset = 0
+            for _ in range(command_count):
+                if offset + 8 > len(commands):
+                    raise ValueError('Incomplete Mach-O load command')
+                command, size = struct.unpack_from('<II', commands, offset)
+                if command == 0x1d:
+                    raise ValueError('Unsigned IPA executable still contains a code signature')
+                if size < 8 or offset + size > len(commands):
+                    raise ValueError('Invalid Mach-O load command size')
+                offset += size
+            if offset != command_bytes or len(commands) != command_bytes:
+                raise ValueError('Incomplete Mach-O load commands')
         # Check the local headers too: lightweight importers may read them directly.
         with output.open('rb') as stream:
             for entry in entries:
@@ -143,10 +167,11 @@ def validate_ipa(output):
             raise ValueError('IPA archive CRC check failed')
         return {'primaryInfoPlist': info_path, 'infoPlistFormat': 'binary' if raw.startswith(b'bplist00') else 'xml',
                 'entryCount': len(names), 'macOSMetadataEntries': 0, 'completeLocalHeaders': True,
-                'arm64Executable': True, 'zipCRCVerified': True}
+                'arm64Executable': True, 'zipCRCVerified': True,
+                'signatureRequired': require_signature}
 
 
-def archive_payload(payload, output):
+def archive_payload(payload, output, *, require_signature=True):
     if output.exists():
         raise ValueError('Refusing to overwrite an existing IPA')
     apps = [p for p in payload.iterdir() if p.is_dir() and p.suffix == '.app']
@@ -167,7 +192,7 @@ def archive_payload(payload, output):
                 if path.is_symlink():
                     raise ValueError('Device application archive cannot contain symbolic links')
                 archive.write(path, path.relative_to(payload.parent).as_posix())
-        return validate_ipa(output)
+        return validate_ipa(output, require_signature=require_signature)
     except Exception:
         output.unlink(missing_ok=True)
         raise
@@ -205,11 +230,30 @@ def issuer_download_url(aia):
     return urllib.parse.urlunsplit(('https',url.netloc,url.path,url.query,''))
 
 
+def export_unsigned(app, output, info, brand, exporter_revision):
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='zhuying-unsigned-ipa-') as temporary:
+        payload = Path(temporary) / 'Payload'; payload.mkdir()
+        shutil.copytree(app, payload / app.name, symlinks=True)
+        validation = archive_payload(payload, output, require_signature=False)
+    result = {**brand, 'schemaVersion': 1, 'kind': 'unsigned-device',
+              'version': info['CFBundleShortVersionString'], 'build': info['CFBundleVersion'],
+              'appSourceRevision': info['ZhuyingSourceRevision'], 'exporterRevision': exporter_revision,
+              'bundleIdentifier': info['CFBundleIdentifier'], 'codeSigned': False,
+              'provisioningProfileIncluded': False, 'archiveValidation': validation,
+              'artifact': output.name, 'bytes': output.stat().st_size,
+              'sha256': hashlib.sha256(output.read_bytes()).hexdigest()}
+    output.with_suffix('.json').write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n')
+    print(output)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app',type=Path,required=True)
-    parser.add_argument('--material',type=Path,required=True,
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--material',type=Path,
                         help='Private directory containing identity.p12, profile.mobileprovision and password')
+    mode.add_argument('--unsigned', action='store_true', help='Package an unsigned iPhoneOS build without signing material')
     parser.add_argument('--output',type=Path,required=True)
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
@@ -222,6 +266,9 @@ def main():
         raise ValueError('IPA export requires an iPhoneOS build, never a Simulator App')
     if not re.fullmatch('[a-f0-9]{40}',original_info.get('ZhuyingSourceRevision','')):
         raise ValueError('Device App source revision is missing')
+    if args.unsigned:
+        export_unsigned(args.app, args.output, original_info, brand, exporter_revision)
+        return
     password = (args.material/'password').read_bytes()
     keychain_password = secrets.token_hex(32)
     with tempfile.TemporaryDirectory(prefix='zhuying-ipa-') as temporary:

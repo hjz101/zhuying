@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionRuleTesterView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @State private var kind = ExtractionRule.Kind.css
     @State private var expression = "p"
     @State private var input = ""
@@ -22,7 +23,7 @@ struct ProductionRuleTesterView: View {
                 if busy { ProgressView("正在解析") }
                 if let message { Text(message).font(.system(size:12)).accessibilityIdentifier("ruleResult") }
                 if !output.isEmpty { Text(output.joined(separator:"\n")).font(.system(size:13)).textSelection(.enabled).accessibilityIdentifier("ruleOutput") }
-                AppSettingsCard("支持范围",icon:"checklist") { ForEach(RuleExtraction.support,id:\.self) { Text($0).font(.system(size:12)).foregroundStyle(Palette.muted) } }
+                AppSettingsCard("支持范围",icon:"checklist") { ForEach(RuleExtraction.support,id:\.self) { Text($0).font(.system(size:12)).foregroundStyle(appAppearance.palette.muted) } }
             }.padding(22)
         }.appPageStyle().navigationTitle("规则兼容测试").navigationBarTitleDisplayMode(.inline).onDisappear { operation?.cancel() }
     }

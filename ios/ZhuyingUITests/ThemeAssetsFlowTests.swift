@@ -7,7 +7,10 @@ final class ThemeAssetsFlowTests: XCTestCase {
         app.launch(); app.tabBars.buttons["我的"].tap()
         let themes = app.buttons["profileThemes"]
         reveal(themes, app: app); themes.tap()
+        app.buttons["globalThemeTools"].tap()
+        app.buttons["globalThemeReadingAssets"].tap()
         XCTAssertTrue(app.segmentedControls["themeLibraryTabs"].waitForExistence(timeout: 8))
+        app.segmentedControls["themeLibraryTabs"].buttons["阅读搭配"].tap()
         // Start this mixing scenario with an explicitly selected theme. A fresh
         // reader otherwise shows its independent paper-color card.
         app.buttons["theme-card-paper"].tap()
@@ -59,7 +62,7 @@ final class ThemeAssetsFlowTests: XCTestCase {
         capture(app, "Themes-CustomMix")
         app.buttons["applyThemeMix"].tap(); back(app)
         XCTAssertTrue(current.label.contains("当前使用 · 夜读深林")); XCTAssertTrue(current.label.contains("山林侧题"))
-        tab("主题套装", app: app)
+        tab("阅读搭配", app: app)
         let white = app.buttons["theme-card-white"]
         reveal(white, app: app); white.tap()
         let missing = app.staticTexts["未附带，保留当前样式"].firstMatch
@@ -71,7 +74,8 @@ final class ThemeAssetsFlowTests: XCTestCase {
 
     @MainActor func testFileImportIncludesAssetsAndIndependentResources() {
         let app = launch(fixtures: true)
-        app.buttons["themeImport"].tap(); app.buttons["选择套装文件"].tap()
+        back(app)
+        app.buttons["globalThemeImport"].tap()
         let file = app.collectionViews["File View"].descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "阅读套装")).firstMatch
         if !file.waitForExistence(timeout: 3) {
             for labels in [["Browse", "浏览"], ["Browse", "浏览"], ["On My iPhone", "我的iPhone", "我的 iPhone"]] {
@@ -107,6 +111,9 @@ final class ThemeAssetsFlowTests: XCTestCase {
         app.tabBars.buttons["我的"].tap()
         let themes = app.buttons["profileThemes"]
         reveal(themes, app: app); themes.tap()
+        app.buttons["globalThemeTools"].tap()
+        app.buttons["globalThemeReadingAssets"].tap()
+        app.segmentedControls["themeLibraryTabs"].buttons["阅读搭配"].tap()
         let night = app.buttons["theme-card-night"]
         reveal(night, app: app); night.tap()
         app.buttons["themeApply"].tap()
@@ -114,7 +121,7 @@ final class ThemeAssetsFlowTests: XCTestCase {
         XCTAssertTrue(applied.waitForExistence(timeout: 5))
         XCTAssertTrue(applied.isHittable, "成功反馈应与底部应用按钮同时可见")
         XCTAssertTrue(applied.label.contains("夜读深林"))
-        back(app); back(app)
+        back(app); back(app); back(app)
         let settings = app.buttons["profileReadingSettings"]
         reveal(settings, app: app); settings.tap()
         XCTAssertTrue(app.staticTexts["readingPreferenceSummary"].waitForExistence(timeout: 5))
@@ -128,9 +135,12 @@ final class ThemeAssetsFlowTests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 10))
         app.tabBars.buttons["我的"].tap()
         reveal(themes, app: app); themes.tap()
+        app.buttons["globalThemeTools"].tap()
+        app.buttons["globalThemeReadingAssets"].tap()
+        app.segmentedControls["themeLibraryTabs"].buttons["阅读搭配"].tap()
         XCTAssertTrue(app.buttons["activeThemeCard"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["activeThemeCard"].label.contains("夜读深林"))
-        back(app)
+        back(app); back(app)
         reveal(settings, app: app); settings.tap()
         XCTAssertTrue(app.staticTexts["readingPreferenceSummary"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["readingPreferenceSummary"].label.contains("夜读深林"))

@@ -1,0 +1,160 @@
+{
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "zhuying-theme"
+    },
+    "formatVersion": {
+      "const": 1
+    },
+    "themeID": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"
+    },
+    "themeVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "author": {
+      "type": "string"
+    },
+    "packageKind": {
+      "enum": [
+        "full",
+        "component"
+      ]
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "app",
+          "reader"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
+    "appearanceModes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "light",
+          "dark"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 1
+    },
+    "requiredCapabilities": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "app.appearance.v1",
+          "reader.appearance.v1",
+          "reader.native-title-css.v1",
+          "reader.comment-bubble-svg.v1",
+          "reader.font.v1"
+        ]
+      }
+    },
+    "optionalCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "entry": {
+      "const": "theme.json"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20971520
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "configuration",
+              "icon",
+              "background",
+              "title-css",
+              "bubble-svg",
+              "font",
+              "preview",
+              "license"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "bytes",
+          "sha256",
+          "mediaType",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 511
+    }
+  },
+  "required": [
+    "format",
+    "formatVersion",
+    "themeID",
+    "themeVersion",
+    "name",
+    "author",
+    "packageKind",
+    "scopes",
+    "appearanceModes",
+    "requiredCapabilities",
+    "optionalCapabilities",
+    "entry",
+    "files"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "竹影 manifest.json v1",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "packageKind": {
+            "const": "full"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scopes": {
+            "minItems": 2
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # 竹影主题制作：可直接交给 AI 的文稿
 
-本文件提供两个独立提示词。A 可用于当前版本；B 用于未来全局主题包，需要 App 先实现并发布对应能力合同。完整设计依据见 [主题包规范](ZHUYING-THEME-PACKAGE.md)。
+本文件提供两个独立提示词。A 可用于当前版本；B 用于已实现的全局主题包 v1，需附 App 导出的制作资料。完整设计依据见 [主题包规范](ZHUYING-THEME-PACKAGE.md)。
 
 建议把本文以 Markdown 或纯文本交给 AI。JSON／CSS／SVG 保持原始文本，不经过富文本编辑器替换引号。
 
@@ -92,11 +92,11 @@
 （在这里粘贴已填写的设计要求）
 ```
 
-## B. 未来完整主题包：主题作者提示词
+## B. 全局主题包 v1：主题作者提示词
 
-只有在 `.zhuyingtheme` 导入／导出和主题能力合同实现后，才可使用此模式制作可导入成品。届时应同时交给 AI：目标 App 导出的有效基础主题、`theme-contract.json`、对应 JSON Schema、校验工具。本文规范可以一并附上，但不能用文稿代替机器协议。
+现在可从「我的 → 主题管理 → 打包分享 → 导出给 AI 的制作资料」获取基础主题、能力合同和两份 Schema。将资料包与以下提示词一并交给 AI；本文不代替机器协议。
 
-以下提示词可现在交给 AI 评审设计；资料不足时只输出明确标注的设计草案，不冒充已可导入的包。
+没有制作资料时，AI 应先输出明确标注的草案，不能猜测字段并冒充可导入主题。
 
 ```text
 你是“竹影”（Zhuying）的主题包制作者。目标是在保持应用整体布局、导航、功能入口和交互行为不变的前提下，制作能够分享并完整恢复的外观主题。
@@ -114,7 +114,7 @@
 4. 页眉页脚开关、高度、间隔与全部元素的类型、区域、百分比坐标、宽度、字号、颜色；保持动态书名、章节、时间和进度占位类型。
 5. 当前生效的章节标题 CSS、气泡 SVG、气泡样式/颜色/圆角及显示开关；段评/神评卡片样式、颜色、圆角及显示开关。
 6. 可移植的全书显示规则。只分享评论外观，不附真实评论数据。
-7. 在合同允许时提供有版本的内置动画预设，附减少动态效果时的静态替代。不要引入任意代码或未支持动画格式。
+7. v1 使用 motion.pressOpacity 和 motion.duration 定义点击反馈，减少动态效果时取消过渡。不要引入任意代码或未支持动画格式。
 8. 阅读模式、点击翻页、震动属于 optionalReadingBehavior，独立列出供接收者选择，默认不覆盖。
 
 三、格式与文件
@@ -122,9 +122,9 @@
 2. 包根直接包含 manifest.json、theme.json；附 assets/icons、assets/backgrounds、assets/reader、assets/fonts、preview、licenses 中实际需要的文件，不额外套一层目录。
 3. manifest 的 format 为 zhuying-theme、formatVersion 为 1；同时记录 themeID、themeVersion、name、author、packageKind、scopes、appearanceModes、requiredCapabilities、optionalCapabilities、entry、files。
 4. full 必须按合同完整覆盖 app 和 reader；只做阅读或图标等部分时用 component，并声明范围。不要把部分套装包装成 full。
-5. theme.json 使用合同规定的 contractVersion、app、reader.appearance、reader.resources、reader.optionalReadingBehavior、fontBindings。不得自行发明新协议。
+5. theme.json 使用合同规定的 contractVersion、app、reader.appearance、reader.resources、reader.optionalReadingBehavior、reader.background、reader.systemFont、fontBindings。不得自行发明新协议。
 6. 颜色采用 #RRGGBB，透明度独立为 opacity 0..1；长度按合同的原生逻辑点或百分比，保持单位明确。
-7. 资源通过包内相对 path 引用，或通过合同中有明确版本的 builtin 资源引用。严禁引用我机器上的路径、个人资源 ID、其他未附带主题或网络文件。
+7. 资源使用包内相对 path，省略时使用合同 v1 内置默认；当前不支持 builtin 引用对象。严禁引用我机器上的路径、个人资源 ID、其他未附带主题或网络文件。
 8. 对 manifest 自身以外的每个文件记录 path、bytes、sha256、mediaType、role，覆盖 theme.json、预览与许可。SHA-256 必须在全部内容完成后按真实字节计算，不能用占位摘要或猜测值。整包哈希记录在旁置报告，避免自引用。
 
 四、完整还原规则
@@ -161,7 +161,7 @@
 ## 如何选用
 
 - 现在制作能导入的阅读主题：复制 A。可以同时附上 [青竹示例文件](theme-examples/竹影-青竹阅读.json)。
-- 现在设计完整主题：B 可作为设计约束，但得到的应是设计草案。
-- 完整主题运行时开发完成后：复制 B，并附目标 App 导出的合同、Schema 和基础主题。先从 App 导出一个完整模板再让 AI 修改，比要求 AI 从零猜测协议更可靠。
+- 现在制作完整主题：先从 App 导出 AI 制作资料，再复制 B 并附资料。
+- 完整主题制作时：复制 B，并附目标 App 导出的合同、Schema 和基础主题。先从 App 导出一个完整模板再让 AI 修改，比要求 AI 从零猜测协议更可靠。
 
-本次交付为规范和提示词，不包含全局主题运行时开发，也不声称完整主题包已可在当前 App 导入。
+全局主题 v1 已接入原生 App；A 的旧 JSON 继续可用，B 的 ZIP 主题包和 A 的旧阅读 JSON 均可从统一主题入口导入。各次制作仍须据实记录原生验证结果。

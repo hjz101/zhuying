@@ -1,0 +1,733 @@
+{
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "const": 1
+    },
+    "app": {
+      "type": "object",
+      "properties": {
+        "dark": {
+          "type": "boolean"
+        },
+        "colors": {
+          "type": "object",
+          "properties": {
+            "background.page": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "text.primary": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "text.secondary": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "border": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "accent": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "background.card": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "background.soft": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "action.primary.background": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "action.primary.foreground": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            }
+          },
+          "required": [
+            "background.page",
+            "text.primary",
+            "text.secondary",
+            "border",
+            "accent",
+            "background.card",
+            "background.soft",
+            "action.primary.background",
+            "action.primary.foreground"
+          ],
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        },
+        "icons": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "symbol": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+              },
+              "selected": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+              },
+              "disabled": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+              },
+              "pressed": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+              },
+              "focused": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+              },
+              "loading": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+              },
+              "template": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "template"
+            ],
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "required": [
+                  "symbol"
+                ],
+                "not": {
+                  "required": [
+                    "path"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "path"
+                ],
+                "not": {
+                  "required": [
+                    "symbol"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "backgrounds": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+              },
+              "mode": {
+                "enum": [
+                  "fill",
+                  "fit",
+                  "tile"
+                ]
+              },
+              "opacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "overlayOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "path",
+              "mode",
+              "opacity",
+              "overlayOpacity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "motion": {
+          "type": "object",
+          "properties": {
+            "pressOpacity": {
+              "type": "number",
+              "minimum": 0.2,
+              "maximum": 1
+            },
+            "duration": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.4
+            }
+          },
+          "required": [
+            "pressOpacity",
+            "duration"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "dark",
+        "colors",
+        "icons",
+        "backgrounds",
+        "motion"
+      ],
+      "additionalProperties": false
+    },
+    "reader": {
+      "type": "object",
+      "properties": {
+        "appearance": {
+          "type": "object",
+          "properties": {
+            "fontSize": {
+              "type": "number",
+              "minimum": 14,
+              "maximum": 30
+            },
+            "lineSpacing": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "preferences": {
+              "type": "object",
+              "properties": {
+                "paragraphSpacing": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 48
+                },
+                "leftMargin": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 80
+                },
+                "rightMargin": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 80
+                },
+                "topMargin": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 80
+                },
+                "bottomMargin": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 80
+                },
+                "marginsLinked": {
+                  "type": "boolean"
+                },
+                "firstLineIndent": {
+                  "type": "boolean"
+                },
+                "fontWeight": {
+                  "enum": [
+                    "常规",
+                    "细体",
+                    "中等",
+                    "粗体"
+                  ]
+                },
+                "colors": {
+                  "type": "object",
+                  "properties": {
+                    "background": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "ink": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "accent": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "dark": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "background",
+                    "ink",
+                    "accent",
+                    "name",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                },
+                "headerEnabled": {
+                  "type": "boolean"
+                },
+                "footerEnabled": {
+                  "type": "boolean"
+                },
+                "headerHeight": {
+                  "type": "number",
+                  "minimum": 48,
+                  "maximum": 140
+                },
+                "footerHeight": {
+                  "type": "number",
+                  "minimum": 48,
+                  "maximum": 140
+                },
+                "headerGap": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 48
+                },
+                "footerGap": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 48
+                },
+                "pageElements": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "zone": {
+                        "enum": [
+                          "header",
+                          "footer"
+                        ]
+                      },
+                      "kind": {
+                        "enum": [
+                          "书名",
+                          "章节",
+                          "时间",
+                          "进度",
+                          "自定义文字"
+                        ]
+                      },
+                      "text": {
+                        "type": "string",
+                        "maxLength": 160
+                      },
+                      "x": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "width": {
+                        "type": "number",
+                        "minimum": 15,
+                        "maximum": 90
+                      },
+                      "fontSize": {
+                        "type": "number",
+                        "minimum": 9,
+                        "maximum": 22
+                      },
+                      "color": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^#[0-9A-Fa-f]{6}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "zone",
+                      "kind",
+                      "text",
+                      "x",
+                      "y",
+                      "width",
+                      "fontSize"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 32
+                },
+                "horizontalEffect": {
+                  "enum": [
+                    "平移",
+                    "覆盖",
+                    "仿真",
+                    "无动画"
+                  ]
+                },
+                "verticalEffect": {
+                  "enum": [
+                    "平移",
+                    "覆盖",
+                    "无动画"
+                  ]
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "match": {
+                        "enum": [
+                          "对话引号",
+                          "系统提示",
+                          "诗词段落",
+                          "章节首段",
+                          "正则表达式",
+                          "关键词"
+                        ]
+                      },
+                      "pattern": {
+                        "type": "string",
+                        "maxLength": 512
+                      },
+                      "presentation": {
+                        "enum": [
+                          "文字高亮",
+                          "段落底色",
+                          "居中斜体",
+                          "首字下沉"
+                        ]
+                      },
+                      "color": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "scope": {
+                        "const": "全部书籍"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "match",
+                      "pattern",
+                      "presentation",
+                      "color",
+                      "enabled",
+                      "scope"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 64
+                },
+                "showCommentBubbles": {
+                  "type": "boolean"
+                },
+                "showGodComments": {
+                  "type": "boolean"
+                },
+                "bubbleStyle": {
+                  "enum": [
+                    "胶囊",
+                    "描边",
+                    "圆角方形",
+                    "自定义"
+                  ]
+                },
+                "godStyle": {
+                  "enum": [
+                    "纯色",
+                    "液态玻璃",
+                    "画框",
+                    "自定义"
+                  ]
+                },
+                "bubbleRadius": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 30
+                },
+                "godRadius": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 30
+                },
+                "bubbleColor": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "godBackground": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "godBorder": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "paragraphSpacing",
+                "leftMargin",
+                "rightMargin",
+                "topMargin",
+                "bottomMargin",
+                "marginsLinked",
+                "firstLineIndent",
+                "fontWeight",
+                "colors",
+                "headerEnabled",
+                "footerEnabled",
+                "headerHeight",
+                "footerHeight",
+                "headerGap",
+                "footerGap",
+                "pageElements",
+                "horizontalEffect",
+                "verticalEffect",
+                "rules",
+                "showCommentBubbles",
+                "showGodComments",
+                "bubbleStyle",
+                "godStyle",
+                "bubbleRadius",
+                "godRadius"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "fontSize",
+            "lineSpacing",
+            "preferences"
+          ],
+          "additionalProperties": false
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            },
+            "bubble": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "optionalReadingBehavior": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "scroll",
+                "paged",
+                "verticalPaged"
+              ]
+            },
+            "tapToTurn": {
+              "type": "boolean"
+            },
+            "haptics": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "mode",
+            "tapToTurn",
+            "haptics"
+          ],
+          "additionalProperties": false
+        },
+        "background": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+            },
+            "mode": {
+              "enum": [
+                "fill",
+                "fit",
+                "tile"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "overlayOpacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "path",
+            "mode",
+            "opacity",
+            "overlayOpacity"
+          ],
+          "additionalProperties": false
+        },
+        "systemFont": {
+          "enum": [
+            "default",
+            "serif"
+          ]
+        }
+      },
+      "required": [
+        "appearance",
+        "resources"
+      ],
+      "additionalProperties": false
+    },
+    "fontBindings": {
+      "type": "object",
+      "properties": {
+        "reader.body": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+            },
+            "postScriptName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "licensePath": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\u0000-\\u001f]+$"
+            }
+          },
+          "required": [
+            "path",
+            "postScriptName",
+            "licensePath"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "contractVersion",
+    "app",
+    "fontBindings"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "竹影 theme.json v1"
+}

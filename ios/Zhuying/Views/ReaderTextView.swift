@@ -140,8 +140,9 @@ struct PagedReaderText: UIViewRepresentable {
         context.coordinator.parent = self
         view.onTap = onTap; view.onSwipe = onSwipe
         view.documentFrame = documentFrame
-        view.backgroundColor = paperColor
-        view.textView.backgroundColor = paperColor
+        let background: UIColor = GlobalThemeStore.shared.readerBundle?.document.reader?.background == nil ? paperColor : .clear
+        view.backgroundColor = background
+        view.textView.backgroundColor = background
         guard !view.textView.attributedText.isEqual(to: text) else { return }
         let forward = pageID >= view.lastPageID
         let shouldAnimate = view.lastLayoutID == layoutID && pageID != view.lastPageID && view.hasText && !UIAccessibility.isReduceMotionEnabled

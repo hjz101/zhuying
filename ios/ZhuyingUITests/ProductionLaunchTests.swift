@@ -70,6 +70,7 @@ final class ProductionLaunchTests: XCTestCase {
         let themes = app.buttons["profileThemes"]
         for _ in 0..<8 { if themes.isHittable { break }; app.swipeUp() }
         themes.tap()
+        app.segmentedControls["themeLibraryTabs"].buttons["阅读搭配"].tap()
         let night = app.buttons["theme-card-night"]
         for _ in 0..<8 { if night.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(night.isHittable); night.tap()
@@ -85,6 +86,7 @@ final class ProductionLaunchTests: XCTestCase {
         app.tabBars.buttons["我的"].tap()
         for _ in 0..<8 { if themes.isHittable { break }; app.swipeUp() }
         themes.tap()
+        app.segmentedControls["themeLibraryTabs"].buttons["阅读搭配"].tap()
         XCTAssertTrue(app.buttons["activeThemeCard"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["activeThemeCard"].label.contains("夜读深林"))
     }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionNetworkView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var initialSourceID: String? = nil
     var suggestedOrigin: URL? = nil
     @EnvironmentObject private var library: LibraryStore
@@ -36,11 +37,11 @@ struct ProductionNetworkView: View {
                 }
                 Button("测试 HTTPS 连接") { test() }.buttonStyle(PrimaryButtonStyle()).disabled(origin == nil || busy).accessibilityIdentifier("networkTest")
                 if busy { ProgressView("正在测试当前配置"); Button("取消") { operation?.cancel(); busy = false } }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("networkMessage") }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("networkMessage") }
                 Text("只作用于所选书源：原生读取、登录、段评、允许联网的脚本与该源浏览器。指定 IP／DNS 使用本机专用 CONNECT 隧道，原始 HTTPS 主机、SNI 与证书校验保留；不会关闭证书验证或修改系统 DNS。代理／DNS 不可用时报错，不自动直连。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                 Text("v1 支持无认证 HTTP CONNECT、IPv4／IPv6 固定地址及 UDP DNS 的 A／AAAA／CNAME。DNS 服务器需填 IP，可指定端口；不支持 DoH／DoT、DNS TCP 回退或代理用户名密码。浏览器仅当前主机走自定义路由，跨站资源按系统网络处理；配置为本设备所有，书库备份不复制局域网地址。测试连接只报告网络状态，书源可读性请用书源调试。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("网络配置").navigationBarTitleDisplayMode(.inline)
             .onAppear {

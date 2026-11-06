@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionBookmarksView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var bookID: String? = nil
     var onOpen: ((LibraryBookmarkRecord) -> Void)? = nil
     @EnvironmentObject private var library: LibraryStore
@@ -21,16 +22,16 @@ struct ProductionBookmarksView: View {
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(library.books.first { $0.id == mark.anchor.bookID }?.title ?? mark.title).font(.system(size: 15, design: .serif))
                                     Text(mark.title).font(.system(size: 11))
-                                    Text(mark.anchor.quote).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(2)
+                                    Text(mark.anchor.quote).font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted).lineLimit(2)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                             }.buttonStyle(.plain).accessibilityIdentifier("bookmark-open-\(mark.id)")
-                            Button { Task { do { try await library.removeBookmark(id: mark.id) } catch { message = error.localizedDescription } } } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
+                            Button { Task { do { try await library.removeBookmark(id: mark.id) } catch { message = error.localizedDescription } } } label: { ThemeIcon(systemName: "trash").frame(width: 44, height: 44) }
                                 .accessibilityLabel("删除书签").accessibilityIdentifier("bookmark-delete-\(mark.id)")
-                        }.padding(14).background(.white.opacity(0.7), in: .rect(cornerRadius: 12))
+                        }.padding(14).background(appAppearance.palette.card, in: .rect(cornerRadius: 12))
                     }
-                    if marks.isEmpty { Text("暂无书签，可添加当前位置。").font(.system(size: 12)).foregroundStyle(Palette.muted) }
+                    if marks.isEmpty { Text("暂无书签，可添加当前位置。").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted) }
                 }
-                if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("bookmarkMessage") }
+                if let message { Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("bookmarkMessage") }
                 Button("添加当前进度书签") {
                     Task {
                         guard let book = selectedBook, let value = library.progress[book.id] else { message = "请先打开一章正文。"; return }
@@ -46,6 +47,7 @@ struct ProductionBookmarksView: View {
 }
 
 struct ProductionGroupsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @State private var selectedGroup = "全部"
     @State private var newGroup = ""
@@ -72,12 +74,12 @@ struct ProductionGroupsView: View {
                 ForEach(books) { book in
                     Button { if selection.contains(book.id) { selection.remove(book.id) } else { selection.insert(book.id) } } label: {
                         HStack {
-                            Image(systemName: selection.contains(book.id) ? "checkmark.circle.fill" : "circle")
+                            ThemeIcon(systemName: selection.contains(book.id) ? "checkmark.circle.fill" : "circle")
                             BookRow(book: book)
                         }
                     }.buttonStyle(.plain).accessibilityIdentifier("group-select-\(book.id)")
                 }
-                if books.isEmpty { Text("此分组还没有作品。").font(.system(size: 12)).foregroundStyle(Palette.muted) }
+                if books.isEmpty { Text("此分组还没有作品。").font(.system(size: 12)).foregroundStyle(appAppearance.palette.muted) }
                 if let removal {
                     HStack { Text("已移出 \(removal.count) 本，历史保留。"); Spacer(); Button("撤销") { library.undoRemoval(removal); self.removal = nil } }.font(.system(size: 12))
                 }

@@ -35,6 +35,7 @@ struct LibraryViewPreferences: Codable {
     var mediaBookmarks: [MediaBookmark]? = nil
     var userSettingsEdited: Bool? = nil
     var farthestPositions: [String:ReadingAnchor]? = nil
+    var globalThemeSelection: GlobalThemeSelection? = nil
     init(_ snapshot: LibrarySnapshot) {
         settings = snapshot.settings; sort = snapshot.sort
         if settings.preferences.bubbleSVG != nil { settings.preferences.bubbleImageData = nil }
@@ -47,6 +48,7 @@ struct LibraryViewPreferences: Codable {
         mediaLocations = snapshot.mediaLocations; mediaBookmarks = snapshot.mediaBookmarks
         userSettingsEdited = snapshot.userSettingsEdited
         farthestPositions = snapshot.farthestPositions
+        globalThemeSelection = snapshot.globalThemeSelection
     }
 }
 
@@ -210,6 +212,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         for chapter in archive.chapters where localIDs.contains(chapter.bookID) { content.append(try await cachedDocument(chapter.id)) }
         var resources = try themes?.backupResources() ?? []
         if let storageDirectory {
+            resources.append(contentsOf: try GlobalThemePackage.backupResources(directory: storageDirectory.appendingPathComponent("resources/global-themes")))
             let url = storageDirectory.appendingPathComponent("resources/processing/rules.json")
             if FileManager.default.fileExists(atPath:url.path) {
                 let values = try url.resourceValues(forKeys:[.fileSizeKey,.isSymbolicLinkKey])
@@ -478,6 +481,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             snapshot.mediaLocations = view.mediaLocations; snapshot.mediaBookmarks = view.mediaBookmarks
             snapshot.userSettingsEdited = view.userSettingsEdited
             snapshot.farthestPositions = view.farthestPositions
+            snapshot.globalThemeSelection = view.globalThemeSelection
         }
         var unresolved = Set<String>()
         if let data = try await records.preference(key: Self.unresolvedKey) {

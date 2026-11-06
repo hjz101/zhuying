@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionCoverSearchView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     var bookID: String? = nil
     @EnvironmentObject private var library: LibraryStore
     @State private var selected = ""
@@ -22,7 +23,7 @@ struct ProductionCoverSearchView: View {
                     Button("搜索封面") { search() }.disabled(selected.isEmpty || query.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || busy).accessibilityIdentifier("coverSearch")
                 }
                 ForEach(results) { result in
-                    Button { preview(result) } label: { HStack { VStack(alignment:.leading,spacing:6) { Text(result.title); Text(result.author).font(.system(size:11)).foregroundStyle(Palette.muted) }; Spacer(); Image(systemName:"photo") }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(Palette.card,in:.rect(cornerRadius:10)) }.disabled(busy).accessibilityIdentifier("cover-result-" + result.id)
+                    Button { preview(result) } label: { HStack { VStack(alignment:.leading,spacing:6) { Text(result.title); Text(result.author).font(.system(size:11)).foregroundStyle(appAppearance.palette.muted) }; Spacer(); ThemeIcon(systemName:"photo") }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(appAppearance.palette.card,in:.rect(cornerRadius:10)) }.disabled(busy).accessibilityIdentifier("cover-result-" + result.id)
                 }
                 if let preview,let image = UIImage(data:preview) {
                     Image(uiImage:image).resizable().scaledToFit().frame(maxHeight:260).accessibilityIdentifier("coverPreview")
@@ -30,9 +31,9 @@ struct ProductionCoverSearchView: View {
                     HStack { Button("取消选择") { self.preview = nil; previewResult = nil }; Spacer(); Button("保存封面") { save() }.disabled(selected.isEmpty || busy).accessibilityIdentifier("coverSave") }
                 }
                 if busy { ProgressView("正在处理封面"); Button("取消") { operation?.cancel(); busy = false } }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("coverMessage") }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("coverMessage") }
                 Text("服务：Open Library。点击搜索时发送输入的书名；选择结果后才下载图片。保存后的封面随本地备份保留；取消或失败保留已有封面。服务未收录时可调整书名，或继续使用默认封面。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                 Link("Open Library 封面服务",destination:URL(string:"https://openlibrary.org/dev/docs/api/covers")!).font(.system(size:12))
             }.padding(22)
         }.appPageStyle().navigationTitle("封面搜索").navigationBarTitleDisplayMode(.inline)

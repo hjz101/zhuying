@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ProductionContentRulesView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @State private var rules: [ContentProcessingRule] = []
     @State private var editing: ContentProcessingRule?
@@ -23,7 +24,7 @@ struct ProductionContentRulesView: View {
                     ForEach(Array(rules.enumerated()),id:\.element.id) { index,rule in
                         VStack(alignment:.leading,spacing:9) {
                             Toggle(isOn:Binding(get:{rule.enabled},set:{ value in var next = rules; next[index].enabled = value; commit(next) })) { Button(rule.name) { editing = rule }.accessibilityIdentifier("purify-edit-" + rule.id) }
-                            Text("\(rule.kind.rawValue) · \(rule.scope.rawValue)").font(.system(size:11)).foregroundStyle(Palette.muted)
+                            Text("\(rule.kind.rawValue) · \(rule.scope.rawValue)").font(.system(size:11)).foregroundStyle(appAppearance.palette.muted)
                             HStack {
                                 Button("上移") { var next = rules; next.swapAt(index,index - 1); commit(next) }.disabled(index == 0)
                                 Button("下移") { var next = rules; next.swapAt(index,index + 1); commit(next) }.disabled(index + 1 == rules.count)
@@ -33,9 +34,9 @@ struct ProductionContentRulesView: View {
                     }
                 }.disabled(busy)
                 if busy { ProgressView("正在保存") }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("purifyMessage") }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("purifyMessage") }
                 Text("按列表顺序处理符合范围的规则。最多启用 20 条，其中 JS 最多 2 条；JS 禁止联网。原文不改写，净化结果可重建，全文搜索与朗读使用同一结果。规则变化先尝试按原文上下文重定位，无法唯一匹配时需明确选章或从章首打开。异常保留上次有效结果或原文，规则随完整备份保存。")
-                    .font(.system(size:12)).foregroundStyle(Palette.muted)
+                    .font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("正文净化").navigationBarTitleDisplayMode(.inline)
             .task { do { rules = try await library.contentProcessor.rules(); message = await library.contentProcessor.message } catch { message = "规则未载入，原文件保留：\(error.localizedDescription)" } }
@@ -55,6 +56,7 @@ struct ProductionContentRulesView: View {
 }
 
 private struct ContentRuleEditor: View {
+    @Environment(\.themeAppearance) private var appAppearance
     @EnvironmentObject private var library: LibraryStore
     @Environment(\.dismiss) private var dismiss
     @State var rule: ContentProcessingRule
@@ -73,7 +75,7 @@ private struct ContentRuleEditor: View {
                     Picker("作用域",selection:$rule.scope) { ForEach(ContentProcessingRule.Scope.allCases,id:\.self) { Text($0.rawValue).tag($0) } }
                     if rule.scope == .book { Picker("目标书籍",selection:Binding(get:{rule.bookID ?? ""},set:{rule.bookID = $0.isEmpty ? nil : $0})) { Text("选择书籍").tag(""); ForEach(library.books) { Text($0.title).tag($0.id) } } }
                     if rule.scope == .source { Picker("目标书源",selection:Binding(get:{rule.sourceID ?? ""},set:{rule.sourceID = $0.isEmpty ? nil : $0})) { Text("选择书源").tag(""); ForEach(library.sources) { Text($0.name).tag($0.id) } } }
-                    Text(rule.kind == .regex ? "正则表达式" : "脚本接收 [{id,text}]，返回保留 id 和相对顺序的数组；可删除条目。网络始终关闭。").font(.system(size:12)).foregroundStyle(Palette.muted)
+                    Text(rule.kind == .regex ? "正则表达式" : "脚本接收 [{id,text}]，返回保留 id 和相对顺序的数组；可删除条目。网络始终关闭。").font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                     TextEditor(text:$rule.pattern).font(.system(size:12,design:.monospaced)).frame(minHeight:120).accessibilityIdentifier("purifyPattern")
                     if rule.kind == .regex { TextField("替换为（可留空）",text:$rule.replacement).accessibilityIdentifier("purifyReplacement") }
                     Toggle("启用规则",isOn:$rule.enabled).accessibilityIdentifier("purifyEnabled")
@@ -83,7 +85,7 @@ private struct ContentRuleEditor: View {
                     Button("预览净化结果") { runPreview() }.disabled(busy || sample.isEmpty).accessibilityIdentifier("purifyPreview")
                     if let preview { Text(preview).font(.system(size:13)).textSelection(.enabled).accessibilityIdentifier("purifyPreviewOutput") }
                 }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("purifyEditorMessage") }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("purifyEditorMessage") }
                 Button("保存规则") { busy = true; operation = Task { defer { busy = false }; do { try rule.validate(); try await onSave(rule); dismiss() } catch { message = error.localizedDescription } } }.buttonStyle(PrimaryButtonStyle()).disabled(busy).accessibilityIdentifier("purifySave")
                 if busy { ProgressView(); Button("取消处理") { operation?.cancel(); busy = false } }
             }.padding(22)

@@ -11,11 +11,22 @@ final class LegadoSourceFlowTests: XCTestCase {
         for _ in 0..<8 { if value.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(value.isHittable)
     }
-    @MainActor private func run(scripted: Bool) {
+    @MainActor private func run(scripted: Bool, themed: Bool = false) {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "--production", "--legado-fixtures"]
+        app.launchArguments = ["--ui-testing", "--production", "--legado-fixtures"] + (themed ? ["--global-theme-fixtures"] : [])
         app.launch()
+        if themed {
+            XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 10)); app.tabBars.buttons["我的"].tap()
+            let themes = app.buttons["profileThemes"]; reveal(themes, app: app); themes.tap()
+            let night = app.buttons["globalTheme-zhuying.builtin.night"]; reveal(night, app: app); night.tap()
+            let apply = app.buttons["globalThemeApply"]; reveal(apply, app: app); apply.tap()
+            XCTAssertTrue(app.staticTexts["globalThemeResult"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.staticTexts["globalThemeResult"].label.contains("已应用"))
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, "幻想夜航")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
         XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 10)); app.tabBars.buttons["我的"].tap()
         let sources = app.buttons["profileSources"]; reveal(sources, app: app); sources.tap()
         app.buttons["sourceAdd"].tap(); app.buttons["导入书源"].tap()
@@ -58,12 +69,18 @@ final class LegadoSourceFlowTests: XCTestCase {
         wait(for: [next], timeout: 10)
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = scripted ? "Legado-Synchronous-Script-Reader" : "Legado-HTML-Rule-Reader"; screenshot.lifetime = .keepAlways; add(screenshot)
         app.buttons["返回书架"].tap()
-        app.terminate(); app.launchArguments = ["--ui-testing", "--production", "--legado-fixtures", "--preserve-ui-test-state"]; app.launch()
+        app.terminate(); app.launchArguments = ["--ui-testing", "--production", "--legado-fixtures", "--preserve-ui-test-state"] + (themed ? ["--global-theme-fixtures"] : []); app.launch()
         XCTAssertTrue(app.buttons["continueReading"].waitForExistence(timeout: 10)); app.buttons["continueReading"].tap()
         let restored = expectation(for: NSPredicate(format: "value CONTAINS %@", phrase.replacingOccurrences(of: "第1章", with: "第2章")), evaluatedWith: app.textViews["continuousText"])
         wait(for: [restored], timeout: 10)
+        if themed {
+            app.buttons["返回书架"].tap(); app.tabBars.buttons["我的"].tap()
+            let themes = app.buttons["profileThemes"]; reveal(themes, app: app); themes.tap()
+            XCTAssertEqual(app.staticTexts["globalThemeCurrent"].label, "幻想夜航")
+        }
     }
 
+    @MainActor func testAppliedThemePreservesScriptSourceReadingAndRestart() { run(scripted: true, themed: true) }
     @MainActor func testImportedHTMLRulesSearchReadNextChapterAndRestart() { run(scripted: false) }
     @MainActor func testImportedSynchronousScriptRulesSearchReadNextChapterAndRestart() { run(scripted: true) }
 }

@@ -27,6 +27,7 @@ import ImageIO
 }
 
 struct ProductionMediaReader: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let book: Book
     @EnvironmentObject private var library: LibraryStore
     @Environment(\.dismiss) private var dismiss
@@ -44,26 +45,26 @@ struct ProductionMediaReader: View {
     var body: some View {
         NavigationStack {
             VStack(spacing:0) {
-                if let error { ContentUnavailableView("页面暂时无法打开",systemImage:"doc",description:Text(error)) }
+                if let error { ThemeUnavailableView("页面暂时无法打开",systemImage:"doc",description:Text(error)) }
                 else if media.kind == .pdf {
                     if let pdfURL { NativePDFPages(url:pdfURL,continuous:continuous,restore:restore,revision:restoreID,onLocation:record).accessibilityIdentifier("nativePDFPages") }
                     else { ProgressView("正在校验 PDF") }
                 } else { comic }
                 VStack(spacing:10) {
                     HStack {
-                        Button { jump(page - 1) } label: { Image(systemName:"chevron.left").frame(width:44,height:44) }.disabled(page == 0).accessibilityIdentifier("mediaPreviousPage")
+                        Button { jump(page - 1) } label: { ThemeIcon(systemName:"chevron.left").frame(width:44,height:44) }.disabled(page == 0).accessibilityIdentifier("mediaPreviousPage")
                         Text("第 \(page + 1) / \(media.pageCount) 页").font(.system(size:12)).frame(maxWidth:.infinity).accessibilityIdentifier("mediaPageStatus")
-                        Button { jump(page + 1) } label: { Image(systemName:"chevron.right").frame(width:44,height:44) }.disabled(page + 1 >= media.pageCount).accessibilityIdentifier("mediaNextPage")
+                        Button { jump(page + 1) } label: { ThemeIcon(systemName:"chevron.right").frame(width:44,height:44) }.disabled(page + 1 >= media.pageCount).accessibilityIdentifier("mediaNextPage")
                     }
                     HStack {
                         Picker("页面浏览",selection:$continuous) { Text(media.kind == .comic ? "条漫" : "连续").tag(true); Text("分页").tag(false) }.pickerStyle(.segmented).accessibilityIdentifier("mediaDisplayMode")
-                        Button { library.saveMediaBookmark(book) } label: { Image(systemName:"bookmark.badge.plus").frame(width:44,height:44) }.accessibilityIdentifier("mediaAddBookmark")
-                        Button { bookmarkList = true } label: { Image(systemName:"list.bullet").frame(width:44,height:44) }.accessibilityIdentifier("mediaBookmarks")
+                        Button { library.saveMediaBookmark(book) } label: { ThemeIcon(systemName:"bookmark.badge.plus").frame(width:44,height:44) }.accessibilityIdentifier("mediaAddBookmark")
+                        Button { bookmarkList = true } label: { ThemeIcon(systemName:"list.bullet").frame(width:44,height:44) }.accessibilityIdentifier("mediaBookmarks")
                     }
                 }.padding(.horizontal,18).background(.regularMaterial)
             }.navigationTitle(book.title).navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement:.topBarLeading) { Button("返回书架") { dismiss() } } }
-                .background(Palette.background).tint(Palette.green)
+                .background(ThemeSurface()).tint(appAppearance.palette.primary)
                 .task {
                     restore = (library.mediaLocations[book.id] ?? .init(page:0)).validated(pages:media.pageCount); page = restore.page; continuous = media.kind == .pdf
                     if media.kind == .pdf { do { let url = try await library.mediaURL(media.resources[0]); outline = await Task.detached { PDFOutlineItem.load(url) }.value; pdfURL = url } catch { self.error = error.localizedDescription } }
@@ -171,6 +172,7 @@ private final class LayoutAwarePDFView: PDFView {
     }
 }
 private struct NativePDFPages: UIViewRepresentable {
+    @Environment(\.themeAppearance) private var appAppearance
     let url: URL
     let continuous: Bool
     let restore: MediaReadingLocation
@@ -178,7 +180,7 @@ private struct NativePDFPages: UIViewRepresentable {
     let onLocation: (MediaReadingLocation) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> PDFView {
-        let view = LayoutAwarePDFView(); view.backgroundColor = UIColor(Palette.background); view.autoScales = true; view.document = PDFDocument(url:url)
+        let view = LayoutAwarePDFView(); view.backgroundColor = UIColor(appAppearance.palette.background); view.autoScales = true; view.document = PDFDocument(url:url)
         view.willChangeSize = { [weak coordinator = context.coordinator] in coordinator?.beginResize() }
         view.didChangeSize = { [weak coordinator = context.coordinator] in DispatchQueue.main.async { coordinator?.finishResize() } }
         context.coordinator.view = view; context.coordinator.observe(); context.coordinator.configure(self,force:true); return view

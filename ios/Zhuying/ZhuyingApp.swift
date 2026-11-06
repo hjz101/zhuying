@@ -70,6 +70,9 @@ struct ZhuyingApp: App {
             if testing && ProcessInfo.processInfo.arguments.contains("--legado-fixtures") {
                 try LegadoDevelopmentFixtures.write(to: manager.urls(for: .documentDirectory, in: .userDomainMask)[0])
             }
+            if testing && ProcessInfo.processInfo.arguments.contains("--global-theme-fixtures") {
+                try GlobalThemeFixtures.write(to: manager.urls(for: .documentDirectory, in: .userDomainMask)[0])
+            }
             if testing && ProcessInfo.processInfo.arguments.contains("--media-fixtures") {
                 try MediaDevelopmentFixtures.write(to:manager.urls(for:.documentDirectory,in:.userDomainMask)[0])
             }
@@ -94,12 +97,15 @@ struct ZhuyingApp: App {
             _library = StateObject(wrappedValue: LibraryStore(books: [], defaults: defaults, seedDemoData: environment.isDemo))
             launchError = "书库加载失败，请保留本地数据后重试。"
         }
+        let themesDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(environment.databaseComponent).appendingPathComponent("GlobalThemes")
+        GlobalThemeStore.shared.configure(directory: themesDirectory, reset: environment.resetsTestState)
     }
 
     var body: some Scene {
         WindowGroup {
             if let launchError {
-                ContentUnavailableView("暂时无法打开书库", systemImage: "books.vertical", description: Text(launchError))
+                ThemeUnavailableView("暂时无法打开书库", systemImage: "books.vertical", description: Text(launchError))
             } else {
                 RootView().environmentObject(library).environmentObject(featureDemo).environmentObject(navigation).environmentObject(toolbox).environmentObject(shushan)
             }
@@ -108,6 +114,7 @@ struct ZhuyingApp: App {
 }
 
 struct RootView: View {
+    @ObservedObject private var globalTheme = GlobalThemeStore.shared
     @EnvironmentObject private var store: LibraryStore
     @EnvironmentObject private var demo: FeatureDemoStore
     @EnvironmentObject private var navigation: NavigationStore
@@ -117,28 +124,24 @@ struct RootView: View {
     @State private var showPlayer = false
     @State private var sharedImport: ShareImportRequest?
 
-    private var preparedTabs: some View {
+    private var bootstrappedNavigation: some View {
         navigationTabs
         .legadoInteractionPresenter()
         .allowsHitTesting(store.loadState == .ready)
         .overlay {
             if store.loadState != .ready {
                 ZStack {
-                    Palette.background.ignoresSafeArea()
+                    AppThemePalette(appearance: globalTheme.active.document.app).background.ignoresSafeArea()
                     if store.loadState == .loading { ProgressView("正在打开书库") }
                     else {
                         ContentUnavailableView {
-                            Label("暂时无法打开书库", systemImage: "books.vertical")
+                            ThemeLabel("暂时无法打开书库", systemImage: "books.vertical")
                         } description: { Text("原有记录和文件已保留，请重试。") }
                         actions: { Button("重试") { Task { await store.bootstrapProductionIfNeeded() } } }
                     }
                 }
             }
         }
-    }
-
-    private var observedTabs: some View {
-        preparedTabs
         .task {
             await store.bootstrapProductionIfNeeded(prepareAppearance: {
                 let fonts = ReadingFontLibrary.shared
@@ -174,7 +177,10 @@ struct RootView: View {
                 if !store.isDemo && scenePhase == .active { store.cloudSync.tick() }
             }
         }
-        .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store); demo.updateShushanAccount(shushan.credential, host: shushan.hostText); configureSource() } }
+    }
+    private var observedContent: some View {
+        bootstrappedNavigation
+        .onChange(of: store.loadState) { _, state in if state == .ready { globalTheme.attach(store); demo.connectReader(store); demo.updateShushanAccount(shushan.credential, host: shushan.hostText); configureSource() } }
         .onChange(of: store.sources) { _, _ in configureSource() }
         .onReceive(NotificationCenter.default.publisher(for:.contentProcessingChanged)) { _ in if !store.isDemo { store.audio.stop() } }
         .onReceive(NotificationCenter.default.publisher(for:.sourceBrowserSessionsChanged)) { _ in configureSource() }
@@ -184,20 +190,18 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.onlineService?.downloads?.pauseForBackground(); await store.saveBeforeSuspending() } } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await store.onlineService?.downloads?.returnToForeground() } } }
         .onChange(of: store.reader?.id) { _, id in if id == nil { Task { await store.flushPendingWrites() } } }
-        .onAppear { demo.connectReader(store) }
+        .onAppear { demo.connectReader(store); globalTheme.attach(store) }
         .onReceive(shushan.$credential) { demo.updateShushanAccount($0, host: shushan.hostText); configureSource() }
         .onChange(of: shushan.expired) { _, _ in configureSource() }
-        .tint(Palette.green)
+        .tint(Color(hex: globalTheme.active.document.app.colors["action.primary.background"].flatMap(GlobalThemePackage.hex) ?? 0x354F40))
     }
-
-    var body: some View {
-        observedTabs
+    private var presentedContent: some View {
+        observedContent
         .onOpenURL { url in
             do { let request = try ShareImportRequest.parse(url); if sharedImport?.id != request.id { sharedImport = request } }
             catch { store.storageMessage = error.localizedDescription }
         }
         .sheet(item:$sharedImport) { request in NavigationStack { ShareImportView(request:request).toolbar { ToolbarItem(placement:.topBarTrailing) { Button("完成") { sharedImport = nil } } } } }
-        .preferredColorScheme(.light)
         .onReceive(NotificationCenter.default.publisher(for: .showImportedShelf)) { _ in selectedTab = .shelf }
         .onChange(of: navigation.visibleTabs) { _, _ in selectedTab = navigation.validSelection(selectedTab) }
         .sheet(isPresented: $showPlayer) {
@@ -212,6 +216,14 @@ struct RootView: View {
             if !store.isDemo { Button("重试") { Task { await store.retryStorage() } } }
             Button("知道了") { store.storageMessage = nil }
         } message: { Text(store.storageMessage ?? "") }
+    }
+    var body: some View {
+        presentedContent
+        .background(ThemeSurface().ignoresSafeArea())
+        .environment(\.themeAppearance, .init(bundle: globalTheme.active))
+        .buttonStyle(ThemeButtonFeedbackStyle())
+        .progressViewStyle(ThemeProgressStyle())
+        .preferredColorScheme(globalTheme.active.document.app.dark ? .dark : .light)
     }
     private func configureSource() {
         Task {
@@ -230,7 +242,7 @@ struct RootView: View {
         } else {
             TabView(selection: $selectedTab) {
                 ForEach(navigation.visibleTabs + [.search]) { tab in
-                    tabPage(tab).tabItem { Label(tab.title, systemImage: tab.icon) }.tag(tab)
+                    tabPage(tab).tabItem { ThemeLabel(tab.title, systemImage: tab.icon, role: "navigation." + tab.rawValue, selected: selectedTab == tab) }.tag(tab)
                 }
             }
         }
@@ -239,9 +251,9 @@ struct RootView: View {
     private var modernTabs: some View {
         TabView(selection: $selectedTab) {
             ForEach(navigation.visibleTabs) { tab in
-                Tab(tab.title, systemImage: tab.icon, value: tab) { tabPage(tab) }
+                Tab(value: tab) { tabPage(tab) } label: { ThemeLabel(tab.title, systemImage: tab.icon, role: "navigation." + tab.rawValue, selected: selectedTab == tab) }
             }
-            Tab("搜索", systemImage: "magnifyingglass", value: AppTab.search, role: .search) { tabPage(.search) }
+            Tab(value: AppTab.search, role: .search) { tabPage(.search) } label: { ThemeLabel("搜索", systemImage: "magnifyingglass", role: "navigation.search", selected: selectedTab == .search) }
         }
     }
     private func tabPage(_ tab: AppTab) -> some View {
@@ -255,16 +267,21 @@ struct RootView: View {
             case .profile: ProfileView(onShelf: { selectedTab = .shelf })
             case .search: DiscoverView(searchEntry: true)
             }
-        }.safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
+        }.background(ThemeSurface().ignoresSafeArea())
+            .background(ThemeNavigationAppearance().frame(width: 0, height: 0))
+            .toolbarBackground(AppThemePalette(appearance: globalTheme.active.document.app).background, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
+            .toolbarColorScheme(globalTheme.active.document.app.dark ? .dark : .light, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
     }
     @ViewBuilder private var miniPlayer: some View {
             if !store.isDemo && store.reader == nil { ProductionMiniPlayer(audio:store.audio,open:{showPlayer = true}) }
             if store.isDemo && demo.playerVisible {
                 HStack(spacing: 15) {
-                    Button { showPlayer = true } label: { Label("长风渡山海 · 演示朗读", systemImage: "waveform").font(.system(size: 11)).frame(maxWidth: .infinity, alignment: .leading) }
-                    Button { demo.isPlaying.toggle() } label: { Image(systemName: demo.isPlaying ? "pause.fill" : "play.fill").frame(width: 40, height: 40) }.accessibilityLabel("切换演示朗读")
-                    Button { demo.playerVisible = false; demo.isPlaying = false } label: { Image(systemName: "xmark").frame(width: 36, height: 40) }.accessibilityLabel("关闭演示播放器")
-                }.foregroundStyle(Palette.green).padding(.horizontal, 17).background(.regularMaterial)
+                    Button { showPlayer = true } label: { ThemeLabel("长风渡山海 · 演示朗读", systemImage: "waveform").font(.system(size: 11)).frame(maxWidth: .infinity, alignment: .leading) }
+                    Button { demo.isPlaying.toggle() } label: { ThemeIcon(systemName: demo.isPlaying ? "pause.fill" : "play.fill").frame(width: 40, height: 40) }.accessibilityLabel("切换演示朗读")
+                    Button { demo.playerVisible = false; demo.isPlaying = false } label: { ThemeIcon(systemName: "xmark").frame(width: 36, height: 40) }.accessibilityLabel("关闭演示播放器")
+                }.foregroundStyle(AppThemePalette(appearance: globalTheme.active.document.app).green).padding(.horizontal, 17).background(.regularMaterial)
             }
     }
 

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProductionCommentsView: View {
+    @Environment(\.themeAppearance) private var appAppearance
     let client: ShushanCommentsClient
     let context: ShushanCommentContext
     let paragraph: SourceParagraphCount
@@ -16,17 +17,17 @@ struct ProductionCommentsView: View {
         ScrollView {
             VStack(alignment:.leading,spacing:18) {
                 Text("本段评论").font(.system(size:23,weight:.medium,design:.serif))
-                Text("书山聚合 · 番茄 · 只读评论").font(.system(size:12)).foregroundStyle(Palette.muted)
+                Text("书山聚合 · 番茄 · 只读评论").font(.system(size:12)).foregroundStyle(appAppearance.palette.muted)
                 Text(originalText).font(.system(size:14)).lineSpacing(7)
-                if stale { Text("当前展示缓存，联网后可刷新。").font(.system(size:12)).foregroundStyle(Palette.muted).accessibilityIdentifier("commentsStale") }
+                if stale { Text("当前展示缓存，联网后可刷新。").font(.system(size:12)).foregroundStyle(appAppearance.palette.muted).accessibilityIdentifier("commentsStale") }
                 ForEach(comments) { comment in
                     AppSettingsCard(comment.author,icon:"bubble.left") {
                         Text(comment.text.isEmpty ? "此条评论仅含媒体，当前支持文字展示。" : comment.text).font(.system(size:14)).textSelection(.enabled)
-                        HStack { if let date = comment.createdAt { Text(date,style:.date) }; Spacer(); Text("赞 \(comment.likes)") }.font(.system(size:11)).foregroundStyle(Palette.muted)
+                        HStack { if let date = comment.createdAt { Text(date,style:.date) }; Spacer(); Text("赞 \(comment.likes)") }.font(.system(size:11)).foregroundStyle(appAppearance.palette.muted)
                     }
                 }
                 if loaded && comments.isEmpty && message == nil { Text("暂无评论").accessibilityIdentifier("commentsEmpty") }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("commentsMessage") }
+                if let message { Text(message).font(.system(size:12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("commentsMessage") }
                 if busy { ProgressView("正在读取评论") }
                 else {
                     if cursor != nil { Button(loaded ? "加载更多" : "重试") { Task { await load() } }.accessibilityIdentifier("commentsMore") }

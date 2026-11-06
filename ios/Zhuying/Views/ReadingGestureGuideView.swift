@@ -29,7 +29,7 @@ struct ReadingGestureGuideView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Label(isPaged ? (store.settings.mode == .verticalPaged ? "上滑下一页 · 下滑上一页" : "左滑下一页 · 右滑上一页") : "上下滑动阅读 · 底部箭头切换章节",
+                    ThemeLabel(isPaged ? (store.settings.mode == .verticalPaged ? "上滑下一页 · 下滑上一页" : "左滑下一页 · 右滑上一页") : "上下滑动阅读 · 底部箭头切换章节",
                           systemImage: store.settings.mode == .paged ? "arrow.left.arrow.right" : "arrow.up.arrow.down")
                         .font(.system(size: 12)).accessibilityIdentifier("gestureGuideSwipe")
                     Text(store.settings.tapToTurn
@@ -59,7 +59,7 @@ struct ReadingGestureGuideView: View {
     private func tapZone(_ title: String, symbol: String, action: String, emphasis: Bool = false) -> some View {
         VStack(spacing: 9) {
             Text(title).font(.system(size: 9)).foregroundStyle(guideSecondary)
-            Image(systemName: symbol).font(.system(size: 19, weight: .light)).frame(height: 23)
+            ThemeIcon(systemName: symbol).font(.system(size: 19, weight: .light)).frame(height: 23)
             Text(action).font(.system(size: 11, weight: .medium)).multilineTextAlignment(.center).frame(minHeight: 28)
         }
         .frame(maxWidth: .infinity, minHeight: 108)

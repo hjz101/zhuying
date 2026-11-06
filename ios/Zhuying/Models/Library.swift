@@ -151,6 +151,7 @@ struct LibrarySnapshot: Codable {
     var mediaBookmarks: [MediaBookmark]? = nil
     var userSettingsEdited: Bool? = nil
     var farthestPositions: [String:ReadingAnchor]? = nil
+    var globalThemeSelection: GlobalThemeSelection? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -184,6 +185,7 @@ final class LibraryStore: ObservableObject {
         }
     }
     @Published private(set) var themeLibrary: ThemeLibrarySnapshot?
+    @Published private(set) var globalThemeSelection: GlobalThemeSelection?
     @Published var sort: ShelfSort = .recent { didSet { persist() } }
     @Published var shelfLayout: ShelfLayout = .standard { didSet { persist() } }
     @Published private(set) var updates: [String: UpdateNotice] = [:]
@@ -424,6 +426,7 @@ final class LibraryStore: ObservableObject {
                 updates = savedUpdates.filter { ids.contains($0.key) }.mapValues { UpdateNotice(firstChapter: max(0, $0.firstChapter), readThrough: max(-1, $0.readThrough)) }
             }
             settings = snapshot.settings
+            globalThemeSelection = snapshot.globalThemeSelection
             settings.fontSize = ReaderPreferenceBounds.clamp(settings.fontSize, 14...30, fallback: 20)
             settings.lineSpacing = ReaderPreferenceBounds.clamp(settings.lineSpacing, 0...24, fallback: 12)
             settings.preferences.normalize()
@@ -610,6 +613,25 @@ final class LibraryStore: ObservableObject {
         return true
     }
 
+    func commitGlobalTheme(_ selection: GlobalThemeSelection, settings next: ReadingSettings) async throws {
+        guard loadState == .ready, await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        let oldSelection = globalThemeSelection, oldSettings = settings
+        let oldEdited = defaults.bool(forKey: "reader.user-settings-edited.v1")
+        suppressPersistence = true
+        globalThemeSelection = selection; settings = next
+        suppressPersistence = false
+        if next != oldSettings { defaults.set(true, forKey: "reader.user-settings-edited.v1") }
+        persist()
+        guard await flushPendingWrites() else {
+            suppressPersistence = true
+            globalThemeSelection = oldSelection; settings = oldSettings
+            suppressPersistence = false
+            defaults.set(oldEdited, forKey: "reader.user-settings-edited.v1")
+            persist(); _ = await flushPendingWrites()
+            throw ContentFailure.storageFailure
+        }
+    }
+
     func persist() {
         guard !suppressPersistence else { return }
         if usesProductionStorage {
@@ -627,7 +649,7 @@ final class LibraryStore: ObservableObject {
 
     private var snapshot: LibrarySnapshot {
         .init(favorites: favorites, progress: progress.filter{mediaLocations[$0.key] == nil}, settings: settings, sort: sort, updates: updates,
-              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted(),narrationSettings:narrationSettings,narrationAnchor:narrationAnchor,mediaLocations:mediaLocations,mediaBookmarks:mediaBookmarks,userSettingsEdited:defaults.bool(forKey:"reader.user-settings-edited.v1"),farthestPositions:farthestPositions)
+              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted(),narrationSettings:narrationSettings,narrationAnchor:narrationAnchor,mediaLocations:mediaLocations,mediaBookmarks:mediaBookmarks,userSettingsEdited:defaults.bool(forKey:"reader.user-settings-edited.v1"),farthestPositions:farthestPositions,globalThemeSelection:globalThemeSelection)
     }
 
     func bootstrapProductionIfNeeded(prepareAppearance: (() throws -> AppearanceMigrationInput)? = nil, forceReload: Bool = false) async {
@@ -650,6 +672,7 @@ final class LibraryStore: ObservableObject {
             importedGroups = restored.snapshot.importedGroups ?? [:]
             groupNames = Array(Set((restored.snapshot.groupNames ?? []) + Array(importedGroups.values))).sorted()
             settings = restored.snapshot.settings
+            globalThemeSelection = restored.snapshot.globalThemeSelection
             defaults.set(restored.snapshot.userSettingsEdited ?? false,forKey:"reader.user-settings-edited.v1")
             settings.fontSize = ReaderPreferenceBounds.clamp(settings.fontSize, 14...30, fallback: 20)
             settings.lineSpacing = ReaderPreferenceBounds.clamp(settings.lineSpacing, 0...24, fallback: 12)

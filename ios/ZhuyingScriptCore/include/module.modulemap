@@ -1,0 +1,4 @@
+module ZhuyingScriptCore {
+    header "ZhuyingScriptCore.h"
+    export *
+}

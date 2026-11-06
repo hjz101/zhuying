@@ -354,6 +354,7 @@ private final class LegadoSourceWorker {
             guard visited.insert(address).inserted else { continue }
             guard visited.count <= maximumPages else { throw LegadoRequestError.limit }
             let response = try fetch(address)
+            if response.url.absoluteString != chapter.nativeChapterID, knownChapters.contains(response.url.absoluteString) { break }
             let raw = try field(definition.content["content"], in: response.text, baseURL: response.url)
             let extracted = try Self.paragraphs(raw)
             // Split pages commonly repeat a paragraph at their boundary. Keep

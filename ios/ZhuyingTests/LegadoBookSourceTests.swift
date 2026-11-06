@@ -9,8 +9,9 @@ private actor LegadoFixtureTransport: HTTPTransport {
     let nextChapterLink: Bool
     let fragments: Bool
     let searchNextLink: Bool
-    init(json: Bool = false, nextChapterLink: Bool = false, fragments: Bool = false, searchNextLink: Bool = false) {
-        self.json = json; self.nextChapterLink = nextChapterLink; self.fragments = fragments; self.searchNextLink = searchNextLink
+    let redirectedChapter: Bool
+    init(json: Bool = false, nextChapterLink: Bool = false, fragments: Bool = false, searchNextLink: Bool = false, redirectedChapter: Bool = false) {
+        self.json = json; self.nextChapterLink = nextChapterLink; self.fragments = fragments; self.searchNextLink = searchNextLink; self.redirectedChapter = redirectedChapter
     }
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
@@ -49,7 +50,8 @@ private actor LegadoFixtureTransport: HTTPTransport {
             default: throw ContentFailure.invalidResponse
             }
         }
-        return (Data(body.utf8), HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!)
+        let finalURL = redirectedChapter && url.path == "/chapter/one" && url.query == "part=2" ? URL(string: "https://fixture.test/chapter/two")! : url
+        return (Data(body.utf8), HTTPURLResponse(url: finalURL, statusCode: 200, httpVersion: nil, headerFields: headers)!)
     }
 }
 
@@ -239,6 +241,15 @@ final class LegadoBookSourceTests: XCTestCase {
         let book = try await adapter.details(for: XCTUnwrap(results.books.first))
         do { _ = try await adapter.chapters(for: book); XCTFail("Fragment chapter addresses are not HTTP chapter identities") }
         catch { XCTAssertEqual(error as? LegadoRequestError, .unsupported("依赖 URL fragment 的书籍或章节地址")) }
+    }
+
+    func testContentPageRedirectToKnownChapterCannotMergeAnotherChapterBody() async throws {
+        let adapter = try LegadoBookSource(source: source(), transport: LegadoFixtureTransport(redirectedChapter: true))
+        let results = try await adapter.search(query: "redirect", page: 1)
+        let book = try await adapter.details(for: XCTUnwrap(results.books.first))
+        let chapters = try await adapter.chapters(for: book)
+        let document = try await adapter.document(for: XCTUnwrap(chapters.first), book: book)
+        XCTAssertEqual(document.paragraphs.map(\.text), ["午后，竹影落在信笺上。", "接续段落。"])
     }
 
     func testRequestHeaderOverridesAreCaseInsensitiveAndNeverRandomlyReplaceCredentials() async throws {

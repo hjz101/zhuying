@@ -44,6 +44,7 @@ struct ReaderView: View {
     @State private var reflowing = false
     @State private var turn = 0
     @State private var message: String?
+    @State private var messageTask: Task<Void, Never>?
     @State private var clearingCache = false
     @State private var initialized = false
     @State private var commentParagraph: Int?
@@ -138,6 +139,7 @@ struct ReaderView: View {
             VStack(spacing: 0) {
                 if let message {
                     Text(message).font(.system(size: 11)).padding(13).foregroundStyle(readerInk).background(.regularMaterial, in: Capsule()).padding(.bottom, 9)
+                        .accessibilityIdentifier("readerFeedback")
                 }
                 if controlsVisible {
                     footer
@@ -163,7 +165,7 @@ struct ReaderView: View {
         .onChange(of:store.followingNarrationAnchor) { _,location in
             followNarration(location)
         }
-        .onDisappear { sampleShelfPrompt(visible: false); store.trackReading(nil); save(); chapterTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
+        .onDisappear { sampleShelfPrompt(visible: false); store.trackReading(nil); save(); chapterTask?.cancel(); messageTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
         .onReceive(NotificationCenter.default.publisher(for:.contentProcessingChanged)) { _ in
             guard !store.isDemo,let loaded else { return }
             let location = try? ReadingAnchor(bookID:book.id,document:loaded,paragraph:anchor.paragraph,offset:anchor.offset)
@@ -469,8 +471,12 @@ struct ReaderView: View {
         else if force || target.paragraph != anchor.paragraph || abs(target.offset - anchor.offset) > 120 { anchor = target; narrationRestoreID += 1; save() }
     }
     private func showMessage(_ value: String) {
+        messageTask?.cancel()
         message = value
-        Task { @MainActor in try? await Task.sleep(for: .seconds(2)); if message == value { message = nil } }
+        messageTask = Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(4)) } catch { return }
+            message = nil
+        }
     }
 }
 
@@ -583,7 +589,7 @@ private extension ContentsView {
             do { try await service.clearCache(bookID: book.id); cacheMessage = "本书临时正文缓存已清除" }
             catch { cacheMessage = "清除未完成：" + error.localizedDescription }
             let shown = cacheMessage
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(4))
             if cacheMessage == shown { cacheMessage = nil }
         }
     }

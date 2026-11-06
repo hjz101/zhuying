@@ -14,7 +14,15 @@ final class OnlineReadingFlowTests: XCTestCase {
             let read = app.buttons["detailRead"]
             XCTAssertTrue(read.waitForExistence(timeout: 10))
             let ready = expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: read); wait(for: [ready], timeout: 10)
-            app.buttons["detailContents"].tap()
+            // The directory is below the fold; move it above the fixed reading CTA.
+            let contents = app.buttons["detailContents"]
+            for _ in 0..<3 {
+                if contents.frame.maxY < read.frame.minY - 8 && contents.isHittable { break }
+                app.swipeUp()
+            }
+            XCTAssertTrue(contents.isHittable)
+            contents.tap()
+            XCTAssertTrue(app.navigationBars["章节目录"].waitForExistence(timeout: 5))
             XCTAssertTrue(app.buttons["chapter-3"].waitForExistence(timeout: 5)); XCTAssertFalse(app.buttons["chapter-3"].isEnabled)
             app.buttons["完成"].tap(); read.tap()
             if app.buttons["dismissGestureGuide"].waitForExistence(timeout: 2) { app.buttons["dismissGestureGuide"].tap() }
@@ -54,10 +62,13 @@ extension OnlineReadingFlowTests {
         let chapter = app.staticTexts["chapterTitle"].label
         app.buttons["readerMoreTools"].tap()
         app.buttons["readerRefreshChapter"].tap()
-        XCTAssertTrue(app.staticTexts["正文已刷新"].waitForExistence(timeout: 5))
+        let feedback = app.staticTexts["readerFeedback"]
+        XCTAssertTrue(feedback.waitForExistence(timeout: 5))
+        XCTAssertEqual(feedback.label, "正文已刷新")
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
         app.buttons["readerMoreTools"].tap(); app.buttons["readerClearCache"].tap()
-        XCTAssertTrue(app.staticTexts["本书临时正文缓存已清除"].waitForExistence(timeout: 5))
+        let cleared = expectation(for: NSPredicate(format: "label == %@", "本书临时正文缓存已清除"), evaluatedWith: feedback)
+        wait(for: [cleared], timeout: 5)
         XCTAssertEqual(app.staticTexts["chapterTitle"].label, chapter)
         XCTAssertTrue(app.textViews["continuousText"].exists)
         app.buttons["readerContents"].tap()

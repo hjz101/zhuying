@@ -155,11 +155,11 @@ def main():
         keychain = work/'signing.keychain-db'
         try:
             invoke(['security','create-keychain','-p',keychain_password,str(keychain)],label='Temporary keychain creation')
-            # Use this keychain explicitly; preserve other search-list changes.
+            # Trust evaluation searches the user list for intermediate certificates.
+            # The temporary keychain is removed again in finally; the default is unchanged.
             listed = shlex.split(invoke(['security','list-keychains','-d','user'],label='Keychain search list').decode())
-            filtered = [p for p in listed if Path(p) != keychain]
-            if filtered != listed:
-                invoke(['security','list-keychains','-d','user','-s',*filtered],label='Keep signing keychain isolated')
+            if str(keychain) not in listed:
+                invoke(['security','list-keychains','-d','user','-s',*listed,str(keychain)],label='Temporary signing search path')
             invoke(['security','unlock-keychain','-p',keychain_password,str(keychain)],label='Temporary keychain unlock')
             compatible = mac_compatible_p12(args.material,work,openssl,keychain_password)
             invoke(['security','import',str(compatible),'-k',str(keychain),'-P',keychain_password,'-T','/usr/bin/codesign'],label='P12 keychain import')

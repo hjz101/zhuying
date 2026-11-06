@@ -54,7 +54,7 @@ struct BookDetailView: View {
                             Spacer()
                             Text("共 \(currentBook.chapters.count) 章").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
                             ThemeIcon(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
-                        }.foregroundStyle(appAppearance.palette.green).frame(minHeight: 42)
+                        }.foregroundStyle(appAppearance.palette.green).frame(minHeight: 44).contentShape(Rectangle())
                     }.accessibilityIdentifier("detailContents")
                     if let progress = store.progress[currentBook.id] {
                         ThemeLabel("上次读到 · \(currentBook.chapterTitle(progress.chapter))", systemImage: "clock").font(.system(size: 10)).foregroundStyle(appAppearance.palette.muted)

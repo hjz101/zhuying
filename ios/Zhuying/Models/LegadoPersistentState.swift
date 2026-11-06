@@ -268,11 +268,19 @@ final class LegadoPersistentState: @unchecked Sendable {
         let origin = try LegadoSourcePolicy.canonicalOrigin(url).absoluteString, date = now()
         return secrets.cookies.filter { $0.origin == origin && ($0.expires.map { $0 > date } ?? true) }.compactMap(\.cookie).filter { Self.matches($0, url: url) }
     }
-    func setCookies(_ cookies: [HTTPCookie], for url: URL) throws { try updateCookies(cookies, for: url, replacing: false) }
+    func setCookies(_ cookies: [HTTPCookie], for url: URL, expectedSessionRevision: UInt64? = nil) throws {
+        try updateCookies(cookies, for: url, replacing: false, expectedSessionRevision: expectedSessionRevision)
+    }
     /// Browser results represent the entire origin's jar, including deletions.
-    func replaceCookies(_ cookies: [HTTPCookie], for url: URL) throws { try updateCookies(cookies, for: url, replacing: true) }
-    private func updateCookies(_ cookies: [HTTPCookie], for url: URL, replacing: Bool) throws {
+    func replaceCookies(_ cookies: [HTTPCookie], for url: URL, expectedSessionRevision: UInt64? = nil) throws {
+        try updateCookies(cookies, for: url, replacing: true, expectedSessionRevision: expectedSessionRevision)
+    }
+    private func updateCookies(_ cookies: [HTTPCookie], for url: URL, replacing: Bool, expectedSessionRevision: UInt64?) throws {
         Self.lock.lock(); defer { Self.lock.unlock() }; try refresh()
+        // The response may have arrived after a UI logout or credential change.
+        // Compare and commit under the same lock so an old response cannot
+        // restore cookies belonging to an invalidated authentication session.
+        if let expectedSessionRevision, expectedSessionRevision != manifest.authEpoch { throw CancellationError() }
         let origin = try LegadoSourcePolicy.canonicalOrigin(url).absoluteString
         var secret = secrets; let date = now()
         secret.cookies = secret.cookies.filter { $0.expires.map { $0 > date } ?? true }

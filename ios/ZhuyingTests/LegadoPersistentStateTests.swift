@@ -151,6 +151,25 @@ final class LegadoPersistentStateTests: XCTestCase {
         try reopened.setCookies([], for: A)
         XCTAssertEqual(reopened.revision, revision, "A response with no Set-Cookie must not resurrect or rewrite the jar")
     }
+    func testLateHTTPAndBrowserCookiesCannotRestoreSessionAfterConcurrentLogout() throws {
+        let worker = try state(), UI = try state(), origin = URL(string: "https://fixture.test/")!
+        let cookie = try XCTUnwrap(HTTPCookie(properties: [.name: "sid", .value: "old-session", .domain: "fixture.test", .path: "/"]))
+        try worker.setLoginInfo(["邮箱": "reader"]); try worker.markVerified()
+        let inFlightSession = worker.sessionRevision
+        try worker.setCookies([cookie], for: origin, expectedSessionRevision: inFlightSession)
+        try UI.logout()
+        let loggedOutRevision = UI.revision
+        XCTAssertThrowsError(try worker.setCookies([cookie], for: origin, expectedSessionRevision: inFlightSession)) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertThrowsError(try worker.replaceCookies([cookie], for: origin, expectedSessionRevision: inFlightSession)) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertEqual(worker.authStatus, .signedOut); XCTAssertEqual(worker.revision, loggedOutRevision)
+        XCTAssertTrue(try worker.cookies(for: origin).isEmpty)
+        XCTAssertTrue(try state().cookies(for: origin).isEmpty)
+        try UI.setLoginInfo(["邮箱": "reader", "密码": "new-session"])
+        let newSession = UI.sessionRevision
+        XCTAssertThrowsError(try worker.setCookies([cookie], for: origin, expectedSessionRevision: inFlightSession)) { XCTAssertTrue($0 is CancellationError) }
+        try worker.replaceCookies([cookie], for: origin, expectedSessionRevision: newSession)
+        XCTAssertEqual(try worker.cookies(for: origin).first?.value, "old-session", "A response explicitly associated with the current session may commit")
+    }
     func testTamperedEncryptedStateAndMissingVaultCannotSilentlyResetSession() throws {
         let first = try state(); try first.setVariable("original", key: "server")
         let file = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)

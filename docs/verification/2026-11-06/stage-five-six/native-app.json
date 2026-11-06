@@ -1,0 +1,46 @@
+{
+  "appInitializationToReadyMS": 306.340666487813,
+  "contentPreserved": true,
+  "measuredAt": "2026-11-06T04:48:08Z",
+  "memoryPhases": [
+    {
+      "memory": {
+        "peakResidentMiB": 284.09375,
+        "physicalFootprintMiB": 43.06474304199219,
+        "residentMiB": 284.09375
+      },
+      "phase": "ready"
+    },
+    {
+      "memory": {
+        "peakResidentMiB": 284.78125,
+        "physicalFootprintMiB": 43.62724304199219,
+        "residentMiB": 284.78125
+      },
+      "phase": "composed"
+    },
+    {
+      "memory": {
+        "peakResidentMiB": 288.296875,
+        "physicalFootprintMiB": 44.56474304199219,
+        "residentMiB": 288.296875
+      },
+      "phase": "paginated"
+    },
+    {
+      "memory": {
+        "peakResidentMiB": 288.46875,
+        "physicalFootprintMiB": 44.67411804199219,
+        "residentMiB": 288.46875
+      },
+      "phase": "reflowed"
+    }
+  ],
+  "method": "Debug simulator App process without XCTest injection; initialization-to-ready excludes dyld; physical footprint supplements RSS; does not replace frozen XCTest criteria",
+  "pages": 164,
+  "paginateMS": 458.9182916097343,
+  "peakRSSMiB": 288.46875,
+  "reflowMS": 481.7612920887768,
+  "schemaVersion": 2,
+  "utf16Units": 117997
+}

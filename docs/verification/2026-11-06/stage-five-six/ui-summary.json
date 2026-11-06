@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 1,
+  "sampleKind": "xcodebuild-console",
+  "result": "Failed",
+  "passedTests": 71,
+  "failedTests": 1,
+  "skippedTests": 0,
+  "tests": [
+    {
+      "identifier": "YueshanUITests.AudioConfigurationFlowTests testCompatibleServiceMetadataRestartsWithoutConnectingOrPlaying",
+      "status": "passed",
+      "seconds": 36.942
+    },
+    {
+      "identifier": "YueshanUITests.AudioConfigurationFlowTests testNativeSystemSpeechStartsPausesResumesStopsAndRecordsListening",
+      "status": "passed",
+      "seconds": 29.035
+    },
+    {
+      "identifier": "YueshanUITests.ContentToolsFlowTests testRealLocalSearchHitAndReadingActivitySurviveRestart",
+      "status": "passed",
+      "seconds": 26.219
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testCompactSourcesCategoriesFiltersSearchAndPin",
+      "status": "passed",
+      "seconds": 26.36
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testEveryFeaturePageIsReachable",
+      "status": "passed",
+      "seconds": 487.788
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testFulltextJumpAndChangeSourceInsideReader",
+      "status": "passed",
+      "seconds": 24.931
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testMagazineProfileLayoutAndDestinations",
+      "status": "passed",
+      "seconds": 38.279
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testMagazineProfileResumesActualReadingAndUpdatesChapter",
+      "status": "passed",
+      "seconds": 10.975
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testPlayerFlow",
+      "status": "passed",
+      "seconds": 19.338
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testProfileSettingsHelpAndAbout",
+      "status": "passed",
+      "seconds": 19.921
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testSourceBatchSelectionGroupingAndConfirmedDelete",
+      "status": "passed",
+      "seconds": 27.409
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testSourceEditingAndBatchReport",
+      "status": "passed",
+      "seconds": 27.899
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testSourceLinkValidationAndSwitchClearsPreview",
+      "status": "passed",
+      "seconds": 19.17
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testSourceLongPressScopeToggleAndConfirmedRemoval",
+      "status": "passed",
+      "seconds": 23.442
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testSourceSwipeLoginAndDetailFallback",
+      "status": "passed",
+      "seconds": 19.191
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testSourceToolbarImportNewAndAdvancedTools",
+      "status": "passed",
+      "seconds": 41.2
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testThemeLibraryImportPreviewFiltersAndDetails",
+      "status": "passed",
+      "seconds": 28.91
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testToolsFoldedGroupsAndActivityDestination",
+      "status": "passed",
+      "seconds": 13.451
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testToolsHomeAndSampleFilePreview",
+      "status": "passed",
+      "seconds": 27.45
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testToolsHomeShortcutsAndCategoryNavigation",
+      "status": "passed",
+      "seconds": 25.185
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testToolShortcutReplaceRemoveAddOrderAndPersistence",
+      "status": "passed",
+      "seconds": 44.789
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testToolsSearchEmptyResultsAndCategoryScope",
+      "status": "passed",
+      "seconds": 24.701
+    },
+    {
+      "identifier": "YueshanUITests.FeatureFlowTests testUnifiedSourceImportFilePickerPreviewAndConfirmation",
+      "status": "passed",
+      "seconds": 20.273
+    },
+    {
+      "identifier": "YueshanUITests.NavigationFlowTests testAutomaticCollapseKeepsSearchAndFixedModeStaysExpanded",
+      "status": "passed",
+      "seconds": 28.837
+    },
+    {
+      "identifier": "YueshanUITests.NavigationFlowTests testDefaultNavigationHeatmapAndReadingFromToday",
+      "status": "passed",
+      "seconds": 44.42
+    },
+    {
+      "identifier": "YueshanUITests.NavigationFlowTests testNavigationCustomizationLimitOrderingPersistenceAndReset",
+      "status": "passed",
+      "seconds": 30.549
+    },
+    {
+      "identifier": "YueshanUITests.NavigationFlowTests testVisitedTabsKeepSearchQueryAndStatisticsSelection",
+      "status": "passed",
+      "seconds": 21.658
+    },
+    {
+      "identifier": "YueshanUITests.OnlineReadingFlowTests testTwoFixtureBooksSearchDetailsThreeChaptersAndOfflineRestartWithoutFavorite",
+      "status": "passed",
+      "seconds": 53.141
+    },
+    {
+      "identifier": "YueshanUITests.ProductionLaunchTests testLegacyLibraryMigratesAndRestartIgnoresStaleBrokenArchive",
+      "status": "passed",
+      "seconds": 17.222
+    },
+    {
+      "identifier": "YueshanUITests.ProductionLaunchTests testProductionEmptyShelfAndDemoRemainIsolatedWithSharedNavigation",
+      "status": "passed",
+      "seconds": 13.799
+    },
+    {
+      "identifier": "YueshanUITests.ProductionLaunchTests testProductionOpenFailureCanRetryInPlace",
+      "status": "passed",
+      "seconds": 7.641
+    },
+    {
+      "identifier": "YueshanUITests.ProductionLaunchTests testProductionSourceBasicEditAndDisableSurviveRestart",
+      "status": "passed",
+      "seconds": 22.466
+    },
+    {
+      "identifier": "YueshanUITests.ProductionLaunchTests testProductionSourceLoginHasRealFieldsAndEmptyToolsDoNotCrash",
+      "status": "passed",
+      "seconds": 15.683
+    },
+    {
+      "identifier": "YueshanUITests.ProductionLaunchTests testProductionStatisticsAndAudioEntriesKeepTruthfulEmptyStates",
+      "status": "passed",
+      "seconds": 16.739
+    },
+    {
+      "identifier": "YueshanUITests.ProductionLaunchTests testProductionThemeSelectionSurvivesRestartUsingOriginalThemePage",
+      "status": "passed",
+      "seconds": 21.032
+    },
+    {
+      "identifier": "YueshanUITests.ProductionStorageFlowTests testBackupAndCacheKeepOriginalEntriesAndAllowPickerCancellation",
+      "status": "failed",
+      "seconds": 16.299
+    },
+    {
+      "identifier": "YueshanUITests.ProductionStorageFlowTests testBookmarkAddJumpRestartDeleteAndEmptyGroupPersistence",
+      "status": "passed",
+      "seconds": 46.206
+    },
+    {
+      "identifier": "YueshanUITests.ProductionStorageFlowTests testFileRenameDeleteCancellationAndPermanentDeleteAreTruthful",
+      "status": "passed",
+      "seconds": 37.031
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testBatchShelfRemovalUndoAndSorting",
+      "status": "passed",
+      "seconds": 12.711
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testCompactShelfContextMenuAndReading",
+      "status": "passed",
+      "seconds": 16.035
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testFirstReadingGuideOnlyAppearsOnceAcrossBooksAndRelaunch",
+      "status": "passed",
+      "seconds": 22.722
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testGuideCanBeReviewedFromSettingsWithoutChangingReadingPosition",
+      "status": "passed",
+      "seconds": 32.033
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testHistoryFindsUnfavoritedBook",
+      "status": "passed",
+      "seconds": 20.299
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testPagedReaderFillsScreenAndKeepsPageWhenControlsToggle",
+      "status": "passed",
+      "seconds": 17.432
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testPagedReadingTapZonesSliderAndModeSwitch",
+      "status": "passed",
+      "seconds": 36.74
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testReaderToolbarRoutesFavoriteNarrationAndSkins",
+      "status": "passed",
+      "seconds": 35.482
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testScrollingReaderFillsScreenWithoutMovingWhenControlsToggle",
+      "status": "passed",
+      "seconds": 24.701
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testSearchDetailFavoriteAndRead",
+      "status": "passed",
+      "seconds": 21.423
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testShelfCategoriesReflowBelowTitleAtAccessibilityTextSize",
+      "status": "passed",
+      "seconds": 6.823
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testShelfCategoryChangeClearsManagedSelection",
+      "status": "passed",
+      "seconds": 7.61
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testShelfDensityGeometryDetailsAndPersistence",
+      "status": "passed",
+      "seconds": 29.598
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testShelfPrimaryCategoriesAndSecondaryFilters",
+      "status": "passed",
+      "seconds": 14.723
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testShelfReaderContentsAndPreferences",
+      "status": "passed",
+      "seconds": 33.038
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testSimulatedUpdatesResumeAndMarkRead",
+      "status": "passed",
+      "seconds": 15.187
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testSpineShelfContextSelectionLayoutChangeAndRemovalUndo",
+      "status": "passed",
+      "seconds": 24.549
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testSpineShelfGeometryFilteringAndLayoutPersistence",
+      "status": "passed",
+      "seconds": 31.967
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testSpineShelfReadingRestoresProgressAndUpdatesFeaturedCover",
+      "status": "passed",
+      "seconds": 13.989
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testSpineShelfRemainsInsidePageAtAccessibilityTextSize",
+      "status": "passed",
+      "seconds": 12.858
+    },
+    {
+      "identifier": "YueshanUITests.ReaderFlowTests testThemedPreferencesResetAndContentsSearchPreserveProgress",
+      "status": "passed",
+      "seconds": 34.473
+    },
+    {
+      "identifier": "YueshanUITests.ReaderSelectionFlowTests testLongPressCanCopyInScrollingAndPagedModesWithoutTurningChapter",
+      "status": "passed",
+      "seconds": 25.208
+    },
+    {
+      "identifier": "YueshanUITests.ReadingPreferencesFlowTests testFreePageElementsAndContentRules",
+      "status": "passed",
+      "seconds": 40.608
+    },
+    {
+      "identifier": "YueshanUITests.ReadingPreferencesFlowTests testOverviewTypographyTitleAndPersistence",
+      "status": "passed",
+      "seconds": 34.323
+    },
+    {
+      "identifier": "YueshanUITests.ReadingPreferencesFlowTests testPageElementDragUpdatesActualReaderHeader",
+      "status": "passed",
+      "seconds": 22.7
+    },
+    {
+      "identifier": "YueshanUITests.ReadingPreferencesFlowTests testToolboxNativeReadingSettingsRoutesExposeLiveControls",
+      "status": "passed",
+      "seconds": 57.456
+    },
+    {
+      "identifier": "YueshanUITests.ReadingPreferencesFlowTests testVerticalPaginationAndIndependentEffectsInReader",
+      "status": "passed",
+      "seconds": 16.883
+    },
+    {
+      "identifier": "YueshanUITests.SmartImportFlowTests testActualFileImportReadingDuplicateAndRestart",
+      "status": "passed",
+      "seconds": 39.803
+    },
+    {
+      "identifier": "YueshanUITests.SmartImportFlowTests testProductionDatabaseImportThreeChaptersBackgroundAndRestart",
+      "status": "passed",
+      "seconds": 38.139
+    },
+    {
+      "identifier": "YueshanUITests.SmartImportFlowTests testShelfShortcutAndUnsupportedFile",
+      "status": "passed",
+      "seconds": 15.281
+    },
+    {
+      "identifier": "YueshanUITests.SmartImportFlowTests testSourcesValidationHelpAndPickerCancellation",
+      "status": "passed",
+      "seconds": 18.532
+    },
+    {
+      "identifier": "YueshanUITests.SourcePackageFlowTests testNativeJSONFilePreviewConfirmAndSourceRestart",
+      "status": "passed",
+      "seconds": 29.015
+    },
+    {
+      "identifier": "YueshanUITests.ThemeAssetsFlowTests testCSSAndSVGLibrariesMixAndMissingAttachments",
+      "status": "passed",
+      "seconds": 38.106
+    },
+    {
+      "identifier": "YueshanUITests.ThemeAssetsFlowTests testFileImportIncludesAssetsAndIndependentResources",
+      "status": "passed",
+      "seconds": 28.952
+    }
+  ],
+  "sourceLogSHA256": "46b1aecb41c4b14c25e9573db4a8b461cef79a50d78ba67161d50fc0222ed6ee",
+  "note": "Original xcresult summary was checked as 71 passed and 1 failed before Xcode retention removed the large bundle; complete console log is retained locally."
+}

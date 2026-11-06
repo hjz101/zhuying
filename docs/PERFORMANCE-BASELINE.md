@@ -99,3 +99,7 @@ bash ios/scripts/verify.sh performance
 七阶段内存同时记录 RSS、生命周期峰值 RSS 和 Darwin `phys_footprint`。兼容样本前峰值 RSS 已约 353.58 MiB，随后约 384.53 MiB，最终 387.56 MiB；对应物理占用约 59.72～66.38 MiB。无 XCTest 注入的 Debug App 单次诊断为 117997 UTF-16 单元、164 页，文字重组完整；峰值 RSS 284.42 MiB，物理占用约 42.66～44.38 MiB，初始化 277.14 ms 仍排除了 dyld。物理占用与 RSS 定义不同，只补充定位，不能据此宣称原内存门槛或真机验收通过。
 
 网络会话现按需创建并失效，SVG 预览合并重复任务、取消旧渲染并限制缓存，相关并发／取消／过期结果测试及主题界面回归通过。本轮数据不足以宣称 RSS 已有显著改善。用户暂时无法提供真机和开发团队，Release 真机内存、iOS 17 及签名内测仍待外部条件；T035 也依赖尚未通过的真实在线 T030。
+
+## 步骤五、六复测（2026-11-06）
+
+预算、负载和样本数不变。最新 3 项测量／内容正确性测试通过，10 项指标中 9 项达标，自动化启动最大 2424.81 ms；宿主 RSS 388.45 MiB 仍高于原 256 MiB。正常 App 的独立诊断为 288.47 MiB，正文重组完整，不能替代冻结宿主指标或真机结果。原始 [性能](verification/2026-11-06/stage-five-six/performance.json)、[启动](verification/2026-11-06/stage-five-six/launch.json) 与 [App 诊断](verification/2026-11-06/stage-five-six/native-app.json) 单独保存；不修改先前报告。

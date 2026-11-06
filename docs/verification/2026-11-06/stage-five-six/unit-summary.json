@@ -1,0 +1,42 @@
+{
+  "devicesAndConfigurations": [
+    {
+      "device": {
+        "architecture": "arm64",
+        "deviceId": "103D7978-92D1-4E65-AA03-B7C7046FB756",
+        "deviceName": "Yueshan Stage Four Small Screen",
+        "modelName": "iPhone SE (3rd generation)",
+        "osBuildNumber": "23F77",
+        "osVersion": "26.5",
+        "platform": "iOS Simulator"
+      },
+      "expectedFailures": 0,
+      "failedTests": 0,
+      "passedTests": 296,
+      "skippedTests": 0,
+      "testPlanConfiguration": {
+        "configurationId": "1",
+        "configurationName": "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription": "Yueshan · Built with macOS 26.4",
+  "expectedFailures": 0,
+  "failedTests": 0,
+  "finishTime": 1793938605.995,
+  "passedTests": 296,
+  "result": "Passed",
+  "skippedTests": 0,
+  "startTime": 1793938593.942,
+  "statistics": [],
+  "testFailures": [],
+  "title": "Test - Yueshan",
+  "topInsights": [
+    {
+      "category": "Longest Test Runs",
+      "impact": "53% of duration",
+      "text": "4 longest test runs with outlier durations exceeding 0.29s (three standard deviations)"
+    }
+  ],
+  "totalTestCount": 296
+}

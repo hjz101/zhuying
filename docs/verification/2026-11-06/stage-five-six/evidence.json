@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-06",
+  "sourceDigest": "e0d177a3681bebc43772e84c3fd702e5c973892bd4434895f9205671475dd096",
+  "performanceReport": "performance.json",
+  "launchReport": "launch.json",
+  "nativeDiagnosticReport": "native-app.json",
+  "functional": {
+    "status": "passed",
+    "failedTests": 0,
+    "unitTests": 296,
+    "uiFlows": 72,
+    "nodeTests": 68,
+    "demoSnapshotChecks": 7,
+    "performanceCorrectnessTests": 3,
+    "coverageStrategy": "72-flow regression with one immediate post-picker hittability failure; updated animation wait and final main-screen rerun passed, plus affected service configuration, native narration, source file import, Smart Import and storage reruns on SE. Full 296-unit target rerun after final restore/download correction.",
+    "unitLog": "yueshan-stage-five-six-final-unit-confirmed.log",
+    "uiLog": "yueshan-stage-five-six-full-ui.log",
+    "uiFinalRerunLog": "yueshan-stage-five-six-main-final-ui.log",
+    "initialUIFailures": 1,
+    "remainingUIFailures": 0,
+    "smallScreenUIFlows": 10,
+    "smallScreenLogs": [
+      "yueshan-stage-five-six-small-screen-final.log",
+      "yueshan-stage-five-six-small-screen-content.log"
+    ]
+  },
+  "liveApp": {
+    "status": "blocked",
+    "sampleKind": "live-app",
+    "books": [],
+    "priorRealRequests": 64,
+    "priorQualifiedBooks": 0,
+    "reports": [
+      "../source-feasibility-unavailable.json",
+      "../source-classics-unavailable.json"
+    ],
+    "reason": "Membership restriction, upstream 503, empty catalogs and invalid content prevented two works with three consecutive chapters. Fixture results do not replace App acceptance."
+  },
+  "deviceMatrix": {
+    "status": "not-run",
+    "sampleKind": "physical-device",
+    "cases": [
+      {
+        "id": "background-resume",
+        "status": "not-run"
+      },
+      {
+        "id": "backup-restore",
+        "status": "not-run"
+      },
+      {
+        "id": "current-ios",
+        "status": "not-run"
+      },
+      {
+        "id": "font-import",
+        "status": "not-run"
+      },
+      {
+        "id": "force-quit-resume",
+        "status": "not-run"
+      },
+      {
+        "id": "ios17",
+        "status": "not-run"
+      },
+      {
+        "id": "landscape",
+        "status": "not-run"
+      },
+      {
+        "id": "large-screen",
+        "status": "not-run"
+      },
+      {
+        "id": "large-text",
+        "status": "not-run"
+      },
+      {
+        "id": "offline",
+        "status": "not-run"
+      },
+      {
+        "id": "small-screen",
+        "status": "not-run"
+      },
+      {
+        "id": "third-party-files",
+        "status": "not-run"
+      },
+      {
+        "id": "upgrade-data",
+        "status": "not-run"
+      },
+      {
+        "id": "voiceover",
+        "status": "not-run"
+      }
+    ],
+    "reason": "User confirmed that a physical iPhone and Apple development team are temporarily unavailable; only iOS 26.5 simulator runtime is installed."
+  },
+  "signedInternalTest": {
+    "status": "not-run",
+    "installed": false,
+    "upgradedWithData": false,
+    "feedbackReviewed": false,
+    "openBlockingIssues": null,
+    "reason": "No configured development team or valid local signing identity; unsigned archives do not satisfy installation or user feedback acceptance."
+  },
+  "simulatorMatrix": {
+    "status": "passed",
+    "systems": [
+      "iOS 26.5"
+    ],
+    "models": [
+      "iPhone 17 Pro",
+      "iPhone SE (3rd generation)"
+    ],
+    "smallScreenUIFlows": 10
+  },
+  "releaseGate": "not-approved",
+  "liveAudio": {
+    "status": "not-configured",
+    "configuredBy": "user-in-app",
+    "contractTests": "passed",
+    "realProviderAccepted": false,
+    "physicalAudioAccepted": false,
+    "systemSpeechReport": "native-narration.json"
+  },
+  "notes": [
+    "Frozen Demo remains pinned; seven snapshot checks pass.",
+    "No credentials were supplied in chat, logs or commits.",
+    "JSON direct-link MIME and small-screen keyboard fixes are covered by final affected reruns.",
+    "Physical, signing, real-source and real-audio-service gates remain unapproved."
+  ]
+}

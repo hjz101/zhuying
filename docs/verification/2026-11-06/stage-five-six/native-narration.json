@@ -1,0 +1,21 @@
+{
+  "physicalDeviceAccepted": false,
+  "sampleKind": "simulator-native-speech-to-pcm",
+  "samples": [
+    {
+      "file": "native-speech-zh-CN.caf",
+      "frames": 100656,
+      "language": "zh-CN",
+      "nonSilentSamples": 97709,
+      "status": "passed"
+    },
+    {
+      "file": "native-speech-en-US.caf",
+      "frames": 70546,
+      "language": "en-US",
+      "nonSilentSamples": 69636,
+      "status": "passed"
+    }
+  ],
+  "schemaVersion": 1
+}

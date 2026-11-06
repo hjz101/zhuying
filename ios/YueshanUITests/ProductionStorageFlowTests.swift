@@ -64,7 +64,8 @@ final class ProductionStorageFlowTests: XCTestCase {
         app.buttons["backupChooseRestore"].tap()
         let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "取消"])).firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 5)); cancel.tap()
-        XCTAssertTrue(app.buttons["backupCreate"].isHittable)
+        let restored = expectation(for:NSPredicate(format:"hittable == true"),evaluatedWith:app.buttons["backupCreate"])
+        wait(for:[restored],timeout:5)
         app.buttons["backupCreate"].tap()
         XCTAssertTrue(app.staticTexts["备份已生成，请选择保存位置。"].waitForExistence(timeout: 10))
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "Backup-System-Export"; screenshot.lifetime = .keepAlways; add(screenshot)

@@ -50,6 +50,7 @@ struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
         }
     }
     static func classify(_ error: Error, authStatus: LegadoAuthStatus? = nil) -> Self {
+        let error = LegadoRuleExecutionError.unwrapped(error)
         if let failure = error as? SourceDiagnosticFailure { return failure.issue }
         if error is CancellationError { return .init(code: .cancelled) }
         if let error = error as? ContentFailure {

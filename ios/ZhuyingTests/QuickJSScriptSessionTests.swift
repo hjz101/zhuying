@@ -292,4 +292,36 @@ final class QuickJSScriptSessionTests: XCTestCase {
         do { _ = try await evaluate(session, "Packages.java.lang.Runtime.getRuntime()"); XCTFail("No Java reflection") }
         catch QuickJSScriptError.javascript(let message) { XCTAssertTrue(message.contains("Unsupported Java package")) }
     }
+
+    func testDateFormatMethodsPassDateMillisecondsAndPreserveNumericArguments() async throws {
+        let result = try await Task.detached {
+            var calls: [(String,[Any])] = []
+            let value = try QuickJSScriptSession().evaluate("[java.timeFormat(new Date(1234567)),java.timeFormatUTC(9876543,'yyyy-MM-dd',3600000)]", bindings: [:]) { method,args in
+                calls.append((method,args)); return "formatted"
+            }
+            return (value as? [String],calls)
+        }.value
+        XCTAssertEqual(result.0, ["formatted","formatted"])
+        XCTAssertEqual(result.1.map(\.0), ["java.timeFormat","java.timeFormatUTC"])
+        XCTAssertEqual(result.1[0].1[0] as? Int, 1234567)
+        XCTAssertEqual(result.1[1].1[0] as? Int, 9876543)
+        XCTAssertEqual(result.1[1].1[1] as? String, "yyyy-MM-dd")
+        XCTAssertEqual(result.1[1].1[2] as? Int, 3600000)
+    }
+
+    func testEmptyJavaImporterSupportsOnlyTheImplementedBase64ClassInWithScope() async throws {
+        let value = try await evaluate(QuickJSScriptSession(), "[importedResult,typeof importedScope.String,Object.keys(new JavaImporter()).length]",
+                                        library: "var importedScope=new JavaImporter();importedScope.importClass(Packages.android.util.Base64);var importedResult;with(importedScope){importedResult=Base64.encodeToString([1,2,3],Base64.NO_WRAP);}") { method,args in
+            XCTAssertEqual(method, "android.base64Encode")
+            XCTAssertEqual(args[0] as? [Int], [1,2,3]); XCTAssertEqual(args[1] as? Int, 2)
+            return "AQID"
+        } as? [Any]
+        XCTAssertEqual(value?[0] as? String, "AQID")
+        XCTAssertEqual(value?[1] as? String, "undefined")
+        XCTAssertEqual(value?[2] as? Int, 0)
+        for script in ["new JavaImporter(Packages.android.util.Base64)","new JavaImporter().importClass({})"] {
+            do { _ = try await evaluate(QuickJSScriptSession(), script); XCTFail("Only the explicitly supported empty importer and Base64 class are allowed") }
+            catch QuickJSScriptError.javascript(let message) { XCTAssertTrue(message.contains("Unsupported JavaImporter")) }
+        }
+    }
 }

@@ -69,6 +69,12 @@ verified against its original JSON and the upstream
 [JsEncodeUtils.kt API](https://github.com/gedoor/legado/blob/fd026e0/app/src/main/java/io/legado/app/help/JsEncodeUtils.kt).
 Other Java packages fail explicitly; no reflection runtime is installed.
 Device ID methods remain callable and also support string/JSON coercion.
+An empty `new JavaImporter()` provides a Rhino-style `with` scope. Its
+`importClass` accepts only the implemented Android Base64 object; constructor
+imports and other classes fail explicitly. No Java String, URL or HttpUrl
+implementation is advertised. Date arguments to `java.timeFormat` and
+`timeFormatUTC` become milliseconds before reaching the native host; numeric
+arguments and explicit formats/offsets are preserved.
 
 The C API uses public memory, stack and interrupt controls. Its allocator caps
 runtime allocations including initialization; native host buffers separately

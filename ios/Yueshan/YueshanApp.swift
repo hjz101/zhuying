@@ -138,6 +138,7 @@ struct RootView: View {
                 let prose = "第一章 星光\n" + String(repeating:"这是一段原创朗读测试正文，读者在山间看见星光。\n",count:80) + "第二章 回声\n回声来自远方。"
                 if let prepared = try? BookImporter.prepare(data:Data(prose.utf8),name:"原创朗读测试.txt") { _ = try? await store.importBookDurably(prepared.book); store.completeReadingGuide() }
             }
+            if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-live-library") { try? await LiveLibraryValidation.run(credential:shushan.credentialForRequests,restart:ProcessInfo.processInfo.arguments.contains("--live-library-restart")) }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-network-browser") { try? await NetworkBrowserValidation.run() }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-native-narration") { try? await NativeNarrationValidation.run() }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-source-comments") { try? await SourceCommentValidation.run(credential:shushan.credentialForRequests) }

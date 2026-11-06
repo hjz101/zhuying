@@ -1,0 +1,25 @@
+{
+  "normalUserLibraryMutated" : false,
+  "phase" : "restart",
+  "rawTextInReport" : false,
+  "samples" : [
+    {
+      "book" : "a7a8d206fc1fc854633d91372a5b1ecae69644e63f53720f303bf891c2e1bce0",
+      "bookmark" : true,
+      "cachedChapters" : 3,
+      "favorite" : true,
+      "restartAccepted" : true,
+      "sameParagraphAndUTF16Offset" : true
+    },
+    {
+      "book" : "1f356c26598ccc51f4c97db4795f9c81fa1f211a67703f764f6e94ab8401a078",
+      "bookmark" : true,
+      "cachedChapters" : 3,
+      "favorite" : true,
+      "restartAccepted" : true,
+      "sameParagraphAndUTF16Offset" : true
+    }
+  ],
+  "schemaVersion" : 1,
+  "status" : "passed"
+}

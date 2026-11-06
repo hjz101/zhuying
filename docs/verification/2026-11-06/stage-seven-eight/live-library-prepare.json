@@ -1,0 +1,35 @@
+{
+  "normalUserLibraryMutated" : false,
+  "phase" : "prepare",
+  "rawTextInReport" : false,
+  "samples" : [
+    {
+      "book" : "a7a8d206fc1fc854633d91372a5b1ecae69644e63f53720f303bf891c2e1bce0",
+      "catalogItems" : 104,
+      "consecutiveNarrativeChapters" : 3,
+      "durableAnchor" : true,
+      "provider" : "番茄小说",
+      "title" : "西游记",
+      "titles" : [
+        "第一回 灵根育孕源流出 心性修持大道生",
+        "第二回 悟彻菩提真妙理 断魔归本合元神",
+        "第三回 四海千山皆拱伏 九幽十类尽除名"
+      ]
+    },
+    {
+      "book" : "1f356c26598ccc51f4c97db4795f9c81fa1f211a67703f764f6e94ab8401a078",
+      "catalogItems" : 124,
+      "consecutiveNarrativeChapters" : 3,
+      "durableAnchor" : true,
+      "provider" : "番茄小说",
+      "title" : "红楼梦",
+      "titles" : [
+        "第一回 甄士隐梦幻识通灵 贾雨村风尘怀闺秀",
+        "第二回 贾夫人仙逝扬州城 冷子兴演说荣国府",
+        "第三回 贾雨村夤缘复旧职 林黛玉抛父进京都"
+      ]
+    }
+  ],
+  "schemaVersion" : 1,
+  "status" : "passed"
+}

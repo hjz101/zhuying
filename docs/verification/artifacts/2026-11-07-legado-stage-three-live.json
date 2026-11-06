@@ -1,0 +1,563 @@
+{
+  "acceptance": {
+    "books": [
+      {
+        "chapters": [
+          {
+            "characters": 2102,
+            "contentHash": "7a9ebf01090ba742d5fdfe42da074257a86d9dec4b4625b60a610edbf7b31d79",
+            "identityHash": "7b1e9ac3d913227b4671bd96fef9fa755cebc09d3d7b049d9de5277e55b424b1",
+            "versionHash": "c015713d5b4fb2cace9d084e23ae152dba94336b73acc909d010a40bedf3fe21"
+          },
+          {
+            "characters": 2513,
+            "contentHash": "cffb4520d2bfd7e3cb50753e5d9f643c4f5b991e8a0b010e5d3d2ba267738d2e",
+            "identityHash": "76e891f1a18a11b7c3b0b81e9193f0be70b827eac65971801a269b9af209378a",
+            "versionHash": "1b0c8dfecf5173e5bbecc21a37e83c92ecc58cdd91c54c207cd18c799b5a914c"
+          },
+          {
+            "characters": 2657,
+            "contentHash": "37cd6a900fa8ecdeb1dc21d6a6dcd49d3922908b1deb24a03db77818d0f18133",
+            "identityHash": "f9d906213245049cf3dd9e56a3453e6c5ab0639db9fda93e13553fce794fd6df",
+            "versionHash": "b63b4cdfa895bd19b21ca2f9af4e7a2a159d1447c66e4beca64a292d6e41adbf"
+          }
+        ],
+        "identityHash": "9f6833dbbbe78a21e7fbde51201a9c18b79b977f769d2b57644bf4a007f9381e",
+        "workHash": "06ed9d6e0284d33da79b514bee63097cc91f4ff55ba42c30d418248c4e7af65e"
+      },
+      {
+        "chapters": [
+          {
+            "characters": 4051,
+            "contentHash": "ab89135e5d7c51e3e92d598b5f41f4b6759d6e7a3e08d66c7bbe9fdd02a11e91",
+            "identityHash": "d3604fab8707f4f2fdecdbfd061cea852cccc231ab76979a49e7c9316894d3c9",
+            "versionHash": "40730accb5e37535b4825ca699d91c0aa9850c0e4d8cc90c5931c5cd7290666b"
+          },
+          {
+            "characters": 3241,
+            "contentHash": "a593a5e3262289b8a4e7c66f3c16291794b89ff1f212c73cbf297168cd1d15f2",
+            "identityHash": "5417850ff6ff207679cd7fa9296c7511ae2c1c908e2922acb2448d48238c03af",
+            "versionHash": "1f4949599e9230a78ae3944a05fb66c8fee708eaeefbd96e46f35be8d600add1"
+          },
+          {
+            "characters": 4779,
+            "contentHash": "de3f9c8740a9778dd8687bea96f6fe092a4fdf00a49eb90aea7c442ef2978f14",
+            "identityHash": "09ced721ff21d6f212c17e512655a299337a4163f3abf14dba50118905c68322",
+            "versionHash": "6851b2fe0cd97fbe75b3685726b773511ffa465370b4b553fa6ac9a9eeff7c44"
+          }
+        ],
+        "identityHash": "6cae131becf7a40ccafbc976d57cebd64b84aff3cfe596c3aefb5e0ba844c005",
+        "workHash": "e6f79c1a0238ee00ac46337d7cce8e2b62bb0040e88a6a2bf652eeb1b5095ec3"
+      }
+    ],
+    "configurationHash": "3040853bf1cdd4dc7c1ad1f8fd1d5d31f9146dc82752a1fc84f0c1640da6f630",
+    "createdAt": 815679524.704274,
+    "engineVersion": "zhuying-source-acceptance-3.2",
+    "evidenceKind": "nativeNetwork",
+    "id": "1CC65BD2-8699-4665-AF3A-D190B45B604E",
+    "initialProcessID": "A451C6EB-3BA7-4686-B87C-F11D588F4680",
+    "initialSteps": [
+      {
+        "count": 162,
+        "milliseconds": 7349,
+        "network": {
+          "bytes": 164715,
+          "failedFetches": 0,
+          "successfulFetches": 1
+        },
+        "step": "搜索"
+      },
+      {
+        "bookIndex": 0,
+        "count": 1,
+        "milliseconds": 2456,
+        "network": {
+          "bytes": 2162,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "详情"
+      },
+      {
+        "bookIndex": 0,
+        "count": 144,
+        "milliseconds": 1510,
+        "network": {
+          "bytes": 37165,
+          "failedFetches": 0,
+          "successfulFetches": 1
+        },
+        "step": "目录"
+      },
+      {
+        "bookIndex": 0,
+        "chapterIndex": 0,
+        "count": 2102,
+        "milliseconds": 2952,
+        "network": {
+          "bytes": 11326,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 0,
+        "chapterIndex": 1,
+        "count": 2513,
+        "milliseconds": 2832,
+        "network": {
+          "bytes": 12385,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 0,
+        "chapterIndex": 2,
+        "count": 2657,
+        "milliseconds": 2610,
+        "network": {
+          "bytes": 10782,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 1,
+        "count": 1,
+        "milliseconds": 2670,
+        "network": {
+          "bytes": 1858,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "详情"
+      },
+      {
+        "bookIndex": 1,
+        "count": 510,
+        "milliseconds": 3692,
+        "network": {
+          "bytes": 129760,
+          "failedFetches": 0,
+          "successfulFetches": 1
+        },
+        "step": "目录"
+      },
+      {
+        "bookIndex": 1,
+        "chapterIndex": 0,
+        "count": 4051,
+        "milliseconds": 3357,
+        "network": {
+          "bytes": 28784,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 1,
+        "chapterIndex": 1,
+        "count": 3241,
+        "milliseconds": 2792,
+        "network": {
+          "bytes": 24018,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 1,
+        "chapterIndex": 2,
+        "count": 4779,
+        "milliseconds": 2807,
+        "network": {
+          "bytes": 34392,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      }
+    ],
+    "scopeHash": "7dd3e81ee6ea5c85cb295d1f1f829ab549cdf1b28adb7e56ff19e54cf8ffbd47",
+    "sessionHash": "031dc88d0ec0c52d518bbc28b322da9334c69a177be1cfa7fd4d819024452f23",
+    "status": "restartVerified",
+    "verificationBooks": [
+      {
+        "chapters": [
+          {
+            "characters": 2102,
+            "contentHash": "7a9ebf01090ba742d5fdfe42da074257a86d9dec4b4625b60a610edbf7b31d79",
+            "identityHash": "7b1e9ac3d913227b4671bd96fef9fa755cebc09d3d7b049d9de5277e55b424b1",
+            "versionHash": "c015713d5b4fb2cace9d084e23ae152dba94336b73acc909d010a40bedf3fe21"
+          },
+          {
+            "characters": 2513,
+            "contentHash": "cffb4520d2bfd7e3cb50753e5d9f643c4f5b991e8a0b010e5d3d2ba267738d2e",
+            "identityHash": "76e891f1a18a11b7c3b0b81e9193f0be70b827eac65971801a269b9af209378a",
+            "versionHash": "1b0c8dfecf5173e5bbecc21a37e83c92ecc58cdd91c54c207cd18c799b5a914c"
+          },
+          {
+            "characters": 2657,
+            "contentHash": "37cd6a900fa8ecdeb1dc21d6a6dcd49d3922908b1deb24a03db77818d0f18133",
+            "identityHash": "f9d906213245049cf3dd9e56a3453e6c5ab0639db9fda93e13553fce794fd6df",
+            "versionHash": "b63b4cdfa895bd19b21ca2f9af4e7a2a159d1447c66e4beca64a292d6e41adbf"
+          }
+        ],
+        "identityHash": "9f6833dbbbe78a21e7fbde51201a9c18b79b977f769d2b57644bf4a007f9381e",
+        "workHash": "06ed9d6e0284d33da79b514bee63097cc91f4ff55ba42c30d418248c4e7af65e"
+      },
+      {
+        "chapters": [
+          {
+            "characters": 4051,
+            "contentHash": "ab89135e5d7c51e3e92d598b5f41f4b6759d6e7a3e08d66c7bbe9fdd02a11e91",
+            "identityHash": "d3604fab8707f4f2fdecdbfd061cea852cccc231ab76979a49e7c9316894d3c9",
+            "versionHash": "40730accb5e37535b4825ca699d91c0aa9850c0e4d8cc90c5931c5cd7290666b"
+          },
+          {
+            "characters": 3241,
+            "contentHash": "a593a5e3262289b8a4e7c66f3c16291794b89ff1f212c73cbf297168cd1d15f2",
+            "identityHash": "5417850ff6ff207679cd7fa9296c7511ae2c1c908e2922acb2448d48238c03af",
+            "versionHash": "1f4949599e9230a78ae3944a05fb66c8fee708eaeefbd96e46f35be8d600add1"
+          },
+          {
+            "characters": 4779,
+            "contentHash": "de3f9c8740a9778dd8687bea96f6fe092a4fdf00a49eb90aea7c442ef2978f14",
+            "identityHash": "09ced721ff21d6f212c17e512655a299337a4163f3abf14dba50118905c68322",
+            "versionHash": "6851b2fe0cd97fbe75b3685726b773511ffa465370b4b553fa6ac9a9eeff7c44"
+          }
+        ],
+        "identityHash": "6cae131becf7a40ccafbc976d57cebd64b84aff3cfe596c3aefb5e0ba844c005",
+        "workHash": "e6f79c1a0238ee00ac46337d7cce8e2b62bb0040e88a6a2bf652eeb1b5095ec3"
+      }
+    ],
+    "verificationProcessID": "EDF11928-CCD4-45B3-A189-5D3CFC981B76",
+    "verificationSteps": [
+      {
+        "count": 162,
+        "milliseconds": 7106,
+        "network": {
+          "bytes": 164687,
+          "failedFetches": 0,
+          "successfulFetches": 1
+        },
+        "step": "搜索"
+      },
+      {
+        "bookIndex": 0,
+        "count": 1,
+        "milliseconds": 1626,
+        "network": {
+          "bytes": 2162,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "详情"
+      },
+      {
+        "bookIndex": 0,
+        "count": 144,
+        "milliseconds": 1443,
+        "network": {
+          "bytes": 37165,
+          "failedFetches": 0,
+          "successfulFetches": 1
+        },
+        "step": "目录"
+      },
+      {
+        "bookIndex": 0,
+        "chapterIndex": 0,
+        "count": 2102,
+        "milliseconds": 2749,
+        "network": {
+          "bytes": 11326,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 0,
+        "chapterIndex": 1,
+        "count": 2513,
+        "milliseconds": 2303,
+        "network": {
+          "bytes": 12382,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 0,
+        "chapterIndex": 2,
+        "count": 2657,
+        "milliseconds": 2108,
+        "network": {
+          "bytes": 10779,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 1,
+        "count": 1,
+        "milliseconds": 1679,
+        "network": {
+          "bytes": 1855,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "详情"
+      },
+      {
+        "bookIndex": 1,
+        "count": 510,
+        "milliseconds": 3110,
+        "network": {
+          "bytes": 129757,
+          "failedFetches": 0,
+          "successfulFetches": 1
+        },
+        "step": "目录"
+      },
+      {
+        "bookIndex": 1,
+        "chapterIndex": 0,
+        "count": 4051,
+        "milliseconds": 2826,
+        "network": {
+          "bytes": 28781,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 1,
+        "chapterIndex": 1,
+        "count": 3241,
+        "milliseconds": 2109,
+        "network": {
+          "bytes": 24015,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      },
+      {
+        "bookIndex": 1,
+        "chapterIndex": 2,
+        "count": 4779,
+        "milliseconds": 2459,
+        "network": {
+          "bytes": 34389,
+          "failedFetches": 0,
+          "successfulFetches": 2
+        },
+        "step": "正文"
+      }
+    ],
+    "verifiedAt": 815680665.213666,
+    "version": 2
+  },
+  "authStatusAfter": "unverified",
+  "authStatusBefore": "unverified",
+  "diagnosticOnly": false,
+  "format": "zhuying-legado-live-probe",
+  "fullAcceptanceVerified": true,
+  "nativeFailure": {},
+  "processID": "EDF11928-CCD4-45B3-A189-5D3CFC981B76",
+  "stages": [
+    {
+      "count": 162,
+      "milliseconds": 7106,
+      "network": {
+        "bytes": 164687,
+        "failedFetches": 0,
+        "successfulFetches": 1
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "搜索"
+    },
+    {
+      "bookIndex": 0,
+      "count": 1,
+      "milliseconds": 1626,
+      "network": {
+        "bytes": 2162,
+        "failedFetches": 0,
+        "successfulFetches": 2
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "详情"
+    },
+    {
+      "bookIndex": 0,
+      "count": 144,
+      "milliseconds": 1443,
+      "network": {
+        "bytes": 37165,
+        "failedFetches": 0,
+        "successfulFetches": 1
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "目录"
+    },
+    {
+      "bookIndex": 0,
+      "chapterIndex": 0,
+      "count": 2102,
+      "milliseconds": 2749,
+      "network": {
+        "bytes": 11326,
+        "failedFetches": 0,
+        "successfulFetches": 2
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "正文"
+    },
+    {
+      "bookIndex": 0,
+      "chapterIndex": 1,
+      "count": 2513,
+      "milliseconds": 2303,
+      "network": {
+        "bytes": 12382,
+        "failedFetches": 0,
+        "successfulFetches": 2
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "正文"
+    },
+    {
+      "bookIndex": 0,
+      "chapterIndex": 2,
+      "count": 2657,
+      "milliseconds": 2108,
+      "network": {
+        "bytes": 10779,
+        "failedFetches": 0,
+        "successfulFetches": 2
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "正文"
+    },
+    {
+      "bookIndex": 1,
+      "count": 1,
+      "milliseconds": 1679,
+      "network": {
+        "bytes": 1855,
+        "failedFetches": 0,
+        "successfulFetches": 2
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "详情"
+    },
+    {
+      "bookIndex": 1,
+      "count": 510,
+      "milliseconds": 3110,
+      "network": {
+        "bytes": 129757,
+        "failedFetches": 0,
+        "successfulFetches": 1
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "目录"
+    },
+    {
+      "bookIndex": 1,
+      "chapterIndex": 0,
+      "count": 4051,
+      "milliseconds": 2826,
+      "network": {
+        "bytes": 28781,
+        "failedFetches": 0,
+        "successfulFetches": 2
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "正文"
+    },
+    {
+      "bookIndex": 1,
+      "chapterIndex": 1,
+      "count": 3241,
+      "milliseconds": 2109,
+      "network": {
+        "bytes": 24015,
+        "failedFetches": 0,
+        "successfulFetches": 2
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "正文"
+    },
+    {
+      "bookIndex": 1,
+      "chapterIndex": 2,
+      "count": 4779,
+      "milliseconds": 2459,
+      "network": {
+        "bytes": 34389,
+        "failedFetches": 0,
+        "successfulFetches": 2
+      },
+      "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+      "status": "成功",
+      "step": "正文"
+    }
+  ],
+  "version": 1,
+  "verificationBuild": {
+    "commit": "e56e042181fcafbbc0caf78467a8d5de40c95f68",
+    "binarySHA256": "6fdb05ed845769ea497e46a21cb67a09f798968f2236d2c0331626a65460f84a",
+    "configuration": "Debug",
+    "platform": "iOS Simulator arm64",
+    "bundleIdentifier": "com.zhuying.reader.acceptance",
+    "stableProfileRetainedAfterInstall": true
+  },
+  "additionalUpdateAttempt": {
+    "status": "verificationFailed",
+    "issue": {
+      "code": "unavailable"
+    },
+    "stages": [
+      {
+        "count": 0,
+        "issue": {
+          "code": "unavailable"
+        },
+        "milliseconds": 3513,
+        "network": {
+          "bytes": 6391,
+          "failedFetches": 1,
+          "successfulFetches": 0
+        },
+        "sourceHash": "d4b91754a3cc5b65fab91b37c1375bf6b1d2338248d81cd823f3a77f90c63976",
+        "status": "失败",
+        "step": "搜索"
+      }
+    ],
+    "authStatusBefore": "unverified",
+    "authStatusAfter": "unverified"
+  }
+}

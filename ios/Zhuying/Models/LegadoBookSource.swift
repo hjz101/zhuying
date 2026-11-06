@@ -16,12 +16,41 @@ private final class LegadoSourceSession: @unchecked Sendable {
     let cookies = LegadoCookieJar()
     private let lock = NSLock()
     private var values: [String: String] = [:]
+    private var valueBytes = 0
+    private var catalogs: [String: Set<String>] = [:]
+    private var catalogOrder: [String] = []
+    private var searchPages: [String: [Int: String]] = [:]
+    private var searchOrder: [String] = []
     func get(_ key: String) -> String { lock.lock(); defer { lock.unlock() }; return values[key] ?? "" }
     func set(_ key: String, _ value: String) throws {
         guard key.utf8.count <= 512, value.utf8.count <= 128 * 1024 else { throw LegadoRequestError.limit }
         lock.lock(); defer { lock.unlock() }
         guard values.count < 512 || values[key] != nil else { throw LegadoRequestError.limit }
-        values[key] = value
+        let oldSize = values[key].map { key.utf8.count + $0.utf8.count } ?? 0
+        let nextSize = valueBytes - oldSize + key.utf8.count + value.utf8.count
+        guard nextSize <= 512 * 1024 else { throw LegadoRequestError.limit }
+        values[key] = value; valueBytes = nextSize
+    }
+    func catalog(_ urls: Set<String>, bookID: String) {
+        lock.lock(); defer { lock.unlock() }
+        catalogs[bookID] = urls; catalogOrder.removeAll { $0 == bookID }; catalogOrder.append(bookID)
+        while catalogOrder.count > 32 { catalogs.removeValue(forKey: catalogOrder.removeFirst()) }
+    }
+    func catalog(bookID: String) -> Set<String> { lock.lock(); defer { lock.unlock() }; return catalogs[bookID] ?? [] }
+    func resetSearch(_ query: String) {
+        lock.lock(); defer { lock.unlock() }
+        searchPages[query] = [:]; searchOrder.removeAll { $0 == query }; searchOrder.append(query)
+        while searchOrder.count > 8 { searchPages.removeValue(forKey: searchOrder.removeFirst()) }
+    }
+    func searchURL(_ query: String, page: Int) -> String? { lock.lock(); defer { lock.unlock() }; return searchPages[query]?[page] }
+    func rememberSearchURL(_ url: String, query: String, page: Int) throws {
+        lock.lock(); defer { lock.unlock() }
+        guard searchPages[query] != nil else { throw ContentFailure.invalidResponse }
+        while searchPages.values.reduce(0, { $0 + $1.count }) >= 100, let first = searchOrder.first, first != query {
+            searchPages.removeValue(forKey: searchOrder.removeFirst())
+        }
+        guard searchPages.values.reduce(0, { $0 + $1.count }) < 100 || searchPages[query]?[page] != nil else { throw LegadoRequestError.limit }
+        searchPages[query]?[page] = url
     }
 }
 
@@ -89,6 +118,8 @@ private final class LegadoSourceWorker {
     private var currentContent = ""
     private var scriptContent: String?
     private var bindings: [String: Any] = [:]
+    private var scriptDepth = 0
+    private var scriptCalls = 0
     private var engine: LegadoRuleEngine { LegadoRuleEngine(context: context) }
 
     init(sourceID: String, definition: LegadoSourceDefinition, http: LegadoHTTPExecutor, shared: LegadoSourceSession, maximumPages: Int) {
@@ -99,6 +130,9 @@ private final class LegadoSourceWorker {
         context.evaluateJS = { [weak self] script, values in
             guard let self else { throw CancellationError() }
             try self.http.control.check()
+            guard self.scriptDepth < 4, self.scriptCalls < 128 else { throw LegadoRequestError.limit }
+            self.scriptDepth += 1; self.scriptCalls += 1
+            defer { self.scriptDepth -= 1 }
             var policy = LegadoScriptPolicy()
             policy.timeoutSeconds = min(5, max(0.1, self.http.control.deadline - ProcessInfo.processInfo.systemUptime))
             policy.cancelled = { do { try self.http.control.check(); return false } catch { return true } }
@@ -179,8 +213,8 @@ private final class LegadoSourceWorker {
     private func url(_ value: String, baseURL: URL) throws -> String {
         let (address, options) = try LegadoHTTPExecutor.split(value)
         guard options.isEmpty else { throw LegadoRequestError.unsupported("书籍、目录或章节地址附带请求选项") }
-        var components = URLComponents(url: try http.absolute(address, baseURL: baseURL), resolvingAgainstBaseURL: false)
-        components?.fragment = nil
+        let components = URLComponents(url: try http.absolute(address, baseURL: baseURL), resolvingAgainstBaseURL: false)
+        guard components?.fragment?.isEmpty ?? true else { throw LegadoRequestError.unsupported("依赖 URL fragment 的书籍或章节地址") }
         guard let result = components?.url else { throw ContentFailure.invalidResponse }
         return result.absoluteString
     }
@@ -194,7 +228,16 @@ private final class LegadoSourceWorker {
     func search(query: String, page: Int) throws -> BookSearchPage {
         bindings["key"] = query; bindings["searchKey"] = query; bindings["page"] = page
         try configure()
-        let response = try fetch(definition.searchURL)
+        let templateHasPage = definition.searchURL.range(of: #"\{\{\s*page\b"#, options: .regularExpression) != nil ||
+            ((definition.searchURL.hasPrefix("@js:") || definition.searchURL.hasPrefix("<js>")) && definition.searchURL.range(of: #"\bpage\b"#, options: .regularExpression) != nil)
+        if page == 1 { shared.resetSearch(query) }
+        let address: String
+        if let next = shared.searchURL(query, page: page) { address = next }
+        else {
+            guard page == 1 || templateHasPage else { throw LegadoRequestError.unsupported("没有该关键词的下一页地址，请重新搜索") }
+            address = definition.searchURL
+        }
+        let response = try fetch(address)
         let rules = definition.search
         let rowRule = rules["bookList"] ?? ""
         let rows = rowRule.isEmpty ? [response.text] : try engine.elements(rowRule, in: response.text, baseURL: response.url)
@@ -211,9 +254,15 @@ private final class LegadoSourceWorker {
             books.append(.init(id: "remote-" + reference.id, title: title, author: try field(rules["author"], in: row, baseURL: response.url, structured: true),
                                summary: try field(rules["intro"], in: row, baseURL: response.url, structured: true), coverURL: cover.isEmpty ? nil : try url(cover, baseURL: response.url), source: reference, addedAt: Date()))
         }
-        let paged = definition.searchURL.contains("page") || rules["nextPageUrl"] != nil
         let next = try field(rules["nextPageUrl"], in: response.text, baseURL: response.url)
-        return .init(books: books, nextPage: !books.isEmpty && paged && page < 100 && (rules["nextPageUrl"] == nil || !next.isEmpty) ? page + 1 : nil)
+        var nextPage: Int?
+        if !books.isEmpty, page < 100 {
+            if !next.isEmpty {
+                try shared.rememberSearchURL(url(next, baseURL: response.url), query: query, page: page + 1)
+                nextPage = page + 1
+            } else if rules["nextPageUrl"] == nil && templateHasPage { nextPage = page + 1 }
+        }
+        return .init(books: books, nextPage: nextPage)
     }
 
     func details(_ book: LibraryBookRecord) throws -> LibraryBookRecord {
@@ -277,7 +326,18 @@ private final class LegadoSourceWorker {
             }
         }
         if reversed { chapters.reverse() }
-        for index in chapters.indices { chapters[index].order = index }
+        var previousURL: String?
+        for index in chapters.indices {
+            chapters[index].order = index
+            chapters[index].requestParameters["legado.previousChapterURL"] = previousURL
+            if chapters[index].access != .volume { previousURL = chapters[index].nativeChapterID }
+        }
+        var nextURL: String?
+        for index in chapters.indices.reversed() {
+            chapters[index].requestParameters["legado.nextChapterURL"] = nextURL
+            if chapters[index].access != .volume { nextURL = chapters[index].nativeChapterID }
+        }
+        shared.catalog(Set(chapters.filter { $0.access != .volume }.map(\.nativeChapterID)), bookID: book.id)
         guard !chapters.isEmpty else { throw ContentFailure.missingChapter }
         return chapters
     }
@@ -287,6 +347,7 @@ private final class LegadoSourceWorker {
         _ = try reference(book)
         guard chapter.bookID == book.id, chapter.access == .readable else { throw ContentFailure.restricted }
         try configure(book: book, chapter: chapter)
+        let knownChapters = shared.catalog(bookID: book.id).union([chapter.requestParameters["legado.nextChapterURL"], chapter.requestParameters["legado.previousChapterURL"]].compactMap { $0 })
         var pending = [chapter.nativeChapterID], visited = Set<String>(), paragraphs: [String] = []
         while !pending.isEmpty {
             let address = pending.removeFirst()
@@ -304,6 +365,7 @@ private final class LegadoSourceWorker {
             if let next = definition.content["nextContentUrl"], !next.isEmpty {
                 for value in try engine.list(next, in: response.text, baseURL: response.url) where !value.isEmpty {
                     let next = try url(value, baseURL: response.url)
+                    if next != chapter.nativeChapterID, knownChapters.contains(next) { continue }
                     if !visited.contains(next), !pending.contains(next) { pending.append(next) }
                 }
             }
@@ -340,7 +402,7 @@ private final class LegadoSourceWorker {
             let response = try http.request(try renderRequest(string(0), baseURL: currentURL), baseURL: currentURL, headers: headers, override: options)
             return method == "java.ajax" ? response.text : response.bridgeValue
         case "java.put":
-            let key = string(0), value = string(1); context.variables[key] = value; try shared.set(key, value); return value
+            let key = string(0), value = string(1); try shared.set(key, value); context.variables[key] = value; return value
         case "java.getString": return try engine.text(string(0), in: scriptContent ?? currentContent, baseURL: currentURL)
         case "java.getStringList": return try engine.list(string(0), in: scriptContent ?? currentContent, baseURL: currentURL)
         case "java.getElements": return try engine.elements(string(0), in: scriptContent ?? currentContent, baseURL: currentURL)

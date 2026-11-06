@@ -78,6 +78,7 @@ final class LegadoCookieJar: @unchecked Sendable {
             if cookie.expiresDate.map({ $0 > Date() }) ?? true { cookies.append(cookie) }
         }
         if cookies.count > 256 { cookies.removeFirst(cookies.count - 256) }
+        while cookies.reduce(0, { $0 + $1.name.utf8.count + $1.value.utf8.count + $1.domain.utf8.count + $1.path.utf8.count }) > 128 * 1024 { cookies.removeFirst() }
     }
     func set(_ value: String, url: URL) { store(["Set-Cookie": value], url: url) }
     func remove() { lock.lock(); cookies = []; lock.unlock() }
@@ -132,7 +133,9 @@ final class LegadoHTTPExecutor {
             guard !key.isEmpty, !key.contains("\n"), !key.contains("\r"), let string = value as? String,
                   !string.contains("\n"), !string.contains("\r"), string.utf8.count <= 8192 else { throw LegadoRequestError.invalid("header 值无效") }
             guard !["host", "content-length", "connection", "proxy-authorization"].contains(key.lowercased()) else { throw LegadoRequestError.unsupported("手动设置 \(key) 请求头") }
-            result[key] = string
+            let normalized = key.lowercased()
+            guard result[normalized] == nil else { throw LegadoRequestError.invalid("大小写重复的请求头：\(key)") }
+            result[normalized] = string
         }
         return result
     }
@@ -157,9 +160,9 @@ final class LegadoHTTPExecutor {
         var request = URLRequest(url: url)
         request.httpMethod = method; request.httpShouldHandleCookies = false
         request.timeoutInterval = max(0.1, min(20, control.deadline - ProcessInfo.processInfo.systemUptime))
-        var allHeaders = headers
+        var allHeaders = try Self.headers(headers)
         for (key, value) in try Self.headers(options["headers"] ?? options["header"]) { allHeaders[key] = value }
-        if !allHeaders.keys.contains(where: { $0.caseInsensitiveCompare("Cookie") == .orderedSame }), let value = cookies.header(for: url) { allHeaders["Cookie"] = value }
+        if allHeaders["cookie"] == nil, let value = cookies.header(for: url) { allHeaders["cookie"] = value }
         for (key, value) in allHeaders { request.setValue(value, forHTTPHeaderField: key) }
         if let body = options["body"] {
             guard method == "POST" else { throw LegadoRequestError.invalid("只有 POST 可以设置 body") }

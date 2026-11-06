@@ -6,7 +6,12 @@ import XCTest
 private actor LegadoFixtureTransport: HTTPTransport {
     private(set) var requests: [URLRequest] = []
     let json: Bool
-    init(json: Bool = false) { self.json = json }
+    let nextChapterLink: Bool
+    let fragments: Bool
+    let searchNextLink: Bool
+    init(json: Bool = false, nextChapterLink: Bool = false, fragments: Bool = false, searchNextLink: Bool = false) {
+        self.json = json; self.nextChapterLink = nextChapterLink; self.fragments = fragments; self.searchNextLink = searchNextLink
+    }
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
         let url = request.url!, path = url.path
@@ -26,16 +31,19 @@ private actor LegadoFixtureTransport: HTTPTransport {
             switch path {
             case "/search":
                 headers["Set-Cookie"] = "sid=fixture-session; Path=/; Secure; HttpOnly"
-                body = "<html><div class='book'><a href='/book/1'><span class='name'>山海原稿</span></a><span class='author'>原创作者</span><img src='/cover.png'/></div></html>"
+                body = "<html><div class='book'><a href='/book/1'><span class='name'>山海原稿</span></a><span class='author'>原创作者</span><img src='/cover.png'/></div>" + (searchNextLink ? "<a class='next' href='/more?cursor=two'>下一页</a>" : "") + "</html>"
+            case "/more": body = "<html><div class='book'><a href='/book/2'><span class='name'>山海续稿</span></a><span class='author'>原创作者</span></div></html>"
             case "/book/1": body = "<h1>山海原稿</h1><span class='author'>原创作者</span><p class='intro'>仅用于竹影回归的原创故事。</p><a id='toc' href='/toc/1?page=1'>目录</a>"
             case "/toc/1":
-                if URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "page" })?.value == "2" {
+                if fragments {
+                    body = "<ul><li><a href='/reader#one'>第一章 信</a></li><li><a href='/reader#two'>第二章 山</a></li></ul>"
+                } else if URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "page" })?.value == "2" {
                     body = "<ul><li><a href='/chapter/one'>第一章 信</a></li><li><a href='/chapter/two'>第二章 山</a></li></ul><a class='next' href='?page=1'>上一页</a>"
                 } else {
                     body = "<ul><li><a href='/chapter/one'>第一章 信</a></li></ul><a class='next' href='?page=2'>下一页</a>"
                 }
             case "/chapter/one":
-                if url.query == "part=2" { body = "<article id='content'><p>接续段落。</p><p>这封信来自山谷。</p></article><a class='next' href='?part=2'>本页</a>" }
+                if url.query == "part=2" { body = "<article id='content'><p>接续段落。</p><p>这封信来自山谷。</p></article><a class='next' href='\(nextChapterLink ? "/chapter/two" : "?part=2")'>下一页</a>" }
                 else { body = "<article id='content'><p>午后，竹影落在信笺上。</p><p>接续段落。</p></article><a class='next' href='?part=2'>下一页</a>" }
             case "/chapter/two": body = "<article id='content'><p>山路上又传来新的脚步声。</p></article>"
             default: throw ContentFailure.invalidResponse
@@ -205,5 +213,101 @@ final class LegadoBookSourceTests: XCTestCase {
         let chapters = try await adapter.chapters(for: book)
         do { _ = try await adapter.document(for: XCTUnwrap(chapters.first), book: book); XCTFail("WebView transforms require an explicit unsupported error") }
         catch { XCTAssertEqual(error as? LegadoCompatibilityError, .unsupported("ruleContent.webJs")) }
+    }
+
+    func testContentPaginationStopsBeforeNextKnownChapterIncludingAfterAdapterRecreation() async throws {
+        let transport = LegadoFixtureTransport(nextChapterLink: true), configured = try source()
+        let adapter = try LegadoBookSource(source: configured, transport: transport)
+        let results = try await adapter.search(query: "pages", page: 1)
+        let book = try await adapter.details(for: XCTUnwrap(results.books.first))
+        let chapters = try await adapter.chapters(for: book)
+        XCTAssertEqual(chapters.count, 2)
+        guard chapters.count == 2 else { return }
+        XCTAssertEqual(chapters[0].requestParameters["legado.nextChapterURL"], chapters[1].nativeChapterID)
+        let first = try await adapter.document(for: chapters[0], book: book)
+        XCTAssertEqual(first.paragraphs.map(\.text), ["午后，竹影落在信笺上。", "接续段落。", "这封信来自山谷。"])
+        let recreated = try LegadoBookSource(source: configured, transport: transport)
+        let reopened = try await recreated.document(for: chapters[0], book: book)
+        XCTAssertEqual(reopened, first)
+        let requests = await transport.requests
+        XCTAssertFalse(requests.contains { $0.url?.path == "/chapter/two" }, "A chapter's next-page rule must never fetch the next chapter")
+    }
+
+    func testFragmentChapterAddressesAreRejectedBeforeDeduplicationCanCollapseThem() async throws {
+        let adapter = try LegadoBookSource(source: source(), transport: LegadoFixtureTransport(fragments: true))
+        let results = try await adapter.search(query: "fragments", page: 1)
+        let book = try await adapter.details(for: XCTUnwrap(results.books.first))
+        do { _ = try await adapter.chapters(for: book); XCTFail("Fragment chapter addresses are not HTTP chapter identities") }
+        catch { XCTAssertEqual(error as? LegadoRequestError, .unsupported("依赖 URL fragment 的书籍或章节地址")) }
+    }
+
+    func testRequestHeaderOverridesAreCaseInsensitiveAndNeverRandomlyReplaceCredentials() async throws {
+        var configured = try source()
+        var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
+        package["header"] = #"{"Authorization":"old","Cookie":"old-cookie","X-Static":"preserved"}"#
+        package["searchUrl"] = #"/search?key={{key}},{"headers":{"authorization":"new","cookie":"new-cookie"}}"#
+        configured.configuration = try JSONSerialization.data(withJSONObject: package)
+        let transport = LegadoFixtureTransport(), adapter = try LegadoBookSource(source: configured, transport: transport)
+        _ = try await adapter.search(query: "headers", page: 1)
+        let requests = await transport.requests, request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "new")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "new-cookie")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Static"), "preserved")
+        XCTAssertThrowsError(try LegadoHTTPExecutor.headers(["Cookie": "one", "cookie": "two"]))
+    }
+
+    func testRecursiveURLScriptsCannotReenterNewJavaScriptVMsUntilTheNativeStackOverflows() async throws {
+        var configured = try source(searchURL: "@js:loop()")
+        var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
+        package["jsLib"] = "function loop(){return java.ajax('@js:loop()')}"
+        configured.configuration = try JSONSerialization.data(withJSONObject: package)
+        let transport = LegadoFixtureTransport(), adapter = try LegadoBookSource(source: configured, transport: transport)
+        let start = ProcessInfo.processInfo.systemUptime
+        do { _ = try await adapter.search(query: "recursive", page: 1); XCTFail("Recursive native reentry must hit a source quota") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("超过限制"), error.localizedDescription) }
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - start, 1)
+        let requests = await transport.requests
+        XCTAssertTrue(requests.isEmpty)
+    }
+
+    func testVariableAggregateQuotaRejectsNewAndReplacementValuesWithoutPollutingPriorState() async throws {
+        var configured = try source()
+        var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
+        package["ruleContent"] = ["content": #"@js:java.put('keep','stable');let big='x'.repeat(131072);for(let i=0;i<3;i++){java.put('v'+i,big)};let failures=0;try{java.put('overflow',big)}catch(e){failures++}try{java.put('keep',big)}catch(e){failures++}if(failures!==2){throw Error('quota did not reject writes')}java.get('keep')+'|'+java.get('overflow')"#]
+        configured.configuration = try JSONSerialization.data(withJSONObject: package)
+        let adapter = try LegadoBookSource(source: configured, transport: LegadoFixtureTransport())
+        let results = try await adapter.search(query: "variables", page: 1)
+        let book = try await adapter.details(for: XCTUnwrap(results.books.first))
+        let chapters = try await adapter.chapters(for: book)
+        let document = try await adapter.document(for: XCTUnwrap(chapters.first), book: book)
+        XCTAssertEqual(document.paragraphs.map(\.text), ["stable|"])
+    }
+
+    func testSourceCookieJarHasAnAggregateByteQuotaAndEvictsOldValues() throws {
+        let jar = LegadoCookieJar(), url = try XCTUnwrap(URL(string: "https://fixture.test/"))
+        for index in 0..<100 { jar.set("item\(index)=" + String(repeating: "x", count: 2000) + "; Path=/; Secure", url: url) }
+        let header = try XCTUnwrap(jar.header(for: url))
+        XCTAssertLessThanOrEqual(header.utf8.count, 128 * 1024)
+        XCTAssertFalse(header.contains("item0="))
+        XCTAssertTrue(header.contains("item99="))
+    }
+
+    func testSearchNextPageURLUsesReturnedCursorInsteadOfRepeatingInitialTemplate() async throws {
+        var configured = try source(searchURL: "/search?key={{key}}")
+        var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
+        var rules = try XCTUnwrap(package["ruleSearch"] as? [String: String])
+        rules["nextPageUrl"] = ".next@href"; package["ruleSearch"] = rules
+        configured.configuration = try JSONSerialization.data(withJSONObject: package)
+        let transport = LegadoFixtureTransport(searchNextLink: true), adapter = try LegadoBookSource(source: configured, transport: transport)
+        let first = try await adapter.search(query: "next", page: 1)
+        XCTAssertEqual(first.nextPage, 2)
+        let second = try await adapter.search(query: "next", page: 2)
+        XCTAssertEqual(second.books.first?.title, "竹影·山海续稿")
+        XCTAssertNotEqual(first.books.first?.id, second.books.first?.id)
+        XCTAssertNil(second.nextPage)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.compactMap { $0.url?.path }, ["/search", "/more"])
+        do { _ = try await adapter.search(query: "different", page: 2); XCTFail("A different keyword must never reuse another query's cursor") }
+        catch { XCTAssertEqual(error as? LegadoRequestError, .unsupported("没有该关键词的下一页地址，请重新搜索")) }
     }
 }

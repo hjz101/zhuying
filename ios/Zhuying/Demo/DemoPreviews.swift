@@ -435,7 +435,9 @@ struct SourceImportView: View {
     @State private var preview: SourceImportPreview?
     @State private var message: String?
     @State private var error: String?
+    #if DEBUG
     private let example = Data("[{\"bookSourceName\":\"远山书屋\",\"bookSourceUrl\":\"https://yuanshan.example\"}]".utf8)
+    #endif
 
     var body: some View {
         ScrollView {
@@ -467,8 +469,10 @@ struct SourceImportView: View {
                         if let filename { ThemeLabel(filename, systemImage: "doc.text").font(.system(size: 12)).accessibilityIdentifier("sourceImportFilename") }
                         Text("支持单个书源或书源数组，最大 5 MB。选择后先预览，再确认导入。")
                             .font(.system(size: 11)).foregroundStyle(appAppearance.palette.muted)
+                        #if DEBUG
                         Button("使用示例文件") { load(example, name: "示例书源.json") }
                             .font(.system(size: 12)).frame(minHeight: 44).accessibilityIdentifier("sourceImportExample")
+                        #endif
                     }
                 }
                 if let error { ThemeLabel(error, systemImage: "exclamationmark.circle").font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("sourceImportError") }
@@ -536,6 +540,10 @@ struct SourceImportView: View {
               !["http", "https"].contains(scheme) || url.host?.isEmpty == false else {
             clearPreview(); error = "请输入有效的书源 URL 或阅读分享链接。"; return
         }
+        #if DEBUG
         load(example)
+        #else
+        clearPreview(); error = "请通过书源导入入口读取您选择的文件或链接。"
+        #endif
     }
 }

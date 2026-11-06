@@ -105,6 +105,7 @@ struct ProductionSourceRuleEditor: View {
     @EnvironmentObject private var library: LibraryStore
     @State private var json = ""
     @State private var message: String?
+    @State private var editingID = ""
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 23) {
@@ -118,19 +119,19 @@ struct ProductionSourceRuleEditor: View {
             }.padding(22)
         }.appPageStyle().navigationTitle("书源编辑").navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                guard let source = demo.sources.first(where: { $0.id == sourceID }), let data = try? SourcePackages.export([source]),
-                      let object = try? JSONSerialization.jsonObject(with: data) as? [String:Any], let rows = object["sources"] as? [[String:Any]], let row = rows.first,
-                      let value = try? JSONSerialization.data(withJSONObject: row, options: [.sortedKeys,.prettyPrinted]) else { return }
-                json = String(decoding: value, as: UTF8.self)
+                guard editingID.isEmpty else { return }
+                editingID = sourceID == "main" ? demo.createSource() : sourceID
+                do { json = try demo.sourceEditorJSON(editingID) }
+                catch { json = "{}"; message = error.localizedDescription }
             }
+            .onDisappear { demo.discardSourceDraft(editingID) }
     }
     private func validate(save: Bool) {
         do {
-            let preview = try SourcePackages.parse(Data(json.utf8), existing: demo.sources.filter { $0.id != sourceID })
-            guard var source = preview.sources.first, preview.sources.count == 1, preview.invalid == 0, let index = demo.sources.firstIndex(where: { $0.id == sourceID }) else { throw ContentFailure.invalidResponse }
-            source = .init(id: sourceID, name: source.name, group: source.group, enabled: source.enabled, detail: source.detail, url: source.url, kind: source.kind, configuration: source.configuration)
-            if save { demo.sources[index] = source; Task { message = await library.flushPendingWrites() ? "已保存有效配置。\(source.detail)" : "保存失败，请重试。" } }
-            else { message = "JSON 有效。\(source.detail)" }
+            if save {
+                let source = try demo.saveSourceJSON(Data(json.utf8), sourceID: editingID); editingID = source.id
+                Task { message = await library.flushPendingWrites() ? "已保存有效配置。\(source.detail)" : "保存失败，请重试。" }
+            } else { message = "JSON 有效。\(try demo.validateSourceJSON(Data(json.utf8), sourceID: editingID).detail)" }
         } catch { message = "未保存：\(error.localizedDescription)" }
     }
 }

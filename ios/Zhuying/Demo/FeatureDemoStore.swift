@@ -19,7 +19,12 @@ struct DemoSource: Identifiable, Codable, Equatable {
     var group = "小说"
     var enabled = true
     var detail: String
-    var url = "https://books.example"
+    #if DEBUG
+    static let defaultURL = "https://books.example"
+    #else
+    static let defaultURL = ""
+    #endif
+    var url = DemoSource.defaultURL
     var loginStatus: DemoLoginStatus = .signedOut
     var kind: DemoSourceKind = .novel
     var pinned = false
@@ -131,11 +136,16 @@ final class FeatureDemoStore: ObservableObject {
     var sourcePersistence: (([DemoSource]) -> Void)?
     var restoringSources = false
     @Published var values: [String: String] = [:]
-    @Published var sources = [
+    #if DEBUG
+    private static let demoSources = [
         DemoSource(id: "shanhai", name: "山海书库", detail: "143 ms · 搜索 / 详情 / 正文", responseMilliseconds: 143),
         DemoSource(id: "yunjian", name: "云间小说", detail: "216 ms · 章节更新及时", url: "https://yunjian.example", loginStatus: .expired, responseMilliseconds: 216),
         DemoSource(id: "paper", name: "纸上漫游", group: "漫画", detail: "超时 · 演示失败状态", url: "https://paper.example", loginStatus: .signedIn, kind: .comic, hasFailure: true),
-    ] { didSet { persistProductionSources() } }
+    ]
+    #endif
+    @Published var sources: [DemoSource] = [] { didSet { persistProductionSources() } }
+    private struct SourceDraft { let kind: DemoSourceKind; let group: String? }
+    private var sourceDrafts: [String: SourceDraft] = [:]
     @Published var groups = ["追更中", "待读", "已读完"]
     @Published var bookGroups: [String: String] = ["changfeng": "追更中", "stars": "追更中", "sunset": "已读完"]
     @Published var bookSources: [String: String] = [:]
@@ -182,8 +192,10 @@ final class FeatureDemoStore: ObservableObject {
         if let defaults { BrandCompatibility.migrateKeys(defaults) }
         self.bubbleRenderer = bubbleRenderer
         isDemo = seedDemoData
+        #if DEBUG
+        if seedDemoData { sources = Self.demoSources }
+        #endif
         if !seedDemoData {
-            sources = [.init(id: "shushan", name: "书山聚合", detail: "待登录", url: ShushanClient.defaultHost)]
             bookGroups = [:]; bookmarks = []; files = []; backups = []
             cacheMB = ["章节": 0, "图片": 0, "音频": 0]
             selectedCover = ""; audioPosition = 0; downloadProgress = 0
@@ -214,7 +226,7 @@ final class FeatureDemoStore: ObservableObject {
     func updateShushanAccount(_ credential: ShushanCredential?, host: String) {
         guard !isDemo, let index = sources.firstIndex(where: { $0.id == "shushan" }) else { return }
         sources[index].loginStatus = credential == nil ? .signedOut : .signedIn
-        sources[index].url = credential?.host.absoluteString ?? host
+        if let credential { sources[index].url = credential.host.absoluteString }
         sources[index].detail = credential == nil ? "待登录" : "\(credential!.nickname) · 登录状态已保存"
     }
 
@@ -294,13 +306,45 @@ final class FeatureDemoStore: ObservableObject {
     func createSource(kind: DemoSourceKind = .novel, group: String? = nil) -> String {
         if !isDemo {
             let id = UUID().uuidString
-            let config: [String:Any] = ["adapter":"json-v1", "endpoints":(try? JSONSerialization.jsonObject(with: JSONEncoder().encode(NativeSourceRules.example))) ?? [:]]
-            sources.append(.init(id: id, name: "自定义书源", group: group ?? "小说", enabled: false, detail: "原生 JSON v1 · 待配置", url: "https://books.example", configuration: try? JSONSerialization.data(withJSONObject: config)))
+            sourceDrafts[id] = .init(kind: kind, group: group)
             return id
         }
         let id = UUID().uuidString
         sources.append(.init(id: id, name: "自定义书源 \(sources.count + 1)", group: group ?? kind.rawValue, detail: "待调试 · 演示配置", kind: kind))
         return id
+    }
+    func hasSourceDraft(_ id: String) -> Bool { sourceDrafts[id] != nil }
+    func discardSourceDraft(_ id: String) { sourceDrafts[id] = nil }
+    func sourceEditorJSON(_ id: String) throws -> String {
+        guard let source = sources.first(where: { $0.id == id }) else { return "{}" }
+        let data = try SourcePackages.export([source])
+        guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rows = envelope["sources"] as? [[String: Any]], let row = rows.first else { throw ContentFailure.invalidResponse }
+        return String(decoding: try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys, .prettyPrinted]), as: UTF8.self)
+    }
+    func validateSourceJSON(_ data: Data, sourceID: String) throws -> DemoSource {
+        guard sources.contains(where: { $0.id == sourceID }) || sourceDrafts[sourceID] != nil else { throw ContentFailure.sourceDisabled }
+        let others = sources.filter { $0.id != sourceID }
+        var preview = try SourcePackages.parse(data, existing: others)
+        guard preview.sources.count == 1, preview.invalid == 0, preview.duplicates == 0 else { throw ContentFailure.invalidResponse }
+        if let draft = sourceDrafts[sourceID], let config = preview.sources[0].configuration,
+           var row = try JSONSerialization.jsonObject(with: config) as? [String: Any] {
+            if row["bookSourceType"] == nil { row["bookSourceType"] = draft.kind == .comic ? 2 : draft.kind == .audio ? 1 : 0 }
+            if row["bookSourceGroup"] == nil, let group = draft.group { row["bookSourceGroup"] = group }
+            preview = try SourcePackages.parse(JSONSerialization.data(withJSONObject: row), existing: others)
+        }
+        guard let value = preview.sources.first else { throw ContentFailure.invalidResponse }
+        let id = sourceDrafts[sourceID] != nil && value.id == "shushan" ? value.id : sourceID
+        return .init(id: id, name: value.name, group: value.group, enabled: value.enabled, detail: value.detail,
+                     url: value.url, kind: value.kind, configuration: value.configuration)
+    }
+    @discardableResult
+    func saveSourceJSON(_ data: Data, sourceID: String) throws -> DemoSource {
+        let source = try validateSourceJSON(data, sourceID: sourceID)
+        if let index = sources.firstIndex(where: { $0.id == sourceID }) { sources[index] = source }
+        else { sources.append(source) }
+        discardSourceDraft(sourceID)
+        return source
     }
     @discardableResult
     func confirmSourceImport(_ preview: SourceImportPreview) -> Int {

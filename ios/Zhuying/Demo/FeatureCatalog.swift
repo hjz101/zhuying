@@ -113,6 +113,7 @@ enum FeatureCatalog {
     static let commonToolIDs = ["import", "fulltext", "themes", "sources"]
     static var commonTools: [DemoFeature] { commonToolIDs.map { feature($0) } }
 
+    #if DEBUG
     static let sampleJSON = """
     {
       "bookSourceName": "山海书库（演示）",
@@ -121,6 +122,29 @@ enum FeatureCatalog {
       "ruleSearch": { "bookList": ".book", "name": "h3@text" }
     }
     """
+    private static let sampleSourceName = "山海书库"
+    private static let sampleSearchRule = ".book-list .book"
+    private static let sampleSubscriptionTitle = "订竹影海书库"
+    private static let sampleBookURL = "https://books.example"
+    private static let sampleBookFileURL = "https://books.example/library.epub"
+    private static let samplePackageURL = "https://sources.example/list.json"
+    private static let sampleTTSURL = "https://tts.example/speak"
+    private static let sampleAIURL = "https://ai.example/v1"
+    private static let sampleBackendURL = "https://reader.example/api"
+    private static let sampleShareURL = "qireader://import?url=https://sources.example/list.json"
+    #else
+    static let sampleJSON = "{}"
+    private static let sampleSourceName = ""
+    private static let sampleSearchRule = ""
+    private static let sampleSubscriptionTitle = "订阅书源"
+    private static let sampleBookURL = ""
+    private static let sampleBookFileURL = ""
+    private static let samplePackageURL = ""
+    private static let sampleTTSURL = ""
+    private static let sampleAIURL = ""
+    private static let sampleBackendURL = ""
+    private static let sampleShareURL = ""
+    #endif
     static let all: [DemoFeature] = [
         .init(id: "shelf", title: "书架管理", icon: "books.vertical", group: .library, summary: "添加移除 · 分组 · 最近阅读 · 继续阅读", preview: .books,
               fields: [.choice("group", "当前分组", ["全部", "追更中", "待读", "已读完"]), .text("newGroup", "新分组名称")], actions: ["新建分组"], related: ["details", "progress"]),
@@ -129,7 +153,7 @@ enum FeatureCatalog {
         .init(id: "fulltext", title: "全文搜索", icon: "doc.text.magnifyingglass", group: .library, summary: "正文全文检索 · 本地书检索 · 跳转命中位置", preview: .fulltext,
               fields: [.text("query", "正文关键词", "地图"), .choice("scope", "搜索范围", ["全部示例书", "当前书籍", "本地示例书"])], actions: ["检索示例正文"]),
         .init(id: "discover", title: "发现与订阅", icon: "safari", group: .library, summary: "书源分类 · 书籍流 · 发现筛选 · 源订阅", preview: .books,
-              fields: [.choice("category", "发现分类", ["全部", "奇幻", "都市", "科幻", "古风"]), .toggle("subscription", "订竹影海书库"), .choice("sort", "书籍流", ["最近更新", "人气精选", "新书入库"])], related: ["sources"]),
+              fields: [.choice("category", "发现分类", ["全部", "奇幻", "都市", "科幻", "古风"]), .toggle("subscription", sampleSubscriptionTitle), .choice("sort", "书籍流", ["最近更新", "人气精选", "新书入库"])], related: ["sources"]),
         .init(id: "details", title: "书籍详情", icon: "book.closed", group: .library, summary: "封面 · 作者 · 简介 · 加入书架 · 开始阅读", preview: .books, related: ["sourceSwitch", "covers"]),
         .init(id: "sourceSwitch", title: "换源", icon: "arrow.triangle.swap", group: .library, summary: "候选来源 · 切换来源 · 保留章节与正文位置", preview: .sourceSwitch, actions: ["切换并继续阅读"]),
         .init(id: "contents", title: "章节目录", icon: "list.bullet", group: .reading, summary: "目录浏览 · 章节搜索 · 正倒序 · 当前章标记", preview: .contents,
@@ -152,13 +176,13 @@ enum FeatureCatalog {
         .init(id: "archive", title: "压缩包支持", icon: "doc.zipper", group: .files, summary: "ZIP · RAR · 7z · 内容导入", preview: .files,
               fields: [.choice("format", "文件格式", ["ZIP", "RAR", "7z"]), .toggle("nested", "扫描子文件夹")], actions: ["预览解压内容", "导入选中内容"]),
         .init(id: "import", title: "智能导入", icon: "square.and.arrow.down", group: .files, summary: "本地文件 · 链接 · 剪贴板 · 预览确认", preview: .files,
-              fields: [.choice("method", "内容来源", ["文件", "URL", "剪贴板示例"]), .text("input", "待识别内容", "https://books.example/library.epub")], actions: ["识别内容", "确认模拟导入"], related: ["txt", "epub", "archive", "links"]),
+              fields: [.choice("method", "内容来源", ["文件", "URL", "剪贴板示例"]), .text("input", "待识别内容", sampleBookFileURL)], actions: ["识别内容", "确认模拟导入"], related: ["txt", "epub", "archive", "links"]),
         .init(id: "sources", title: "书源管理", icon: "externaldrive", group: .sources, summary: "新建编辑删除 · 分组 · 启停 · 批量管理", preview: .sources,
               fields: [.choice("group", "书源分组", ["全部", "小说", "漫画", "个人收藏"])], actions: ["新建示例书源", "全部启用", "全部停用"], related: ["sourceImport", "sourceEdit", "sourceBatch"]),
         .init(id: "sourceImport", title: "书源导入导出", icon: "arrow.up.arrow.down.circle", group: .sources, summary: "URL／文件导入 · JSON 导出 · 阅读 3.0 链接", preview: .sources,
-              fields: [.choice("method", "导入方式", ["URL", "JSON 文件", "阅读 3.0 链接"]), .text("url", "导入地址", "https://sources.example/list.json"), .code("json", "导出内容示例", sampleJSON)], actions: ["预览导入", "模拟导出 JSON"]),
+              fields: [.choice("method", "导入方式", ["URL", "JSON 文件", "阅读 3.0 链接"]), .text("url", "导入地址", samplePackageURL), .code("json", "导出内容示例", sampleJSON)], actions: ["预览导入", "模拟导出 JSON"]),
         .init(id: "sourceEdit", title: "书源编辑", icon: "square.and.pencil", group: .sources, summary: "基本信息 · 规则编辑 · JSON 源码校验", preview: .sources,
-              fields: [.text("name", "书源名称", "山海书库"), .text("url", "站点地址", "https://books.example"), .choice("syntax", "规则类型", ["CSS", "XPath", "JSONPath", "正则", "JavaScript"]), .text("rule", "搜索结果规则", ".book-list .book"), .code("json", "JSON 源码", sampleJSON)], actions: ["校验 JSON", "保存演示配置"], related: ["sourceDebug", "sourceLogin"]),
+              fields: [.text("name", "书源名称", sampleSourceName), .text("url", "站点地址", sampleBookURL), .choice("syntax", "规则类型", ["CSS", "XPath", "JSONPath", "正则", "JavaScript"]), .text("rule", "搜索结果规则", sampleSearchRule), .code("json", "JSON 源码", sampleJSON)], actions: ["校验 JSON", "保存演示配置"], related: ["sourceDebug", "sourceLogin"]),
         .init(id: "sourceLogin", title: "书源登录", icon: "person.badge.key", group: .sources, summary: "网页／表单登录 · Cookie 保存与复用", preview: .browser,
               fields: [.choice("method", "登录方式", ["网页登录", "表单登录"]), .text("account", "演示账号", "demo-reader"), .secret("password", "演示密码"), .toggle("cookie", "复用演示 Cookie")], actions: ["模拟登录", "清除演示 Cookie"]),
         .init(id: "sourceDebug", title: "书源调试", icon: "ladybug", group: .sources, summary: "搜索 → 详情 → 目录 → 正文分步测试", preview: .sources,
@@ -170,13 +194,13 @@ enum FeatureCatalog {
         .init(id: "systemTTS", title: "系统朗读", icon: "speaker.wave.2", group: .audio, summary: "系统声音 · 播放／暂停 · 语速与进度", preview: .player,
               fields: [.choice("voice", "声音", ["晓晓 · 普通话", "婷婷 · 普通话", "粤语"]), .slider("speed", "语速", 1, 0.5, 2, "×")], actions: ["打开模拟播放器"], related: ["backgroundAudio", "aiRoles"]),
         .init(id: "onlineTTS", title: "在线朗读", icon: "waveform", group: .audio, summary: "HTTP TTS · WebSocket 流式 · 朗读源管理", preview: .player,
-              fields: [.choice("transport", "协议", ["HTTP TTS", "WebSocket"]), .text("url", "服务地址", "https://tts.example/speak"), .choice("voice", "朗读源", ["云端女声", "云端男声", "自定义"]), .toggle("stream", "流式朗读")], actions: ["模拟连接", "打开模拟播放器"]),
+              fields: [.choice("transport", "协议", ["HTTP TTS", "WebSocket"]), .text("url", "服务地址", sampleTTSURL), .choice("voice", "朗读源", ["云端女声", "云端男声", "自定义"]), .toggle("stream", "流式朗读")], actions: ["模拟连接", "打开模拟播放器"]),
         .init(id: "backgroundAudio", title: "后台音频", icon: "play.rectangle", group: .audio, summary: "后台播放 · 系统播放信息 · 音频缓存", preview: .player,
               fields: [.toggle("background", "后台播放"), .toggle("lockscreen", "锁屏控制"), .toggle("cache", "音频缓存")], actions: ["预览锁屏播放卡片"], related: ["cache"]),
         .init(id: "aiRoles", title: "AI 多角色朗读", icon: "person.2.wave.2", group: .audio, summary: "正文角色分析 · 角色管理 · 不同声音映射", preview: .roles,
               fields: [.choice("narrator", "旁白", ["温柔女声", "沉稳男声"]), .choice("hero", "陆青崖", ["少年男声", "沉稳男声"]), .choice("elder", "老掌柜", ["长者男声", "沉稳男声"])], actions: ["模拟角色分析", "试听布局预览"], related: ["aiConfig", "onlineTTS"]),
         .init(id: "aiConfig", title: "AI 服务配置", icon: "sparkles", group: .audio, summary: "服务商 · 模型 · API Key · 安全存储入口", preview: .roles,
-              fields: [.choice("provider", "服务商", ["自定义兼容服务", "本地服务"]), .text("url", "Base URL", "https://ai.example/v1"), .text("model", "模型", "demo-model"), .secret("key", "API Key（仅占位）"), .toggle("secure", "使用钥匙串（界面示意）")], actions: ["模拟连接测试"]),
+              fields: [.choice("provider", "服务商", ["自定义兼容服务", "本地服务"]), .text("url", "Base URL", sampleAIURL), .text("model", "模型", "demo-model"), .secret("key", "API Key（仅占位）"), .toggle("secure", "使用钥匙串（界面示意）")], actions: ["模拟连接测试"]),
         .init(id: "purify", title: "正文净化", icon: "line.3.horizontal.decrease", group: .style, summary: "正则／JS 替换 · 分组启停 · 导入导出 · 作用域", preview: .rules,
               fields: [.choice("scope", "作用域", ["全部书籍", "当前书籍", "当前书源"]), .choice("type", "规则类型", ["正则", "JavaScript"]), .text("pattern", "匹配内容", "\\(本章完\\)"), .text("replacement", "替换为"), .toggle("enabled", "启用规则")], actions: ["预览净化结果", "模拟导入导出"]),
         .init(id: "highlight", title: "高亮规则", icon: "highlighter", group: .style, summary: "正文样式规则 · 对话／系统／诗词模板 · 正则与关键词 · 首字下沉", preview: .rules),
@@ -195,15 +219,15 @@ enum FeatureCatalog {
         .init(id: "cache", title: "缓存管理", icon: "internaldrive", group: .system, summary: "章节 · 图片 · 音频 · 空间清理", preview: .cache,
               fields: [.choice("type", "缓存类型", ["全部", "章节", "图片", "音频"])], actions: ["清理演示缓存"]),
         .init(id: "browser", title: "内置浏览器", icon: "globe", group: .system, summary: "网页浏览 · 书源登录 · 调试与网页交互", preview: .browser,
-              fields: [.text("url", "地址", "https://books.example"), .toggle("script", "网页交互（模拟）")], actions: ["预览示例网页"], related: ["sourceLogin", "sourceDebug"]),
+              fields: [.text("url", "地址", sampleBookURL), .toggle("script", "网页交互（模拟）")], actions: ["预览示例网页"], related: ["sourceLogin", "sourceDebug"]),
         .init(id: "covers", title: "封面搜索", icon: "photo.on.rectangle", group: .system, summary: "Bing 图片搜索入口 · 封面选择", preview: .covers,
               fields: [.text("query", "封面关键词", "长风渡山海"), .choice("ratio", "图片比例", ["竖版", "全部"])], actions: ["模拟搜索封面"]),
         .init(id: "network", title: "网络配置", icon: "network", group: .system, summary: "书源级代理 · 自定义 DNS／IP", preview: .sources,
               fields: [.toggle("proxy", "为此书源启用代理", false), .text("host", "代理地址", "127.0.0.1:7890"), .text("dns", "DNS", "1.1.1.1"), .text("ip", "指定 IP（可选）")], actions: ["模拟网络诊断"]),
         .init(id: "backend", title: "远程后端", icon: "server.rack", group: .system, summary: "将选定书源请求转发至自建服务", preview: .sources,
-              fields: [.toggle("enabled", "启用转发（模拟）", false), .text("url", "后端地址", "https://reader.example/api"), .secret("token", "访问令牌（占位）"), .choice("scope", "转发范围", ["选定书源", "全部书源"])], actions: ["模拟连接测试"]),
+              fields: [.toggle("enabled", "启用转发（模拟）", false), .text("url", "后端地址", sampleBackendURL), .secret("token", "访问令牌（占位）"), .choice("scope", "转发范围", ["选定书源", "全部书源"])], actions: ["模拟连接测试"]),
         .init(id: "links", title: "外部链接接入", icon: "link", group: .system, summary: "qireader:// · yuedu:// · 识别与导入确认", preview: .files,
-              fields: [.text("input", "待识别链接", "qireader://import?url=https://sources.example/list.json")], actions: ["识别链接", "确认模拟导入"]),
+              fields: [.text("input", "待识别链接", sampleShareURL)], actions: ["识别链接", "确认模拟导入"]),
     ]
     static func feature(_ id: String) -> DemoFeature { all.first { $0.id == id }! }
     static func search(_ query: String, group: DemoGroup? = nil) -> [DemoFeature] {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 
 test('IPA export validates profile scope, expiry, certificate binding and actual Payload layout', () => {
-  const code = `
+  const code = String.raw`
 import importlib.util,datetime as d,tempfile,pathlib,plistlib,zipfile
 s=importlib.util.spec_from_file_location('ipa','ios/scripts/export-ipa.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 now=d.datetime(2026,11,6,tzinfo=d.timezone.utc)
@@ -22,6 +22,26 @@ with tempfile.TemporaryDirectory() as tmp:
  try:m.archive_payload(payload,out)
  except ValueError:pass
  else:raise AssertionError('Existing IPA overwritten')
+`;
+  assert.doesNotThrow(() => execFileSync('python3', ['-c', code], { stdio: 'pipe' }));
+});
+
+test('P12 compatibility conversion retains the certificate and leaves no plaintext private-key file', () => {
+  const code = String.raw`
+import importlib.util,tempfile,pathlib,subprocess,shutil
+s=importlib.util.spec_from_file_location('ipa','ios/scripts/export-ipa.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+openssl=shutil.which('openssl')
+with tempfile.TemporaryDirectory() as tmp:
+ root=pathlib.Path(tmp);source=root/'source';source.mkdir();work=root/'converted';work.mkdir()
+ key=root/'synthetic.key';cert=root/'synthetic.crt'
+ m.invoke([openssl,'req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(key),'-out',str(cert),'-subj','/CN=Original Export Test','-days','1'])
+ secret=source/'password';secret.write_text('synthetic-password')
+ m.invoke([openssl,'pkcs12','-export','-inkey',str(key),'-in',str(cert),'-out',str(source/'identity.p12'),'-passout','file:'+str(secret)])
+ converted=m.mac_compatible_p12(source,work,openssl,'temporary-synthetic-password')
+ decoded=m.invoke([openssl,'pkcs12','-in',str(converted),'-passin','stdin','-clcerts','-nokeys'],data=b'temporary-synthetic-password\n')
+ assert m.invoke([openssl,'x509','-outform','DER'],data=decoded)==m.invoke([openssl,'x509','-in',str(cert),'-outform','DER'])
+ assert sorted(p.name for p in work.iterdir())==['compatible.p12','import-password']
+ assert converted.stat().st_mode & 0o077==0
 `;
   assert.doesNotThrow(() => execFileSync('python3', ['-c', code], { stdio: 'pipe' }));
 });

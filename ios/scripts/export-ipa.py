@@ -76,6 +76,16 @@ def archive_payload(payload, output):
             raise ValueError('IPA must contain Payload/App.app')
 
 
+def mac_compatible_p12(material, work, openssl, temporary_password):
+    """Normalize legacy P12 MAC/PBE compatibility without a plaintext key file."""
+    password = (material/'password').read_bytes()
+    private_pem = invoke([openssl,'pkcs12','-in',str(material/'identity.p12'),'-passin','stdin','-nodes'],data=password+b'\n',label='Private identity decode')
+    secret_file = work/'import-password';secret_file.write_text(temporary_password);secret_file.chmod(0o600)
+    encoded = invoke([openssl,'pkcs12','-export','-in','/dev/stdin','-passout','file:'+str(secret_file),'-keypbe','PBE-SHA1-3DES','-certpbe','PBE-SHA1-3DES','-macalg','sha1'],data=private_pem,label='Compatible identity encoding')
+    output = work/'compatible.p12';output.write_bytes(encoded);output.chmod(0o600)
+    return output
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app',type=Path,required=True)
@@ -84,9 +94,9 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
-    if invoke(['git','status','--porcelain'],label='Repository status').strip():
+    if invoke(['git','-C',str(repo),'status','--porcelain'],label='Repository status').strip():
         raise ValueError('Commit source and tests before export')
-    exporter_revision = invoke(['git','rev-parse','HEAD'],label='Exporter revision').decode().strip()
+    exporter_revision = invoke(['git','-C',str(repo),'rev-parse','HEAD'],label='Exporter revision').decode().strip()
     original_info = plistlib.loads((args.app/'Info.plist').read_bytes())
     if original_info.get('CFBundleSupportedPlatforms') != ['iPhoneOS']:
         raise ValueError('IPA export requires an iPhoneOS build, never a Simulator App')
@@ -128,7 +138,8 @@ def main():
             if filtered != listed:
                 invoke(['security','list-keychains','-d','user','-s',*filtered],label='Keep signing keychain isolated')
             invoke(['security','unlock-keychain','-p',keychain_password,str(keychain)],label='Temporary keychain unlock')
-            invoke(['security','import',str(args.material/'identity.p12'),'-k',str(keychain),'-P',password.decode(),'-T','/usr/bin/codesign'],label='P12 keychain import')
+            compatible = mac_compatible_p12(args.material,work,openssl,keychain_password)
+            invoke(['security','import',str(compatible),'-k',str(keychain),'-P',keychain_password,'-T','/usr/bin/codesign'],label='P12 keychain import')
             # Import the official issuing certificate only into the temporary keychain.
             detail = invoke([openssl,'x509','-noout','-text'],data=pem,label='Certificate issuer metadata').decode()
             match = re.search(r'CA Issuers - URI:(https?://[^\s]+)',detail)

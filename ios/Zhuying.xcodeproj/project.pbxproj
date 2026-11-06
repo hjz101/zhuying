@@ -118,6 +118,7 @@
 		6F0865F376ED3E01C492E49A /* ProductionOnlineTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9BA5DF2729A3BE0B86150F8 /* ProductionOnlineTools.swift */; };
 		7008981D646FA267F018A691 /* ProcessMemorySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107DDEF0F7261A739AA877DE /* ProcessMemorySnapshot.swift */; };
 		7151C524A7A5224FD8F135E4 /* NativeScriptHostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB23A8192BB21667C77BDFA /* NativeScriptHostTests.swift */; };
+		729194EBB2D29F1786CC647D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5ECED31AF7C04F38077E31A7 /* Assets.xcassets */; };
 		734A654EE428C1E69031BC20 /* AudioTestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A53DAC2829993F419AB332 /* AudioTestFixtures.swift */; };
 		75B3C9F79B9B0E67E2173DDB /* SourceNetworkProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F919E9B7A00B333E580DE60 /* SourceNetworkProfiles.swift */; };
 		761A53D5538835C719691E3F /* ThemeAssetsFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8532E8CC8F950BA42656ED21 /* ThemeAssetsFlowTests.swift */; };
@@ -378,6 +379,7 @@
 		58DC905CB9A7F393D3229EAC /* ReadingSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingSessionController.swift; sourceTree = "<group>"; };
 		5BE0CFB70BD39E10C337AFB6 /* SourceCommentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceCommentTests.swift; sourceTree = "<group>"; };
 		5C1A11B53F860C448B034E99 /* CompatibleAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibleAudioService.swift; sourceTree = "<group>"; };
+		5ECED31AF7C04F38077E31A7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		61939E66ED4027736A7B1D60 /* MediaFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlowTests.swift; sourceTree = "<group>"; };
 		630752D4D63F94A62C2E58B2 /* ZhuyingPerformanceUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ZhuyingPerformanceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		659DCB75182DA7CE8783CC09 /* OfflineDownloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineDownloads.swift; sourceTree = "<group>"; };
@@ -844,6 +846,7 @@
 		E35B49D4A66982EE22795960 /* Zhuying */ = {
 			isa = PBXGroup;
 			children = (
+				5ECED31AF7C04F38077E31A7 /* Assets.xcassets */,
 				9A6D39438ED4E70D587E005D /* iCloud.entitlements.example */,
 				E128A50627804CF2F00F5293 /* Info.plist */,
 				DBF7D4A3DE75CBA996FA354B /* ZhuyingApp.swift */,
@@ -1159,6 +1162,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				729194EBB2D29F1786CC647D /* Assets.xcassets in Resources */,
 				8A3F84ECFC14D451CF46B4FC /* ThirdPartyNotices.txt in Resources */,
 				EB709D91E0AFEE856262E888 /* iCloud.entitlements.example in Resources */,
 				D68EB0EDE9A0079D969B63E5 /* library.json in Resources */,

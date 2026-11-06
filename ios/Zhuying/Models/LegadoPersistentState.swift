@@ -112,6 +112,15 @@ final class LegadoPersistentState: @unchecked Sendable {
     var authStatus: LegadoAuthStatus { Self.lock.lock(); defer { Self.lock.unlock() }; do { try refresh(); return manifest.status } catch { return .expired } }
     var revision: UInt64 { Self.lock.lock(); defer { Self.lock.unlock() }; try? refresh(); return manifest.revision }
     var sessionRevision: UInt64 { Self.lock.lock(); defer { Self.lock.unlock() }; try? refresh(); return manifest.authEpoch }
+    /// An operation may intentionally change its own login epoch. Validate its
+    /// starting epoch, perform that mutation and capture the resulting epoch
+    /// under the same recursive lock, excluding an intervening UI logout.
+    func withSessionMutation<Value>(expectedSessionRevision: UInt64?, _ body: () throws -> Value) throws -> (Value, UInt64) {
+        Self.lock.lock(); defer { Self.lock.unlock() }; try refresh()
+        if let expectedSessionRevision, expectedSessionRevision != manifest.authEpoch { throw CancellationError() }
+        let result = try body()
+        return (result, manifest.authEpoch)
+    }
     /// An app-generated identifier, not an Android or hardware identifier.
     /// Stored separately so logout/reset do not silently change device identity.
     func deviceIdentifier() throws -> String {

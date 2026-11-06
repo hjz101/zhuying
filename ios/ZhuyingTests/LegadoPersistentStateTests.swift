@@ -170,6 +170,23 @@ final class LegadoPersistentStateTests: XCTestCase {
         try worker.replaceCookies([cookie], for: origin, expectedSessionRevision: newSession)
         XCTAssertEqual(try worker.cookies(for: origin).first?.value, "old-session", "A response explicitly associated with the current session may commit")
     }
+    func testSessionMutationRejectsStaleEpochBeforeBodyAndReturnsItsOwnChangedEpoch() throws {
+        let worker = try state(), UI = try state(), startingEpoch = worker.sessionRevision
+        let (result, changedEpoch) = try worker.withSessionMutation(expectedSessionRevision: startingEpoch) {
+            try worker.setLoginInfo(["邮箱": "reader"])
+            return "saved"
+        }
+        XCTAssertEqual(result, "saved"); XCTAssertEqual(changedEpoch, worker.sessionRevision)
+        XCTAssertGreaterThan(changedEpoch, startingEpoch)
+        try UI.logout()
+        var called = false
+        XCTAssertThrowsError(try worker.withSessionMutation(expectedSessionRevision: changedEpoch) {
+            called = true
+            try worker.setLoginInfo(["邮箱": "must-not-return"])
+        }) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertFalse(called); XCTAssertEqual(worker.authStatus, .signedOut)
+        XCTAssertEqual(try worker.getLoginInfo(), "")
+    }
     func testTamperedEncryptedStateAndMissingVaultCannotSilentlyResetSession() throws {
         let first = try state(); try first.setVariable("original", key: "server")
         let file = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)

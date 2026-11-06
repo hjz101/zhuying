@@ -129,54 +129,211 @@ struct ProductionSourceDiagnosticsView: View {
     @State private var query = ""
     @State private var selection = ""
     @State private var step = SourceDiagnostics.Step.search
+    @State private var mode = "分步调试"
     @State private var concurrency = 3
     @State private var timeout = 15.0
     @State private var reports: [SourceDiagnosticResult] = []
-    @State private var operation: Task<Void,Never>?
+    @State private var acceptance: SourceAcceptanceReport?
+    @State private var operation: Task<Void, Never>?
+    @State private var revision = UUID()
     @State private var busy = false
     @State private var message: String?
     @State private var export: ExportFile?
+    private var checkpointStore: SourceAcceptanceStore { SourceAcceptanceStore(directory: library.sourceDiagnosticsDirectory) }
+
     var body: some View {
         ScrollView {
-            VStack(alignment:.leading,spacing:23) {
-                AppPageHeader(title:batch ? "批量测试" : "书源调试",subtitle:"搜索 → 详情 → 目录 → 正文 · 实际请求与分步结果",icon:batch ? "checklist" : "ladybug")
+            VStack(alignment: .leading, spacing: 23) {
+                AppPageHeader(title: batch ? "批量测试" : "书源调试", subtitle: "搜索 → 详情 → 目录 → 正文 · 实际请求与分步结果", icon: batch ? "checklist" : "ladybug")
                 if !batch { NavigationLink("规则兼容测试") { ProductionRuleTesterView() }.accessibilityIdentifier("sourceRuleTester") }
-                AppSettingsCard("配置与选项",icon:"slider.horizontal.3") {
-                    if !batch { Picker("书源",selection:$selection) { ForEach(library.sources) { Text($0.name).tag($0.id) } }; Picker("调试步骤",selection:$step) { ForEach(SourceDiagnostics.Step.allCases,id:\.self) { Text($0.rawValue).tag($0) } } }
-                    TextField("测试关键词",text:$query).accessibilityIdentifier("sourceDiagnosticQuery")
-                    if batch { Picker("并发数量",selection:$concurrency) { ForEach([3,5,10],id:\.self) { Text("\($0)") } } }
-                    Slider(value:$timeout,in:5...60,step:1); Text("每步超时 \(Int(timeout)) 秒").font(.system(size:11))
+                AppSettingsCard("配置与选项", icon: "slider.horizontal.3") {
+                    if !batch {
+                        Picker("书源", selection: $selection) { ForEach(library.sources) { Text($0.name).tag($0.id) } }.accessibilityIdentifier("sourceDiagnosticSource")
+                        Picker("测试模式", selection: $mode) { Text("分步调试").tag("分步调试"); Text("完整验收").tag("完整验收") }.accessibilityIdentifier("sourceDiagnosticMode")
+                        if mode == "分步调试" {
+                            Picker("调试步骤", selection: $step) { ForEach(SourceDiagnostics.Step.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.accessibilityIdentifier("sourceDiagnosticStep")
+                        } else {
+                            Text("两本书各三章。首次检查保存指纹，真正退出并重新启动竹影后，再验证同一组书籍和章节。")
+                                .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        }
+                    }
+                    TextField("测试关键词", text: $query).accessibilityIdentifier("sourceDiagnosticQuery")
+                    if batch { Picker("并发数量", selection: $concurrency) { ForEach([3, 5, 10], id: \.self) { Text("\($0)") } } }
+                    Slider(value: $timeout, in: 5...60, step: 1); Text("每步超时 \(Int(timeout)) 秒").font(.system(size: 11))
+                }.disabled(busy)
+                Button(busy ? "正在运行" : mode == "完整验收" && !batch ? "开始完整验收" : "运行测试") { run() }
+                    .buttonStyle(PrimaryButtonStyle()).disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("sourceDiagnosticRun")
+                if busy { ProgressView(); Button("取消测试") { cancel() }.frame(minHeight: 44).accessibilityIdentifier("sourceDiagnosticCancel") }
+                if !batch, mode == "完整验收", let acceptance { acceptanceCard(acceptance) }
+                ForEach(reports) { report in resultRow(report) }
+                if !reports.isEmpty || acceptance != nil {
+                    Button("导出脱敏报告") { exportReport() }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("sourceDiagnosticExport")
                 }
-                Button(busy ? "正在运行" : "运行测试") { run() }.buttonStyle(PrimaryButtonStyle()).disabled(busy || query.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
-                if busy { ProgressView(); Button("取消测试") { operation?.cancel(); busy = false } }
-                ForEach(reports) { report in
-                    HStack { Text(library.sources.first(where:{$0.id == report.sourceID})?.name ?? "来源"); Spacer(); Text("\(report.step) · \(report.status) · \(report.milliseconds) ms · \(report.count)") }.font(.system(size:11)).padding(.vertical,8)
-                }
-                if !reports.isEmpty { Button("导出脱敏报告") { do { export = try ExportFile.prepare(JSONEncoder().encode(reports),filename:"书源检测报告.json") } catch { message = error.localizedDescription } }.buttonStyle(PrimaryButtonStyle(filled:false)) }
-                if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent) }
+                if let message { Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourceDiagnosticMessage") }
             }.padding(22)
         }.appPageStyle().navigationTitle(batch ? "批量测试" : "书源调试").navigationBarTitleDisplayMode(.inline)
-            .onAppear { selection = library.sources.contains(where: { $0.id == sourceID }) ? sourceID! : library.sources.first?.id ?? "" }
-            .onDisappear { operation?.cancel() }
-            .sheet(item:$export) { file in NativeFileExporter(file:file) { _ in export = nil } }
-    }
-    private func run() {
-        operation?.cancel(); busy = true; reports = []; message = nil
-        operation = Task {
-            defer { if !Task.isCancelled { busy = false } }
-            var providers: [any BookSource] = []
-            for source in library.sources where source.enabled && (batch || source.id == selection) {
-                if source.id == "shushan",let credential = shushan.credentialForRequests,let transport = try? library.sourceTransport(for:source) { providers.append(ShushanBookSource(credential:credential,transport:ResilientSourceTransport(base:transport))) }
-                else if let provider = try? library.configuredBookSource(source) { providers.append(provider) }
-                else { reports.append(.init(sourceID:source.id,step:"配置",status:"未运行：需登录或规则未支持",milliseconds:0,count:0)) }
+            .onAppear {
+                if selection.isEmpty { selection = sourceID.flatMap { id in library.sources.contains(where: { $0.id == id }) ? id : nil } ?? library.sources.first?.id ?? "" }
             }
-            do {
-                let values: [SourceDiagnosticResult]
-                if batch { values = try await SourceDiagnostics.batch(sources:providers,query:query,concurrency:concurrency,timeout:timeout) }
-                else if let provider = providers.first { values = try await SourceDiagnostics.run(source:provider,query:query,through:step,timeout:timeout) }
-                else { values = [] }
-                try Task.checkCancellation(); reports += values
-            } catch { if !Task.isCancelled { message = error.localizedDescription } }
+            .task(id: selection) { await loadCheckpoint() }
+            .onDisappear { if busy { cancel() } }
+            .sheet(item: $export) { file in NativeFileExporter(file: file) { _ in export = nil } }
+    }
+    private func resultRow(_ report: SourceDiagnosticResult) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(library.sources.first(where: { $0.id == report.sourceID })?.name ?? "来源")
+                Spacer()
+                Text("\(report.step) · \(report.status) · \(report.milliseconds) ms · \(report.count)")
+            }.font(.system(size: 11))
+            if let book = report.bookIndex { Text("第 \(book + 1) 本" + (report.chapterIndex.map { " · 第 \($0 + 1) 章" } ?? ""))
+                    .font(.system(size: 10)).foregroundStyle(Palette.muted) }
+            if let network = report.network {
+                Text("原生请求：成功 \(network.successfulFetches) · 失败 \(network.failedFetches)")
+                    .font(.system(size: 10)).foregroundStyle(Palette.muted)
+            }
+            if let issue = report.issue {
+                Text(issue.message).font(.system(size: 12)).foregroundStyle(Palette.accent)
+                    .accessibilityIdentifier("sourceDiagnosticIssue-" + issue.code.rawValue)
+                if let origin = issue.origin { Text(origin).font(.system(size: 11)).textSelection(.enabled) }
+                HStack(spacing: 15) {
+                    ForEach(issue.recoveries, id: \.rawValue) { recovery in
+                        switch recovery {
+                        case .login:
+                            NavigationLink("登录此书源") { FeatureDemoView(feature: FeatureCatalog.feature("sourceLogin"), scope: report.sourceID) }
+                                .accessibilityIdentifier("sourceDiagnosticLogin")
+                        case .network:
+                            NavigationLink("网络配置") { ProductionNetworkView(initialSourceID: report.sourceID, suggestedOrigin: issue.origin.flatMap(URL.init(string:))) }
+                                .accessibilityIdentifier("sourceDiagnosticNetwork")
+                        case .rules:
+                            NavigationLink("检查规则") { FeatureDemoView(feature: FeatureCatalog.feature("sourceEdit"), scope: report.sourceID) }
+                        case .retry:
+                            Button("重新调试") { run(source: report.sourceID, target: SourceDiagnostics.Step(rawValue: report.step)) }.disabled(busy)
+                                .accessibilityIdentifier("sourceDiagnosticRetry")
+                        }
+                    }
+                }.font(.system(size: 12)).frame(minHeight: 44)
+            }
+        }.padding(.vertical, 8)
+    }
+    private func acceptanceCard(_ report: SourceAcceptanceReport) -> some View {
+        AppSettingsCard("验收记录", icon: "checklist") {
+            Text(report.evidenceKind == .controlledFixture ? "原创测试夹具记录" : "原生网络请求记录").font(.system(size: 12))
+            Text(acceptanceStatus(report)).font(.system(size: 13)).accessibilityIdentifier("sourceAcceptanceStatus")
+            Text("已核对 \(report.books.count) 本 · \(report.books.reduce(0) { $0 + $1.chapters.count }) 章").font(.system(size: 11))
+            if report.canVerifyRestart {
+                Button("重启后验证") { run(restart: true) }
+                    .buttonStyle(PrimaryButtonStyle(filled: false))
+                    .disabled(busy || report.initialProcessID == SourceDiagnosticProcess.id || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("sourceAcceptanceVerifyRestart")
+                if report.initialProcessID == SourceDiagnosticProcess.id { Text("请真正退出并重新启动竹影，再输入相同关键词验证。").font(.system(size: 11)).foregroundStyle(Palette.muted) }
+            }
+            Text("记录只证明已检查的规则返回和原生请求；不代表其他作品或全部脚本能力均已通过。")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted)
         }
+    }
+    private func acceptanceStatus(_ report: SourceAcceptanceReport) -> String {
+        switch report.status {
+        case .failed: "完整验收未完成"
+        case .awaitingRestart: "首次检查完成，等待真正重启"
+        case .verificationFailed: "重启复核未完成，可处理问题后重试"
+        case .restartVerified: report.evidenceKind == .controlledFixture ? "测试夹具已通过跨进程重启复核" : "已通过两书六章及跨进程重启复核"
+        }
+    }
+    private func context(_ source: DemoSource) throws -> (SourceDiagnosticScope, LegadoAuthStatus?, SourceDiagnosticEvidenceKind) {
+        let profile = (library.isDemo ? "demo:" : "production:") + library.sourceDiagnosticsDirectory.path
+        var scope = SourceDiagnosticScope(sourceID: source.id, libraryProfile: profile)
+        var auth: LegadoAuthStatus?
+        if (try? SourcePackages.legadoDefinition(source)) != nil {
+            let state = try library.legadoLoginState(for: source)
+            scope = .init(sourceID: source.id, accountID: state.scope.accountID, libraryProfile: state.scope.libraryProfile)
+            scope.sessionEpoch = state.sessionRevision
+            auth = state.authStatus
+        } else if source.id == "shushan" {
+            scope.accountID = shushan.credentialForRequests.map { StableContentID.make($0.host.absoluteString, $0.apiKey) } ?? "signed-out"
+            auth = shushan.expired ? .expired : shushan.credentialForRequests == nil ? .signedOut : .verified
+        }
+        scope.configurationHash = StableContentID.make(source.configuration?.base64EncodedString() ?? "", source.url)
+        var kind = SourceDiagnosticEvidenceKind.nativeNetwork
+        #if DEBUG
+        if LegadoDevelopmentFixtures.isEnabled(source) || SourceDiagnosticDevelopmentFixtures.isEnabled(source) { kind = .controlledFixture }
+        #endif
+        return (scope, auth, kind)
+    }
+    private func loadCheckpoint() async {
+        guard !batch, !busy, let source = library.sources.first(where: { $0.id == selection }) else { return }
+        acceptance = nil
+        let selected = selection
+        do {
+            let (scope, _, _) = try context(source)
+            let saved = try await checkpointStore.load(scope: scope)
+            guard selection == selected, !busy else { return }
+            acceptance = saved
+        } catch { if selection == selected { message = SourceDiagnosticIssue.classify(error).message } }
+    }
+    private func cancel() {
+        guard busy else { return }
+        operation?.cancel(); revision = UUID(); busy = false
+        let issue = SourceDiagnosticIssue(code: .cancelled)
+        reports.append(SourceDiagnostics.result(sourceID: selection, step: "取消", start: ProcessInfo.processInfo.systemUptime, issue: issue))
+        message = issue.message
+    }
+    private func run(source override: String? = nil, target: SourceDiagnostics.Step? = nil, restart: Bool = false) {
+        operation?.cancel()
+        if let override { selection = override }
+        let token = UUID(); revision = token; busy = true; reports = []; message = nil
+        let currentMode = mode, baseline = acceptance, selectedID = selection
+        operation = Task { @MainActor in
+            defer { if revision == token { busy = false; operation = nil } }
+            var providers: [any BookSource] = [], configuration: [SourceDiagnosticResult] = []
+            for source in library.sources where source.enabled && (batch || source.id == selectedID) {
+                do { providers.append(try library.configuredDiagnosticBookSource(source, credential: shushan.credentialForRequests)) }
+                catch {
+                    let auth = (try? context(source))?.1
+                    configuration.append(SourceDiagnostics.result(sourceID: source.id, step: "配置", start: ProcessInfo.processInfo.systemUptime, issue: .classify(error, authStatus: auth)))
+                }
+            }
+            reports = configuration
+            do {
+                if !batch && (currentMode == "完整验收" || restart) {
+                    guard let source = library.sources.first(where: { $0.id == selectedID }), let provider = providers.first else { return }
+                    let (scope, auth, kind) = try context(source)
+                    let report = try await SourceAcceptanceRunner.run(source: provider, query: query, scope: scope, evidenceKind: kind, timeout: timeout,
+                        authStatus: auth, baseline: restart ? baseline : nil) { rows in
+                        await MainActor.run { if revision == token { reports = configuration + rows } }
+                    }
+                    try Task.checkCancellation(); guard revision == token else { return }
+                    try await checkpointStore.save(report, scope: scope); acceptance = report
+                    message = report.issue?.message ?? acceptanceStatus(report)
+                } else {
+                    let values: [SourceDiagnosticResult]
+                    if batch { values = try await SourceDiagnostics.batch(sources: providers, query: query, concurrency: concurrency, timeout: timeout) }
+                    else if let provider = providers.first {
+                        let auth = library.sources.first(where: { $0.id == selectedID }).flatMap { (try? context($0))?.1 }
+                        values = try await SourceDiagnostics.run(source: provider, query: query, through: target ?? step, timeout: timeout, authStatus: auth)
+                    } else {
+                        values = configuration.isEmpty ? [SourceDiagnostics.result(sourceID: selectedID, step: "配置", start: ProcessInfo.processInfo.systemUptime, issue: .init(code: .sourceDisabled))] : []
+                    }
+                    try Task.checkCancellation(); if revision == token { reports = configuration + values }
+                }
+            } catch is CancellationError {
+                if revision == token { message = SourceDiagnosticIssue(code: .cancelled).message }
+            } catch {
+                if revision == token {
+                    let issue = SourceDiagnosticIssue.classify(error)
+                    reports.append(SourceDiagnostics.result(sourceID: selectedID, step: restart ? "重启复核" : "完整验收", start: ProcessInfo.processInfo.systemUptime, issue: issue))
+                    message = issue.message
+                }
+            }
+        }
+    }
+    private func exportReport() {
+        do {
+            let bytes: Data
+            if mode == "完整验收", let acceptance { bytes = try SourceAcceptanceRunner.export(acceptance) }
+            else { bytes = try SourceDiagnostics.export(reports) }
+            export = try ExportFile.prepare(bytes, filename: "竹影书源检测报告.json")
+        } catch { message = SourceDiagnosticIssue(code: .stateUnavailable).message }
     }
 }

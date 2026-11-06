@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ProductionNetworkView: View {
+    var initialSourceID: String? = nil
+    var suggestedOrigin: URL? = nil
     @EnvironmentObject private var library: LibraryStore
     @State private var sourceID = ""
     @State private var profile = SourceNetworkProfile()
@@ -41,7 +43,11 @@ struct ProductionNetworkView: View {
                     .font(.system(size:12)).foregroundStyle(Palette.muted)
             }.padding(22)
         }.appPageStyle().navigationTitle("网络配置").navigationBarTitleDisplayMode(.inline)
-            .onAppear { sourceID = library.sources.first?.id ?? ""; loadOrigins() }
+            .onAppear {
+                sourceID = initialSourceID.flatMap { id in library.sources.contains(where: { $0.id == id }) ? id : nil } ?? library.sources.first?.id ?? ""
+                loadOrigins()
+                additionalOrigin = suggestedOrigin.flatMap { try? LegadoSourcePolicy.canonicalOrigin($0).absoluteString } ?? ""
+            }
             .onChange(of:sourceID) { _,_ in operation?.cancel(); busy = false; additionalOrigin = ""; loadOrigins() }
             .onChange(of:selectedOrigin) { _,_ in operation?.cancel(); busy = false; load() }
             .onDisappear { operation?.cancel() }

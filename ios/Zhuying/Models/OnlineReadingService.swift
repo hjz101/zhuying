@@ -14,14 +14,18 @@ actor OnlineReadingService {
     let downloads: OfflineDownloadStore?
     private let networkObserver: DownloadNetworkObserver?
     private var authenticationHandler: (@Sendable () async -> Void)?
-    func setAuthenticationHandler(_ handler: @escaping @Sendable () async -> Void) { authenticationHandler = handler }
+    private var authenticationHandlerSourceID: String?
+    func setAuthenticationHandler(sourceID: String? = nil, _ handler: @escaping @Sendable () async -> Void) {
+        authenticationHandlerSourceID = sourceID; authenticationHandler = handler
+    }
     private func recordFailure(_ error: Error, revision: Int, sourceID: String? = nil) async {
         guard revision == generation, error as? ContentFailure == .authenticationRequired else { return }
+        let failedSourceID = sourceID ?? source?.sourceID ?? ""
         generation += 1
-        providers.removeValue(forKey: sourceID ?? source?.sourceID ?? "")
+        providers.removeValue(forKey: failedSourceID)
         source = providers.values.first; failure = .authenticationRequired
         prefetch?.cancel(); prefetch = nil
-        await authenticationHandler?()
+        if authenticationHandlerSourceID == nil || authenticationHandlerSourceID == failedSourceID { await authenticationHandler?() }
     }
     init(cache: RecentChapterCache, downloads: OfflineDownloadStore? = nil) {
         self.cache = cache; self.downloads = downloads; networkObserver = downloads.map { DownloadNetworkObserver(store:$0) }

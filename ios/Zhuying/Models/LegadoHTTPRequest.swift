@@ -2,12 +2,14 @@ import Foundation
 import CoreFoundation
 
 enum LegadoRequestError: LocalizedError, Equatable {
-    case invalid(String), unsupported(String), limit
+    case invalid(String), unsupported(String), limit, searchResultLimit, scriptEvaluationLimit
     var errorDescription: String? {
         switch self {
         case .invalid(let value): "阅读书源请求无效：\(value)"
         case .unsupported(let value): "当前阅读书源暂不支持：\(value)"
         case .limit: "阅读书源的请求数量、正文大小或分页超过限制。"
+        case .searchResultLimit: "搜索结果超过单次书源处理额度，请缩小关键词范围。"
+        case .scriptEvaluationLimit: "单次书源操作的规则求值次数超过额度。"
         }
     }
 }
@@ -23,10 +25,11 @@ final class LegadoOperationControl: @unchecked Sendable {
     private var sessionState: LegadoPersistentState?
     private var expectedRevision: UInt64?
     private var changingSession = false
+    private var sessionBound = false
     var sessionRevision: UInt64? { lock.lock(); defer { lock.unlock() }; return expectedRevision }
     func bindSession(_ state: LegadoPersistentState?) {
         let revision = state?.sessionRevision
-        lock.lock(); sessionState = state; expectedRevision = revision; lock.unlock()
+        lock.lock(); defer { lock.unlock() }; guard !sessionBound else { return }; sessionBound = true; sessionState = state; expectedRevision = revision
     }
     func mutateSession<Value>(_ body: () throws -> Value) throws -> Value {
         try check()

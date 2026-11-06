@@ -82,10 +82,12 @@ struct SourceDiagnosticIssue: Codable, Equatable, Sendable {
                 // which may contain credentials, into the report or export.
                 if feature.hasPrefix("尚未允许主机") { return .init(code: .hostNotAllowed) }
                 return .init(code: .unsupportedRule)
+            case .limit: return .init(code: .resourceLimit)
             default: return .init(code: .invalidResponse)
             }
         }
         if let error = error as? LegadoRequestError {
+            if [.limit, .searchResultLimit, .scriptEvaluationLimit].contains(error) { return .init(code: .resourceLimit) }
             if case .unsupported(let feature) = error {
                 return .init(code: feature.hasPrefix("脚本宿主方法") ? .unsupportedHost : .unsupportedRule)
             }

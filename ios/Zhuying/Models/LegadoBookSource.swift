@@ -36,14 +36,14 @@ private final class LegadoBlockingResult<Value>: @unchecked Sendable {
 
 private final class LegadoSourceSession: @unchecked Sendable {
     let cookies = LegadoCookieJar()
-    let runtime = QuickJSScriptSession()
+    let runtime: QuickJSScriptSession
     let queue = DispatchQueue(label: "com.zhuying.legado.worker", qos: .userInitiated)
     let state: LegadoPersistentState?
     private var references: [String: LegadoReference] = [:]
     private var runtimeRevision: UInt64 = 0
     var lastMessage = ""
     var inheritedHeaderOrigin: URL?
-    init(state: LegadoPersistentState?) { self.state = state }
+    init(state: LegadoPersistentState?, scriptBudget: QuickJSScriptMemoryBudget) { self.state = state; runtime = QuickJSScriptSession(budget: scriptBudget) }
     func prepareRuntime() {
         let revision = state?.sessionRevision ?? 0
         if revision != runtimeRevision { runtime.reset(); runtimeRevision = revision }
@@ -149,13 +149,13 @@ struct LegadoBookSource: BookSource, @unchecked Sendable {
     private let maximumPages: Int
     private let timeout: TimeInterval
 
-    init(source: DemoSource, transport: any HTTPTransport = SourceHTTPTransport(maximumResponseBytes: 2 * 1024 * 1024), maximumPages: Int = 8, deadline: TimeInterval = 25, state: LegadoPersistentState? = nil) throws {
+    init(source: DemoSource, transport: any HTTPTransport = SourceHTTPTransport(maximumResponseBytes: 2 * 1024 * 1024), maximumPages: Int = 8, deadline: TimeInterval = 25, state: LegadoPersistentState? = nil, scriptBudget: QuickJSScriptMemoryBudget = .shared) throws {
         sourceID = source.id; definition = try LegadoSourceDefinition.decode(source)
-        origin = definition.baseURL; self.transport = transport; session = LegadoSourceSession(state: state)
+        origin = definition.baseURL; self.transport = transport; session = LegadoSourceSession(state: state, scriptBudget: scriptBudget)
         self.maximumPages = min(32, max(1, maximumPages)); timeout = min(90, max(0.1, deadline))
     }
 
-    private func operation<Value>(_ body: @escaping (LegadoSourceWorker) throws -> Value) async throws -> Value {
+    private func operation<Value>(prepare: ((LegadoOperationControl) throws -> Void)? = nil, _ body: @escaping (LegadoSourceWorker) throws -> Value) async throws -> Value {
         try Task.checkCancellation()
         let control = LegadoOperationControl(timeout: timeout)
         session.track(control); defer { session.untrack(control) }
@@ -166,13 +166,21 @@ struct LegadoBookSource: BookSource, @unchecked Sendable {
                 control.startWatchdog()
                 session.queue.async {
                     do {
+                        control.bindSession(session.state)
                         try control.check()
+                        try prepare?(control)
                         session.prepareRuntime()
-                        var policy = definition.policy
-                        for origin in try session.state?.allowedOrigins() ?? [] { policy = try policy.addingOrigin(origin.absoluteString) }
-                        let http = LegadoHTTPExecutor(origin: origin, policy: policy, state: session.state, inheritedHeaderOrigin: session.inheritedHeaderOrigin, rememberHeaderOrigin: { session.inheritedHeaderOrigin = $0 }, transport: transport, control: control, cookies: session.cookies)
-                        let worker = LegadoSourceWorker(sourceID: sourceID, definition: definition, http: http, shared: session, maximumPages: maximumPages)
-                        let result = try body(worker)
+                        let result = try session.runtime.withLease(
+                            timeoutSeconds: max(0.01, control.deadline - ProcessInfo.processInfo.systemUptime),
+                            cancelled: { do { try control.check(); return false } catch { return true } }
+                        ) {
+                            try control.check()
+                            var policy = definition.policy
+                            for origin in try session.state?.allowedOrigins() ?? [] { policy = try policy.addingOrigin(origin.absoluteString) }
+                            let http = LegadoHTTPExecutor(origin: origin, policy: policy, state: session.state, inheritedHeaderOrigin: session.inheritedHeaderOrigin, rememberHeaderOrigin: { session.inheritedHeaderOrigin = $0 }, transport: transport, control: control, cookies: session.cookies)
+                            let worker = LegadoSourceWorker(sourceID: sourceID, definition: definition, http: http, shared: session, maximumPages: maximumPages)
+                            return try body(worker)
+                        }
                         try control.check(); completion.finish(.success(result))
                     } catch {
                         do { try control.check(); completion.finish(.failure(error)) }
@@ -184,7 +192,9 @@ struct LegadoBookSource: BookSource, @unchecked Sendable {
     }
 
     func login(action: String, values: [String: String]) async throws -> LegadoLoginActionResult {
-        try await operation { try $0.login(action: action, values: values) }
+        try await operation(prepare: { control in
+            try control.mutateSession { try session.state?.setLoginInfo(values) }
+        }) { try $0.login(action: action, values: values) }
     }
     func resetRuntime() { session.reset() }
     func search(query: String, page: Int) async throws -> BookSearchPage {
@@ -212,8 +222,10 @@ private final class LegadoSourceWorker {
     private var bindings: [String: Any] = [:]
     private var scriptDepth = 0
     private var scriptCalls = 0
+    private var ruleField = LegadoRuleExecutionError.Field.unknown
     private var bookIdentity = ""
     private var chapterIdentity = ""
+    private var useReplaceRule: Bool?
     private var engine: LegadoRuleEngine { LegadoRuleEngine(context: context) }
 
     init(sourceID: String, definition: LegadoSourceDefinition, http: LegadoHTTPExecutor, shared: LegadoSourceSession, maximumPages: Int) {
@@ -226,7 +238,8 @@ private final class LegadoSourceWorker {
         context.evaluateJS = { [weak self] script, values in
             guard let self else { throw CancellationError() }
             try self.http.control.check()
-            guard self.scriptDepth < 4, self.scriptCalls < 128 else { throw LegadoRequestError.limit }
+            guard self.scriptDepth < 4 else { throw LegadoRequestError.limit }
+            guard self.scriptCalls < 2048 else { throw LegadoRequestError.scriptEvaluationLimit }
             self.scriptDepth += 1; self.scriptCalls += 1
             defer { self.scriptDepth -= 1 }
             var policy = LegadoScriptPolicy()
@@ -235,9 +248,22 @@ private final class LegadoSourceWorker {
             let previousContent = self.scriptContent
             self.scriptContent = values["src"] as? String ?? values["result"] as? String ?? self.currentContent
             defer { self.scriptContent = previousContent }
-            return try self.shared.runtime.evaluate(script, bindings: self.bindings.merging(values) { _, value in value }, library: self.libraryScript, policy: policy) { [weak self] method, args in
-                guard let self else { throw CancellationError() }
-                return try self.bridge(method, args: args)
+            var hostFailure: Error?
+            do {
+                return try self.shared.runtime.evaluate(script, bindings: self.bindings.merging(values) { _, value in value }, library: self.libraryScript, policy: policy) { [weak self] method, args in
+                    guard let self else { throw CancellationError() }
+                    do { return try self.bridge(method, args: args) }
+                    catch { hostFailure = error; throw error }
+                }
+            } catch {
+                // A script may catch a host failure and recover successfully.
+                // Only an uncaught JS failure carries its native cause outward,
+                // so login/host-policy errors retain their typed recovery path.
+                if let scriptError = error as? QuickJSScriptError, case .javascript = scriptError {
+                    if let hostFailure { throw hostFailure }
+                    throw LegadoRuleExecutionError(field: self.ruleField, cause: error)
+                }
+                throw error
             }
         }
     }
@@ -249,8 +275,6 @@ private final class LegadoSourceWorker {
         return definition.jsLib + "\n;\n" + program
     }
     func login(action: String, values: [String: String]) throws -> LegadoLoginActionResult {
-        try http.control.mutateSession { try shared.state?.setLoginInfo(values) }
-        shared.prepareRuntime()
         bindings["result"] = values
         try configure()
         guard action.utf8.count <= 64 * 1024 else { throw LegadoRequestError.limit }
@@ -264,8 +288,14 @@ private final class LegadoSourceWorker {
     private func configure(book: LibraryBookRecord? = nil, chapter: ChapterRecord? = nil) throws {
         if let book {
             bookIdentity = book.id
+            let storedReplacement = try shared.get("book:" + StableContentID.make(book.id, "") + ":useReplaceRule")
+            useReplaceRule = storedReplacement == "false" ? false : storedReplacement == "true" ? true : book.source?.useReplaceRule
             let reference = try reference(book)
             bindings["book"] = ["bookUrl": try shared.resolve(reference.bookURL, baseURL: currentURL).resolvedDescriptor, "name": book.title, "author": book.author, "intro": book.summary, "tocUrl": reference.remoteBookID.isEmpty ? "" : try shared.resolve(reference.remoteBookID, baseURL: currentURL).resolvedDescriptor, "origin": reference.origin ?? "", "variable": try shared.get("book:" + StableContentID.make(book.id, "") + ":variable")]
+            var boundBook = bindings["book"] as? [String: Any] ?? [:]
+            boundBook["readConfig"] = useReplaceRule.map { ["useReplaceRule": $0] as [String: Any] } ?? NSNull()
+            boundBook["type"] = 0
+            bindings["book"] = boundBook
             currentURL = try referenceURL(shared.resolve(reference.bookURL, baseURL: currentURL))
         }
         if let chapter { chapterIdentity = chapter.id; bindings["chapter"] = ["url": try shared.resolve(chapter.nativeChapterID, baseURL: currentURL).resolvedDescriptor, "title": chapter.title, "index": chapter.order] }
@@ -326,12 +356,17 @@ private final class LegadoSourceWorker {
         let data = try JSONSerialization.data(withJSONObject: options, options: .sortedKeys)
         return rendered + "," + String(decoding: data, as: UTF8.self)
     }
-    private func field(_ rule: String?, in content: String, baseURL: URL, fallback: String = "", structured: Bool = false) throws -> String {
+    private func withRuleField<Value>(_ location: LegadoRuleExecutionError.Field, _ body: () throws -> Value) rethrows -> Value {
+        let previous = ruleField; ruleField = location
+        defer { ruleField = previous }
+        return try body()
+    }
+    private func field(_ rule: String?, in content: String, baseURL: URL, fallback: String = "", structured: Bool = false, location: LegadoRuleExecutionError.Field = .unknown) throws -> String {
         guard let rule, !rule.isEmpty else { return fallback }
         try http.control.check()
         let previous = context.structuredInput; context.structuredInput = structured
         defer { context.structuredInput = previous }
-        let result = try engine.text(rule, in: content, baseURL: baseURL).trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = try withRuleField(location) { try engine.text(rule, in: content, baseURL: baseURL) }.trimmingCharacters(in: .whitespacesAndNewlines)
         guard result.utf8.count <= 256 * 1024 else { throw LegadoRequestError.limit }
         return result
     }
@@ -367,11 +402,11 @@ private final class LegadoSourceWorker {
             guard page == 1 || templateHasPage else { throw LegadoRequestError.unsupported("没有该关键词的下一页地址，请重新搜索") }
             address = definition.searchURL
         }
-        let response = try fetch(address)
+        let response = try withRuleField(.searchURL) { try fetch(address) }
         let rules = definition.search
         let rowRule = rules["bookList"] ?? ""
-        let rows = rowRule.isEmpty ? [response.text] : try engine.elements(rowRule, in: response.text, baseURL: response.url)
-        guard rows.count <= 500 else { throw LegadoRequestError.limit }
+        let rows = rowRule.isEmpty ? [response.text] : try withRuleField(.searchBookList) { try engine.elements(rowRule, in: response.text, baseURL: response.url) }
+        guard rows.count <= 500 else { throw LegadoRequestError.searchResultLimit }
         var books: [LibraryBookRecord] = [], seen = Set<String>(), budget = LegadoMetadataBudget(), bookReferences: [LegadoReference] = []
         for row in rows {
             let title = try field(rules["name"], in: row, baseURL: response.url, structured: true)
@@ -405,18 +440,19 @@ private final class LegadoSourceWorker {
         let response = try fetch(reference.bookURL)
         let rules = definition.bookInfo
         let input: String
-        if let initialize = rules["init"], !initialize.isEmpty { input = try engine.elements(initialize, in: response.text, baseURL: response.url).joined(separator: "\n") }
+        if let initialize = rules["init"], !initialize.isEmpty { input = try withRuleField(.bookInfoInit) { try engine.elements(initialize, in: response.text, baseURL: response.url) }.joined(separator: "\n") }
         else { input = response.text }
         var result = book
-        let title = try field(rules["name"], in: input, baseURL: response.url)
+        let title = try field(rules["name"], in: input, baseURL: response.url, location: .bookInfoName)
         if !title.isEmpty { result.title = title }
-        let author = try field(rules["author"], in: input, baseURL: response.url)
+        let author = try field(rules["author"], in: input, baseURL: response.url, location: .bookInfoAuthor)
         if !author.isEmpty { result.author = author }
-        result.summary = try field(rules["intro"], in: input, baseURL: response.url, fallback: result.summary)
-        let cover = try field(rules["coverUrl"], in: input, baseURL: response.url)
+        result.summary = try field(rules["intro"], in: input, baseURL: response.url, fallback: result.summary, location: .bookInfoIntro)
+        let cover = try field(rules["coverUrl"], in: input, baseURL: response.url, location: .bookInfoCoverURL)
         if !cover.isEmpty { result.coverURL = coverURL(cover, baseURL: response.url) }
-        let toc = try field(rules["tocUrl"], in: input, baseURL: response.url)
+        let toc = try field(rules["tocUrl"], in: input, baseURL: response.url, location: .bookInfoTOCURL)
         if !toc.isEmpty { result.source?.remoteBookID = try registered(url(toc, baseURL: response.url), role: "toc", baseURL: response.url) }
+        result.source?.useReplaceRule = useReplaceRule
         return result
     }
 
@@ -437,7 +473,7 @@ private final class LegadoSourceWorker {
             guard visited.insert(address).inserted else { continue }
             guard visited.count <= maximumPages else { throw LegadoRequestError.limit }
             let response = try fetch(address)
-            let rows = rowsRule.isEmpty ? [response.text] : try engine.elements(rowsRule, in: response.text, baseURL: response.url)
+            let rows = rowsRule.isEmpty ? [response.text] : try withRuleField(.tocChapterList) { try engine.elements(rowsRule, in: response.text, baseURL: response.url) }
             for row in rows {
                 let title = try field(definition.toc["chapterName"], in: row, baseURL: response.url, structured: true)
                 guard !title.isEmpty else { continue }
@@ -505,7 +541,7 @@ private final class LegadoSourceWorker {
             guard visited.count <= maximumPages else { throw LegadoRequestError.limit }
             let response = try fetch(address)
             if otherURLs.contains(response.url.absoluteString) { break }
-            let raw = try field(definition.content["content"], in: response.text, baseURL: response.url)
+            let raw = try field(definition.content["content"], in: response.text, baseURL: response.url, location: .content)
             let extracted = try Self.paragraphs(raw)
             // Split pages commonly repeat a paragraph at their boundary. Keep
             // repetitions elsewhere, where they may be intentional prose.
@@ -562,6 +598,14 @@ private final class LegadoSourceWorker {
         case "source.setVariable", "book.setVariable", "chapter.setVariable":
             let key = args.count == 1 ? "variable" : string(0), value = args.count == 1 ? string(0) : string(1)
             try shared.set(variableScope(method) + key, value); return value
+        case "book.getUseReplaceRule": return useReplaceRule ?? true
+        case "book.setUseReplaceRule":
+            guard !bookIdentity.isEmpty, let flag = args.first as? Bool else { throw LegadoRequestError.invalid("书籍替换规则开关") }
+            try shared.set(variableScope("book.put") + "useReplaceRule", flag ? "true" : "false")
+            useReplaceRule = flag
+            var boundBook = bindings["book"] as? [String: Any] ?? [:]
+            boundBook["readConfig"] = ["useReplaceRule": flag]; bindings["book"] = boundBook; context.bindings = bindings
+            return NSNull()
         case "source.getKey", "source.getBookSourceUrl", "source.getUrl": return definition.sourceURL
         case "source.getBookSourceName", "source.getName": return definition.name
         case "book.getName", "book.getTitle", "book.getAuthor", "book.getTocUrl", "book.getBookUrl", "book.getUrl",

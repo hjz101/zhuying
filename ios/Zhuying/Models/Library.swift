@@ -237,11 +237,19 @@ final class LibraryStore: ObservableObject {
     func sourceTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> any HTTPTransport {
         BrowserSessionTransport(sourceID:source.id,origin:try ShushanClient.host(source.url),sessions:browserSessions,base:try requestTransport(for:source,maximumBytes:maximumBytes))
     }
+    var sourceDiagnosticsDirectory: URL { managedSettingsDirectory.appendingPathComponent("SourceDiagnostics-v1") }
     private var legadoAdapters: [String: (Data?, LegadoBookSource)] = [:]
     private var legadoStates: [String: LegadoPersistentState] = [:]
+    private var legadoProfileIdentity: LegadoLibraryProfileIdentity?
     func legadoLoginState(for source: DemoSource) throws -> LegadoPersistentState {
         if let state = legadoStates[source.id] { return state }
-        let profile = (isDemo ? "demo:" : "production:") + managedSettingsDirectory.path
+        let identity: LegadoLibraryProfileIdentity
+        if let cached = legadoProfileIdentity { identity = cached }
+        else {
+            identity = try LegadoLibraryProfileIdentity.load(directory: managedSettingsDirectory, namespace: isDemo ? "demo" : "production")
+            legadoProfileIdentity = identity
+        }
+        let profile = identity.libraryProfile
         let state = try LegadoPersistentState(sourceID: source.id, libraryProfile: profile,
             directory: managedSettingsDirectory.appendingPathComponent("LegadoSessions-v2"))
         legadoStates[source.id] = state; return state
@@ -249,7 +257,9 @@ final class LibraryStore: ObservableObject {
     func runLegadoLoginAction(sourceID: String, action: String, values: [String: String]) async throws -> LegadoLoginActionResult {
         guard let source = sources.first(where: { $0.id == sourceID && $0.enabled }),
               let adapter = try configuredBookSource(source) as? LegadoBookSource else { throw ContentFailure.sourceDisabled }
-        return try await adapter.login(action: action, values: values)
+        let result = try await adapter.login(action: action, values: values)
+        NotificationCenter.default.post(name: .legadoLoginActionCompleted, object: nil, userInfo: ["sourceID": sourceID])
+        return result
     }
     private func legadoRequest(_ request: URLRequest, source: DemoSource, state: LegadoPersistentState) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url else { throw ContentFailure.invalidResponse }
@@ -262,6 +272,39 @@ final class LibraryStore: ObservableObject {
         let transport = try requestTransport(for: routing, maximumBytes: 2 * 1024 * 1024)
         return try await transport.send(request)
     }
+    /// Diagnostics get an independent VM and transport recorder, while login
+    /// state stays in the same protected account as the normal source entry.
+    func configuredDiagnosticBookSource(_ source: DemoSource, credential: ShushanCredential? = nil) throws -> any BookSource {
+        let transport: any HTTPTransport
+        #if DEBUG
+        if SourceDiagnosticDevelopmentFixtures.isEnabled(source) { transport = SourceDiagnosticDevelopmentFixtures.transport() }
+        else if LegadoDevelopmentFixtures.isEnabled(source) { transport = LegadoDevelopmentTransport() }
+        else if (try? SourcePackages.legadoDefinition(source)) != nil {
+            let state = try legadoLoginState(for: source)
+            transport = LegadoRoutingTransport { [weak self] request in
+                guard let self else { throw CancellationError() }; return try await self.legadoRequest(request, source: source, state: state)
+            }
+        } else { transport = try sourceTransport(for: source, maximumBytes: 2 * 1024 * 1024) }
+        #else
+        if (try? SourcePackages.legadoDefinition(source)) != nil {
+            let state = try legadoLoginState(for: source)
+            transport = LegadoRoutingTransport { [weak self] request in
+                guard let self else { throw CancellationError() }; return try await self.legadoRequest(request, source: source, state: state)
+            }
+        } else { transport = try sourceTransport(for: source, maximumBytes: 2 * 1024 * 1024) }
+        #endif
+        let recorder = SourceDiagnosticHTTPTransport(base: transport)
+        let provider: any BookSource
+        if source.id == "shushan" {
+            guard let credential else { throw ContentFailure.authenticationRequired }
+            provider = ShushanBookSource(credential: credential, transport: recorder)
+        } else if (try? SourcePackages.legadoDefinition(source)) != nil {
+            provider = try LegadoBookSource(source: source, transport: recorder, state: legadoLoginState(for: source))
+        } else if try SourcePackages.rules(source).extraction != nil {
+            provider = try ExtractionBookSource(source: source, transport: recorder)
+        } else { provider = try ConfigurableBookSource(source: source, transport: recorder) }
+        return SourceDiagnosticBookSource(base: provider, recorder: recorder)
+    }
     func configuredBookSource(_ source: DemoSource) throws -> any BookSource {
         if (try? SourcePackages.legadoDefinition(source)) != nil {
             if let cached = legadoAdapters[source.id], cached.0 == source.configuration { return cached.1 }
@@ -269,7 +312,8 @@ final class LibraryStore: ObservableObject {
             let state = try legadoLoginState(for: source)
             let transport: any HTTPTransport
             #if DEBUG
-            if LegadoDevelopmentFixtures.isEnabled(source) { transport = LegadoDevelopmentTransport() }
+            if SourceDiagnosticDevelopmentFixtures.isEnabled(source) { transport = SourceDiagnosticDevelopmentFixtures.transport() }
+            else if LegadoDevelopmentFixtures.isEnabled(source) { transport = LegadoDevelopmentTransport() }
             else { transport = LegadoRoutingTransport { [weak self] request in
                 guard let self else { throw CancellationError() }; return try await self.legadoRequest(request, source: source, state: state)
             } }
@@ -647,7 +691,7 @@ final class LibraryStore: ObservableObject {
     func chapterRepository(for book: Book) -> any ChapterDocumentLoading {
         let repository = rawChapterRepository(for:book)
         guard !isDemo,book.media == nil else { return repository }
-        return ProcessedChapterRepository(base:repository,processor:contentProcessor,bookID:book.id,sourceID:remoteBooks[book.id]?.source?.sourceID)
+        return ProcessedChapterRepository(base:repository,processor:contentProcessor,bookID:book.id,sourceID:remoteBooks[book.id]?.source?.sourceID,useReplaceRule:remoteBooks[book.id]?.source?.useReplaceRule != false)
     }
     private func rawChapterRepository(for book: Book) -> any ChapterDocumentLoading {
         if let remote = remoteBooks[book.id], let service = onlineService {
@@ -730,7 +774,7 @@ final class LibraryStore: ObservableObject {
                 guard request.chapter.access == .readable else { continue }
                 let document: ChapterDocument?
                 if let remote = remoteBooks[book.id] {
-                    if let raw = try await onlineService?.cachedDocument(book:remote,chapter:request.chapter) { document = try await contentProcessor.process(raw,bookID:book.id,sourceID:remote.source?.sourceID).document } else { document = nil }
+                    if let raw = try await onlineService?.cachedDocument(book:remote,chapter:request.chapter) { document = try await contentProcessor.process(raw,bookID:book.id,sourceID:remote.source?.sourceID,useReplaceRule:remote.source?.useReplaceRule != false).document } else { document = nil }
                 }
                 else { document = try await chapterRepository(for: book).document(chapterID: request.chapter.id) }
                 if let document { indexed.append(.init(bookID: book.id, document: document)) } else { missing += 1 }
@@ -1116,4 +1160,8 @@ final class LibraryStore: ObservableObject {
 private struct LegadoRoutingTransport: HTTPTransport {
     let operation: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) { try await operation(request) }
+}
+
+extension Notification.Name {
+    static let legadoLoginActionCompleted = Notification.Name("legadoLoginActionCompleted")
 }

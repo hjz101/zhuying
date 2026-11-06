@@ -64,6 +64,9 @@ struct ZhuyingApp: App {
             }
             var rejectFirstOpen = testing && ProcessInfo.processInfo.arguments.contains("--storage-retry-fixture")
             #if DEBUG
+            if testing && ProcessInfo.processInfo.arguments.contains("--source-diagnostic-fixtures") {
+                try SourceDiagnosticDevelopmentFixtures.write(to: manager.urls(for: .documentDirectory, in: .userDomainMask)[0])
+            }
             if testing && ProcessInfo.processInfo.arguments.contains("--legado-fixtures") {
                 try LegadoDevelopmentFixtures.write(to: manager.urls(for: .documentDirectory, in: .userDomainMask)[0])
             }
@@ -114,7 +117,7 @@ struct RootView: View {
     @State private var showPlayer = false
     @State private var sharedImport: ShareImportRequest?
 
-    var body: some View {
+    private var preparedTabs: some View {
         navigationTabs
         .legadoInteractionPresenter()
         .allowsHitTesting(store.loadState == .ready)
@@ -132,6 +135,10 @@ struct RootView: View {
                 }
             }
         }
+    }
+
+    private var observedTabs: some View {
+        preparedTabs
         .task {
             await store.bootstrapProductionIfNeeded(prepareAppearance: {
                 let fonts = ReadingFontLibrary.shared
@@ -144,6 +151,10 @@ struct RootView: View {
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--narration-fixtures") && store.books.isEmpty {
                 let prose = "第一章 星光\n" + String(repeating:"这是一段原创朗读测试正文，读者在山间看见星光。\n",count:80) + "第二章 回声\n回声来自远方。"
                 if let prepared = try? BookImporter.prepare(data:Data(prose.utf8),name:"原创朗读测试.txt") { _ = try? await store.importBookDurably(prepared.book); store.completeReadingGuide() }
+            }
+            if let input = try? LegadoLiveSourceProbe.Input.parse(ProcessInfo.processInfo.arguments) {
+                let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("DevelopmentValidation")
+                try? await LegadoLiveSourceProbe.run(library: store, input: input, outputDirectory: directory)
             }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-live-library") { try? await LiveLibraryValidation.run(credential:shushan.credentialForRequests,restart:ProcessInfo.processInfo.arguments.contains("--live-library-restart")) }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-network-browser") { try? await NetworkBrowserValidation.run() }
@@ -167,6 +178,7 @@ struct RootView: View {
         .onChange(of: store.sources) { _, _ in configureSource() }
         .onReceive(NotificationCenter.default.publisher(for:.contentProcessingChanged)) { _ in if !store.isDemo { store.audio.stop() } }
         .onReceive(NotificationCenter.default.publisher(for:.sourceBrowserSessionsChanged)) { _ in configureSource() }
+        .onReceive(NotificationCenter.default.publisher(for:.legadoLoginActionCompleted)) { _ in configureSource() }
         .onReceive(NotificationCenter.default.publisher(for:.remoteBackendChanged)) { _ in configureSource() }
         .onReceive(NotificationCenter.default.publisher(for:.sourceNetworkChanged)) { _ in configureSource() }
         .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.onlineService?.downloads?.pauseForBackground(); await store.saveBeforeSuspending() } } }
@@ -176,6 +188,10 @@ struct RootView: View {
         .onReceive(shushan.$credential) { demo.updateShushanAccount($0, host: shushan.hostText); configureSource() }
         .onChange(of: shushan.expired) { _, _ in configureSource() }
         .tint(Palette.green)
+    }
+
+    var body: some View {
+        observedTabs
         .onOpenURL { url in
             do { let request = try ShareImportRequest.parse(url); if sharedImport?.id != request.id { sharedImport = request } }
             catch { store.storageMessage = error.localizedDescription }
@@ -199,7 +215,7 @@ struct RootView: View {
     }
     private func configureSource() {
         Task {
-            await store.onlineService?.setAuthenticationHandler { @MainActor in shushan.markExpired() }
+            await store.onlineService?.setAuthenticationHandler(sourceID: "shushan") { @MainActor in shushan.markExpired() }
             await store.configureOnline(credential: shushan.credentialForRequests, expired: shushan.expired)
             if shushan.expired, let index = demo.sources.firstIndex(where: { $0.id == "shushan" }), demo.sources[index].loginStatus != .expired {
                 demo.sources[index].loginStatus = .expired

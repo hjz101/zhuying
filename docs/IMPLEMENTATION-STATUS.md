@@ -10,12 +10,12 @@
 - 工作负责人：本聊天的开发代理；用户负责在原生界面登录书山聚合。当前先交付可构建原生工程及模拟器版本；签名内测包、公开发布和真机验收需要实际发布环境，不能把模拟器结果视作真机结果。
 - Demo 和正式模式共用页面、导航、配色、字体、尺寸、设置入口和阅读组件。正式模式使用真实或空数据，不能注入模拟收藏与进度。正式统计使用真实阅读／朗读会话，音频仅在底层实际播放后显示播放状态，正文不生成虚构评论；尚未交付的能力保留原入口并说明不可用（T034）。
 - 最低系统继续 iOS 17。当前自动化运行时 iOS 26.5，模拟器覆盖 iPhone 17 Pro／iPhone 17e／iPhone SE（第三代）；iOS 17 实际运行及真机文件、手势和后台验证保持待验收。
-- `Yueshan` scheme 保留开发 Demo；`Yueshan Production` scheme 用 `--production` 启动同一套界面；Release 默认正式模式。正常 Demo、正式模式及两类 UI 测试的记录与文件分开。
+- `Zhuying` scheme 保留开发 Demo；`Zhuying Production` scheme 用 `--production` 启动同一套界面；Release 默认正式模式。正常 Demo、正式模式及两类 UI 测试的记录与文件分开。
 - 数据模型、仓库接口和迁移由同一实现维护。每项变更补测试、验证、独立提交，记录范围和证据。
 
 ## 验证与外部依赖
 
-- 原始基线：Xcode 26.6、iOS 26.5、Yueshan Theme QA 模拟器，原有 iOS 单元测试运行成功；本机临时证据 `/tmp/yueshan-development-baseline.xcresult`。
+- 原始基线：Xcode 26.6、iOS 26.5、Zhuying Theme QA 模拟器，原有 iOS 单元测试运行成功；本机临时证据 `/tmp/zhuying-development-baseline.xcresult`。
 - 参考为用户 Downloads 内的 `书山聚合v5.61.json`。只做静态检查，没有执行其中 JavaScript；正文路径依赖 `X-Api-Key` 和宿主辅助逻辑。
 - 初始无凭据探测为 HTTP 200 且业务提示缺少登录凭证；后续实际探测已出现公开搜索结果，认证结论按时间分别保留。T003／G1 仍须两本书各连续三章通过。
 - 用户已确认继续用书山聚合，并已在专用开发设备的正式应用中登录。聊天、日志和提交不收集真实密码或 API Key。
@@ -95,9 +95,9 @@
 ## 本轮新增验证
 
 - 150 项 iOS 单元测试通过，含稳定身份、定位回退、数据库事务、内容清单失败回滚、登录业务错误、真实模拟器钥匙串及书源四步接口样本。
-- 专用 Yueshan Development QA 模拟器（iPhone 17 Pro、iOS 26.5）通过 3 条 UI 复验：原 Demo 书源分类／筛选／置顶，正式空书架／Demo 隔离，原入口进入真实登录字段与空工具页安全返回。
+- 专用 Zhuying Development QA 模拟器（iPhone 17 Pro、iOS 26.5）通过 3 条 UI 复验：原 Demo 书源分类／筛选／置顶，正式空书架／Demo 隔离，原入口进入真实登录字段与空工具页安全返回。
 - Demo 来源批量管理、编辑／检测报告、左滑／详情登录的 3 条 UI 流程通过。
-- 全 47 入口遍历通过。旧测试仍以目录名称断言 5 个原生偏好页标题，按现有 Demo 实际标题修正测试后全部通过；页面未改名。证据为本机 `/tmp/yueshan-development-isolated/Logs/Test/Test-Yueshan-2026.11.05_21-09-36-+0800.xcresult`。
+- 全 47 入口遍历通过。旧测试仍以目录名称断言 5 个原生偏好页标题，按现有 Demo 实际标题修正测试后全部通过；页面未改名。证据为本机 `/tmp/zhuying-development-isolated/Logs/Test/Test-Zhuying-2026.11.05_21-09-36-+0800.xcresult`。
 - 当前项目目录的 52 项 Node 测试及网页语法检查通过。npm test 已限定 `tests/*.test.js`，并通过临时项目中的 Demo 副本反例测试，避免把副本测试数当成本次项目测试数。
 - 原模拟器中个人页入口的可点击性失败，在专用新模拟器以相同程序复验通过；后续 UI 验证使用专用设备，避免共享状态影响。
 - 原关闭签名的命令无法访问模拟器钥匙串（-34018）；改用无需开发者证书的临时签名后，实际存取／更新／删除测试通过。verify.sh 的 unit／ui／all 目标、带空格路径与错误参数均有自动化验证。
@@ -106,7 +106,7 @@ G0 的范围、基线与契约已经完成。G1 的登录已具备，但真实�
 
 书山契约、支持子集和联调边界见 [接入记录](SHUSHAN-INTEGRATION.md)。所有变更按 AGENTS.md 完成验证后提交；模拟内容与真实服务的边界保持明确。
 
-实际登录页截图：[书山聚合登录](../ios/screenshots/production-shushan-login.png)。正式空书架与登录路径最终复验均通过，独立结果包为本机 `/tmp/yueshan-production-ui-verification.xcresult`。
+实际登录页截图：[书山聚合登录](../ios/screenshots/production-shushan-login.png)。正式空书架与登录路径最终复验均通过，独立结果包为本机 `/tmp/zhuying-production-ui-verification.xcresult`。
 
 ## 继续开发：本地持久化事务
 
@@ -122,7 +122,7 @@ G0 的范围、基线与契约已经完成。G1 的登录已具备，但真实�
 
 当前仍以完整本地作品投影复用 Demo 阅读器；尚未实现 T015 的按章懒加载，主题／字体资源独立模块与完整书签交互也未纳入本轮。G2／G3 保持未通过，真实书山在线流程仍等待应用内登录与后续接入。
 
-最终验证：170 项 iOS 单元测试、8 条相关 UI 流程、52 项 Node 测试全部通过；网页语法、验证脚本语法与 diff 检查通过。本机结果包 `/tmp/yueshan-library-lifecycle-verification.xcresult`。界面覆盖正式真实文件导入三章、修改字号、后台与重启恢复、旧记录迁移后忽略损坏旧归档、正式／Demo 隔离、原登录入口及 Demo 原阅读／导入流程。截图：[重启续读](../ios/screenshots/production-database-restored-reader.png)、[迁移恢复](../ios/screenshots/production-legacy-restored-reader.png)。
+最终验证：170 项 iOS 单元测试、8 条相关 UI 流程、52 项 Node 测试全部通过；网页语法、验证脚本语法与 diff 检查通过。本机结果包 `/tmp/zhuying-library-lifecycle-verification.xcresult`。界面覆盖正式真实文件导入三章、修改字号、后台与重启恢复、旧记录迁移后忽略损坏旧归档、正式／Demo 隔离、原登录入口及 Demo 原阅读／导入流程。截图：[重启续读](../ios/screenshots/production-database-restored-reader.png)、[迁移恢复](../ios/screenshots/production-legacy-restored-reader.png)。
 
 ## 步骤 0 续做：预算与真实来源结论
 
@@ -133,13 +133,13 @@ T001、T002、T004、T005 已完成，步骤 0 当前为 4／5；T003／G1 没�
 - 对《西游记》及参考测试书目继续筛选后，最终记录《我在精神病院学斩神》《诡秘之主》各最多 6 个站点版本：搜索和部分目录可用，正文仍出现会员限制、503、空目录及无效返回，合格作品数为 0。没有更改访问权限或伪造正文。用户确认暂无已知可读书目，下一次验收需要来源恢复可读正文或具备对应访问条件；详见 [接入记录](SHUSHAN-INTEGRATION.md)。
 - 生成脱敏报告的 Debug 入口及重启／新鲜报告检查脚本已加入。错误和短占位文字不会被误算为通过，失败进程返回非零；正式与 Demo 的页面和导航保持原样。
 
-本轮验证：186 项 iOS 单元测试、2 条相关 UI 流程、3 项性能／兼容基线测试、61 项 Node 测试通过；网页、新验证脚本语法及 diff 检查通过。性能测试通过指测量和内容断言正确，4 项目标缺口以及真实书源失败保留，不计作对应门槛通过。结果包为本机 `/tmp/yueshan-step-zero-functional.xcresult`、`/tmp/yueshan-step-zero-performance.xcresult`。
+本轮验证：186 项 iOS 单元测试、2 条相关 UI 流程、3 项性能／兼容基线测试、61 项 Node 测试通过；网页、新验证脚本语法及 diff 检查通过。性能测试通过指测量和内容断言正确，4 项目标缺口以及真实书源失败保留，不计作对应门槛通过。结果包为本机 `/tmp/zhuying-step-zero-functional.xcresult`、`/tmp/zhuying-step-zero-performance.xcresult`。
 
 ## 步骤 1 续做：资源与外观迁移（2026-11-06）
 
 正式版已接入独立主题资源仓库与字体 v2 清单，资源按 SHA-256 校验、不可变写入并在元数据提交失败时回收。旧字体清单原件、旧主题数据和个人阅读设置保留；迁移标记与主题引用、偏好同事务提交。损坏主题保留引用并暂用有效样式，后续可修复文件；字体缺失或校验失败回退系统字体。正式版主题页复用 Demo 组件，保存进入数据库；SVG 栅格图按需重建。
 
-新增覆盖迁移幂等、坏旧数据重试、SQL 末步失败回滚、损坏资源修复、非法样式保留有效值、字体回退以及设置观察器递归回归。199 项 iOS 单元测试通过，结果包：本机 `/tmp/yueshan-development-isolated/Logs/Test/Test-Yueshan-2026.11.06_00-12-18-+0800.xcresult`。T007／T008／T011 的主要能力已接入，步骤一仍需书签／删除边界、启动失败恢复及 UI 联合验收后统一勾选；步骤二随后推进。
+新增覆盖迁移幂等、坏旧数据重试、SQL 末步失败回滚、损坏资源修复、非法样式保留有效值、字体回退以及设置观察器递归回归。199 项 iOS 单元测试通过，结果包：本机 `/tmp/zhuying-development-isolated/Logs/Test/Test-Zhuying-2026.11.06_00-12-18-+0800.xcresult`。T007／T008／T011 的主要能力已接入，步骤一仍需书签／删除边界、启动失败恢复及 UI 联合验收后统一勾选；步骤二随后推进。
 
 ## 步骤 1 验收完成（2026-11-06）
 
@@ -147,7 +147,7 @@ T006～T012 已完成。新增真实书签去重与持久化、批量分组／�
 
 数据库打开改为可重试工厂，坏数据库原件保留，修复后可直接重试，不退回旧版存储或空白覆盖。保存提示提供重试入口，保留待保存修改。界面联调发现并修复新建资源目录 URL 尾斜杠比较问题，并添加真实嵌套目录回归；Demo 混搭测试显式选择基础主题后验证个人标题、气泡和缺附件保留行为。
 
-验证：203 项 iOS 单元测试通过；4 条受影响 UI 路径全部通过（正式启动失败重试、主题后台／重启恢复、系统文件导入三章→排版→后台→重启、Demo CSS／SVG 混搭）；63 项 Node 测试通过。单元及前三条 UI 记录在本机 `/tmp/yueshan-stage-one-final.log`，Demo 混搭最终通过记录 `/tmp/yueshan-stage-one-demo-theme.log`。文件仓库错误注入覆盖对象／清单／SQL 提交失败、空间不足、损坏数据、原件保留与重启回收。真机系统终止时机和触觉在 T036 补验。步骤二尚未验收，G2 保持未通过；真实书源 T003／G1 的外部受限结论不变。
+验证：203 项 iOS 单元测试通过；4 条受影响 UI 路径全部通过（正式启动失败重试、主题后台／重启恢复、系统文件导入三章→排版→后台→重启、Demo CSS／SVG 混搭）；63 项 Node 测试通过。单元及前三条 UI 记录在本机 `/tmp/zhuying-stage-one-final.log`，Demo 混搭最终通过记录 `/tmp/zhuying-stage-one-demo-theme.log`。文件仓库错误注入覆盖对象／清单／SQL 提交失败、空间不足、损坏数据、原件保留与重启回收。真机系统终止时机和触觉在 T036 补验。步骤二尚未验收，G2 保持未通过；真实书源 T003／G1 的外部受限结论不变。
 
 ## 步骤 2 进行中：真实会话与按章加载（2026-11-06）
 
@@ -155,7 +155,7 @@ T006～T012 已完成。新增真实书签去重与持久化、批量分组／�
 
 正式书架启动只读目录和位置元数据，正文按章打开；进度不变时沿用已保存的稳定锚点。正文缓存采用 LRU，最多 3 章／4 MiB，超大当前章可单独保留。正文损坏不阻塞整架，原位置保留且修复后可重试。正式正文去掉 Demo 的原创示例标记和虚构段评，设置及组件仍复用原页面。已修复异步排版时标题与正文不同步以及过期滚动回调问题。
 
-211 项 iOS 单元测试通过；正式迁移恢复、Demo 分页／滚动、正式真实导入三章／排版／后台／重启流程均通过。最终单位记录 `/tmp/yueshan-stage-two-lazy-unit-final.log`，本地闭环 UI 最终记录 `/tmp/yueshan-stage-two-lazy-final.log`。分页性能、文字选择／可访问操作、解析接口与导入取消仍在推进，T015～T020 和 G2 尚未整体验收。
+211 项 iOS 单元测试通过；正式迁移恢复、Demo 分页／滚动、正式真实导入三章／排版／后台／重启流程均通过。最终单位记录 `/tmp/zhuying-stage-two-lazy-unit-final.log`，本地闭环 UI 最终记录 `/tmp/zhuying-stage-two-lazy-final.log`。分页性能、文字选择／可访问操作、解析接口与导入取消仍在推进，T015～T020 和 G2 尚未整体验收。
 
 步骤二续做：分页已按窗口测量并保持显示层 TextKit 一致，长章与大字号重排达到原预算，宿主 RSS 与自动化启动缺口继续明确记录。TXT／文字 PDF 解析已抽为格式接口，保留原编码和分章行为，补加密 PDF 拒绝测试。214 项单元测试、2 项性能／兼容测试通过，原始复测报告已归档；导入取消及手势／文字选择仍待完成。
 
@@ -165,11 +165,11 @@ T013～T020 的本地开发与当前模拟器验证完成，G2 通过。共用 D
 
 滚动与分页均支持原生长按选字／复制；三分区轻触覆盖整页空白边距，文字仍在原排版区域。原生选字与阅读手势共存，拖动已选文字不翻页；仿真过渡允许继续操作。可访问区域、翻页及菜单动作已自动验证，真机触觉与读屏朗读实操仍留 T036。缓存淘汰后使用锚点保存的段落总数计算书架百分比，避免把未加载的章误算成一段；旧锚点缺此字段仍能恢复。
 
-最终验证：222 项 iOS 单元测试、13 条不同的受影响 UI 流程、63 项 Node 测试通过，网页语法及 diff 检查通过。UI 证据分布于本机 `/tmp/yueshan-stage-two-native-verification.xcresult`（最终分页、复制、三分区、纵向）、`/tmp/yueshan-stage-two-import-migration-verification.xcresult`（迁移与 4 条导入流程），以及 `/tmp/yueshan-stage-two-final-verification.xcresult` 内未受后续改动影响且通过的主题、手势帮助及滚动流程。早期读取 StaticText 的两条断言不适用于可选 UITextView，已改为核对实际文字值并重跑成功；失败记录未充当通过证据。单元最终日志 `/tmp/yueshan-stage-two-final-unit.log`。
+最终验证：222 项 iOS 单元测试、13 条不同的受影响 UI 流程、63 项 Node 测试通过，网页语法及 diff 检查通过。UI 证据分布于本机 `/tmp/zhuying-stage-two-native-verification.xcresult`（最终分页、复制、三分区、纵向）、`/tmp/zhuying-stage-two-import-migration-verification.xcresult`（迁移与 4 条导入流程），以及 `/tmp/zhuying-stage-two-final-verification.xcresult` 内未受后续改动影响且通过的主题、手势帮助及滚动流程。早期读取 StaticText 的两条断言不适用于可选 UITextView，已改为核对实际文字值并重跑成功；失败记录未充当通过证据。单元最终日志 `/tmp/zhuying-stage-two-final-unit.log`。
 
 分页复测最大约 444 ms、横屏大字号重排约 486 ms，原始报告和冻结预算均保留。测试宿主 RSS 及含自动化握手启动目标仍未通过，iOS 17 与真机检查未冒充完成；参见性能基线和 T035／T036。真实书山 T003／G1 仍受外部正文可读性阻塞，G2 不代表在线版或完整 47 项功能交付。
 
-Release 模拟器构建通过（`Yueshan Production`，本机日志 `/tmp/yueshan-stage-two-release-build.log`）；冻结 Demo 的 7 项原件／哈希／独立历史检查通过。视觉证据：[正式本地重启续读](../ios/screenshots/production-local-step-two.png)、[共享原生分页正文](../ios/screenshots/reader-paged-step-two.png)。这些记录只证明当前模拟器范围，不替代签名真机发布验收。
+Release 模拟器构建通过（`Zhuying Production`，本机日志 `/tmp/zhuying-stage-two-release-build.log`）；冻结 Demo 的 7 项原件／哈希／独立历史检查通过。视觉证据：[正式本地重启续读](../ios/screenshots/production-local-step-two.png)、[共享原生分页正文](../ios/screenshots/reader-paged-step-two.png)。这些记录只证明当前模拟器范围，不替代签名真机发布验收。
 
 ## 2026-11-06：步骤三、四的客户端与数据管理收尾
 

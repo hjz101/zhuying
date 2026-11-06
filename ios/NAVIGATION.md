@@ -35,6 +35,6 @@ iOS 26 使用系统原生独立搜索和导航自动收起。iOS 18–25 保留�
 - `Models/NavigationStore.swift`：导航规则、持久化及热力图日期与模拟数据。
 - `Views/NavigationSettingsView.swift`：开关、排序和恢复默认。
 - `Views/FootprintsView.swift`：热力图、日期详情与阅读入口。
-- `YueshanApp.swift`：原生 Tab、独立搜索和滑动收起方式。
+- `ZhuyingApp.swift`：原生 Tab、独立搜索和滑动收起方式。
 
 预览见 `screenshots/navigation-default.png`、`screenshots/navigation-collapsed.png`、`screenshots/navigation-settings.png`、`screenshots/reading-footprints.png`。

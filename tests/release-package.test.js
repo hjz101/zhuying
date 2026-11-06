@@ -10,8 +10,8 @@ import importlib.util, pathlib, plistlib, tempfile
 spec=importlib.util.spec_from_file_location('candidate','ios/scripts/package-candidate.py')
 module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
 with tempfile.TemporaryDirectory() as root:
- app=pathlib.Path(root)/'Yueshan.app'; app.mkdir()
- info={'CFBundleIdentifier':'test.reader','CFBundleShortVersionString':'0.4.0','CFBundleVersion':'2','CFBundleSupportedPlatforms':['iPhoneSimulator'],'MinimumOSVersion':'17.0','YueshanSourceRevision':'a'*40}
+ app=pathlib.Path(root)/'Zhuying.app'; app.mkdir()
+ info={'CFBundleIdentifier':'test.reader','CFBundleShortVersionString':'0.4.0','CFBundleVersion':'2','CFBundleSupportedPlatforms':['iPhoneSimulator'],'MinimumOSVersion':'17.0','ZhuyingSourceRevision':'a'*40}
  (app/'Info.plist').write_bytes(plistlib.dumps(info))
  record=module.metadata(app,'a'*40,'simulator')
  assert record['releaseGate']=='not-approved' and record['uploaded'] is False
@@ -48,7 +48,7 @@ test('historical release evidence remains unapproved while current physical and 
   assert.equal(classics.requests.length, 34);
   assert.deepEqual(classics.events.filter(event => event.stage === 'search').map(event => event.query), ['西游记', '红楼梦']);
   inspect(classics);
-  const rawBudget = read('../ios/YueshanTestSupport/performance-budget.json');
+  const rawBudget = read('../ios/ZhuyingTestSupport/performance-budget.json');
   const budget = JSON.parse(rawBudget);
   const performance = JSON.parse(read('../docs/verification/2026-11-06/stage-four-performance.json'));
   const launch = JSON.parse(read('../docs/verification/2026-11-06/stage-four-launch.json'));

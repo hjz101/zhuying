@@ -9,8 +9,8 @@
 Node 22及以上，无第三方运行依赖：
 
 ```sh
-export YUESHAN_GATEWAY_TOKEN='<在服务器私下设置至少16字符的令牌>'
-export YUESHAN_GATEWAY_SOURCES='{"shushan":{"origin":"https://v1.vossc.com","paths":["/search","/details","/catalog","/content","/para","/idea_comment"]}}'
+export ZHUYING_GATEWAY_TOKEN='<在服务器私下设置至少16字符的令牌>'
+export ZHUYING_GATEWAY_SOURCES='{"shushan":{"origin":"https://v1.vossc.com","paths":["/search","/details","/catalog","/content","/para","/idea_comment"]}}'
 node backend/reader-gateway.mjs
 ```
 

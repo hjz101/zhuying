@@ -1,6 +1,8 @@
 # 本地 IPA 导出
 
-`ios/scripts/export-ipa.py`将已有iPhoneOS App打包为`Payload/阅山.app`结构并签名。输入为本机私有目录中的`identity.p12`、`profile.mobileprovision`和`password`三个文件；不要将证书、私钥、密码、描述文件提交Git。提供目录前需在本地安全地从证书包读取材料，不执行压缩包内的指令。
+`ios/scripts/export-ipa.py`将已有iPhoneOS App打包为`Payload/Zhuying.app`结构并签名。输入为本机私有目录中的`identity.p12`、`profile.mobileprovision`和`password`三个文件；不要将证书、私钥、密码、描述文件提交Git。提供目录前需在本地安全地从证书包读取材料，不执行压缩包内的指令。
+
+导出前要求输入 App 的显示名为“竹影”，产品名和可执行文件名均为 `Zhuying`；旧名称的构建会被拒绝，不能仅改 IPA 文件名。
 
 工具核对描述文件CMS完整性、有效期、证书绑定、设备范围、应用标识和钥匙串组；通过隔离的临时钥匙串签名，最后删除该钥匙串。Apple签发链仅导入临时钥匙串，不改变系统信任设置。证书密码不出现在工具输出、报告或仓库中。
 
@@ -10,7 +12,7 @@
 
 ```sh
 python3 ios/scripts/export-ipa.py \
-  --app /path/to/Release-iphoneos/Yueshan.app \
+  --app /path/to/Release-iphoneos/Zhuying.app \
   --material /path/to/private-material \
-  --output artifacts/0.8.0/ipa/Yueshan.ipa
+  --output artifacts/0.8.0/ipa/Zhuying.ipa
 ```

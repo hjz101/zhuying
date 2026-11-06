@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const path = '阅山Demo-2026-11-05';
+const path = '竹影Demo-2026-11-05';
 const commit = 'ea3b91c9b6cfcdbc411567ac4c7a7c0ae70a70e4';
 const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
 

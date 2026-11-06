@@ -82,16 +82,16 @@
 
 ## 如何调整布局
 
-- `Yueshan/Demo/FeatureCatalog.swift`：47 个模块的文案、分组、字段、按钮及相关入口。
-- `Yueshan/Demo/FeatureDemoView.swift`：工具目录、共享配置表单及页面结构。
-- `Yueshan/Demo/DemoPreviews.swift`：书源卡片、播放器、画布、规则、评论、图表和文件阅读样例。
-- `Yueshan/Demo/FeatureDemoStore.swift`：演示状态与动作；不建立通用书源引擎。
-- `Yueshan/Views/SmartImportView.swift`：来源切换、系统文件选择、预览清单和确认导入。
-- `Yueshan/Models/BookImport.swift`：真实文件解析、导入队列、重复检测与失败重试；正文归档由 `LibraryStore` 管理。
-- `Yueshan/Views/ReadingPreferencesView.swift`：偏好总览、文字与边距、翻页与手势及阅读预览。
-- `Yueshan/Views/ReadingPageEditors.swift`：章节标题 CSS 编辑与自由页眉页脚。
-- `Yueshan/Views/ReadingAppearanceView.swift`、`ReadingContentPreferences.swift`：主题／字体入口、样式规则与段评皮肤。
-- `Yueshan/Models/ReaderPreferences.swift`、`ReaderEngine.swift`：偏好迁移与校正、标题／规则解析、真实正文排版与分页。
-- `Yueshan/Models/ReadingFontLibrary.swift`、`ThemeReadingBridge.swift`：本地字体注册、主题持久化与原生阅读桥接。
+- `Zhuying/Demo/FeatureCatalog.swift`：47 个模块的文案、分组、字段、按钮及相关入口。
+- `Zhuying/Demo/FeatureDemoView.swift`：工具目录、共享配置表单及页面结构。
+- `Zhuying/Demo/DemoPreviews.swift`：书源卡片、播放器、画布、规则、评论、图表和文件阅读样例。
+- `Zhuying/Demo/FeatureDemoStore.swift`：演示状态与动作；不建立通用书源引擎。
+- `Zhuying/Views/SmartImportView.swift`：来源切换、系统文件选择、预览清单和确认导入。
+- `Zhuying/Models/BookImport.swift`：真实文件解析、导入队列、重复检测与失败重试；正文归档由 `LibraryStore` 管理。
+- `Zhuying/Views/ReadingPreferencesView.swift`：偏好总览、文字与边距、翻页与手势及阅读预览。
+- `Zhuying/Views/ReadingPageEditors.swift`：章节标题 CSS 编辑与自由页眉页脚。
+- `Zhuying/Views/ReadingAppearanceView.swift`、`ReadingContentPreferences.swift`：主题／字体入口、样式规则与段评皮肤。
+- `Zhuying/Models/ReaderPreferences.swift`、`ReaderEngine.swift`：偏好迁移与校正、标题／规则解析、真实正文排版与分页。
+- `Zhuying/Models/ReadingFontLibrary.swift`、`ThemeReadingBridge.swift`：本地字体注册、主题持久化与原生阅读桥接。
 
 通用演示模块共用 Demo 配置和预览文件，智能导入与阅读偏好使用独立页面和模型，没有引入第三方依赖或账号后端。

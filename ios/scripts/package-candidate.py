@@ -16,7 +16,7 @@ def metadata(app: Path, commit: str, kind: str) -> dict:
         raise ValueError(f'{kind} requires {expected}, found {platforms}')
     if len(commit) != 40 or any(c not in '0123456789abcdef' for c in commit):
         raise ValueError('A full Git commit is required')
-    if info.get('YueshanSourceRevision') != commit:
+    if info.get('ZhuyingSourceRevision') != commit:
         raise ValueError('Built App source revision does not match the current committed checkout')
     return {
         'schemaVersion': 1, 'kind': kind, 'commit': commit,
@@ -40,7 +40,7 @@ def main() -> None:
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repository, text=True).strip()
     result = metadata(args.app, commit, args.kind)
     args.output.mkdir(parents=True, exist_ok=True)
-    archive = args.output / f'yueshan-{args.kind}-{commit[:8]}.zip'
+    archive = args.output / f'zhuying-{args.kind}-{commit[:8]}.zip'
     if archive.exists():
         raise SystemExit(f'Refusing to overwrite {archive}')
     subprocess.run(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(args.app), str(archive)], check=True)

@@ -1,17 +1,17 @@
-# 阅山 for iOS
+# 竹影 for iOS
 
 原生 SwiftUI 应用，正式版正在按任务清单开发。最低系统 iOS 17，面向 iPhone；Demo 保留原创模拟书库，正式模式使用独立数据。正式书架、导入正文、进度与排版偏好已接入 GRDB／SQLite 和章节文件仓库；智能导入支持实际文件读取和用户主动发起的文件链接下载。
 
 ## 正式模式 v0.6 开发版本
 
-选择 `Yueshan Production` scheme，Release 默认使用正式模式。现已接入书山原生搜索／详情／目录／正文、稳定进度、60 章／32 MiB 近期缓存、真实分组／书签、本地备份及归档管理；备份不含凭据和网络缓存，恢复先验证再切换独立数据代。本轮新增多源候选／换源、持久化下载、可重排 EPUB、实际全文搜索与阅读／朗读统计、书源 JSON 工具和订阅更新。系统朗读真实发声，在线朗读与多角色支持用户自配兼容服务；云同步等未交付能力保留原入口。
+选择 `Zhuying Production` scheme，Release 默认使用正式模式。现已接入书山原生搜索／详情／目录／正文、稳定进度、60 章／32 MiB 近期缓存、真实分组／书签、本地备份及归档管理；备份不含凭据和网络缓存，恢复先验证再切换独立数据代。本轮新增多源候选／换源、持久化下载、可重排 EPUB、实际全文搜索与阅读／朗读统计、书源 JSON 工具和订阅更新。系统朗读真实发声，在线朗读与多角色支持用户自配兼容服务；云同步等未交付能力保留原入口。
 
 当前为0.8.0开发候选，步骤七八的原生功能与自建转发服务已接入。书山真实连续正文、段评及独立书库重启已通过；实际iCloud／双设备、用户自配服务、冻结性能、真机与签名门槛仍单列。构建及限制见 [0.8.0候选说明](../docs/release/2026-11-06-stage-seven-eight.md)，完整范围见 [47项兼容表](../docs/EXTENDED-COMPATIBILITY.md)。以下Demo介绍仅描述演示模式。
 
 ## 打开与运行
 
-1. 使用 Xcode 打开 `Yueshan.xcodeproj`。
-2. 选择 `Yueshan` scheme 和已安装运行时的 iPhone 模拟器。
+1. 使用 Xcode 打开 `Zhuying.xcodeproj`。
+2. 选择 `Zhuying` scheme 和已安装运行时的 iPhone 模拟器。
 3. 按 ⌘R 运行；模拟器不需要开发者账号。安装到真实 iPhone 时需在 Signing & Capabilities 选择你的开发团队。
 
 项目已提交，可直接打开。若修改了文件结构或项目配置，可在仓库根目录运行 `xcodegen generate --spec ios/project.yml` 重新生成工程；日常运行不需要 XcodeGen。
@@ -120,18 +120,18 @@
 在 Xcode 按 ⌘U，或从仓库根目录运行：
 
 ```sh
-xcodebuild -project ios/Yueshan.xcodeproj -scheme Yueshan \
+xcodebuild -project ios/Zhuying.xcodeproj -scheme Zhuying \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
 CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
 ```
 
-选择的模拟器名称需与本机实际安装的设备一致。`YueshanTests` 验证模型和持久化，`YueshanUITests` 验证原生 App 操作流程；界面测试使用独立测试数据，不重置正常运行的收藏。
+选择的模拟器名称需与本机实际安装的设备一致。`ZhuyingTests` 验证模型和持久化，`ZhuyingUITests` 验证原生 App 操作流程；界面测试使用独立测试数据，不重置正常运行的收藏。
 
 新增钥匙串集成测试需要模拟器的临时签名，`CODE_SIGN_IDENTITY=-` 无需开发者证书；不要关闭签名后将钥匙串失败当作通过。统一验证命令为 `bash ios/scripts/verify.sh unit`，`ui` 运行界面流程，`all` 运行全部；脚本目标为模拟器，真机签名在 Xcode 中配置。
 
-性能基线使用独立的 `Yueshan Performance` scheme，命令为 `bash ios/scripts/verify.sh performance`；日常 `all` 指功能测试，性能负载单独运行。固定负载、冻结目标、原始样本与未达标项见 [性能基线](../docs/PERFORMANCE-BASELINE.md)。基线测试验证测量与内容正确性，性能门槛是否达标须核对报告中的 `withinTarget`。
+性能基线使用独立的 `Zhuying Performance` scheme，命令为 `bash ios/scripts/verify.sh performance`；日常 `all` 指功能测试，性能负载单独运行。固定负载、冻结目标、原始样本与未达标项见 [性能基线](../docs/PERFORMANCE-BASELINE.md)。基线测试验证测量与内容正确性，性能门槛是否达标须核对报告中的 `withinTarget`。
 
-使用 `Yueshan Production` scheme 运行正式模式，或使用 `--production` 启动参数；`Yueshan` 的 Debug 启动保留 Demo。两者共用原有界面，数据独立。正式模式“我的 → 书源管理 → 书山聚合 → 登录”提供原生登录入口；在线阅读尚需完成后续接入与登录联调，不能据登录页面可用宣称正式版已完成。
+使用 `Zhuying Production` scheme 运行正式模式，或使用 `--production` 启动参数；`Zhuying` 的 Debug 启动保留 Demo。两者共用原有界面，数据独立。正式模式“我的 → 书源管理 → 书山聚合 → 登录”提供原生登录入口；在线阅读尚需完成后续接入与登录联调，不能据登录页面可用宣称正式版已完成。
 
 正式本地流程：我的 → 智能导入 → 选择 TXT／文字 PDF → 预览确认 → 查看书架 → 阅读。旧正式归档、收藏、分组、进度及阅读偏好首次启动自动迁移并保留原件，后续从数据库恢复；迁移失败可重试。切章、退出阅读和后台补存，持续阅读节流保存；保存失败会提示并保留上次有效记录。正式书架只读元数据，正文按章加载并使用有上限缓存；三种阅读模式共用文字锚点，长按可选择／复制，下载与识别可取消及重试。主题、字体与个人覆盖统一恢复。步骤一、步骤二的本地开发及当前模拟器 G2 验收已通过。真机、iOS 17、宿主内存与启动预算仍按实施记录补验，完整在线版尚未通过。
 

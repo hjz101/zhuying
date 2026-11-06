@@ -73,10 +73,10 @@ def glyph(contours):
 
 def names():
     strings = {
-        0: "Original synthetic outlines for Yueshan automated tests; CC0.",
-        1: "Yueshan Reader Test", 2: "Regular",
-        3: "YueshanReaderTest-Regular-1.000", 4: "Yueshan Reader Test Regular",
-        5: "Version 1.000", 6: "YueshanReaderTest-Regular",
+        0: "Original synthetic outlines for Zhuying automated tests; CC0.",
+        1: "Zhuying Reader Test", 2: "Regular",
+        3: "ZhuyingReaderTest-Regular-1.000", 4: "Zhuying Reader Test Regular",
+        5: "Version 1.000", 6: "ZhuyingReaderTest-Regular",
         13: "Original test outlines dedicated to the public domain under CC0 1.0.",
         14: "https://creativecommons.org/publicdomain/zero/1.0/",
     }
@@ -141,8 +141,8 @@ def font():
 
 
 if __name__ == "__main__":
-    output = Path(__file__).resolve().parent.parent / "YueshanTests" / "Fixtures" / "ReaderTestFont.ttf"
+    output = Path(__file__).resolve().parent.parent / "ZhuyingTests" / "Fixtures" / "ReaderTestFont.ttf"
     output.parent.mkdir(parents=True, exist_ok=True)
     data = font()
     output.write_bytes(data)
-    print(f"Generated {output.name}: {len(data)} bytes; PostScript name YueshanReaderTest-Regular")
+    print(f"Generated {output.name}: {len(data)} bytes; PostScript name ZhuyingReaderTest-Regular")

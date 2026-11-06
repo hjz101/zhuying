@@ -1,6 +1,6 @@
 # 真实书源验收
 
-普通`Yueshan`测试只使用原创或受控数据，不借用用户登录。额外`Yueshan Live Acceptance` scheme需要在同一模拟器的正式App里已有、经用户授权的书山登录。密码与API Key始终只在应用内，不传给脚本、测试参数或报告。
+普通`Zhuying`测试只使用原创或受控数据，不借用用户登录。额外`Zhuying Live Acceptance` scheme需要在同一模拟器的正式App里已有、经用户授权的书山登录。密码与API Key始终只在应用内，不传给脚本、测试参数或报告。
 
 专用scheme通过`--production --live-source-acceptance`启动：仅Debug识别此标记，Release忽略。它使用单独的LiveAcceptance数据库／导入／字体／缓存／UserDefaults，复用正常正式Keychain已有登录；测试不会登录、登出或编辑账号。普通`--ui-testing`同时出现时禁用此标记，防止普通UI测试混入真实账号。测试书名为公开经典《西游记》《红楼梦》，固定已验证的番茄来源版本；源不可用时测试明确失败，不用替身补通过。
 

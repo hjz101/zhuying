@@ -1,4 +1,4 @@
-name: Yueshan
+name: Zhuying
 packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift.git
@@ -13,7 +13,7 @@ packages:
     url: https://github.com/matteo-pacini/libarchive-for-swift.git
     exactVersion: 1.0.0
 options:
-  bundleIdPrefix: com.yueshan
+  bundleIdPrefix: com.zhuying
   deploymentTarget:
     iOS: '17.0'
 settings:
@@ -23,10 +23,10 @@ settings:
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ''
     MARKETING_VERSION: '0.8.0'
-    CURRENT_PROJECT_VERSION: '8'
-    YUESHAN_SOURCE_REVISION: unrecorded
+    CURRENT_PROJECT_VERSION: '9'
+    ZHUYING_SOURCE_REVISION: unrecorded
 targets:
-  Yueshan:
+  Zhuying:
     type: application
     platform: iOS
     dependencies:
@@ -36,111 +36,111 @@ targets:
       - package: LibArchive
         product: libarchive
     info:
-      path: Yueshan/Info.plist
+      path: Zhuying/Info.plist
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        YueshanSourceRevision: $(YUESHAN_SOURCE_REVISION)
+        ZhuyingSourceRevision: $(ZHUYING_SOURCE_REVISION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         NSLocalNetworkUsageDescription: 用于连接您在书源网络配置中指定的局域网代理或 DNS 服务。
         UIBackgroundModes: [audio]
         CFBundleURLTypes:
-          - CFBundleURLName: com.yueshan.import
-            CFBundleURLSchemes: [yueshan]
+          - CFBundleURLName: com.zhuying.import
+            CFBundleURLSchemes: [zhuying, yueshan]
     sources:
-      - path: Yueshan
+      - path: Zhuying
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.yueshan.reader.demo
+        PRODUCT_BUNDLE_IDENTIFIER: com.zhuying.reader.demo
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: 阅山
+        INFOPLIST_KEY_CFBundleDisplayName: 竹影
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.books
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-  YueshanTests:
+  ZhuyingTests:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: YueshanTests
-      - path: YueshanTestSupport
+      - path: ZhuyingTests
+      - path: ZhuyingTestSupport
     dependencies:
-      - target: Yueshan
+      - target: Zhuying
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-  YueshanUITests:
+  ZhuyingUITests:
     type: bundle.ui-testing
     platform: iOS
     sources:
-      - path: YueshanUITests
+      - path: ZhuyingUITests
     dependencies:
-      - target: Yueshan
+      - target: Zhuying
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-  YueshanLiveAcceptanceUITests:
+  ZhuyingLiveAcceptanceUITests:
     type: bundle.ui-testing
     platform: iOS
     sources:
-      - path: YueshanLiveAcceptanceUITests
+      - path: ZhuyingLiveAcceptanceUITests
     dependencies:
-      - target: Yueshan
+      - target: Zhuying
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-  YueshanPerformanceTests:
+  ZhuyingPerformanceTests:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: YueshanPerformanceTests
-      - path: YueshanTestSupport
-      - path: YueshanTests/Fixtures/ReaderTestFont.ttf
+      - path: ZhuyingPerformanceTests
+      - path: ZhuyingTestSupport
+      - path: ZhuyingTests/Fixtures/ReaderTestFont.ttf
     dependencies:
-      - target: Yueshan
+      - target: Zhuying
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-  YueshanPerformanceUITests:
+  ZhuyingPerformanceUITests:
     type: bundle.ui-testing
     platform: iOS
     sources:
-      - path: YueshanPerformanceUITests
+      - path: ZhuyingPerformanceUITests
     dependencies:
-      - target: Yueshan
+      - target: Zhuying
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
 schemes:
-  Yueshan Live Acceptance:
+  Zhuying Live Acceptance:
     build:
       targets:
-        Yueshan: all
+        Zhuying: all
     test:
       targets:
-        - YueshanLiveAcceptanceUITests
-  Yueshan Performance:
+        - ZhuyingLiveAcceptanceUITests
+  Zhuying Performance:
     build:
       targets:
-        Yueshan: all
+        Zhuying: all
     test:
       targets:
-        - YueshanPerformanceTests
-        - YueshanPerformanceUITests
-  Yueshan Production:
+        - ZhuyingPerformanceTests
+        - ZhuyingPerformanceUITests
+  Zhuying Production:
     build:
       targets:
-        Yueshan: all
+        Zhuying: all
     run:
       commandLineArguments:
         --production: true
-  Yueshan:
+  Zhuying:
     build:
       targets:
-        Yueshan: all
+        Zhuying: all
     test:
       gatherCoverageData: true
       targets:
-        - YueshanTests
-        - YueshanUITests
+        - ZhuyingTests
+        - ZhuyingUITests

@@ -70,6 +70,14 @@ def signed_entitlements(app):
     return result
 
 
+def application_brand(info):
+    if (info.get('CFBundleDisplayName') != '竹影' or info.get('CFBundleName') != 'Zhuying'
+            or info.get('CFBundleExecutable') != 'Zhuying'):
+        raise ValueError('Rebuild the Zhuying application before exporting its IPA')
+    return {'displayName': info['CFBundleDisplayName'], 'productName': info['CFBundleName'],
+            'executable': info['CFBundleExecutable']}
+
+
 def archive_payload(payload, output):
     if output.exists():
         raise ValueError('Refusing to overwrite an existing IPA')
@@ -126,13 +134,14 @@ def main():
         raise ValueError('Commit source and tests before export')
     exporter_revision = invoke(['git','-C',str(repo),'rev-parse','HEAD'],label='Exporter revision').decode().strip()
     original_info = plistlib.loads((args.app/'Info.plist').read_bytes())
+    brand = application_brand(original_info)
     if original_info.get('CFBundleSupportedPlatforms') != ['iPhoneOS']:
         raise ValueError('IPA export requires an iPhoneOS build, never a Simulator App')
-    if not re.fullmatch('[a-f0-9]{40}',original_info.get('YueshanSourceRevision','')):
+    if not re.fullmatch('[a-f0-9]{40}',original_info.get('ZhuyingSourceRevision','')):
         raise ValueError('Device App source revision is missing')
     password = (args.material/'password').read_bytes()
     keychain_password = secrets.token_hex(32)
-    with tempfile.TemporaryDirectory(prefix='yueshan-ipa-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='zhuying-ipa-') as temporary:
         work = Path(temporary);work.chmod(0o700)
         openssl = shutil.which('openssl')
         profile_path = args.material/'profile.mobileprovision'
@@ -196,8 +205,8 @@ def main():
                 raise ValueError('Signed entitlements do not match the verified profile')
             args.output.parent.mkdir(parents=True,exist_ok=True)
             archive_payload(payload,args.output)
-            result = {'schemaVersion':1,'kind':'adhoc-device','version':info['CFBundleShortVersionString'],
-                      'build':info['CFBundleVersion'],'appSourceRevision':info['YueshanSourceRevision'],
+            result = {**brand,'schemaVersion':1,'kind':'adhoc-device','version':info['CFBundleShortVersionString'],
+                      'build':info['CFBundleVersion'],'appSourceRevision':info['ZhuyingSourceRevision'],
                       'exporterRevision':exporter_revision,'originalBundleIdentifier':original_info['CFBundleIdentifier'],
                       'bundleIdentifier':bundle_id,'signatureVerified':True,'profileCMSVerified':True,
                       'certificateExpires':parse(dates['notAfter']).isoformat(),

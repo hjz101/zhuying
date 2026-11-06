@@ -1,4 +1,4 @@
-# 阅山 0.8 功能与兼容范围
+# 竹影 0.8 功能与兼容范围
 
 本表对应冻结 Demo 的47项入口。正式版复用页面、导航和阅读组件，显示真实或空数据。实现不等同于所有外部环境已验收：iCloud 账号与两台设备、签名／真机／iOS17、用户自配语音／AI和远程后端仍需实际环境；冻结RSS门槛单列。禁止以扩大阈值、示例数据或测试替身代替这些条件。
 
@@ -50,7 +50,7 @@
 | F44 封面搜索 | Open Library真实搜索与选图，确认保存≤800px PNG，失败保留 | CoverSearch tests／服务可用性报告 |
 | F45 网络配置 | 每源CONNECT、固定IP、UDP DNS，无TLS放宽或自动回退 | SourceNetwork tests／实际HTTPS隧道与证书拒绝报告 |
 | F46 远程后端 | 附带自建Node网关，书源／路径白名单、Keychain令牌、明确回退 | RemoteBackend tests／Node真实HTTP tests／设置UI |
-| F47 外部链接 | yueshan://import file／source／theme，预览确认，拒绝敏感链接与未知方言 | ScopedRulesAndShare tests／系统实际路由 |
+| F47 外部链接 | zhuying://import file／source／theme，预览确认，拒绝敏感链接与未知方言 | ScopedRulesAndShare tests／系统实际路由 |
 
 ## 格式与资源限制
 

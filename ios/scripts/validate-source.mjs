@@ -14,7 +14,7 @@ if (queries !== undefined) {
     process.exit(1);
   }
 }
-const app = 'com.yueshan.reader.demo';
+const app = 'com.zhuying.reader.demo';
 try {
   const container = execFileSync('xcrun', ['simctl', 'get_app_container', device, app, 'data'], { encoding: 'utf8' }).trim();
   const source = join(container, 'Documents', 'DevelopmentValidation', 'source-feasibility.json');

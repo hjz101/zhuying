@@ -9,16 +9,16 @@ import { spawnSync } from 'node:child_process';
 const script = fileURLToPath(new URL('../ios/scripts/verify.sh', import.meta.url));
 
 function invoke(mode) {
-  const directory = mkdtempSync(join(tmpdir(), 'yueshan-verification-'));
+  const directory = mkdtempSync(join(tmpdir(), 'zhuying-verification-'));
   const output = join(directory, 'xcode-arguments');
   writeFileSync(join(directory, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-  writeFileSync(join(directory, 'xcodebuild'), '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$YUESHAN_TEST_ARGS"\n', { mode: 0o755 });
+  writeFileSync(join(directory, 'xcodebuild'), '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$ZHUYING_TEST_ARGS"\n', { mode: 0o755 });
   const destination = 'platform=iOS Simulator,id=test-device';
   const derivedData = join(directory, 'Derived Data');
   const result = spawnSync('bash', [script, mode], { encoding: 'utf8', env: {
     ...process.env, PATH: `${directory}:${process.env.PATH}`,
-    YUESHAN_TEST_ARGS: output, YUESHAN_TEST_DESTINATION: destination,
-    YUESHAN_DERIVED_DATA: derivedData
+    ZHUYING_TEST_ARGS: output, ZHUYING_TEST_DESTINATION: destination,
+    ZHUYING_DERIVED_DATA: derivedData
   } });
   const args = existsSync(output) ? readFileSync(output, 'utf8').trim().split('\n') : [];
   rmSync(directory, { recursive: true, force: true });
@@ -28,7 +28,7 @@ function invoke(mode) {
 test('iOS unit verification selects model tests and uses simulator signing required by Keychain', () => {
   const result = invoke('unit');
   assert.equal(result.status, 0, result.stderr);
-  assert.ok(result.args.includes('-only-testing:YueshanTests'));
+  assert.ok(result.args.includes('-only-testing:ZhuyingTests'));
   assert.ok(result.args.includes('CODE_SIGNING_ALLOWED=YES'));
   assert.ok(result.args.includes('CODE_SIGN_IDENTITY=-'));
   assert.equal(result.args[result.args.indexOf('-destination') + 1], result.destination);
@@ -38,7 +38,7 @@ test('iOS unit verification selects model tests and uses simulator signing requi
 test('iOS UI and full verification modes pass valid targets including an empty full-suite filter', () => {
   const ui = invoke('ui');
   assert.equal(ui.status, 0, ui.stderr);
-  assert.ok(ui.args.includes('-only-testing:YueshanUITests'));
+  assert.ok(ui.args.includes('-only-testing:ZhuyingUITests'));
   const all = invoke('all');
   assert.equal(all.status, 0, all.stderr);
   assert.ok(!all.args.some(arg => arg.startsWith('-only-testing:')));
@@ -55,13 +55,13 @@ test('invalid iOS verification mode stops before running any build', () => {
 test('performance verification selects its independent scheme without filtering out baseline targets', () => {
   const result = invoke('performance');
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.args[result.args.indexOf('-scheme') + 1], 'Yueshan Performance');
+  assert.equal(result.args[result.args.indexOf('-scheme') + 1], 'Zhuying Performance');
   assert.ok(!result.args.some(arg => arg.startsWith('-only-testing:')));
   assert.equal(result.args.at(-1), 'test');
 });
 
 test('npm test only discovers the active project tests and excludes saved Demo copies', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'yueshan-test-discovery-'));
+  const directory = mkdtempSync(join(tmpdir(), 'zhuying-test-discovery-'));
   try {
     const configuration = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
     mkdirSync(join(directory, 'tests'));

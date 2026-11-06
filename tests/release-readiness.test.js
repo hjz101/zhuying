@@ -7,7 +7,7 @@ test('release audit rejects missing real acceptance, stale sources, unsigned pac
 import importlib.util, json, hashlib, copy, pathlib
 spec=importlib.util.spec_from_file_location('readiness','ios/scripts/release-readiness.py')
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-raw=pathlib.Path('ios/YueshanTestSupport/performance-budget.json').read_bytes();budget=json.loads(raw);digest=hashlib.sha256(raw).hexdigest()
+raw=pathlib.Path('ios/ZhuyingTestSupport/performance-budget.json').read_bytes();budget=json.loads(raw);digest=hashlib.sha256(raw).hexdigest()
 metrics=[]
 for key,limit in budget['limits'].items():
  count=budget['storageSamples'] if key.startswith('library.') else budget['samples']
@@ -45,16 +45,16 @@ test('release evidence digest changes with application and test edits', () => {
 import importlib.util,pathlib,tempfile
 spec=importlib.util.spec_from_file_location('readiness','ios/scripts/release-readiness.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 with tempfile.TemporaryDirectory() as root:
- p=pathlib.Path(root);(p/'ios/Yueshan').mkdir(parents=True);(p/'ios/YueshanTests').mkdir();(p/'ios/project.yml').write_text('name: example')
- app=p/'ios/Yueshan/App.swift';app.write_text('struct App {}');before=m.source_digest(p);assert m.source_digest(p)==before
+ p=pathlib.Path(root);(p/'ios/Zhuying').mkdir(parents=True);(p/'ios/ZhuyingTests').mkdir();(p/'ios/project.yml').write_text('name: example')
+ app=p/'ios/Zhuying/App.swift';app.write_text('struct App {}');before=m.source_digest(p);assert m.source_digest(p)==before
  app.write_text('struct Changed {}');after=m.source_digest(p);assert after!=before
- test=p/'ios/YueshanTests/Test.swift';test.write_text('func testOne() {}');assert m.source_digest(p)!=after;assert m.inventory(p)['unitTests']==1
- before=m.source_digest(p);epub=p/'ios/YueshanTests/original.epub';epub.write_bytes(b'original EPUB fixture');assert m.source_digest(p)!=before
- before=m.source_digest(p);live=p/'ios/YueshanLiveAcceptanceUITests';live.mkdir();(live/'Original.swift').write_text('func testLive() {}');assert m.source_digest(p)!=before
+ test=p/'ios/ZhuyingTests/Test.swift';test.write_text('func testOne() {}');assert m.source_digest(p)!=after;assert m.inventory(p)['unitTests']==1
+ before=m.source_digest(p);epub=p/'ios/ZhuyingTests/original.epub';epub.write_bytes(b'original EPUB fixture');assert m.source_digest(p)!=before
+ before=m.source_digest(p);live=p/'ios/ZhuyingLiveAcceptanceUITests';live.mkdir();(live/'Original.swift').write_text('func testLive() {}');assert m.source_digest(p)!=before
  for name in ['archive.rar','archive.7z','comic.cbz','image.png','notice.txt']:
-  before=m.source_digest(p);(p/'ios/YueshanTests'/name).write_bytes(b'original sample');assert m.source_digest(p)!=before
+  before=m.source_digest(p);(p/'ios/ZhuyingTests'/name).write_bytes(b'original sample');assert m.source_digest(p)!=before
  before=m.source_digest(p);(p/'backend').mkdir();(p/'backend/reader.mjs').write_text('export const version=1');assert m.source_digest(p)!=before
- before=m.source_digest(p);scheme=p/'ios/Yueshan.xcodeproj/xcshareddata/xcschemes';scheme.mkdir(parents=True);(scheme/'Test.xcscheme').write_text('<Scheme/>');assert m.source_digest(p)!=before
+ before=m.source_digest(p);scheme=p/'ios/Zhuying.xcodeproj/xcshareddata/xcschemes';scheme.mkdir(parents=True);(scheme/'Test.xcscheme').write_text('<Scheme/>');assert m.source_digest(p)!=before
 `;
   assert.doesNotThrow(() => execFileSync('python3', ['-c', script], { stdio: 'pipe' }));
 });
@@ -65,7 +65,7 @@ import importlib.util,pathlib,json,hashlib
 spec=importlib.util.spec_from_file_location('readiness','ios/scripts/release-readiness.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 root=pathlib.Path('.');base=root/'docs/verification/2026-11-06/stage-four-follow-up'
 e=json.loads((base/'evidence.json').read_text());p=json.loads((base/e['performanceReport']).read_text());l=json.loads((base/e['launchReport']).read_text())
-raw=(root/'ios/YueshanTestSupport/performance-budget.json').read_bytes()
+raw=(root/'ios/ZhuyingTestSupport/performance-budget.json').read_bytes()
 assert len(e['sourceDigest'])==64
 assert l['withinTarget'] is True and max(l['samples'])<=3000
 assert next(x for x in p['measurements'] if x['id']=='process.peak-rss.mib')['withinTarget'] is False

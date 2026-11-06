@@ -5,6 +5,18 @@ import { STORAGE_KEY, seedState, normalizeState, loadState, persistState, toggle
 
 const memory = () => { const values = new Map(); return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) }; };
 
+test('Zhuying reads the previous browser shelf and writes only the new storage key', () => {
+  const storage = memory(), old = seedState(1000000000);
+  old.settings.theme = 'dark'; old.shelf = [];
+  storage.setItem('yueshan-demo-v1', JSON.stringify(old));
+  assert.equal(STORAGE_KEY, 'zhuying-demo-v1');
+  assert.deepEqual(loadState(storage).state, old);
+  const current = seedState(2000000000);
+  assert.equal(persistState(storage, current), true);
+  assert.deepEqual(loadState(storage).state, current);
+  assert.equal(storage.getItem('yueshan-demo-v1'), JSON.stringify(old));
+});
+
 test('new visitors get a coherent demo shelf with three independent reading records', () => {
   const state = seedState(1000000000);
   assert.equal(state.shelf.length, 6);

@@ -7,6 +7,13 @@ test('IPA export validates profile scope, expiry, certificate binding and actual
 import importlib.util,datetime as d,tempfile,pathlib,plistlib,zipfile
 s=importlib.util.spec_from_file_location('ipa','ios/scripts/export-ipa.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 now=d.datetime(2026,11,6,tzinfo=d.timezone.utc)
+brand={'CFBundleDisplayName':'竹影','CFBundleName':'Zhuying','CFBundleExecutable':'Zhuying'}
+assert m.application_brand(brand)['displayName']=='竹影'
+for field in brand:
+ broken=dict(brand);broken[field]='Yueshan'
+ try:m.application_brand(broken)
+ except ValueError:pass
+ else:raise AssertionError('Old application branding was accepted for IPA export')
 assert isinstance(m.signed_entitlements('/System/Applications/Calculator.app'),dict)
 assert m.issuer_download_url('http://certs.apple.com/wwdrg3.der')=='https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer'
 try:m.issuer_download_url('https://other.invalid/issuer')

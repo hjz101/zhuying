@@ -1,6 +1,6 @@
-# 阅山 · iOS 小说阅读器 Demo
+# 竹影 · iOS 阅读器
 
-首发平台已确认为 **iOS**。原生 Demo v0.3 位于 `ios/`，使用 SwiftUI、原生导航与底部标签栏，支持滚动／左右分页、历史、模拟追更和书架批量管理，内置 8 本原创模拟小说，不连接真实后端。用 Xcode 打开 `ios/Yueshan.xcodeproj`，选择 `Yueshan` scheme 和 iPhone 模拟器后运行。
+竹影（Zhuying）使用 SwiftUI 开发，当前版本为 0.8.0（build 9），支持正式阅读与独立 Demo 模式。用 Xcode 打开 `ios/Zhuying.xcodeproj`，选择 `Zhuying` scheme 和 iPhone 模拟器运行；正式模式使用 `Zhuying Production` scheme。签名 IPA 的生成方式见 [IPA 导出说明](docs/release/IPA-EXPORT.md)。
 
 原生版使用与测试方式见 [iOS 说明](ios/README.md)，47 个模块的覆盖与模拟边界见 [功能清单](ios/FEATURES.md)。下方保留的是之前的网页草稿，仅供历史设计参考。
 
@@ -12,9 +12,9 @@
 
 ## 冻结 Demo
 
-原 Demo 的完整源码、截图和保存清单位于 [保存分支](https://github.com/hjz101/zhuying/tree/codex/saved-demo-2026-11-05)，固定提交为 `ea3b91c9b6cfcdbc411567ac4c7a7c0ae70a70e4`。主分支通过 `阅山Demo-2026-11-05/` 子模块引用该版本，保留独立历史。
+原 Demo 的完整源码、截图和保存清单位于 [保存分支](https://github.com/hjz101/zhuying/tree/codex/saved-demo-2026-11-05)，固定提交为 `ea3b91c9b6cfcdbc411567ac4c7a7c0ae70a70e4`。主分支通过 `竹影Demo-2026-11-05/` 子模块引用该版本，保留独立历史。
 
-克隆时使用 `git clone --recurse-submodules https://github.com/hjz101/zhuying.git`；已有仓库运行 `git submodule update --init --recursive` 取回 Demo。在该目录运行 `python3 verification/verify_snapshot.py` 可校验快照，打开其 `ios/Yueshan.xcodeproj` 可运行原 Demo。
+克隆时使用 `git clone --recurse-submodules https://github.com/hjz101/zhuying.git`；已有仓库运行 `git submodule update --init --recursive` 取回 Demo。在该目录运行 `python3 verification/verify_snapshot.py` 可校验快照，打开其 `ios/Yueshan.xcodeproj` 可运行原 Demo。该子模块与 `docs/verification/`、带日期的发布记录是原始历史证据，保留当时名称和路径；当前工程与网页 Demo 已统一使用竹影。
 
 ## 旧网页草稿启动
 
@@ -35,7 +35,7 @@ npm run dev
 5. 在书架切换“正在阅读／尚未开始”及网格／列表布局，使用封面右上角菜单移除收藏，或点击提示中的“撤销”。
 6. 缩窄窗口至手机尺寸，查看底部导航和阅读工具栏。
 
-首次访问会预置 6 本收藏和 3 条阅读记录，便于体验已有内容的界面。收藏、进度和偏好保存在当前浏览器的 `yueshan-demo-v1` localStorage 项；清除该项再刷新可重置演示。
+首次访问会预置 6 本收藏和 3 条阅读记录，便于体验已有内容的界面。收藏、进度和偏好保存在当前浏览器的 `zhuying-demo-v1` localStorage 项；清除该项再刷新可重置演示。
 
 示例标注的字数与连载状态用于界面展示，实际只包含短篇样章。没有接入真实书源、登录、云同步、整本下载或离线缓存。
 

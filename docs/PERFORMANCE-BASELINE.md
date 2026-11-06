@@ -1,6 +1,6 @@
 # 步骤 0：性能与兼容基线（T005）
 
-预算 v1 在首次测量和优化之前冻结于 `ios/YueshanTestSupport/performance-budget.json`。结果必须携带该文件的 SHA-256；更改预算需要新版本、理由及单独提交，不得根据测量值追改门槛。
+预算 v1 在首次测量和优化之前冻结于 `ios/ZhuyingTestSupport/performance-budget.json`。结果必须携带该文件的 SHA-256；更改预算需要新版本、理由及单独提交，不得根据测量值追改门槛。
 
 ## 冻结的负载与目标
 
@@ -21,7 +21,7 @@
 
 ## 测量规则
 
-- 主机：Apple M4、16 GiB；Xcode 26.6（17F113）；专用 Yueshan Development QA，iPhone 17 Pro、iOS 26.5。版本与设备变化应另存基线。
+- 主机：Apple M4、16 GiB；Xcode 26.6（17F113）；专用 Zhuying Development QA，iPhone 17 Pro、iOS 26.5。版本与设备变化应另存基线。
 - 使用 Debug 模拟器构建，覆盖现阶段开发路径；结果不代表 Release 真机速度。iOS 17 及真机的字体、旋转、内存和启动另行验收，不把编译通过写成运行通过。
 - 计算与读取各取 5 次，完整导入与书库恢复各取 3 次；保留所有原始数值、中位数、最大值和目标比较，不把小样本叫作稳定的生产 P95。判定使用样本最大值。
 - 每次存储测量使用独立临时目录；恢复采用新仓库实例，但 OS 文件页缓存可能仍命中，因此称“重新打开”，不声称磁盘冷缓存。
@@ -55,12 +55,12 @@
 从仓库根目录执行：
 
 ```sh
-YUESHAN_TEST_DESTINATION='platform=iOS Simulator,id=4038B360-1687-474F-BEC3-D5B1A898BC11' \
-YUESHAN_DERIVED_DATA=/tmp/yueshan-development-isolated \
+ZHUYING_TEST_DESTINATION='platform=iOS Simulator,id=4038B360-1687-474F-BEC3-D5B1A898BC11' \
+ZHUYING_DERIVED_DATA=/tmp/zhuying-development-isolated \
 bash ios/scripts/verify.sh performance
 ```
 
-该模式只运行独立的 `Yueshan Performance` scheme，不混入日常功能单测。XCTest 结果包附带 `StepZero-Performance-Baseline` 和 `StepZero-Launch-Baseline` 两份 JSON；用 `xcrun xcresulttool export attachments --path <结果包> --output-path <导出目录>` 导出。`performance` 记录基线和内容正确性，不将未达耗时目标转换成通过；预算是否达标须读取每项 `withinTarget`。本轮原结果包为 `/tmp/yueshan-step-zero-performance.xcresult`。
+该模式只运行独立的 `Zhuying Performance` scheme，不混入日常功能单测。XCTest 结果包附带 `StepZero-Performance-Baseline` 和 `StepZero-Launch-Baseline` 两份 JSON；用 `xcrun xcresulttool export attachments --path <结果包> --output-path <导出目录>` 导出。`performance` 记录基线和内容正确性，不将未达耗时目标转换成通过；预算是否达标须读取每项 `withinTarget`。本轮原结果包为 `/tmp/zhuying-step-zero-performance.xcresult`。
 
 | 范围 | 本轮实际覆盖 | 待补条件 |
 | --- | --- | --- |

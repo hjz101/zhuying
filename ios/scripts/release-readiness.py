@@ -20,12 +20,12 @@ PHYSICAL_CASES = {
 
 def source_digest(root: Path) -> str:
     paths = [root / 'ios/project.yml']
-    for name in ['ios/Yueshan.xcodeproj/project.pbxproj', 'ios/Yueshan.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved']:
+    for name in ['ios/Zhuying.xcodeproj/project.pbxproj', 'ios/Zhuying.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved']:
         path = root / name
         if path.is_file(): paths.append(path)
-    for folder in ['Yueshan', 'YueshanTests', 'YueshanUITests', 'YueshanLiveAcceptanceUITests', 'YueshanPerformanceTests', 'YueshanPerformanceUITests', 'YueshanTestSupport']:
+    for folder in ['Zhuying', 'ZhuyingTests', 'ZhuyingUITests', 'ZhuyingLiveAcceptanceUITests', 'ZhuyingPerformanceTests', 'ZhuyingPerformanceUITests', 'ZhuyingTestSupport']:
         paths += [p for p in (root / 'ios' / folder).rglob('*') if p.is_file() and p.suffix.lower() in {'.swift', '.json', '.plist', '.ttf', '.otf', '.epub', '.pdf', '.zip', '.rar', '.7z', '.cbz', '.cbr', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.wav', '.txt', '.md', '.entitlements'}]
-    paths += list((root / 'ios/Yueshan.xcodeproj/xcshareddata/xcschemes').glob('*.xcscheme'))
+    paths += list((root / 'ios/Zhuying.xcodeproj/xcshareddata/xcschemes').glob('*.xcscheme'))
     for folder in ['backend', 'tests']:
         paths += [p for p in (root / folder).rglob('*') if p.is_file() and p.suffix in {'.js', '.mjs', '.json'}]
     if (root / 'package.json').is_file(): paths.append(root / 'package.json')
@@ -39,7 +39,7 @@ def source_digest(root: Path) -> str:
 def inventory(root: Path) -> dict:
     def count(folder):
         return sum(len(re.findall(r'func\s+test\w+\s*\(', p.read_text())) for p in (root / 'ios' / folder).rglob('*.swift'))
-    return {'unitTests': count('YueshanTests'), 'uiFlows': count('YueshanUITests')}
+    return {'unitTests': count('ZhuyingTests'), 'uiFlows': count('ZhuyingUITests')}
 
 
 def evaluate(evidence: dict, performance: dict, launch: dict, budget: dict,
@@ -136,7 +136,7 @@ def main() -> int:
     base = args.evidence.parent
     performance = json.loads((base / evidence['performanceReport']).read_text())
     launch = json.loads((base / evidence['launchReport']).read_text())
-    raw_budget = (root / 'ios/YueshanTestSupport/performance-budget.json').read_bytes()
+    raw_budget = (root / 'ios/ZhuyingTestSupport/performance-budget.json').read_bytes()
     candidate = json.loads(args.candidate.read_text()) if args.candidate else None
     valid = False
     if candidate:

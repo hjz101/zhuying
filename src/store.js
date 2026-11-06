@@ -1,6 +1,6 @@
 import { books } from './data.js';
 
-export const STORAGE_KEY = 'yueshan-demo-v1';
+export const STORAGE_KEY = 'zhuying-demo-v1';
 export const defaults = { fontSize: 20, lineHeight: 1.8, theme: 'paper' };
 const validIds = new Set(books.map(book => book.id));
 export const findBook = id => books.find(book => book.id === id);
@@ -29,7 +29,7 @@ export function normalizeState(raw) {
 }
 export function loadState(storage, now) {
   try {
-    const saved = storage.getItem(STORAGE_KEY);
+    const saved = storage.getItem(STORAGE_KEY) ?? storage.getItem('yueshan-demo-v1');
     return { state: saved ? normalizeState(JSON.parse(saved)) : seedState(now), error: false };
   } catch { return { state: seedState(now), error: true }; }
 }

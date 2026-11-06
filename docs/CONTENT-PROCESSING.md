@@ -8,6 +8,6 @@
 
 规则变化尝试通过已有稳定文字位置与上下文定位。无法唯一匹配时保留历史，用户明确选择章节或“从本章开头打开”；不会猜到别段后覆盖位置。段评先在原文映射，再通过对应关系连接处理后的段落；评论原文核对仍使用来源原文。若处理缓存已回收，缺失对应关系时隐藏段评。
 
-规则包以 `format:yueshan-purification`、`version:1` 和 `rules` 保存，规则字段为 id／name／kind／pattern／replacement／enabled／scope／bookID／sourceID。规则种类和作用域使用界面中的原始中文值；可先导出本机样本后修改。规则文件保存在当前书库代的 `resources/processing/rules.json`，跟随完整备份在新代中校验恢复，切换失败不影响旧代。
+规则包以 `format:zhuying-purification`、`version:1` 和 `rules` 保存，规则字段为 id／name／kind／pattern／replacement／enabled／scope／bookID／sourceID。规则种类和作用域使用界面中的原始中文值；可先导出本机样本后修改。规则文件保存在当前书库代的 `resources/processing/rules.json`，跟随完整备份在新代中校验恢复，切换失败不影响旧代。
 
 已验证顺序、范围、Unicode、真实 JS、伪造段落拒绝、取消、空结果回退、重启、原文不可变、搜索一致、规则与原文备份恢复，以及净化后段评仍关联原始段落。338 项单元测试与应用内编辑／启用／重新定位／重启续读流程通过；早期错误态零宽布局问题已修复后复验。

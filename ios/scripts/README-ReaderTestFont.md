@@ -1,7 +1,7 @@
 # Original reader test font
 
-`../YueshanTests/Fixtures/ReaderTestFont.ttf` is a 3.9 KB TrueType font with the
-unique PostScript name `YueshanReaderTest-Regular`. Its glyphs are space, A,
+`../ZhuyingTests/Fixtures/ReaderTestFont.ttf` is a 3.9 KB TrueType font with the
+unique PostScript name `ZhuyingReaderTest-Regular`. Its glyphs are space, A,
 and digits 0–9. All outlines consist of original rectangles on a 5 × 7 grid;
 no installed font or third-party font data is copied. The generated outlines
 and font are dedicated to the public domain under CC0 1.0.

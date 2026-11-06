@@ -76,7 +76,7 @@ export function createGateway({ token, sources, fetchImpl = fetch, timeoutMS = 1
   });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const server = createGateway({ token: process.env.YUESHAN_GATEWAY_TOKEN, sources: JSON.parse(process.env.YUESHAN_GATEWAY_SOURCES || '{}') });
-  const port = Number(process.env.PORT || 8787), host = process.env.YUESHAN_GATEWAY_HOST || '127.0.0.1';
+  const server = createGateway({ token: process.env.ZHUYING_GATEWAY_TOKEN, sources: JSON.parse(process.env.ZHUYING_GATEWAY_SOURCES || '{}') });
+  const port = Number(process.env.PORT || 8787), host = process.env.ZHUYING_GATEWAY_HOST || '127.0.0.1';
   server.listen(port, host, () => console.log(`Reader gateway listening on ${host}:${port}; use an HTTPS reverse proxy.`));
 }

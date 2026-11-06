@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 const read = path => readFileSync(new URL(path, import.meta.url));
-const raw = read('../ios/YueshanTestSupport/performance-budget.json');
+const raw = read('../ios/ZhuyingTestSupport/performance-budget.json');
 const budget = JSON.parse(raw);
 const baseline = JSON.parse(read('../docs/verification/2026-11-05/performance-baseline-v1.json'));
 const launch = JSON.parse(read('../docs/verification/2026-11-05/launch-baseline-v1.json'));

@@ -117,6 +117,12 @@ actor FileChapterRepository: ChapterContentRepository {
         try writer.write(JSONEncoder().encode(next), to: root.appendingPathComponent("manifest.json"))
         manifest = next
     }
+    func collectUnreferenced() throws {
+        let keep = Set(manifest.entries.values), folder = root.appendingPathComponent("objects")
+        for file in try FileManager.default.contentsOfDirectory(at:folder,includingPropertiesForKeys:nil) {
+            if Self.validFilename(file.lastPathComponent), !keep.contains(file.lastPathComponent) { try FileManager.default.removeItem(at:file) }
+        }
+    }
 
     private static func validFilename(_ name: String) -> Bool {
         guard name.hasSuffix(".json") else { return false }

@@ -102,7 +102,7 @@ final class SmartImportFlowTests: XCTestCase {
         chooseFile("不支持的格式", app: app)
         let status = app.staticTexts["importStatus-不支持的格式.epub"]
         XCTAssertTrue(status.waitForExistence(timeout: 10))
-        XCTAssertTrue(status.label.contains("暂不支持 EPUB"))
+        XCTAssertTrue(status.label.contains("EPUB"), "A malformed EPUB must explain the format error without adding a book")
         XCTAssertFalse(app.buttons["importConfirm"].exists)
         app.buttons["移除不支持的格式.epub"].tap()
         XCTAssertTrue(app.buttons["importChooseFiles"].exists)

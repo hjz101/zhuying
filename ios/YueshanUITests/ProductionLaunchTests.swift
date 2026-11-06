@@ -26,10 +26,10 @@ final class ProductionLaunchTests: XCTestCase {
         let app = XCUIApplication(); app.launchArguments = ["--ui-testing", "--production"]; app.launch()
         XCTAssertTrue(app.staticTexts["这里还没有故事"].waitForExistence(timeout: 10))
         app.tabBars.buttons["足迹"].tap()
-        XCTAssertTrue(app.staticTexts["阅读计时暂未启用 · 不生成模拟统计"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["真实阅读记录 · 前台阅读，空闲 60 秒停止计时 · 朗读单独记录"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["activityTotal"].label, "0 分钟")
         app.tabBars.buttons["我的"].tap()
-        XCTAssertTrue(app.staticTexts["计时暂不可用"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["今天读了 · 实际记录"].waitForExistence(timeout: 5))
         let tools = app.buttons["allTools"]
         for _ in 0..<8 { if tools.isHittable { break }; app.swipeUp() }
         tools.tap()

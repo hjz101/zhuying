@@ -64,6 +64,18 @@ enum BookImporter {
         try Task.checkCancellation()
         try validateSize(data.count)
         let format = (name as NSString).pathExtension.lowercased()
+        if format == "epub" {
+            let parsed: EPUBBookParser.Result
+            do { parsed = try EPUBBookParser.parse(data) }
+            catch is CancellationError { throw CancellationError() }
+            catch let error as BookImportError { throw error }
+            catch { throw BookImportError.message("EPUB 文件无法解包，请检查文件是否完整。") }
+            let book = Book(id: "local-" + StableContentID.list(parsed.chapters.flatMap { $0 }), title: parsed.title, author: parsed.author,
+                            genre: "本地书籍", category: "其他", status: "已完结", words: "\(parsed.chapters.flatMap { $0 }.filter { !$0.hasPrefix(ReaderInlineImage.prefix) }.joined().count) 字",
+                            color: "sage", subtitle: "EPUB", intro: parsed.chapters.flatMap { $0 }.first { !$0.hasPrefix(ReaderInlineImage.prefix) } ?? "EPUB 作品",
+                            tags: ["本地", "EPUB"], chapters: parsed.titles, content: parsed.chapters)
+            return .init(book: book, bytes: data.count, encoding: "EPUB 可重排文字／插图")
+        }
         let parsed = try BookFormatParsers.parse(data: data, extension: format, encoding: encoding)
         let text = parsed.text, encodingName = parsed.encoding
         let normalized = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")

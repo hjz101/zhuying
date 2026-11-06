@@ -107,10 +107,11 @@ enum ActivityPeriod: String, CaseIterable {
     }
 }
 
-struct ActivitySession {
+struct ActivitySession: Codable, Equatable, Sendable {
     let bookID: String
     let start: Date
     let seconds: TimeInterval
+    var kind: ReadingActivityKind? = nil
     var end: Date { start.addingTimeInterval(seconds) }
     func duration(in interval: DateInterval) -> TimeInterval {
         max(0, min(end, interval.end).timeIntervalSince(max(start, interval.start)))

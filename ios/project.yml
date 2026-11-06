@@ -3,6 +3,9 @@ packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift.git
     from: 7.12.0
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    exactVersion: 0.9.20
 options:
   bundleIdPrefix: com.yueshan
   deploymentTarget:
@@ -22,6 +25,7 @@ targets:
     platform: iOS
     dependencies:
       - package: GRDB
+      - package: ZIPFoundation
     info:
       path: Yueshan/Info.plist
       properties:

@@ -127,8 +127,11 @@ struct ReaderView: View {
             updateAnchor(document.anchor(at: ranges[target].location))
             haptic()
         }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { save() } }
-        .onDisappear { save(); chapterTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
+        .onChange(of: scenePhase) { _, phase in store.readingHeartbeat(foreground: phase == .active); if phase != .active { save() } }
+        .onDisappear { store.trackReading(nil); save(); chapterTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
+        .onChange(of: showSettings || showContents || showGestureGuide || showBookmarks || demoFeature != nil) { _, covered in
+            store.trackReading(covered ? nil : (initialized ? book.id : nil),interacted:!covered)
+        }
         .sheet(isPresented: $showContents) {
             ContentsView(book: book, currentChapter: chapter) { target in goChapter(target); showContents = false }
         }
@@ -145,8 +148,14 @@ struct ReaderView: View {
             NavigationStack {
                 FeatureDemoView(feature: feature, bookID: book.id) { item, chapter, paragraph, offset in
                     if item.id == book.id {
-                        goChapter(chapter); anchor = .init(paragraph: paragraph, offset: offset); restoreID += 1; save()
-                        demoFeature = nil
+                        Task {
+                            do {
+                                let request = try store.chapterRequest(for:book,chapter:chapter)
+                                guard let content = try await store.chapterRepository(for:book).document(chapterID:request.chapter.id) else { throw ContentFailure.missingChapter }
+                                let target = try ReadingAnchor(bookID:book.id,document:content,paragraph:paragraph,offset:offset)
+                                demoFeature = nil; goChapter(chapter,location:target)
+                            } catch { message = error.localizedDescription }
+                        }
                     } else {
                         demoFeature = nil
                         store.record(item, chapter: chapter, paragraph: paragraph, characterOffset: offset)
@@ -278,6 +287,7 @@ struct ReaderView: View {
     }
     private func updateAnchor(_ value: ReaderAnchor) {
         guard initialized, !reflowing, loading.phase == .readable else { return }
+        if value != anchor { store.trackReading(book.id, interacted: true) }
         anchor = value; save()
     }
     private func save() {
@@ -290,6 +300,7 @@ struct ReaderView: View {
         chapterTask = Task { await loadChapter(target, resume: resume, atEnd: atEnd, location: location) }
     }
     private func loadChapter(_ target: Int, resume: Bool, atEnd: Bool, location: ReadingAnchor? = nil) async {
+        store.trackReading(nil)
         requestedChapter = target; requestedResume = resume; requestedAtEnd = atEnd
         requestedLocation = location
         guard var request = try? store.chapterRequest(for: book, chapter: target, resume: resume, atEnd: atEnd) else { return }
@@ -301,6 +312,7 @@ struct ReaderView: View {
         sliderValue = Double(target); ranges = []; page = 0
         initialized = true; restoreID += 1; requestedChapter = nil
         _ = store.confirmChapter(book, chapter: target, document: content, anchor: anchor)
+        store.trackReading(book.id, interacted: true)
         showGestureGuide = !store.hasSeenReadingGuide
         haptic()
     }
@@ -312,6 +324,7 @@ struct ReaderView: View {
         } else { goChapter(chapter + (forward ? 1 : -1), atEnd: !forward) }
     }
     private func handleTap(_ fraction: Double) {
+        if initialized && loading.phase == .readable { store.trackReading(book.id,interacted:true) }
         switch ReaderInteraction.action(at: fraction, settings: store.settings) {
         case .controls: controlsVisible.toggle(); haptic()
         case .next, .previous:

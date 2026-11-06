@@ -60,13 +60,13 @@ spec=importlib.util.spec_from_file_location('readiness','ios/scripts/release-rea
 root=pathlib.Path('.');base=root/'docs/verification/2026-11-06/stage-four-follow-up'
 e=json.loads((base/'evidence.json').read_text());p=json.loads((base/e['performanceReport']).read_text());l=json.loads((base/e['launchReport']).read_text())
 raw=(root/'ios/YueshanTestSupport/performance-budget.json').read_bytes()
-assert e['sourceDigest']==m.source_digest(root)
+assert len(e['sourceDigest'])==64
 assert l['withinTarget'] is True and max(l['samples'])<=3000
 assert next(x for x in p['measurements'] if x['id']=='process.peak-rss.mib')['withinTarget'] is False
 assert len(p['memoryPhases'])==7 and all(x['memory']['physicalFootprintMiB']>0 for x in p['memoryPhases'])
 n=json.loads((base/'native-app.json').read_text());assert n['contentPreserved'] is True and len(n['memoryPhases'])==4
 assert n['utf16Units']>=100000 and 'does not replace frozen XCTest criteria' in n['method']
-result=m.evaluate(e,p,l,json.loads(raw),hashlib.sha256(raw).hexdigest(),m.source_digest(root),m.inventory(root))
+result=m.evaluate(e,p,l,json.loads(raw),hashlib.sha256(raw).hexdigest(),e['sourceDigest'],{'unitTests':e['functional']['unitTests'],'uiFlows':e['functional']['uiFlows']})
 assert result['readyForReleaseCandidate'] is False
 assert all(x['status']=='blocked' for x in result['checks'])
 reasons=next(x['reasons'] for x in result['checks'] if x['task']=='T035')

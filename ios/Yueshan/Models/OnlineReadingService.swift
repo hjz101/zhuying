@@ -4,48 +4,90 @@ import Foundation
 /// response to write into the cache. Local archives use their own repository.
 actor OnlineReadingService {
     private var source: (any BookSource)?
+    private var providers: [String:any BookSource] = [:]
+    private let multiSearch = MultiSourceSearch()
+    private let discoverySearch = MultiSourceSearch()
     private var failure: ContentFailure = .authenticationRequired
     private var generation = 0
     private var prefetch: Task<Void, Never>?
     private let cache: RecentChapterCache
+    let downloads: OfflineDownloadStore?
+    private let networkObserver: DownloadNetworkObserver?
     private var authenticationHandler: (@Sendable () async -> Void)?
     func setAuthenticationHandler(_ handler: @escaping @Sendable () async -> Void) { authenticationHandler = handler }
-    private func recordFailure(_ error: Error, revision: Int) async {
+    private func recordFailure(_ error: Error, revision: Int, sourceID: String? = nil) async {
         guard revision == generation, error as? ContentFailure == .authenticationRequired else { return }
-        generation += 1; source = nil; failure = .authenticationRequired
+        generation += 1
+        providers.removeValue(forKey: sourceID ?? source?.sourceID ?? "")
+        source = providers.values.first; failure = .authenticationRequired
         prefetch?.cancel(); prefetch = nil
         await authenticationHandler?()
     }
-    init(cache: RecentChapterCache) { self.cache = cache }
+    init(cache: RecentChapterCache, downloads: OfflineDownloadStore? = nil) {
+        self.cache = cache; self.downloads = downloads; networkObserver = downloads.map { DownloadNetworkObserver(store:$0) }
+    }
+    func prepareDownloads() async {
+        await downloads?.configure { [weak self] book,chapter in
+            guard let self else { throw CancellationError() }; return try await self.networkDocument(book:book,chapter:chapter)
+        }
+    }
+    private func networkDocument(book: LibraryBookRecord, chapter: ChapterRecord) async throws -> ChapterDocument {
+        guard let source = providers[book.source?.sourceID ?? ""], chapter.bookID == book.id, chapter.access == .readable else { throw failure }
+        let revision = generation
+        let document = try await source.document(for:chapter,book:book)
+        try Task.checkCancellation(); guard revision == generation, document.chapterID == chapter.id else { throw CancellationError() }
+        return document
+    }
     func configure(source: (any BookSource)?, failure: ContentFailure = .authenticationRequired) {
         generation += 1; prefetch?.cancel(); prefetch = nil
         self.source = source; self.failure = failure
+        providers = source.map { [$0.sourceID:$0] } ?? [:]
+    }
+    func configure(sources: [any BookSource], failure: ContentFailure = .authenticationRequired) {
+        generation += 1; prefetch?.cancel(); prefetch = nil
+        providers = Dictionary(sources.map { ($0.sourceID,$0) }, uniquingKeysWith: { first,_ in first })
+        source = sources.first; self.failure = failure
     }
     func search(query: String, page: Int) async throws -> BookSearchPage {
         guard let source else { throw failure }
         let revision = generation
         let result: BookSearchPage
-        do { result = try await source.search(query: query, page: page) }
+        do {
+            if providers.count <= 1 { result = try await source.search(query: query, page: page) }
+            else { result = try await multiSearch.search(query, page: page, sources: providers.values.sorted { $0.sourceID < $1.sourceID }) }
+        }
         catch { await recordFailure(error, revision: revision); throw error }
         try Task.checkCancellation(); guard revision == generation else { throw CancellationError() }
         return result
     }
     func details(_ book: LibraryBookRecord) async throws -> (LibraryBookRecord, [ChapterRecord]) {
-        guard let source else { throw failure }
+        guard let source = providers[book.source?.sourceID ?? ""] else { throw failure }
         let revision = generation
         let detail: LibraryBookRecord, catalog: [ChapterRecord]
         do {
             detail = try await source.details(for: book)
             catalog = try await source.chapters(for: detail)
-        } catch { await recordFailure(error, revision: revision); throw error }
+        } catch { await recordFailure(error, revision: revision, sourceID: source.sourceID); throw error }
         try Task.checkCancellation(); guard revision == generation else { throw CancellationError() }
         guard !catalog.isEmpty else { throw ContentFailure.missingChapter }
         return (detail, catalog)
     }
+    func discover(category: String,page: Int,subscribed: Set<String>) async throws -> BookSearchPage {
+        let enabled: [any BookSource] = providers.values.compactMap { source in
+            guard subscribed.contains(source.sourceID), let provider = source as? any DiscoveryBookSource, provider.supportsDiscovery else { return nil }
+            return DiscoverySourceRequest(provider:provider)
+        }.sorted { $0.sourceID < $1.sourceID }
+        guard !enabled.isEmpty else { throw SourceImportError.message("已订阅来源暂不支持分类发现；可继续搜索或检查书架更新。") }
+        let revision = generation
+        let page = try await discoverySearch.search(category,page:page,sources:enabled)
+        try Task.checkCancellation(); guard revision == generation else { throw CancellationError() }; return page
+    }
     func document(book: LibraryBookRecord, chapter: ChapterRecord) async throws -> ChapterDocument {
         prefetch?.cancel(); prefetch = nil
         guard chapter.bookID == book.id, chapter.access == .readable else { throw ContentFailure.restricted }
+        if let document = try await downloads?.document(book:book,chapter:chapter) { return document }
         let key = RecentChapterCache.fingerprint(book: book, chapter: chapter)
+        let source = providers[book.source?.sourceID ?? ""]
         if let document = try await cache.document(bookID: book.id, chapterID: chapter.id, fingerprint: key, allowStale: source == nil) { return document }
         guard let source else { throw failure }
         guard book.source?.sourceID == source.sourceID else { throw ContentFailure.sourceDisabled }
@@ -53,7 +95,7 @@ actor OnlineReadingService {
         let document: ChapterDocument
         do { document = try await source.document(for: chapter, book: book) }
         catch {
-            await recordFailure(error, revision: revision)
+            await recordFailure(error, revision: revision, sourceID: source.sourceID)
             if revision == generation, let failure = error as? ContentFailure,
                [.offline, .timedOut, .unavailable, .rateLimited].contains(failure),
                let cached = try await cache.document(bookID: book.id, chapterID: chapter.id, fingerprint: key, allowStale: true) { return cached }
@@ -67,7 +109,7 @@ actor OnlineReadingService {
     }
     func prefetchNext(book: LibraryBookRecord, current: ChapterRecord, next: ChapterRecord?) {
         prefetch?.cancel(); prefetch = nil
-        guard let source, let next, next.access == .readable, next.bookID == book.id else { return }
+        guard let source = providers[book.source?.sourceID ?? ""], let next, next.access == .readable, next.bookID == book.id else { return }
         let revision = generation, cache = cache
         prefetch = Task { [weak self] in
             do {
@@ -82,6 +124,10 @@ actor OnlineReadingService {
     }
     func cancelPrefetch() { prefetch?.cancel(); prefetch = nil }
     func cacheUsage() async -> (bytes: Int, chapters: Int) { await cache.usage() }
+    func cachedDocument(book: LibraryBookRecord, chapter: ChapterRecord) async throws -> ChapterDocument? {
+        if let document = try await downloads?.document(book:book,chapter:chapter) { return document }
+        return try await cache.document(bookID: book.id, chapterID: chapter.id, fingerprint: RecentChapterCache.fingerprint(book: book, chapter: chapter), allowStale: true)
+    }
     func clearCache(bookID: String? = nil) async throws { prefetch?.cancel(); try await cache.clear(bookID: bookID) }
 }
 

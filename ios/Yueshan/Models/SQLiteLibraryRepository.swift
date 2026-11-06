@@ -239,6 +239,32 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
             try db.execute(sql: "UPDATE book_records SET payload=? WHERE id=?", arguments: [try JSONEncoder().encode(book), id])
         }
     }
+    /// A different source is a separate edition. Retain the original catalog,
+    /// bookmarks and reading anchor; transfer the shelf slot only after the new
+    /// edition's content and anchor have been validated.
+    func commitSourceSwitch(from oldID: String, book: LibraryBookRecord, chapters: [ChapterRecord], anchor: ReadingAnchor) throws {
+        guard oldID != book.id, book.source != nil, !chapters.isEmpty,
+              chapters.allSatisfy({ $0.bookID == book.id }), Set(chapters.map(\.id)).count == chapters.count,
+              Set(chapters.map(\.order)).count == chapters.count, anchor.bookID == book.id,
+              chapters.contains(where: { $0.id == anchor.chapterID && $0.access == .readable }) else { throw ContentFailure.invalidResponse }
+        try database.write { db in
+            guard try Data.fetchOne(db, sql: "SELECT payload FROM book_records WHERE id=?",arguments:[oldID]) != nil else { throw ContentFailure.missingChapter }
+            try db.execute(sql:"INSERT INTO book_records(id,payload) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",arguments:[book.id,try JSONEncoder().encode(book)])
+            try db.execute(sql:"DELETE FROM source_bindings WHERE bookID=?",arguments:[book.id])
+            let source = book.source!
+            try db.execute(sql:"INSERT INTO source_bindings(id,bookID,sourceID,nativeBookID) VALUES (?,?,?,?)",arguments:[source.id,book.id,source.sourceID,source.nativeBookID])
+            try db.execute(sql:"DELETE FROM chapter_records WHERE bookID=?",arguments:[book.id])
+            for chapter in chapters { try db.execute(sql:"INSERT INTO chapter_records(id,bookID,position,payload) VALUES (?,?,?,?)",arguments:[chapter.id,book.id,chapter.order,try JSONEncoder().encode(chapter)]) }
+            try db.execute(sql:"INSERT INTO reading_progress(bookID,payload) VALUES (?,?) ON CONFLICT(bookID) DO UPDATE SET payload=excluded.payload",arguments:[book.id,try JSONEncoder().encode(anchor)])
+            if let row = try Row.fetchOne(db,sql:"SELECT addedAt,position FROM shelf_entries WHERE bookID=?",arguments:[oldID]) {
+                try db.execute(sql:"DELETE FROM shelf_entries WHERE bookID IN (?,?)",arguments:[oldID,book.id])
+                try db.execute(sql:"INSERT INTO shelf_entries(bookID,addedAt,position) VALUES (?,?,?)",arguments:[book.id,row["addedAt"] as Date,row["position"] as Int?])
+            }
+            if let group = try String.fetchOne(db,sql:"SELECT name FROM book_groups WHERE bookID=?",arguments:[oldID]) {
+                try db.execute(sql:"INSERT INTO book_groups(bookID,name) VALUES (?,?) ON CONFLICT(bookID) DO UPDATE SET name=excluded.name",arguments:[book.id,group])
+            }
+        }
+    }
     /// Only used for a validated, inactive restore generation.
     func restoreBackup(_ value: LibraryDatabaseArchive) throws {
         try database.write { db in

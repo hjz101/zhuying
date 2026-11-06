@@ -17,8 +17,9 @@ struct ProductionCacheView: View {
                     HStack { Label("图片", systemImage: "photo"); Spacer(); Text("未缓存") }
                     HStack { Label("音频", systemImage: "waveform"); Spacer(); Text("暂不支持") }
                 }.font(.system(size: 12))
-                Text("近期缓存最多 60 章、32 MiB；联网时超过 24 小时尝试更新，断网仍可读已缓存正文。当前章优先，预取失败不阻塞阅读。清理仅影响网络正文缓存，保留导入正文、进度、收藏、书签、字体和主题。整本下载队列尚未交付。")
+                Text("近期缓存最多 60 章、32 MiB；联网时超过 24 小时尝试更新，断网仍可读已缓存正文。当前章优先，预取失败不阻塞阅读。清理近期缓存会保留主动下载、导入正文、进度、收藏、书签、字体和主题。")
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                NavigationLink { ProductionDownloadView(bookID:bookID) } label: { Label("管理主动下载",systemImage:"arrow.down.circle") }.font(.system(size:13))
                 Button(bookID == nil ? "清理近期章节缓存" : "清理当前作品缓存") { confirming = true }.buttonStyle(PrimaryButtonStyle(filled: false)).accessibilityIdentifier("clearRecentCache")
                 if let message { Text(message).font(.system(size: 12)).accessibilityIdentifier("cacheMessage") }
             }.padding(22)

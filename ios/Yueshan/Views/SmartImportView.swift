@@ -75,7 +75,7 @@ struct SmartImportView: View {
                     Text("从“文件”选择，可浏览我的 iPhone、iCloud 等位置。")
                         .font(.system(size: 11)).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
                     Button("选择文件") { showingFiles = true }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("importChooseFiles")
-                    Text("可多选 · TXT / 文字 PDF · 单个文件 ≤ 20 MB")
+                    Text("可多选 · TXT / EPUB / 文字 PDF · 单个文件 ≤ 20 MB")
                         .font(.system(size: 10)).foregroundStyle(Palette.muted)
                 }.frame(maxWidth: .infinity).padding(22).background(Palette.card, in: .rect(cornerRadius: 16))
             } else {
@@ -97,7 +97,7 @@ struct SmartImportView: View {
                     Button("识别链接") { recognizeLink() }.disabled(link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .accessibilityIdentifier("importRecognizeLink")
                 }.font(.system(size: 13))
-                Text("支持 TXT、文字 PDF 的 https 下载链接。")
+                Text("支持 TXT、EPUB、文字 PDF 的 https 下载链接。")
                     .font(.system(size: 11)).foregroundStyle(Palette.muted)
             }.disabled(session.busy)
         case .clipboard:
@@ -190,7 +190,7 @@ struct SmartImportView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("选择 → 预览 → 导入").font(.system(size: 23, design: .serif))
                     Text("本地文件通过系统“文件”选择，可多选；iCloud 文件需要先完成下载。取消选择不会改变书架。")
-                    Text("TXT 支持 UTF-8、UTF-16 和 GB18030；PDF 提取文字后使用文本阅读器。扫描版、加密 PDF、EPUB、漫画与压缩包暂不支持实际解析。")
+                    Text("TXT 支持 UTF-8、UTF-16 和 GB18030；EPUB 支持未加密可重排文字和本地 PNG／JPEG 插图，使用当前阅读样式；PDF 提取文字。固定版式、出版社复杂样式、扫描版、加密内容、漫画与独立压缩包暂不支持。")
                     Text("重复内容会跳过。确认导入后，正文保存在 App 内，阅读进度在重启后保留。移除预览只影响本次清单，不删除原文件。")
                     Text("书源、主题等专用内容，请从对应的管理页面导入。")
                 }.font(.system(size: 14)).lineSpacing(6).padding(22)

@@ -8,13 +8,14 @@ import Combine
     @Published private(set) var message: String?
     @Published private(set) var partial = false
     @Published private(set) var nextPage: Int?
+    @Published private(set) var sourceReports: [SourceSearchReport] = []
     private var generation = 0
     private var operation: Task<Void, Never>?
     func search(_ text: String, service: OnlineReadingService, debounce: Bool = true) {
         operation?.cancel(); generation += 1
         let revision = generation
         query = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        results = []; message = nil; partial = false; nextPage = nil; busy = !query.isEmpty
+        results = []; message = nil; partial = false; nextPage = nil; sourceReports = []; busy = !query.isEmpty
         guard !query.isEmpty else { return }
         let requested = query
         operation = Task { [weak self] in
@@ -51,5 +52,6 @@ import Combine
         if replacing { results = new } else { results.append(contentsOf: new) }
         nextPage = !replacing && new.isEmpty ? nil : page.nextPage
         partial = partial || page.hasPartialFailures
+        sourceReports = page.sourceReports
     }
 }

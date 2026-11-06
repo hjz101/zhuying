@@ -112,6 +112,14 @@ struct ReaderDocument {
         var ranges: [NSRange] = []
         let font = ReaderTypography.font(settings: settings)
         for (paragraphIndex, paragraph) in (paragraphs ?? book.content[safe: chapter] ?? []).enumerated() {
+            if let image = ReaderInlineImage.image(paragraph) {
+                let attachment = ReaderResponsiveCommentAttachment(); attachment.image = image
+                let ratio = image.size.height / max(1, image.size.width)
+                attachment.bounds = CGRect(x: 0, y: 0, width: min(240, 280 / max(0.1, ratio)), height: min(280, 240 * ratio))
+                ranges.append(NSRange(location: text.length, length: 1))
+                text.append(NSAttributedString(attachment: attachment)); text.append(NSAttributedString(string: "\n"))
+                continue
+            }
             ranges.append(NSRange(location: text.length, length: (paragraph as NSString).length))
             let style = NSMutableParagraphStyle()
             style.lineSpacing = settings.lineSpacing

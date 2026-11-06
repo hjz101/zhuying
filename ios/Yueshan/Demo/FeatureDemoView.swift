@@ -47,7 +47,9 @@ struct FeatureDemoView: View {
 
     var body: some View {
         Group {
-            if feature.id == "import" { SmartImportView() }
+            if feature.id == "import" || (!library.isDemo && ["epub", "txt"].contains(feature.id)) { SmartImportView() }
+            else if !library.isDemo && feature.id == "fulltext" { ProductionTextSearchView(bookID: bookID, onRead: onRead) }
+            else if !library.isDemo && feature.id == "statistics" { FootprintsView(title: feature.title) }
             else if feature.id == "themes" { ThemeLibraryView() }
             else if feature.id == "fonts" { ReadingFontManagerView() }
             else if feature.id == "typography" { ReadingTypographyPreferencesView().navigationTitle(feature.title) }
@@ -56,13 +58,20 @@ struct FeatureDemoView: View {
             else if feature.id == "highlight" { ReadingStyleRulesView().navigationTitle(feature.title) }
             else if feature.id == "comments" { ReadingCommentsPreferencesView().navigationTitle(feature.title) }
             else if !library.isDemo && feature.id == "sourceLogin" && scope == "shushan" { ShushanLoginView() }
-            else if !library.isDemo && feature.id == "sourceEdit" && scope == "shushan" { SourceConfigurationView(sourceID: scope) }
+            else if !library.isDemo && feature.id == "sourceEdit" && (scope == "shushan" || (scope == "main" && library.sources.first?.id == "shushan")) { SourceConfigurationView(sourceID:"shushan") }
+            else if !library.isDemo && feature.id == "sourceEdit" { ProductionSourceRuleEditor(sourceID: scope == "main" ? library.sources.first?.id ?? scope : scope) }
+            else if !library.isDemo && feature.id == "sourceImport" { ProductionSourceImportView() }
+            else if !library.isDemo && feature.id == "sourceSwitch" { ProductionSourceSwitchView(bookID:bookID) }
+            else if !library.isDemo && feature.id == "sourceDebug" { ProductionSourceDiagnosticsView(sourceID:scope) }
+            else if !library.isDemo && feature.id == "sourceBatch" { ProductionSourceDiagnosticsView(batch:true) }
+            else if !library.isDemo && feature.id == "discover" { ProductionSubscriptionsView() }
             else if !library.isDemo && feature.id == "search" { DiscoverView(searchEntry: true) }
             else if !library.isDemo && feature.id == "shelf" { ProductionGroupsView() }
             else if !library.isDemo && feature.id == "bookmarks" { ProductionBookmarksView(bookID: bookID) }
             else if !library.isDemo && ["history", "progress"].contains(feature.id) { ReadingHistoryView() }
             else if !library.isDemo && feature.id == "backup" { ProductionBackupView() }
-            else if !library.isDemo && ["cache", "chapterCache"].contains(feature.id) { ProductionCacheView(bookID: bookID) }
+            else if !library.isDemo && feature.id == "cache" { ProductionCacheView(bookID: bookID) }
+            else if !library.isDemo && feature.id == "chapterCache" { ProductionDownloadView(bookID:bookID) }
             else if !library.isDemo && feature.id == "files" { ProductionFilesView() }
             else if !library.isDemo {
                 ContentUnavailableView(feature.title, systemImage: feature.icon, description: Text("当前版本暂不支持此功能。"))

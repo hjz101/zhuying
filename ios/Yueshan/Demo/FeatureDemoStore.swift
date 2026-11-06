@@ -25,6 +25,7 @@ struct DemoSource: Identifiable, Codable, Equatable {
     var pinned = false
     var responseMilliseconds: Int?
     var hasFailure = false
+    var configuration: Data? = nil
 }
 struct SourceImportPreview {
     let sources: [DemoSource]
@@ -291,10 +292,10 @@ final class FeatureDemoStore: ObservableObject {
     @discardableResult
     func createSource(kind: DemoSourceKind = .novel, group: String? = nil) -> String {
         if !isDemo {
-            if !sources.contains(where: { $0.id == "shushan" }) {
-                sources.append(.init(id: "shushan", name: "书山聚合", group: group ?? "小说", detail: "固定原生适配器", url: ShushanClient.defaultHost))
-            }
-            return "shushan"
+            let id = UUID().uuidString
+            let config: [String:Any] = ["adapter":"json-v1", "endpoints":(try? JSONSerialization.jsonObject(with: JSONEncoder().encode(NativeSourceRules.example))) ?? [:]]
+            sources.append(.init(id: id, name: "自定义书源", group: group ?? "小说", enabled: false, detail: "原生 JSON v1 · 待配置", url: "https://books.example", configuration: try? JSONSerialization.data(withJSONObject: config)))
+            return id
         }
         let id = UUID().uuidString
         sources.append(.init(id: id, name: "自定义书源 \(sources.count + 1)", group: group ?? kind.rawValue, detail: "待调试 · 演示配置", kind: kind))

@@ -26,12 +26,17 @@ private struct LibraryViewPreferences: Codable {
     var shelfLayout: String?
     var hasSeenReadingGuide: Bool
     var groupNames: [String]? = nil
+    var activitySessions: [ActivitySession]? = nil
+    var subscribedSourceIDs: [String]? = nil
+    var updates: [String:UpdateNotice]? = nil
     init(_ snapshot: LibrarySnapshot) {
         settings = snapshot.settings; sort = snapshot.sort
         if settings.preferences.bubbleSVG != nil { settings.preferences.bubbleImageData = nil }
         if settings.preferences.customBubbleSVG != nil { settings.preferences.customBubbleImageData = nil }
         shelfLayout = snapshot.shelfLayout; hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
         groupNames = snapshot.groupNames
+        activitySessions = snapshot.activitySessions
+        subscribedSourceIDs = snapshot.subscribedSourceIDs; updates = snapshot.updates
     }
 }
 
@@ -115,6 +120,14 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         savedAnchors[anchor.bookID] = anchor; remoteDocuments[document.chapterID] = document
     }
     func cachedChapterCount() -> Int { documents.count }
+    func switchSource(from oldID: String, book: LibraryBookRecord, chapters: [ChapterRecord], anchor: ReadingAnchor, document: ChapterDocument) async throws {
+        try await serialized { try await $0.performSwitchSource(from:oldID,book:book,chapters:chapters,anchor:anchor,document:document) }
+    }
+    private func performSwitchSource(from oldID: String, book: LibraryBookRecord, chapters: [ChapterRecord], anchor: ReadingAnchor, document: ChapterDocument) async throws {
+        guard case .exact = ReadingAnchorResolver.resolve(anchor,in:document) else { throw ContentFailure.invalidResponse }
+        try await records.commitSourceSwitch(from:oldID,book:book.withDisplayMetadata(),chapters:chapters,anchor:anchor)
+        catalogs[book.id] = chapters; savedAnchors[book.id] = anchor; remoteDocuments[document.chapterID] = document
+    }
     func localFiles() async throws -> [LocalBookFile] {
         try await serialized { backend in try await backend.performLocalFiles() }
     }
@@ -386,6 +399,8 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             snapshot.settings = view.settings; snapshot.sort = view.sort
             snapshot.shelfLayout = view.shelfLayout; snapshot.hasSeenReadingGuide = view.hasSeenReadingGuide
             snapshot.groupNames = view.groupNames
+            snapshot.activitySessions = view.activitySessions
+            snapshot.subscribedSourceIDs = view.subscribedSourceIDs; snapshot.updates = view.updates
         }
         var unresolved = Set<String>()
         if let data = try await records.preference(key: Self.unresolvedKey) {

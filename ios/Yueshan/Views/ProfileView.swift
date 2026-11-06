@@ -8,7 +8,7 @@ struct ProfileView: View {
 
     private var todaySeconds: TimeInterval {
         let calendar = Calendar.current
-        return ActivityReport(sessions: ActivitySession.demo(books: store.books, now: now, calendar: calendar),
+        return ActivityReport(sessions: store.isDemo ? ActivitySession.demo(books: store.books, now: now, calendar: calendar) : store.activitySessions.filter { ($0.kind ?? .reading) == .reading },
                               now: now, period: .day, calendar: calendar).seconds
     }
 
@@ -31,7 +31,7 @@ struct ProfileView: View {
                     sectionRule("那些翻过书页的日子", label: "HABITS / 02")
                     HStack(alignment: .top, spacing: 12) {
                         NavigationLink { FootprintsView() } label: {
-                            metric(store.isDemo ? "\(Int(todaySeconds / 60))" : "—", unit: "分钟", caption: store.isDemo ? "今天读了 · 示例" : "计时暂不可用")
+                            metric("\(Int(todaySeconds / 60))", unit: "分钟", caption: store.isDemo ? "今天读了 · 示例" : "今天读了 · 实际记录")
                         }.accessibilityIdentifier("profileActivity")
                         Button(action: onShelf) { metric("\(store.favorites.count)", unit: "本", caption: "收藏的故事") }
                             .accessibilityIdentifier("profileFavorites")
@@ -190,7 +190,7 @@ private struct DemoAboutView: View {
                     Text("YUESHAN FOR iOS · DESIGN PREVIEW 0.3").font(.system(size: 9)).foregroundStyle(Palette.muted)
                     } else {
                         Text("原生文字阅读器，支持 TXT／文字 PDF、书山聚合固定接口、书架与稳定位置、本地备份。")
-                        Text("在线可读性取决于书源；朗读、统计计时、云同步及未接入扩展功能明确显示暂不可用。")
+                        Text("在线可读性取决于书源；阅读时长来自实际前台会话。需要服务配置的能力及尚未接入的扩展会单独说明。")
                         Text("YUESHAN FOR iOS · DEVELOPMENT CANDIDATE").font(.system(size: 9)).foregroundStyle(Palette.muted)
                     }
                 }.font(.system(size: 12)).lineSpacing(6)

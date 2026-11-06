@@ -122,6 +122,7 @@ struct ReadingSettings: Codable, Equatable {
 struct UpdateNotice: Codable, Equatable {
     var firstChapter: Int
     var readThrough: Int = -1
+    var unreadChapterIDs: [String]? = nil
 }
 
 struct ShelfRemoval {
@@ -140,6 +141,8 @@ struct LibrarySnapshot: Codable {
     var shelfLayout: String? = nil
     var importedGroups: [String: String]? = nil
     var groupNames: [String]? = nil
+    var activitySessions: [ActivitySession]? = nil
+    var subscribedSourceIDs: [String]? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -182,6 +185,12 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var sources: [DemoSource] = []
     @Published private(set) var onlineRevision = 0
     @Published private(set) var groupNames: [String] = []
+    @Published private(set) var activitySessions: [ActivitySession] = []
+    @Published private(set) var subscribedSourceIDs: Set<String> = []
+    private var readingActivityClock = ReadingActivityClock()
+    private var activityBookID: String?
+    private var activityForeground = true
+    private var textIndex: TextSearchIndex?
     private(set) var onlineService: OnlineReadingService?
     private(set) var workspace: LibraryWorkspace?
     private var remoteBooks: [String: LibraryBookRecord] = [:]
@@ -247,6 +256,7 @@ final class LibraryStore: ObservableObject {
             let snapshot = try JSONDecoder().decode(LibrarySnapshot.self, from: JSONSerialization.data(withJSONObject: object))
             guard snapshot.version == 1 else { throw CocoaError(.coderReadCorrupt) }
             hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
+            activitySessions = snapshot.activitySessions ?? []
             var seen = Set<String>()
             let ids = Set(books.map(\.id))
             importedGroups = (snapshot.importedGroups ?? [:]).filter { ids.contains($0.key) }
@@ -326,6 +336,7 @@ final class LibraryStore: ObservableObject {
     var updatedBooks: [Book] { shelf.filter { updateCount($0) > 0 } }
     func updateCount(_ book: Book) -> Int {
         guard let notice = updates[book.id] else { return 0 }
+        if let unread = notice.unreadChapterIDs { return unread.count }
         return max(0, book.chapters.count - max(notice.firstChapter, notice.readThrough + 1))
     }
     func simulateUpdates() {
@@ -395,6 +406,9 @@ final class LibraryStore: ObservableObject {
             notice.readThrough = max(notice.readThrough, chapter)
             updates[book.id] = notice
         }
+        if let chapterID = chapterCatalogs[book.id]?[safe:chapter]?.id, var notice = updates[book.id], let unread = notice.unreadChapterIDs {
+            notice.unreadChapterIDs = unread.filter { $0 != chapterID }; updates[book.id] = notice
+        }
         persist()
         if changedChapter && productionPersistence != nil { enqueueSave() }
         return true
@@ -459,7 +473,7 @@ final class LibraryStore: ObservableObject {
 
     private var snapshot: LibrarySnapshot {
         .init(favorites: favorites, progress: progress, settings: settings, sort: sort, updates: updates,
-              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames)
+              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted())
     }
 
     func bootstrapProductionIfNeeded(prepareAppearance: (() throws -> AppearanceMigrationInput)? = nil, forceReload: Bool = false) async {
@@ -488,6 +502,9 @@ final class LibraryStore: ObservableObject {
             sort = restored.snapshot.sort
             shelfLayout = ShelfLayout(rawValue: restored.snapshot.shelfLayout ?? "") ?? .standard
             hasSeenReadingGuide = restored.snapshot.hasSeenReadingGuide ?? false
+            activitySessions = restored.snapshot.activitySessions ?? []
+            subscribedSourceIDs = Set(restored.snapshot.subscribedSourceIDs ?? [])
+            updates = restored.snapshot.updates ?? [:]
             themeLibrary = restored.themeLibrary
             unresolvedBookIDs = restored.unresolvedBookIDs
             bookmarks = restored.bookmarks
@@ -545,9 +562,89 @@ final class LibraryStore: ObservableObject {
     }
     func chapterAccess(_ book: Book, chapter: Int) -> ChapterRecord.Access { chapterCatalogs[book.id]?[safe: chapter]?.access ?? .readable }
     func remoteMetadata(_ id: String) -> LibraryBookRecord? { remoteBooks[id] }
+    func trackReading(_ bookID: String?, foreground: Bool? = nil, interacted: Bool = false,
+                      now: Date = Date(), uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        guard !isDemo else { return }
+        if let foreground { activityForeground = foreground }
+        let session = readingActivityClock.advance(bookID: bookID, active: activityForeground && bookID != nil,
+                                                  interacted: interacted, wall: now, uptime: uptime)
+        activityBookID = bookID
+        guard let session else { return }
+        if let last = activitySessions.last, last.bookID == session.bookID, last.kind == session.kind,
+           abs(last.end.timeIntervalSince(session.start)) < 0.01, last.seconds + session.seconds <= 900 {
+            activitySessions[activitySessions.count - 1] = .init(bookID: last.bookID, start: last.start, seconds: last.seconds + session.seconds, kind: last.kind)
+        } else { activitySessions.append(session) }
+        persist()
+    }
+    func readingHeartbeat(foreground: Bool? = nil) { trackReading(activityBookID, foreground: foreground) }
+    struct SearchResult { let hits: [TextSearchHit]; let indexed: Int; let uncached: Int }
+    func searchText(_ query: String, bookID: String? = nil) async throws -> SearchResult {
+        var indexed: [IndexedChapter] = [], missing = 0
+        for book in books where bookID == nil || book.id == bookID {
+            for chapter in book.chapters.indices {
+                try Task.checkCancellation()
+                let request = try chapterRequest(for: book, chapter: chapter)
+                guard request.chapter.access == .readable else { continue }
+                let document: ChapterDocument?
+                if let remote = remoteBooks[book.id] { document = try await onlineService?.cachedDocument(book: remote, chapter: request.chapter) }
+                else { document = try await chapterRepository(for: book).document(chapterID: request.chapter.id) }
+                if let document { indexed.append(.init(bookID: book.id, document: document)) } else { missing += 1 }
+            }
+        }
+        if textIndex == nil { textIndex = try TextSearchIndex(url: workspace?.root.appendingPathComponent("ContentIndex.sqlite")) }
+        guard let textIndex else { throw ContentFailure.storageFailure }
+        try await textIndex.replace(indexed)
+        return .init(hits: try await textIndex.search(query, bookID: bookID), indexed: indexed.count, uncached: missing)
+    }
+    func openSearchHit(_ hit: TextSearchHit, present: Bool = true) async throws -> ReadingAnchor {
+        guard let book = books.first(where: { $0.id == hit.bookID }), let chapter = chapterIndex(bookID: hit.bookID, chapterID: hit.chapterID),
+              let document = try await chapterRepository(for: book).document(chapterID: hit.chapterID), document.version == hit.version,
+              document.paragraphs[safe: hit.paragraph]?.text == hit.text else { throw BookImportError.message("正文或缓存已更新，请重新检索后打开；原进度已保留。") }
+        let anchor = try ReadingAnchor(bookID: hit.bookID, document: document, paragraph: hit.paragraph, offset: hit.offset)
+        if present { reader = .init(book: book, chapter: chapter, resume: false, anchor: anchor) }
+        return anchor
+    }
     func updateSources(_ value: [DemoSource]) {
         guard loadState == .ready, sources != value else { return }
         sources = value; onlineRevision += 1; persist()
+    }
+    func sourceSwitchSuggestion(bookID: String, catalog: [ChapterRecord]) -> Int? {
+        guard let book = books.first(where: { $0.id == bookID }), let chapter = progress[bookID]?.chapter, book.chapters.indices.contains(chapter) else { return nil }
+        return SourceChapterMapping.suggestion(title: book.chapterTitle(chapter),order:chapter,catalog:catalog)
+    }
+    func subscribe(sourceID: String, enabled: Bool) {
+        if enabled { subscribedSourceIDs.insert(sourceID) } else { subscribedSourceIDs.remove(sourceID) }; persist()
+    }
+    func checkSubscribedUpdates() async throws -> (checked: Int, failed: Int, added: Int) {
+        guard let service = onlineService else { throw ContentFailure.sourceDisabled }
+        var checked = 0, failed = 0, added = 0
+        let candidates = shelf.compactMap { remoteBooks[$0.id] }.filter { subscribedSourceIDs.contains($0.source?.sourceID ?? "") }
+        for book in candidates {
+            try Task.checkCancellation()
+            do {
+                let (detail,catalog) = try await service.details(book)
+                try Task.checkCancellation()
+                let previous = Set((chapterCatalogs[book.id] ?? []).map(\.id)), current = Set(catalog.map(\.id))
+                let newlyAdded = current.subtracting(previous)
+                _ = try await registerRemoteBook(detail,chapters:catalog)
+                let unread = Set(updates[book.id]?.unreadChapterIDs ?? []).union(newlyAdded).intersection(current)
+                updates[book.id] = .init(firstChapter:0,unreadChapterIDs:unread.sorted())
+                added += newlyAdded.count; checked += 1
+            } catch is CancellationError { throw CancellationError() }
+            catch { failed += 1 }
+        }
+        persist(); guard await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        return (checked,failed,added)
+    }
+    func switchSource(from oldID: String, to book: LibraryBookRecord, catalog: [ChapterRecord], chapter: Int, allowChapterStart: Bool) async throws {
+        guard let backend = productionPersistence, let service = onlineService, catalog.indices.contains(chapter), await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        let document = try await service.document(book:book,chapter:catalog[chapter])
+        try Task.checkCancellation()
+        let anchor = try SourceChapterMapping.anchor(from: stableProgress[oldID],bookID:book.id,document:document,allowChapterStart:allowChapterStart)
+        try await backend.switchSource(from:oldID,book:book,chapters:catalog,anchor:anchor,document:document)
+        await bootstrapProductionIfNeeded(forceReload:true)
+        guard loadState == .ready, let presentation = books.first(where: { $0.id == book.id }) else { throw ContentFailure.storageFailure }
+        reader = .init(book:presentation,chapter:chapter,resume:false,anchor:anchor)
     }
     func configureOnline(credential: ShushanCredential?, expired: Bool = false) async {
         guard let service = onlineService else { return }
@@ -558,10 +655,19 @@ final class LibraryStore: ObservableObject {
         }
         #endif
         let source = sources.first { $0.id == "shushan" && $0.enabled && $0.kind == .novel }
+        var providers: [any BookSource] = sources.filter { $0.enabled && $0.kind == .novel && $0.id != "shushan" }.compactMap { try? ConfigurableBookSource(source: $0) }
         if let source, let credential, (try? ShushanClient.host(source.url)) == credential.host, !expired {
-            await service.configure(source: ShushanBookSource(credential: credential))
-        } else { await service.configure(source: nil, failure: source == nil ? .sourceDisabled : .authenticationRequired) }
+            providers.append(ShushanBookSource(credential: credential))
+        }
+        await service.configure(sources: providers, failure: source == nil ? .sourceDisabled : .authenticationRequired)
+        await service.prepareDownloads()
         onlineRevision += 1
+    }
+    func enqueueDownload(bookID: String, count: Int?, wifiOnly: Bool) async throws {
+        guard let book = remoteBooks[bookID], let catalog = chapterCatalogs[bookID], let downloads = await onlineService?.downloads else { throw ContentFailure.sourceDisabled }
+        let start = min(catalog.count, (progress[bookID]?.chapter ?? -1) + 1)
+        let selected = count.map { Array(catalog.dropFirst(start).prefix($0)) } ?? catalog
+        _ = try await downloads.enqueue(book:book,chapters:selected.filter { $0.access == .readable },wifiOnly:wifiOnly)
     }
     @discardableResult func registerRemoteBook(_ record: LibraryBookRecord, chapters: [ChapterRecord]) async throws -> Book {
         guard let backend = productionPersistence, loadState == .ready else { throw ContentFailure.storageFailure }

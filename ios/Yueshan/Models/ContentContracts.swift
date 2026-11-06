@@ -190,6 +190,7 @@ struct BookSearchPage: Equatable, Sendable {
     var nextPage: Int?
     /// An aggregate source may return usable results while some providers fail.
     var hasPartialFailures = false
+    var sourceReports: [SourceSearchReport] = []
 }
 
 protocol BookSource: Sendable {

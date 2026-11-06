@@ -7,7 +7,11 @@ struct DiscoverView: View {
     @State private var query = ""
     @State private var category = "全部"
     @State private var searchPresented = false
-    private let categories = ["全部", "奇幻", "都市", "科幻", "古风", "悬疑", "仙侠"]
+    private var categories: [String] {
+        if store.isDemo { return ["全部", "奇幻", "都市", "科幻", "古风", "悬疑", "仙侠"] }
+        var seen: Set<String> = ["全部"]
+        return ["全部"] + store.sources.flatMap { (try? SourcePackages.rules($0))?.categories ?? [] }.filter { seen.insert($0).inserted }
+    }
 
     var body: some View {
         ScrollView {
@@ -47,7 +51,8 @@ struct DiscoverView: View {
                     }
                 }
                 } else {
-                    onlineResults
+                    if !searchEntry && query.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty { SubscribedDiscoverySection(category:category) }
+                    else { onlineResults }
                 }
             }.padding(.horizontal, 22).padding(.top, 19).padding(.bottom, 25)
         }
@@ -55,7 +60,7 @@ struct DiscoverView: View {
         .navigationTitle(searchEntry ? "搜索" : "发现")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书名或作者")
-        .onAppear { if searchEntry { searchPresented = true } }
+        .onAppear { if searchEntry { searchPresented = true }; if !store.isDemo && !query.isEmpty { runSearch() } }
         .onChange(of: query) { _, _ in runSearch() }
         .onChange(of: store.onlineRevision) { _, _ in runSearch() }
         .onDisappear { online.cancel() }
@@ -70,7 +75,7 @@ struct DiscoverView: View {
         SectionHeading(title: query.isEmpty ? "故事小馆" : "搜索结果", subtitle: "\(online.results.count) 个来源版本")
         if online.busy && online.results.isEmpty { ProgressView("正在搜索书源").frame(maxWidth: .infinity).accessibilityIdentifier("onlineSearching") }
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            ContentUnavailableView("搜索书名或作者", systemImage: "magnifyingglass", description: Text("使用已启用并登录的书山聚合查找作品。"))
+            ContentUnavailableView("搜索书名或作者", systemImage: "magnifyingglass", description: Text("搜索已启用的可运行书源；书山聚合需先登录。不同来源版本分别保留。"))
         } else if online.results.isEmpty && !online.busy && online.message == nil { ContentUnavailableView.search(text: query) }
         if let message = online.message {
             Text(message).font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("onlineSearchError")
@@ -78,12 +83,19 @@ struct DiscoverView: View {
             NavigationLink("管理书源与登录") { SourceManagementView() }
         }
         if online.partial { Text("部分站点未返回结果，已保留可用来源版本。").font(.system(size: 11)).foregroundStyle(Palette.muted) }
+        ForEach(online.sourceReports, id: \.sourceID) { report in
+            Text("\(store.sources.first(where: { $0.id == report.sourceID })?.name ?? report.sourceID) · \(report.status) · \(report.count) 个结果")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted)
+        }
         LazyVStack(spacing: 23) {
-            ForEach(online.results) { record in
+            ForEach(BookCandidateGroup.groups(online.results)) { group in
+                if group.records.count > 1 { Text("同名同作者候选 · \(group.records.count) 个版本，内容尚未确认一致").font(.system(size:11)).foregroundStyle(Palette.muted) }
+                ForEach(group.records) { record in
                 NavigationLink { BookDetailView(book: record.presentation(chapters: []), onlineRecord: record) } label: {
                     BookRow(book: record.presentation(chapters: []))
                 }.buttonStyle(.plain).accessibilityIdentifier("online-result-\(record.id)")
                 if record.id != online.results.last?.id { Divider().overlay(Palette.line) }
+                }
             }
         }
         if online.nextPage != nil {

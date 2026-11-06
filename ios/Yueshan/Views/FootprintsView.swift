@@ -12,13 +12,13 @@ struct FootprintsView: View {
     @State private var showAll = false
     private var calendar: Calendar { .current }
     private var report: ActivityReport {
-        ActivityReport(sessions: store.isDemo ? ActivitySession.demo(books: store.books, now: now, calendar: calendar) : [], now: now, period: period, calendar: calendar)
+        ActivityReport(sessions: store.isDemo ? ActivitySession.demo(books: store.books, now: now, calendar: calendar) : store.activitySessions.filter { ($0.kind ?? .reading) == .reading }, now: now, period: period, calendar: calendar)
     }
     var body: some View {
         let data = report
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                AppPageHeader(title: "每一页，都有足迹。", subtitle: store.isDemo ? "阅读统计 · 示例数据，非实际计时" : "阅读计时暂未启用 · 不生成模拟统计", icon: "calendar")
+                AppPageHeader(title: "每一页，都有足迹。", subtitle: store.isDemo ? "阅读统计 · 示例数据，非实际计时" : "真实阅读记录 · 前台阅读，空闲 60 秒停止计时 · 朗读单独记录", icon: "calendar")
                 Picker("统计周期", selection: $period) {
                     ForEach(ActivityPeriod.allCases, id: \.self) { Text($0.title).tag($0) }
                 }.pickerStyle(.segmented).accessibilityIdentifier("activityPeriod")
@@ -231,7 +231,7 @@ private struct ActivityBookView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 18) { BookCover(book: book, width: 75); AppPageHeader(title: book.title, subtitle: "本\(report.period.title) · 示例阅读记录", icon: "clock") }
+                HStack(spacing: 18) { BookCover(book: book, width: 75); AppPageHeader(title: book.title, subtitle: "本\(report.period.title) · \(store.isDemo ? "示例阅读记录" : "真实阅读记录")", icon: "clock") }
                 Text(ActivityReport.duration(report.total(in: report.interval, bookID: book.id))).font(.system(size: 25, design: .serif))
                 Button { store.read(book) } label: { Label("继续阅读", systemImage: "book") }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("activityResume")
                 ForEach(report.sessions.filter { $0.bookID == book.id && $0.duration(in: report.interval) > 0 }.sorted { $0.start > $1.start }, id: \.start) { session in

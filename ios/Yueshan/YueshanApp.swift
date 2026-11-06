@@ -62,7 +62,7 @@ struct YueshanApp: App {
             var rejectFirstOpen = testing && ProcessInfo.processInfo.arguments.contains("--storage-retry-fixture")
             let cacheRoot = manager.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent(environment.databaseComponent + "/RecentChapters")
             if environment.resetsTestState { try? manager.removeItem(at: cacheRoot) }
-            let online = environment.isDemo ? nil : OnlineReadingService(cache: try RecentChapterCache(directory: cacheRoot))
+            let online = environment.isDemo ? nil : OnlineReadingService(cache: try RecentChapterCache(directory: cacheRoot), downloads: try OfflineDownloadStore(directory: databaseDirectory.appendingPathComponent("OfflineDownloads")))
             _library = StateObject(wrappedValue: LibraryStore(books: books, defaults: defaults, importsURL: archive, seedDemoData: environment.isDemo,
                 productionFactory: environment.isDemo ? nil : {
                     if rejectFirstOpen { rejectFirstOpen = false; throw CocoaError(.fileWriteNoPermission) }
@@ -129,10 +129,15 @@ struct RootView: View {
                 try? await SourceFeasibilityValidation.runDevelopmentProbe(credential: shushan.credentialForRequests)
             }
             #endif
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { break }
+                store.readingHeartbeat()
+            }
         }
         .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store); demo.updateShushanAccount(shushan.credential, host: shushan.hostText); configureSource() } }
         .onChange(of: store.sources) { _, _ in configureSource() }
-        .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.saveBeforeSuspending() } } }
+        .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.onlineService?.downloads?.pauseForBackground(); await store.saveBeforeSuspending() } } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await store.onlineService?.downloads?.returnToForeground() } } }
         .onChange(of: store.reader?.id) { _, id in if id == nil { Task { await store.flushPendingWrites() } } }
         .onAppear { demo.connectReader(store) }
         .onReceive(shushan.$credential) { demo.updateShushanAccount($0, host: shushan.hostText); configureSource() }

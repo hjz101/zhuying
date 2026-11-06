@@ -21,6 +21,7 @@ struct ReaderView: View {
     @State private var loaded: ChapterDocument?
     @State private var rendered: ReaderDocument?
     @State private var chapterTask: Task<Void, Never>?
+    @State private var pendingNarrationChapter = false
     @State private var requestedChapter: Int?
     @State private var requestedResume = false
     @State private var requestedAtEnd = false
@@ -43,7 +44,10 @@ struct ReaderView: View {
     @State private var message: String?
     @State private var initialized = false
     @State private var commentParagraph: Int?
+    @State private var showShelfPrompt = false
+    @State private var showNarration = false
     @StateObject private var comments = ReaderCommentsModel()
+    private let readingTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     init(book: Book, initialChapter: Int, resume: Bool = true, startingAnchor: ReadingAnchor? = nil, repository: (any ChapterDocumentLoading)? = nil) {
         self.book = book; self.resume = resume
@@ -77,7 +81,7 @@ struct ReaderView: View {
             let layout = ReaderLayout(settings: store.settings, size: geo.size)
             ZStack(alignment: .topLeading) {
                 if initialized && rendered != nil && store.settings.mode == .scroll {
-                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID + narrationRestoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { commentParagraph = $0 })
+                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID + narrationRestoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { commentParagraph = $0 }, onManualScroll: { detachNarration() })
                         .frame(width: layout.scrollFrame.width, height: layout.scrollFrame.height)
                         .position(x: layout.scrollFrame.midX, y: layout.scrollFrame.midY)
                 } else if initialized && !ranges.isEmpty {
@@ -135,6 +139,7 @@ struct ReaderView: View {
                 if controlsVisible {
                     footer
                 }
+                if !store.isDemo { ReaderNarrationMiniPlayer(audio: store.audio, bookID: book.id, open: { showNarration = true }, follow: { followNarration(store.audio.state.anchor, force: true) }) }
             }
         }
         .background(readerBackground.ignoresSafeArea())
@@ -146,16 +151,16 @@ struct ReaderView: View {
             updateAnchor(document.anchor(at: ranges[target].location))
             haptic()
         }
-        .onChange(of: scenePhase) { _, phase in store.readingHeartbeat(foreground: phase == .active); if phase != .active { save() } }
-        .onChange(of:store.followingNarrationAnchor) { _,location in
-            guard let location,location.bookID == book.id,let index = store.chapterIndex(bookID:book.id,chapterID:location.chapterID) else { return }
-            if index != chapter { if requestedChapter != index { goChapter(index,location:location) }; return }
-            guard loaded?.version == location.contentVersion,initialized else { return }
-            let target = ReaderAnchor(paragraph:location.paragraphIndex,offset:location.utf16Offset)
-            if store.settings.mode.isPaged { page = ReaderPaginator.page(containing:target,document:document,ranges:ranges) }
-            else if target.paragraph != anchor.paragraph || abs(target.offset - anchor.offset) > 120 { anchor = target; narrationRestoreID += 1; save() }
+        .onChange(of: scenePhase) { _, phase in
+            store.readingHeartbeat(foreground: phase == .active)
+            sampleShelfPrompt()
+            if phase != .active { save() }
         }
-        .onDisappear { store.trackReading(nil); save(); chapterTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
+        .onReceive(readingTimer) { _ in sampleShelfPrompt() }
+        .onChange(of:store.followingNarrationAnchor) { _,location in
+            followNarration(location)
+        }
+        .onDisappear { sampleShelfPrompt(visible: false); store.trackReading(nil); save(); chapterTask?.cancel(); loading.cancel(); Task { await store.flushPendingWrites() } }
         .onReceive(NotificationCenter.default.publisher(for:.contentProcessingChanged)) { _ in
             guard !store.isDemo,let loaded else { return }
             let location = try? ReadingAnchor(bookID:book.id,document:loaded,paragraph:anchor.paragraph,offset:anchor.offset)
@@ -164,17 +169,32 @@ struct ReaderView: View {
         .onReceive(NotificationCenter.default.publisher(for:.contentProcessingFailed)) { event in
             if event.userInfo?["bookID"] as? String == book.id { showMessage("净化处理未完成，已保留有效正文。") }
         }
-        .onChange(of: showSettings || showContents || showGestureGuide || showBookmarks || demoFeature != nil) { _, covered in
+        .onChange(of: showSettings || showContents || showGestureGuide || showBookmarks || showNarration || commentParagraph != nil || demoFeature != nil) { _, covered in
+            sampleShelfPrompt()
             store.trackReading(covered ? nil : (initialized ? book.id : nil),interacted:!covered)
         }
+        .alert("加入书架？", isPresented: $showShelfPrompt) {
+            Button("暂不加入", role: .cancel) {}
+            Button("加入书架") {
+                if !store.isFavorite(book) { _ = store.toggleFavorite(book) }
+                showMessage("已加入书架")
+            }
+        } message: { Text("已经阅读两分钟了，将《\(book.title)》加入书架，方便下次继续阅读。") }
         .sheet(isPresented: $showContents) {
-            ContentsView(book: book, currentChapter: chapter) { target in goChapter(target); showContents = false }
+            ContentsView(book: book, currentChapter: chapter) { target in detachNarration(); goChapter(target); showContents = false }
         }
         .sheet(isPresented: $showSettings, onDismiss: { restoreID += 1 }) { ReadingSettingsView() }
+        .sheet(isPresented: $showNarration) {
+            NavigationStack {
+                ProductionNarrationView(bookID: store.audio.state.bookID, mode: nil)
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showNarration = false } } }
+            }
+        }
         .sheet(isPresented: $showBookmarks) {
             NavigationStack {
                 ProductionBookmarksView(bookID: book.id) { mark in
                     guard let index = store.chapterIndex(bookID: book.id, chapterID: mark.anchor.chapterID) else { return }
+                    detachNarration()
                     showBookmarks = false; goChapter(index, location: mark.anchor)
                 }.toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showBookmarks = false } } }
             }
@@ -188,6 +208,7 @@ struct ReaderView: View {
                                 let request = try store.chapterRequest(for:book,chapter:chapter)
                                 guard let content = try await store.chapterRepository(for:book).document(chapterID:request.chapter.id) else { throw ContentFailure.missingChapter }
                                 let target = try ReadingAnchor(bookID:book.id,document:content,paragraph:paragraph,offset:offset)
+                                detachNarration()
                                 demoFeature = nil; goChapter(chapter,location:target)
                             } catch { message = error.localizedDescription }
                         }
@@ -283,7 +304,7 @@ struct ReaderView: View {
                     }
                     Slider(value: $sliderValue, in: 0...Double(max(1, book.chapters.count - 1)), step: 1) { editing in
                         sliderEditing = editing
-                        if !editing { goChapter(min(book.chapters.count - 1, Int(sliderValue))) }
+                        if !editing { detachNarration(); goChapter(min(book.chapters.count - 1, Int(sliderValue))) }
                     }.tint(readerInk.opacity(0.65)).accessibilityLabel("章节进度").accessibilityValue(book.chapterTitle(Int(sliderValue))).accessibilityIdentifier("chapterSlider")
                 }
                 Button { flip(forward: true) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.disabled(chapter == book.chapters.count - 1 && (store.settings.mode == .scroll || page == ranges.count - 1)).accessibilityLabel(store.settings.mode.isPaged ? "下一页" : "下一章").accessibilityIdentifier("nextChapter")
@@ -345,18 +366,23 @@ struct ReaderView: View {
         guard initialized, loading.phase == .readable else { return }
         store.record(book, chapter: chapter, paragraph: anchor.paragraph, characterOffset: anchor.offset)
     }
-    private func goChapter(_ target: Int, resume: Bool = false, atEnd: Bool = false, location: ReadingAnchor? = nil) {
-        guard book.chapters.indices.contains(target) else { showMessage(target < 0 ? "已经是第一章" : (store.isDemo ? "已读完全部示例章节" : "已经是最后一章")); return }
+    private func goChapter(_ target: Int, resume: Bool = false, atEnd: Bool = false, location: ReadingAnchor? = nil, following: Bool = false) {
+        let forward = target >= chapter
+        guard let target = store.readableChapterIndex(for: book, startingAt: target, direction: forward ? 1 : -1) else { showMessage(forward ? (store.isDemo ? "已读完全部示例章节" : "已经是最后一章") : "已经是第一章"); return }
         chapterTask?.cancel()
-        chapterTask = Task { await loadChapter(target, resume: resume, atEnd: atEnd, location: location) }
+        pendingNarrationChapter = following
+        chapterTask = Task { await loadChapter(target, resume: resume, atEnd: atEnd, location: location, following: following) }
     }
-    private func loadChapter(_ target: Int, resume: Bool, atEnd: Bool, location: ReadingAnchor? = nil) async {
+    private func loadChapter(_ target: Int, resume: Bool, atEnd: Bool, location: ReadingAnchor? = nil, following: Bool = false) async {
+        guard let target = store.readableChapterIndex(for: book, startingAt: target, direction: atEnd ? -1 : 1) else { return }
         store.trackReading(nil)
         requestedChapter = target; requestedResume = resume; requestedAtEnd = atEnd
         requestedLocation = location
         guard var request = try? store.chapterRequest(for: book, chapter: target, resume: resume, atEnd: atEnd) else { return }
         if let location { request.anchor = location }
         guard await loading.load(request), let content = loading.document, let location = loading.confirmed else { return }
+        guard !following || !store.audio.readerDetached else { loading.cancel(); return }
+        pendingNarrationChapter = false
         reflowing = true
         loaded = content; chapter = target
         anchor = .init(paragraph: location.paragraphIndex, offset: location.utf16Offset)
@@ -368,6 +394,7 @@ struct ReaderView: View {
         haptic()
     }
     private func flip(forward: Bool) {
+        detachNarration()
         if store.settings.mode == .scroll { goChapter((requestedChapter ?? chapter) + (forward ? 1 : -1)); return }
         let target = page + (forward ? 1 : -1)
         if ranges.indices.contains(target) {
@@ -379,15 +406,52 @@ struct ReaderView: View {
         switch ReaderInteraction.action(at: fraction, settings: store.settings) {
         case .controls: controlsVisible.toggle(); haptic()
         case .next, .previous:
+            detachNarration()
             let forward = ReaderInteraction.action(at: fraction, settings: store.settings) == .next
             if store.settings.mode.isPaged { flip(forward: forward) }
             else { turn += forward ? 1 : -1; haptic() }
         }
     }
     private func haptic() { if store.settings.haptics { UISelectionFeedbackGenerator().selectionChanged() } }
+    private func sampleShelfPrompt(visible: Bool = true) {
+        let active = visible && scenePhase == .active && initialized && loading.phase == .readable &&
+            !showSettings && !showContents && !showGestureGuide && !showBookmarks && !showNarration && demoFeature == nil && commentParagraph == nil
+        if store.shelfPrompt.sample(bookID: book.id, active: active, eligible: !store.isFavorite(book), uptime: ProcessInfo.processInfo.systemUptime) {
+            showShelfPrompt = true
+        }
+    }
+    private func detachNarration() {
+        store.audio.readerNavigated(bookID: book.id)
+        if pendingNarrationChapter {
+            chapterTask?.cancel(); loading.cancel(); requestedChapter = nil; pendingNarrationChapter = false
+        }
+    }
+    private func followNarration(_ location: ReadingAnchor?, force: Bool = false) {
+        guard !store.audio.readerDetached, let location, location.bookID == book.id,
+              let index = store.chapterIndex(bookID: book.id, chapterID: location.chapterID) else { return }
+        if index != chapter { if requestedChapter != index { goChapter(index, location: location, following: true) }; return }
+        guard loaded?.version == location.contentVersion, initialized else { return }
+        let target = ReaderAnchor(paragraph: location.paragraphIndex, offset: location.utf16Offset)
+        if store.settings.mode.isPaged { page = ReaderPaginator.page(containing: target, document: document, ranges: ranges) }
+        else if force || target.paragraph != anchor.paragraph || abs(target.offset - anchor.offset) > 120 { anchor = target; narrationRestoreID += 1; save() }
+    }
     private func showMessage(_ value: String) {
         message = value
         Task { @MainActor in try? await Task.sleep(for: .seconds(2)); if message == value { message = nil } }
+    }
+}
+
+private struct ReaderNarrationMiniPlayer: View {
+    @ObservedObject var audio: LibraryAudioCoordinator
+    let bookID: String
+    let open: () -> Void
+    let follow: () -> Void
+    var body: some View {
+        if ![.idle, .completed].contains(audio.state.phase) {
+            ProductionMiniPlayer(audio: audio, open: open, reader: true, readerBookID: bookID, follow: follow)
+                .frame(maxWidth: 520).readerFloatingSurface()
+                .padding(.horizontal, 18).padding(.bottom, 8)
+        }
     }
 }
 

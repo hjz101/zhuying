@@ -44,11 +44,13 @@ struct ZhuyingApp: App {
                 try Data("unsupported".utf8).write(to: documents.appendingPathComponent("不支持的格式.epub"))
             }
             if testing && !environment.isDemo && environment.resetsTestState && ProcessInfo.processInfo.arguments.contains("--legacy-library-fixtures") {
-                let book = try BookImporter.prepare(data: Data("第一章 旧信\n保留的第一章正文。\n第二章 重逢\n升级前已经读到的真实段落。".utf8), name: "迁移测试.txt").book
+                let narrationFixture = ProcessInfo.processInfo.arguments.contains("--narration-fixture")
+                let prose = "第一章 旧信\n保留的第一章正文。\n第二章 重逢\n升级前已经读到的真实段落。" + (narrationFixture ? String(repeating: "\n山间的读者看见远处的灯光，沿着小路走向竹林。这里的正文用于验证朗读时手动翻页和悬浮播放器。", count: 100) : "")
+                let book = try BookImporter.prepare(data: Data(prose.utf8), name: "迁移测试.txt").book
                 try manager.createDirectory(at: archive.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try JSONEncoder().encode([book]).write(to: archive, options: .atomic)
                 let snapshot = LibrarySnapshot(favorites: [book.id], progress: [book.id: .init(chapter: 1, paragraph: 0, updatedAt: Date(), characterOffset: 3)],
-                                               settings: .init(fontSize: 24, lineSpacing: 16, theme: .dark), sort: .title, hasSeenReadingGuide: true, shelfLayout: "list", importedGroups: [book.id: "升级前分组"])
+                                               settings: .init(fontSize: 24, lineSpacing: 16, theme: .dark, mode: narrationFixture ? .paged : .scroll), sort: .title, hasSeenReadingGuide: true, shelfLayout: "list", importedGroups: [book.id: "升级前分组"])
                 defaults.set(try JSONEncoder().encode(snapshot), forKey: LibraryStore.storageKey)
             }
             if testing && !environment.isDemo && ProcessInfo.processInfo.arguments.contains("--corrupt-migrated-legacy-fixtures") {
@@ -236,7 +238,7 @@ struct RootView: View {
         }.safeAreaInset(edge: .bottom, spacing: 0) { miniPlayer }
     }
     @ViewBuilder private var miniPlayer: some View {
-            if !store.isDemo { ProductionMiniPlayer(audio:store.audio,open:{showPlayer = true}) }
+            if !store.isDemo && store.reader == nil { ProductionMiniPlayer(audio:store.audio,open:{showPlayer = true}) }
             if store.isDemo && demo.playerVisible {
                 HStack(spacing: 15) {
                     Button { showPlayer = true } label: { Label("长风渡山海 · 演示朗读", systemImage: "waveform").font(.system(size: 11)).frame(maxWidth: .infinity, alignment: .leading) }

@@ -217,6 +217,7 @@ final class LibraryStore: ObservableObject {
     private(set) var workspace: LibraryWorkspace?
     private var remoteBooks: [String: LibraryBookRecord] = [:]
     private let defaults: UserDefaults
+    lazy var shelfPrompt = ReadingShelfPrompt(defaults: defaults, key: "reader.shelf-prompt.v1." + (isDemo ? "demo" : "production"))
     private var managedSettingsDirectory: URL { workspace?.root ?? productionPersistence?.storageDirectory ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent(AppEnvironment().databaseComponent) }
     lazy var cloudSync = RecordSyncController(library:self,directory:managedSettingsDirectory.appendingPathComponent("CloudSync-v1"),defaults:defaults)
     lazy var browserSessions = SourceBrowserSessions(defaults:defaults)

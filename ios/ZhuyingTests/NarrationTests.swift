@@ -88,4 +88,44 @@ import XCTest
         let player = NarrationController(output:output,activatesSession:false); defer { player.stop() }; start(player)
         try await wait { player.state.phase == .failed }; XCTAssertTrue(output.tokens.isEmpty); XCTAssertEqual(player.state.chapter,0)
     }
+
+    func testManualReadingStaysDetachedUntilExplicitReturnWithoutSeekingAudio() async throws {
+        let domain = "com.zhuying.narration-follow-tests." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let books = try Book.load(bundle: Bundle(for: LibraryStore.self)), book = books[0]
+        let library = LibraryStore(books: books, defaults: defaults)
+        library.read(book)
+        let output = NarrationOutputProbe(), player = NarrationController(output: output, activatesSession: false)
+        let audio = LibraryAudioCoordinator(library: library, controller: player)
+        defer { audio.stop() }
+        try audio.start(bookID: book.id, mode: .system)
+        try await wait { audio.state.phase == .playing }
+        let token = try XCTUnwrap(output.tokens.last)
+        output.onProgress?(token, NSRange(location: 1, length: 1))
+        XCTAssertEqual(library.followingNarrationAnchor, audio.state.anchor)
+        audio.readerNavigated(bookID: "another-book")
+        XCTAssertFalse(audio.readerDetached)
+        audio.readerNavigated(bookID: book.id)
+        let lastFollowed = library.followingNarrationAnchor
+        output.onProgress?(token, NSRange(location: 4, length: 1))
+        XCTAssertTrue(audio.readerDetached)
+        XCTAssertEqual(audio.state.phase, .playing)
+        XCTAssertNotEqual(lastFollowed, audio.state.anchor)
+        XCTAssertEqual(library.followingNarrationAnchor, lastFollowed, "A speech callback must not undo manual paging")
+        audio.pause()
+        let speechAnchor = audio.state.anchor
+        audio.returnToNarration()
+        XCTAssertFalse(audio.readerDetached)
+        XCTAssertEqual(library.followingNarrationAnchor, speechAnchor)
+        XCTAssertEqual(audio.state.anchor, speechAnchor, "Returning the reader must not seek audio")
+        XCTAssertEqual(audio.state.phase, .paused)
+        audio.resume()
+        output.onProgress?(token, NSRange(location: 6, length: 1))
+        XCTAssertEqual(library.followingNarrationAnchor, audio.state.anchor)
+        library.narrationSettings.followsReader = false
+        let unfollowed = library.followingNarrationAnchor
+        output.onProgress?(token, NSRange(location: 8, length: 1))
+        XCTAssertEqual(library.followingNarrationAnchor, unfollowed)
+    }
 }

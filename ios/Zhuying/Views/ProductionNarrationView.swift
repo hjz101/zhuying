@@ -77,15 +77,36 @@ private struct NarrationPanel: View {
 struct ProductionMiniPlayer: View {
     @ObservedObject var audio: LibraryAudioCoordinator
     let open: () -> Void
+    var reader = false
+    var readerBookID: String? = nil
+    var follow: (() -> Void)? = nil
     var body: some View {
         if ![.idle,.completed].contains(audio.state.phase) {
             HStack(spacing:15) {
-                Button(action:open) { Label(audio.state.title + (audio.state.phase == .buffering ? " · 缓冲中" : " · " + audio.mode.rawValue),systemImage:"waveform").font(.system(size:11)).lineLimit(1).frame(maxWidth:.infinity,alignment:.leading) }
-                Button { audio.state.phase == .playing || audio.state.phase == .buffering ? audio.pause() : audio.resume() } label: { Image(systemName:audio.state.phase == .playing ? "pause.fill" : "play.fill").frame(width:40,height:40) }.accessibilityLabel("切换朗读")
-                Button { audio.stop() } label: { Image(systemName:"xmark").frame(width:36,height:40) }.accessibilityLabel("关闭播放器")
-            }.foregroundStyle(Palette.green).padding(.horizontal,17).background(.regularMaterial).accessibilityIdentifier("productionMiniPlayer")
+                Button(action:open) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(audio.state.title).lineLimit(1)
+                            Text(audio.state.phase == .playing ? "正在朗读 · " + audio.state.chapterTitle : audio.state.phase == .buffering ? "正在缓冲" : audio.state.phase == .paused ? "朗读已暂停" : "朗读未完成，点击查看")
+                                .lineLimit(1).font(.system(size: 10))
+                        }
+                    } icon: { Image(systemName:"waveform") }
+                        .font(.system(size:11)).frame(maxWidth:.infinity,minHeight:44,alignment:.leading)
+                }.accessibilityLabel("打开朗读播放器，" + audio.state.title).accessibilityIdentifier("miniPlayerOpen")
+                if reader && readerBookID == audio.state.bookID && audio.readerDetached {
+                    Button { audio.returnToNarration(); follow?() } label: { Image(systemName:"text.line.first.and.arrowtriangle.forward").frame(width:44,height:44) }
+                        .accessibilityLabel("返回朗读位置").accessibilityIdentifier("miniPlayerFollow")
+                }
+                Button { audio.state.phase == .playing || audio.state.phase == .buffering ? audio.pause() : audio.resume() } label: { Image(systemName:audio.state.phase == .playing || audio.state.phase == .buffering ? "pause.fill" : "play.fill").frame(width:44,height:44) }
+                    .accessibilityLabel(audio.state.phase == .playing || audio.state.phase == .buffering ? "暂停朗读" : "继续朗读").accessibilityIdentifier("miniPlayerToggle")
+                Button { audio.stop() } label: { Image(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("关闭播放器")
+            }.foregroundStyle(reader ? Color(ReaderPalette(settings: readerSettings).ink) : Palette.green)
+                .padding(.horizontal, reader ? 10 : 17).background { if !reader { Rectangle().fill(.regularMaterial) } }
+                .accessibilityElement(children: .contain).accessibilityIdentifier("productionMiniPlayer")
         }
     }
+    @EnvironmentObject private var library: LibraryStore
+    private var readerSettings: ReadingSettings { library.settings }
 }
 
 struct ProductionAudioServiceView: View {

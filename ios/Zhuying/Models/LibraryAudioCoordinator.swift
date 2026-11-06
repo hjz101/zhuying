@@ -4,6 +4,7 @@ import Combine
 @MainActor final class LibraryAudioCoordinator: ObservableObject {
     @Published private(set) var state = NarrationState()
     @Published private(set) var mode = NarrationMode.system
+    @Published private(set) var readerDetached = false
     private weak var library: LibraryStore?
     private var controller: NarrationController?
     private var serviceStore: AudioServiceStore?
@@ -12,7 +13,10 @@ import Combine
     private var listeningClock = ReadingActivityClock()
     private var analysisRequestsRemaining = 0
     private var rolesPlaybackBegan = false
-    init(library: LibraryStore) { self.library = library }
+    init(library: LibraryStore, controller: NarrationController? = nil) {
+        self.library = library; self.controller = controller
+        controller?.onState = { [weak self] in self?.receive($0) }
+    }
     private var directory: URL {
         library?.workspace?.root.appendingPathComponent("AudioServices") ?? FileManager.default.temporaryDirectory.appendingPathComponent("ZhuyingAudio-" + String(ObjectIdentifier(self).hashValue))
     }
@@ -42,7 +46,7 @@ import Combine
         if (previous.phase == .playing) != (next.phase == .playing) { library.narrationPlaybackChanged(next.phase == .playing) }
         if let anchor = next.anchor, next.phase == .playing || next.phase == .completed || (next.phase == .paused && previous.phase == .playing) {
             library.narrationAnchor = anchor
-            if library.narrationSettings.followsReader && next.phase == .playing && library.reader?.book.id == anchor.bookID { library.followNarration(anchor) }
+            if library.narrationSettings.followsReader && !readerDetached && next.phase == .playing && library.reader?.book.id == anchor.bookID { library.followNarration(anchor) }
         }
     }
     private func client() throws -> CompatibleAudioClient {
@@ -62,7 +66,7 @@ import Combine
         guard let library,let book = library.books.first(where: { $0.id == bookID }) else { throw ContentFailure.missingChapter }
         guard book.media == nil else { throw BookImportError.message("原版式 PDF 与漫画使用页面阅读；朗读请导入文字提取版本。") }
         if mode != .system { _ = try client() }
-        self.mode = mode; rolesPlaybackBegan = false
+        self.mode = mode; rolesPlaybackBegan = false; readerDetached = false
         let anchor = library.narrationAnchor?.bookID == bookID ? library.narrationAnchor : nil
         let chapter = anchor.flatMap { library.chapterIndex(bookID:bookID,chapterID:$0.chapterID) } ?? library.progress[bookID]?.chapter ?? 0
         analysisRequestsRemaining = max(1,min(20,library.narrationSettings.maximumAnalysisRequests))
@@ -105,7 +109,15 @@ import Combine
     func saveAnalysis(_ analysis: RoleAnalysis) async throws { try await roles().save(analysis) }
     func pause() { controller?.pause() }
     func resume() { controller?.resume() }
-    func stop() { controller?.stop() }
+    func stop() { controller?.stop(); readerDetached = false }
+    func readerNavigated(bookID: String) {
+        guard state.bookID == bookID, ![.idle, .completed].contains(state.phase) else { return }
+        readerDetached = true
+    }
+    func returnToNarration() {
+        readerDetached = false
+        if let anchor = state.anchor { library?.followNarration(anchor) }
+    }
     func next() { controller?.changeChapter(1) }
     func previous() { controller?.changeChapter(-1) }
     func updateSettings() { if let library { controller?.update(settings:library.narrationSettings) } }

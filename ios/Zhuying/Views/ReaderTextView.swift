@@ -12,6 +12,7 @@ struct ContinuousReaderText: UIViewRepresentable {
     let onBoundary: (Bool) -> Void
     var insets: UIEdgeInsets = UIEdgeInsets(top: 24, left: 25, bottom: 20, right: 25)
     var onComment: (Int) -> Void = { _ in }
+    var onManualScroll: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> UITextView {
@@ -78,6 +79,7 @@ struct ContinuousReaderText: UIViewRepresentable {
         var displayedText: NSAttributedString?
         var textRevision = 0
         init(_ parent: ContinuousReaderText) { self.parent = parent }
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { parent.onManualScroll() }
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             guard !restoring, let view = scrollView as? UITextView, parent.document.text.length > 0 else { return }
             let point = CGPoint(x: 0, y: max(0, view.contentOffset.y - view.textContainerInset.top + 8))

@@ -121,6 +121,36 @@ final class LegadoPersistentStateTests: XCTestCase {
         XCTAssertNil(try worker.cacheGet("memory", memory: true))
         XCTAssertTrue(try worker.cookies(for: URL(string: "https://fixture.test")!).isEmpty)
     }
+    func testPublicSessionCookiesAndUnverifiedLoginDoNotInventAuthenticationRequirements() throws {
+        let first = try state(), origin = URL(string: "https://fixture.test/")!
+        let cookie = try XCTUnwrap(HTTPCookie(properties: [.name: "anonymous-session", .value: "public", .domain: "fixture.test", .path: "/"]))
+        try first.setCookies([cookie], for: origin)
+        XCTAssertEqual(first.authStatus, .unverified)
+        let HTTP = try LegadoReference.parse("https://fixture.test/book?id=public")
+        let key = try first.registerReference(HTTP, role: "book")
+        XCTAssertEqual(try first.resolveReference(key).requestURL, HTTP.requestURL)
+        let payload = try LegadoReferenceTests.inline()
+        try first.setLoginInfo(["邮箱": "reader"]); try first.markVerified()
+        let verifiedKey = try first.registerReference(payload, role: "book")
+        try first.logout(); XCTAssertThrowsError(try first.resolveReference(verifiedKey))
+        try first.setLoginInfo(["邮箱": "reader"])
+        XCTAssertEqual(first.authStatus, .unverified)
+        XCTAssertNoThrow(try first.resolveReference(verifiedKey), "Unverified is allowed to reach the service for real authentication checks")
+        XCTAssertNotEqual(first.authStatus, .verified)
+    }
+    func testReplacingCompleteBrowserJarRemovesDeletedCookiesWithoutTouchingAnotherOrigin() throws {
+        let first = try state(), A = URL(string: "https://a.fixture.test/")!, B = URL(string: "https://b.fixture.test/")!
+        let a = try XCTUnwrap(HTTPCookie(properties: [.name: "sid", .value: "A", .domain: "a.fixture.test", .path: "/"]))
+        let b = try XCTUnwrap(HTTPCookie(properties: [.name: "sid", .value: "B", .domain: "b.fixture.test", .path: "/"]))
+        try first.setCookies([a], for: A); try first.setCookies([b], for: B)
+        try first.replaceCookies([], for: A)
+        let reopened = try state()
+        XCTAssertTrue(try reopened.cookies(for: A).isEmpty)
+        XCTAssertEqual(try reopened.cookies(for: B).first?.value, "B")
+        let revision = reopened.revision
+        try reopened.setCookies([], for: A)
+        XCTAssertEqual(reopened.revision, revision, "A response with no Set-Cookie must not resurrect or rewrite the jar")
+    }
     func testTamperedEncryptedStateAndMissingVaultCannotSilentlyResetSession() throws {
         let first = try state(); try first.setVariable("original", key: "server")
         let file = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)

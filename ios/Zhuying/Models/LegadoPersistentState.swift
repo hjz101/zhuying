@@ -73,7 +73,7 @@ final class LegadoPersistentState: @unchecked Sendable {
         let epoch: UInt64
         let requiresAuthentication: Bool
     }
-    private struct CookieRecord: Codable {
+    private struct CookieRecord: Codable, Equatable {
         let origin: String
         let name: String
         let value: String
@@ -268,11 +268,15 @@ final class LegadoPersistentState: @unchecked Sendable {
         let origin = try LegadoSourcePolicy.canonicalOrigin(url).absoluteString, date = now()
         return secrets.cookies.filter { $0.origin == origin && ($0.expires.map { $0 > date } ?? true) }.compactMap(\.cookie).filter { Self.matches($0, url: url) }
     }
-    func setCookies(_ cookies: [HTTPCookie], for url: URL) throws {
+    func setCookies(_ cookies: [HTTPCookie], for url: URL) throws { try updateCookies(cookies, for: url, replacing: false) }
+    /// Browser results represent the entire origin's jar, including deletions.
+    func replaceCookies(_ cookies: [HTTPCookie], for url: URL) throws { try updateCookies(cookies, for: url, replacing: true) }
+    private func updateCookies(_ cookies: [HTTPCookie], for url: URL, replacing: Bool) throws {
         Self.lock.lock(); defer { Self.lock.unlock() }; try refresh()
         let origin = try LegadoSourcePolicy.canonicalOrigin(url).absoluteString
         var secret = secrets; let date = now()
         secret.cookies = secret.cookies.filter { $0.expires.map { $0 > date } ?? true }
+        if replacing { secret.cookies.removeAll { $0.origin == origin } }
         for cookie in cookies {
             guard Self.domainMatches(cookie.domain, host: url.host ?? ""), cookie.name.utf8.count + cookie.value.utf8.count <= 8192,
                   [cookie.name, cookie.value, cookie.domain, cookie.path].allSatisfy({ !$0.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) }) else { throw LegadoStateError.limit }
@@ -281,6 +285,7 @@ final class LegadoPersistentState: @unchecked Sendable {
             secret.cookies.append(.init(origin: origin, name: cookie.name, value: cookie.value, domain: cookie.domain, path: cookie.path, secure: cookie.isSecure, httpOnly: cookie.isHTTPOnly, expires: cookie.expiresDate))
         }
         guard secret.cookies.reduce(0, { $0 + $1.name.utf8.count + $1.value.utf8.count + $1.domain.utf8.count + $1.path.utf8.count }) <= 256 * 1024 else { throw LegadoStateError.limit }
+        guard secret.cookies != secrets.cookies else { return }
         var next = manifest; if next.status == .signedOut, !secret.cookies.isEmpty { next.status = .unverified }; try commit(next, secret)
     }
     func clearCookies(origin: URL? = nil) throws {
@@ -298,7 +303,7 @@ final class LegadoPersistentState: @unchecked Sendable {
         for (index, reference) in references.enumerated() {
             let id = try reference.stableID(sourceIdentity: scope.sourceID, role: role, nativeID: nativeIDs?[index] ?? nil)
             let key = "legado-ref-v2-" + id
-            secret.references[key] = .init(descriptor: reference.resolvedDescriptor, epoch: manifest.authEpoch, requiresAuthentication: manifest.status != .signedOut)
+            secret.references[key] = .init(descriptor: reference.resolvedDescriptor, epoch: manifest.authEpoch, requiresAuthentication: manifest.status == .verified)
             keys.append(key)
         }
         try commit(manifest, secret); return keys
@@ -307,7 +312,7 @@ final class LegadoPersistentState: @unchecked Sendable {
         Self.lock.lock(); defer { Self.lock.unlock() }; try refresh()
         guard let record = secrets.references[key] else { throw LegadoStateError.referenceMissing }
         let reference = try LegadoReference.parse(record.descriptor)
-        if record.requiresAuthentication, manifest.status != .verified { throw ContentFailure.authenticationRequired }
+        if record.requiresAuthentication, manifest.status == .signedOut || manifest.status == .expired { throw ContentFailure.authenticationRequired }
         if record.epoch != manifest.authEpoch, !reference.isPortableIdentityPayload { throw LegadoStateError.referenceNeedsRefresh }
         return reference
     }

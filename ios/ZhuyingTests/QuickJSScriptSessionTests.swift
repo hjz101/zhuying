@@ -209,7 +209,7 @@ final class QuickJSScriptSessionTests: XCTestCase {
                 source.putLoginInfo('credentials');source.setLoginHeader({'Authorization':'token'});cache.put('chapter','text',30);
                 [source.getLoginInfo(),source.getLoginInfoMap(),source.getLoginHeader(),source.getHeaderMap(),cache.get('chapter'),
                  java.deviceID(),String(java.deviceID),java.androidId(),typeof java.reLoginView,typeof java.qread,typeof java.noSuchMethod,
-                 typeof java.startBrowserAwait,JSON.stringify(java.deviceID)];
+                 typeof java.startBrowserAwait,JSON.stringify(java.deviceID),java.getCookie('https://source.test'),java.getWebViewUA()];
                 """#, bindings: [:]) { method, _ in
                 calls.append(method)
                 switch method {
@@ -219,6 +219,8 @@ final class QuickJSScriptSessionTests: XCTestCase {
                 case "cache.get": return "text"
                 case "java.deviceID": return "stable-device"
                 case "java.androidId": return "stable-android"
+                case "java.getCookie": return "sid=fixture"
+                case "java.getWebViewUA": return "Zhuying fixture UA"
                 default: return NSNull()
                 }
             }
@@ -233,6 +235,8 @@ final class QuickJSScriptSessionTests: XCTestCase {
         XCTAssertEqual(result.0?[7] as? String, "stable-android")
         XCTAssertEqual(Array((result.0 ?? []).dropFirst(8).prefix(4)) as? [String], ["undefined", "undefined", "undefined", "function"])
         XCTAssertEqual(result.0?[12] as? String, "\"stable-device\"")
+        XCTAssertEqual(result.0?[13] as? String, "sid=fixture")
+        XCTAssertEqual(result.0?[14] as? String, "Zhuying fixture UA")
         XCTAssertTrue(result.1.contains("source.putLoginInfo")); XCTAssertTrue(result.1.contains("cache.put"))
     }
 

@@ -213,7 +213,7 @@ static const char *zy_shim =
 "    Object.defineProperties(value,{toString:{value:()=>String(value())},toJSON:{value:()=>value()},valueOf:{value:()=>value()},[Symbol.toPrimitive]:{value:()=>value()}});\n"
 "    return value;\n"
 "  };\n"
-"  const javaMethods = new Set(['ajax','get','post','head','connect','put','getString','getStringList','getElements','base64Encode','base64Decode','encodeURI','decodeURI','md5Encode','hexDecodeToString','startBrowserAwait','showBrowser','startBrowser','showReadingBrowser','startBrowserDp','toast','longToast','log']);\n"
+"  const javaMethods = new Set(['ajax','get','post','head','connect','put','getString','getStringList','getElements','getCookie','getWebViewUA','base64Encode','base64Decode','encodeURI','decodeURI','md5Encode','hexDecodeToString','startBrowserAwait','showBrowser','startBrowser','showReadingBrowser','startBrowserDp','toast','longToast','log']);\n"
 "  for (const name of ['source','book','chapter']) Object.defineProperty(globalThis,name,{value:object(name),configurable:false});\n"
 "  Object.defineProperty(globalThis,'java',{value:new Proxy(Object.create(null), {get(target,key) {\n"
 "    if (typeof key!=='string'||key==='then'||key==='toJSON') return undefined;\n"

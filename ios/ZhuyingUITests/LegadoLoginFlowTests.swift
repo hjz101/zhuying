@@ -45,7 +45,7 @@ final class LegadoLoginFlowTests: XCTestCase {
         account.tap(); account.typeText("fixture-reader"); password.tap(); password.typeText("fixture-password")
         let save = app.buttons["保存测试登录"]; reveal(save, app: app); save.tap()
         let feedback = app.staticTexts["legadoLoginMessage"]
-        XCTAssertTrue(feedback.waitForExistence(timeout: 8))
+        XCTAssertTrue(feedback.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(feedback.label.contains("测试信息已保存"))
         XCTAssertLessThan(feedback.frame.midY, app.windows.firstMatch.frame.height / 2, "Feedback floats above the form regardless of scroll position")
         let dismissFeedback = app.buttons["关闭反馈"]
@@ -79,21 +79,27 @@ final class LegadoLoginFlowTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5)); reveal(row, app: app)
         let sourceID = String(row.identifier.dropFirst("source-row-".count))
         row.swipeRight()
-        XCTAssertTrue(app.buttons["source-leading-login-" + sourceID].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["source-refresh-" + sourceID].exists)
-        XCTAssertTrue(app.buttons["source-browser-" + sourceID].exists)
-        app.buttons["source-leading-login-" + sourceID].tap()
+        // UIKit's native swipe-action buttons expose their visible label;
+        // SwiftUI accessibility identifiers are not preserved on every OS.
+        let login = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "source-leading-login-" + sourceID, "登录")).firstMatch
+        let refresh = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "source-refresh-" + sourceID, "刷新书源")).firstMatch
+        let browser = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "source-browser-" + sourceID, "浏览器打开")).firstMatch
+        XCTAssertTrue(login.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(refresh.exists, app.debugDescription)
+        XCTAssertTrue(browser.exists, app.debugDescription)
+        login.tap()
         XCTAssertTrue(app.staticTexts["legadoLoginStatus"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        row.swipeRight(); app.buttons["source-refresh-" + sourceID].tap()
-        XCTAssertTrue(app.staticTexts["sourceRefreshMessage"].waitForExistence(timeout: 5))
+        row.swipeRight(); XCTAssertTrue(refresh.waitForExistence(timeout: 3), app.debugDescription); refresh.tap()
+        XCTAssertTrue(app.staticTexts["sourceRefreshMessage"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.staticTexts["sourceRefreshMessage"].label.contains("已刷新"))
         let close = app.buttons["关闭反馈"]; if close.isHittable { close.tap() }
-        row.swipeRight(); app.buttons["source-browser-" + sourceID].tap()
+        row.swipeRight(); XCTAssertTrue(browser.waitForExistence(timeout: 3), app.debugDescription); browser.tap()
         let address = app.textFields["browserAddress"]
         XCTAssertTrue(address.waitForExistence(timeout: 5)); XCTAssertTrue((address.value as? String)?.contains("legado-js.fixture") == true)
         app.navigationBars.buttons.element(boundBy: 0).tap()
         row.swipeLeft()
-        XCTAssertTrue(app.buttons["source-edit-" + sourceID].waitForExistence(timeout: 3))
+        let edit = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "source-edit-" + sourceID, "编辑")).firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 3), app.debugDescription)
     }
 }

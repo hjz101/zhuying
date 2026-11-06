@@ -25,7 +25,9 @@ private struct SourceFloatingFeedback: ViewModifier {
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(appearance.palette.line))
                 .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
                 .padding(.horizontal, 18).padding(.top, 8)
-                .accessibilityIdentifier(identifier + "Overlay")
+                // Keep identifiers on the individual message/control. A
+                // container identifier propagates to SwiftUI descendants and
+                // can replace the message's identifier in the native tree.
             }
         }
         .task(id: message) {

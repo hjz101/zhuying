@@ -99,6 +99,16 @@ static int zy_interactive_method(const char *method) {
     return 0;
 }
 
+static int zy_network_method(const char *method) {
+    // These hosts route through the native executor's independent wall-clock
+    // deadline, request/response quotas and cancellation. Waiting for their
+    // callbacks is not JavaScript execution time.
+    static const char *methods[] = {"java.ajax", "java.get", "java.post", "java.head", "java.connect"};
+    for (size_t index = 0; index < sizeof(methods) / sizeof(methods[0]); index++)
+        if (!strcmp(method, methods[index])) return 1;
+    return 0;
+}
+
 static JSValue zy_host(JSContext *context, JSValueConst receiver, int count, JSValueConst *arguments) {
     (void)receiver;
     ZYState *state = JS_GetContextOpaque(context);
@@ -128,9 +138,10 @@ static JSValue zy_host(JSContext *context, JSValueConst receiver, int count, JSV
         state->bridge_bytes += length;
         int is_error = 0;
         int interactive = zy_interactive_method(method);
-        uint64_t started = interactive ? zy_now() : 0;
+        int waiting = interactive || zy_network_method(method);
+        uint64_t started = waiting ? zy_now() : 0;
         char *output = state->host ? state->host(state->opaque, method, input, &is_error) : NULL;
-        if (interactive) {
+        if (waiting) {
             uint64_t elapsed = zy_now() - started;
             state->deadline = elapsed > UINT64_MAX - state->deadline ? UINT64_MAX : state->deadline + elapsed;
         }

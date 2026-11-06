@@ -22,6 +22,8 @@ typedef enum {
 typedef struct {
     size_t memory_limit_bytes;
     size_t stack_limit_bytes;
+    /* Execution deadline excluding controlled HTTP/browser callback waits.
+       The host must enforce its independent operation/network deadlines. */
     uint64_t timeout_milliseconds;
     size_t maximum_output_bytes;
     size_t maximum_host_calls;

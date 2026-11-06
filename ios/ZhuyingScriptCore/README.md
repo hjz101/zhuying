@@ -110,16 +110,26 @@ arguments and explicit formats/offsets are preserved.
 
 The C API uses public memory, stack and interrupt controls. Its allocator caps
 runtime allocations including initialization; native host buffers separately
-have bridge/output quotas. Cancellation/deadlines are checked before and after
-every host callback. A blocked network callback must separately enforce its
-deadline, cancel its URLSession task and wake its waiter. An interrupt cannot
-stop arbitrary blocking native code. Blocking `Atomics.wait` is disabled.
+have bridge/output quotas. The JS execution budget is elapsed time while the
+interpreter and its ordinary native helpers execute, normally five seconds.
+It is not a process CPU-time measurement. Cancellation/deadlines are checked
+before and after every host callback. Blocking `Atomics.wait` is disabled.
+
+Waiting inside the controlled `java.ajax`, `get`, `post`, `head` and `connect`
+network callbacks is excluded from that JS budget. Their native HTTP executor
+retains its request timeout, cancellation, 64-request/response quotas and the
+source operation's independent wall-clock deadline (normally 25 seconds).
+Network waits do not extend the operation deadline. JS argument serialization,
+the rule's code before/after a network callback, host-call quotas and bridge
+byte quotas still apply. A host implementation outside the source adapter must
+enforce equivalent network deadlines itself; an interpreter interrupt cannot
+stop arbitrary blocking native code.
 
 Waiting inside `java.startBrowserAwait`, `showBrowser`, `startBrowser`,
 `showReadingBrowser`, `startBrowserDp` and `reLoginView` is excluded from the
-script deadline. These exact host method names are the only exemptions; normal
-network waits still consume the script budget. The interaction host must own
-its own timeout and cancellation. A failed interaction invalidates the VM even
+JS execution deadline. These user interactions also pause the source operation
+deadline while its separately bounded browser wait (normally 300 seconds) is
+active. The interaction host owns that timeout and cancellation. A failed interaction invalidates the VM even
 if the source catches its JavaScript exception. Per-call host/bridge quotas and
 cancellation still apply to interactive calls.
 

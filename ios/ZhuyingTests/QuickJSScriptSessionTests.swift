@@ -164,7 +164,7 @@ final class QuickJSScriptSessionTests: XCTestCase {
         XCTAssertEqual(next, 1)
     }
 
-    func testInteractiveWaitDoesNotConsumeScriptBudgetButNetworkWaitDoes() async throws {
+    func testInteractiveAndControlledNetworkWaitsDoNotConsumeScriptExecutionBudget() async throws {
         let session = QuickJSScriptSession()
         var policy = LegadoScriptPolicy(); policy.timeoutSeconds = 0.025
         let interaction = try await evaluate(session, "java.startBrowserAwait('https://source.test').body();next()", library: counterLibrary, policy: policy) { method, _ in
@@ -173,14 +173,43 @@ final class QuickJSScriptSessionTests: XCTestCase {
             return ["body": "reader finished", "statusCode": 200, "headers": [:], "url": "https://source.test"] as [String: Any]
         } as? Int
         XCTAssertEqual(interaction, 1)
+        for (index,method) in ["ajax","get","post","head","connect"].enumerated() {
+            let result = try await evaluate(session, "java.\(method)('https://source.test');next()", library: counterLibrary, policy: policy) { name, _ in
+                XCTAssertEqual(name, "java." + method)
+                Thread.sleep(forTimeInterval: 0.06); return "controlled network"
+            } as? Int
+            XCTAssertEqual(result, index + 2)
+        }
+    }
+
+    func testOtherNativeWorkStillConsumesScriptExecutionBudget() async throws {
+        var policy = LegadoScriptPolicy(); policy.timeoutSeconds = 0.025
         do {
-            _ = try await evaluate(session, "java.ajax('https://source.test');next()", library: counterLibrary, policy: policy) { _, _ in
+            _ = try await evaluate(QuickJSScriptSession(), "java.md5Encode('input');42", policy: policy) { _,_ in
+                Thread.sleep(forTimeInterval: 0.06); return "non-network native work"
+            }
+            XCTFail("Only explicitly controlled waits are excluded")
+        } catch { XCTAssertEqual(error as? QuickJSScriptError, .timedOut) }
+    }
+
+    func testSlowNetworkDoesNotBypassJavaScriptLoopsOrHostCallQuotas() async throws {
+        let session = QuickJSScriptSession()
+        var policy = LegadoScriptPolicy(); policy.timeoutSeconds = 0.025
+        let started = ProcessInfo.processInfo.systemUptime
+        do {
+            _ = try await evaluate(session, "java.ajax('https://source.test');while(true){}", policy: policy) { _,_ in
                 Thread.sleep(forTimeInterval: 0.06); return "network"
             }
-            XCTFail("Network waits remain inside the script deadline")
+            XCTFail("The JS execution budget continues after network returns")
         } catch { XCTAssertEqual(error as? QuickJSScriptError, .timedOut) }
-        let rebuilt = try await evaluate(session, "next()", library: counterLibrary) as? Int
-        XCTAssertEqual(rebuilt, 1)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - started, 2)
+        policy.maximumHostCalls = 2
+        do {
+            _ = try await evaluate(session, "try{for(let n=0;n<10;n++)java.ajax('https://source.test')}catch(e){};42", policy: policy) { _,_ in
+                Thread.sleep(forTimeInterval: 0.03); return "network"
+            }
+            XCTFail("Pausing the timer must not reset host-call quotas")
+        } catch { XCTAssertEqual(error as? QuickJSScriptError, .bridgeLimit) }
     }
 
     func testInteractionCancellationAndHostErrorCannotBeCaughtToReuseScope() async throws {

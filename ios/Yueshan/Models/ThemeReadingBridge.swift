@@ -54,6 +54,10 @@ enum ThemeReaderBridge {
 
 @MainActor extension FeatureDemoStore {
     func connectReader(_ library: LibraryStore) {
+        if readingLibrary !== library {
+            for task in bubbleRenderTasks.values { task.cancel() }
+            bubbleRenderTasks = [:]; bubbleRenderKeys = [:]; completedBubbleKeys = [:]; bubbleRenderRevisions = [:]
+        }
         readingLibrary = library
         if !library.isDemo, library.loadState == .ready {
             restoringSources = true; sources = library.sources; restoringSources = false
@@ -112,22 +116,46 @@ enum ThemeReaderBridge {
         theme.background = hex(palette.background); theme.ink = hex(palette.ink); theme.accent = hex(palette.accent)
         if let svg = library.settings.preferences.bubbleSVG {
             rasterize(svg, theme: theme, library: library, custom: false)
-        }
+        } else { cancelBubbleRender(custom: false) }
         if let svg = library.settings.preferences.customBubbleSVG {
             rasterize(svg, theme: theme, library: library, custom: true)
-        }
+        } else { cancelBubbleRender(custom: true) }
+    }
+    private func cancelBubbleRender(custom: Bool) {
+        bubbleRenderTasks[custom]?.cancel(); bubbleRenderTasks[custom] = nil
+        bubbleRenderKeys[custom] = nil; completedBubbleKeys[custom] = nil
+        bubbleRenderRevisions[custom] = UUID()
     }
     private func rasterize(_ svg: String, theme: DemoTheme, library: LibraryStore, custom: Bool) {
-        let requestedColors = library.settings.preferences.colors
-        let requestedTheme = library.settings.theme
-        Task { @MainActor [weak library, weak self] in
+        let key = ThemeBubbleRasterizer.key(svg, theme: theme)
+        let existing = custom ? library.settings.preferences.customBubbleImageData : library.settings.preferences.bubbleImageData
+        if completedBubbleKeys[custom] == key && existing != nil { return }
+        if bubbleRenderKeys[custom] == key && bubbleRenderTasks[custom] != nil { return }
+        bubbleRenderTasks[custom]?.cancel()
+        let revision = UUID(); bubbleRenderRevisions[custom] = revision
+        bubbleRenderKeys[custom] = key
+        let requestedPalette = ReaderPalette(settings: library.settings)
+        let renderer = bubbleRenderer
+        bubbleRenderTasks[custom] = Task { @MainActor [weak library, weak self] in
+            defer {
+                if self?.bubbleRenderRevisions[custom] == revision {
+                    self?.bubbleRenderTasks[custom] = nil; self?.bubbleRenderKeys[custom] = nil
+                }
+            }
             do {
-                let data = try await ThemeBubbleRasterizer.render(svg, theme: theme)
-                guard let library, library.settings.preferences.colors == requestedColors, library.settings.theme == requestedTheme,
+                let data = try await renderer(svg, theme)
+                try Task.checkCancellation()
+                guard let library, self?.readingLibrary === library,
                       (custom ? library.settings.preferences.customBubbleSVG : library.settings.preferences.bubbleSVG) == svg else { return }
+                let palette = ReaderPalette(settings: library.settings)
+                guard palette.background.isEqual(requestedPalette.background), palette.ink.isEqual(requestedPalette.ink),
+                      palette.accent.isEqual(requestedPalette.accent) else { return }
+                self?.completedBubbleKeys[custom] = key
+                if self?.readerThemeMessage == "配色已应用；该气泡无法生成原生预览，暂用默认气泡。" { self?.readerThemeMessage = nil }
                 if custom { library.settings.preferences.customBubbleImageData = data }
                 else { library.settings.preferences.bubbleImageData = data }
-            } catch { self?.readerThemeMessage = "配色已应用；该气泡无法生成原生预览，暂用默认气泡。" }
+            } catch is CancellationError { }
+            catch { if !Task.isCancelled { self?.readerThemeMessage = "配色已应用；该气泡无法生成原生预览，暂用默认气泡。" } }
         }
     }
     func persistThemeLibrary() {
@@ -154,18 +182,41 @@ enum ThemeReaderBridge {
 }
 
 @MainActor final class ThemeBubbleRasterizer: NSObject, WKNavigationDelegate {
+    private static let cache: NSCache<NSString, NSData> = {
+        let value = NSCache<NSString, NSData>(); value.countLimit = 32; value.totalCostLimit = 2 * 1024 * 1024; return value
+    }()
+    private static let dataStore = WKWebsiteDataStore.nonPersistent()
+    private(set) static var activeRenders = 0
     private var webView: WKWebView?
     private var continuation: CheckedContinuation<Data, Error>?
     private var timeout: Task<Void, Never>?
     static func render(_ svg: String, theme: DemoTheme) async throws -> Data {
+        try Task.checkCancellation()
+        let key = key(svg, theme: theme) as NSString
+        if let data = cache.object(forKey: key) { return data as Data }
         let renderer = ThemeBubbleRasterizer()
-        return try await renderer.image(svg, theme: theme)
+        let data = try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await renderer.image(svg, theme: theme)
+        } onCancel: {
+            Task { @MainActor in renderer.finish(.failure(CancellationError())) }
+        }
+        try Task.checkCancellation()
+        cache.setObject(data as NSData, forKey: key, cost: data.count)
+        return data
+    }
+    static func key(_ svg: String, theme: DemoTheme) -> String {
+        StableContentID.make(svg, String(theme.background), String(theme.ink), String(theme.accent))
     }
     private func image(_ svg: String, theme: DemoTheme) async throws -> Data {
         guard ThemeAssetValidator.isValid(svg, kind: .bubble) else { throw ThemePackageError.invalid("无效气泡 SVG。") }
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
-            let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 72, height: 44))
+            Self.activeRenders += 1
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = Self.dataStore
+            configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+            let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 72, height: 44), configuration: configuration)
             view.isOpaque = false; view.backgroundColor = .clear; view.scrollView.backgroundColor = .clear; view.navigationDelegate = self
             webView = view
             let content = svg.replacingOccurrences(of: "{{accent}}", with: String(format: "#%06X", theme.accent))
@@ -190,7 +241,9 @@ enum ThemeReaderBridge {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish(.failure(error)) }
     private func finish(_ result: Result<Data, Error>) {
         guard let continuation else { return }
-        self.continuation = nil; timeout?.cancel(); timeout = nil; webView = nil
+        self.continuation = nil; timeout?.cancel(); timeout = nil
+        webView?.navigationDelegate = nil; webView?.stopLoading(); webView = nil
+        Self.activeRenders -= 1
         continuation.resume(with: result)
     }
 }

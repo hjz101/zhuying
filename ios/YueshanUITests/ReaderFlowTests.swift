@@ -460,7 +460,15 @@ final class ReaderFlowTests: XCTestCase {
             reveal(layout, in: app)
         }
         layout.tap()
-        app.buttons[title].tap()
+        let option = app.buttons[title]
+        for _ in 0..<4 {
+            if option.exists && option.isHittable { break }
+            let menu = app.collectionViews.firstMatch
+            guard menu.exists else { break }
+            menu.swipeUp()
+        }
+        XCTAssertTrue(option.isHittable, "The native layout menu can scroll at accessibility text sizes")
+        option.tap()
         XCTAssertEqual(layout.value as? String, title)
     }
 
@@ -485,7 +493,9 @@ final class ReaderFlowTests: XCTestCase {
         XCTAssertTrue(bar.waitForExistence(timeout: 5))
         XCTAssertGreaterThanOrEqual(bar.frame.minX, app.frame.minX + 14)
         XCTAssertLessThanOrEqual(bar.frame.maxX, app.frame.maxX - 14)
-        XCTAssertLessThan(bar.frame.maxY, app.frame.maxY - 20)
+        // The Demo reserves 8 pt below the toolbar plus the device safe area.
+        // Home-button devices have a smaller safe area than Face ID devices.
+        XCTAssertLessThanOrEqual(bar.frame.maxY, app.frame.maxY - 8)
         XCTAssertLessThanOrEqual(bar.frame.height, 80, "The primary toolbar should stay compact like the home tab bar")
         for id in ["readerContents", "readerSettings", "readerNarration", "readerSkins"] {
             XCTAssertTrue(bar.buttons[id].isHittable, "Bottom controls must remain accessible: \(id)")

@@ -153,6 +153,11 @@ final class FeatureDemoStore: ObservableObject {
     var restoringThemeLibrary = false
     var themePersistence: ((ThemeLibrarySnapshot) -> Void)?
     weak var readingLibrary: LibraryStore?
+    let bubbleRenderer: @MainActor (String, DemoTheme) async throws -> Data
+    var bubbleRenderTasks: [Bool: Task<Void, Never>] = [:]
+    var bubbleRenderKeys: [Bool: String] = [:]
+    var completedBubbleKeys: [Bool: String] = [:]
+    var bubbleRenderRevisions: [Bool: UUID] = [:]
     @Published var readerThemeMessage: String?
     @Published var themes: [DemoTheme] = [
         .init(id: "paper", name: "暖纸山林", mode: .light, background: 0xEDE8D9, ink: 0x354F40, accent: 0xB7815A, summary: "温暖纸色 · 森林绿", source: "内置主题", version: "1.0", favorite: true),
@@ -171,7 +176,9 @@ final class FeatureDemoStore: ObservableObject {
     @Published var activeBubbleStyleID: String? = "paper:bubble:main" { didSet { persistThemeLibrary() } }
     @Published var themeImportMessage: String?
 
-    init(defaults: UserDefaults? = nil, seedDemoData: Bool = true) {
+    init(defaults: UserDefaults? = nil, seedDemoData: Bool = true,
+         bubbleRenderer: @escaping @MainActor (String, DemoTheme) async throws -> Data = { try await ThemeBubbleRasterizer.render($0, theme: $1) }) {
+        self.bubbleRenderer = bubbleRenderer
         isDemo = seedDemoData
         if !seedDemoData {
             sources = [.init(id: "shushan", name: "书山聚合", detail: "待登录", url: ShushanClient.defaultHost)]
@@ -193,6 +200,7 @@ final class FeatureDemoStore: ObservableObject {
         restoringThemeLibrary = false
         if seedDemoData { restoreThemeLibrary() }
     }
+    deinit { for task in bubbleRenderTasks.values { task.cancel() } }
 
     private func persistProductionSources() {
         guard !restoringSources else { return }

@@ -16,19 +16,31 @@ private final class SourceRedirectPolicy: NSObject, URLSessionTaskDelegate, @unc
     }
 }
 
-struct SourceHTTPTransport: HTTPTransport {
-    private let session: URLSession
-    init() {
+final class SourceHTTPTransport: HTTPTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var cachedSession: URLSession?
+    private let makeSession: @Sendable () -> URLSession
+    init(makeSession: (@Sendable () -> URLSession)? = nil) {
+        self.makeSession = makeSession ?? Self.makeDefaultSession
+    }
+    deinit { cachedSession?.invalidateAndCancel() }
+    private static func makeDefaultSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
         configuration.urlCache = nil
         configuration.timeoutIntervalForRequest = 15
         configuration.timeoutIntervalForResource = 30
-        session = URLSession(configuration: configuration, delegate: SourceRedirectPolicy(), delegateQueue: nil)
+        return URLSession(configuration: configuration, delegate: SourceRedirectPolicy(), delegateQueue: nil)
+    }
+    private func sessionForRequest() -> URLSession {
+        lock.lock(); defer { lock.unlock() }
+        if let cachedSession { return cachedSession }
+        let session = makeSession(); cachedSession = session; return session
     }
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await session.data(for: request)
+        try Task.checkCancellation()
+        let (data, response) = try await sessionForRequest().data(for: request)
         try Task.checkCancellation()
         guard let response = response as? HTTPURLResponse else { throw ContentFailure.invalidResponse }
         return (data, response)

@@ -1,6 +1,26 @@
 import XCTest
 
 final class NavigationFlowTests: XCTestCase {
+    @MainActor func testVisitedTabsKeepSearchQueryAndStatisticsSelection() {
+        continueAfterFailure = false
+        let app = launch()
+        app.tabBars.buttons["足迹"].tap()
+        XCTAssertTrue(app.segmentedControls["activityPeriod"].waitForExistence(timeout: 5))
+        app.segmentedControls["activityPeriod"].buttons["周"].tap()
+        app.tabBars.buttons["搜索"].tap()
+        let search = app.searchFields.firstMatch; XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("星\n")
+        XCTAssertTrue(app.buttons["result-stars"].waitForExistence(timeout: 5))
+        // The native search role collapses the main capsule to its previous tab.
+        app.tabBars.buttons["足迹"].tap()
+        XCTAssertTrue(app.segmentedControls["activityPeriod"].buttons["周"].isSelected)
+        app.tabBars.buttons["我的"].tap()
+        XCTAssertTrue(app.staticTexts["profileEditorialTitle"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["足迹"].tap()
+        XCTAssertTrue(app.segmentedControls["activityPeriod"].buttons["周"].isSelected)
+        app.tabBars.buttons["搜索"].tap()
+        XCTAssertEqual(search.value as? String, "星")
+        XCTAssertTrue(app.buttons["result-stars"].exists)
+    }
     @MainActor private func launch() -> XCUIApplication {
         let app = XCUIApplication(); app.launchArguments = ["--ui-testing"]; app.launch(); return app
     }

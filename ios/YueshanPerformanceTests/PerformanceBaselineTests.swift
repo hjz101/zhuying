@@ -23,11 +23,14 @@ import Darwin
         let configuration: String
         let scales: PerformanceBudget.Scales
         let measurements: [Measurement]
+        let memoryPhases: [NativePerformanceValidation.MemoryPhase]
     }
     private var timings: [String: [Double]] = [:]
+    private static var memoryPhases: [NativePerformanceValidation.MemoryPhase] = []
     private func traceMemory(_ stage: String) {
         var usage = rusage(); _ = getrusage(RUSAGE_SELF, &usage)
         print("PERFORMANCE_MEMORY", stage, Double(usage.ru_maxrss) / 1_048_576)
+        if let memory = try? ProcessMemorySnapshot.capture() { Self.memoryPhases.append(.init(phase: stage, memory: memory)) }
     }
     private func record(_ id: String, started: Double) {
         timings[id, default: []].append((ProcessInfo.processInfo.systemUptime - started) * 1000)
@@ -143,7 +146,9 @@ import Darwin
             return .init(id: id, samples: timings[id]!, median: samples[samples.count / 2], maximum: maximum, limit: limit, withinTarget: maximum <= limit)
         }
         let report = Report(schemaVersion: 1, profile: budget.profile, budgetSHA256: StableContentID.version(String(decoding: raw, as: UTF8.self)), measuredAt: Date(), os: ProcessInfo.processInfo.operatingSystemVersionString,
-                            model: ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] ?? "unknown", configuration: "Debug simulator; reopen may use OS file cache", scales: scale, measurements: measurements)
+                            model: ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] ?? "unknown", configuration: "Debug simulator; reopen may use OS file cache", scales: scale, measurements: measurements, memoryPhases: Self.memoryPhases)
+        XCTAssertFalse(report.memoryPhases.isEmpty)
+        XCTAssertTrue(report.memoryPhases.allSatisfy { $0.memory.physicalFootprintMiB > 0 })
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .prettyPrinted]; encoder.dateEncodingStrategy = .iso8601
         let attachment = XCTAttachment(data: try encoder.encode(report), uniformTypeIdentifier: "public.json")
         attachment.name = "StepZero-Performance-Baseline"; attachment.lifetime = .keepAlways; add(attachment)

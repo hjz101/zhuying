@@ -58,6 +58,8 @@ struct FeatureDemoView: View {
             else if !library.isDemo && feature.id == "icloud" { ProductionCloudView() }
             else if !library.isDemo && feature.id == "engine" { ProductionRuleTesterView() }
             else if !library.isDemo && feature.id == "purify" { ProductionContentRulesView() }
+            else if !library.isDemo && feature.id == "browser" { ProductionBrowserView() }
+            else if !library.isDemo && feature.id == "network" { ProductionNetworkView() }
             else if !library.isDemo && feature.id == "aiConfig" { ProductionAudioServiceView() }
             else if !library.isDemo && feature.id == "aiRoles" { ProductionRolesView(bookID:bookID) }
             else if !library.isDemo && ["systemTTS","onlineTTS","backgroundAudio"].contains(feature.id) { ProductionNarrationView(bookID:bookID,mode:feature.id == "backgroundAudio" ? nil : feature.id == "onlineTTS" ? .online : .system,title:feature.title) }

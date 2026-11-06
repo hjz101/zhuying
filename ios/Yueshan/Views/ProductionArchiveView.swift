@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct ProductionArchiveView: View {
     var comicOnly = false
+    var initialURL: URL? = nil
     @EnvironmentObject private var library: LibraryStore
     @State private var choosing = false
     @State private var members: [ArchiveMember] = []
@@ -47,6 +48,7 @@ struct ProductionArchiveView: View {
                 if case .success(let url) = result { load(url) }
             }
             .onDisappear { operation?.cancel(); members = [] }
+            .task { if let initialURL,members.isEmpty { load(initialURL) } }
     }
     private func load(_ url: URL) {
         operation?.cancel(); busy = true; message = nil; members = []; selection = []; fileName = url.lastPathComponent

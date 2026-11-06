@@ -7,6 +7,8 @@ enum ProductionCapabilities {
         if id == "comments" { return "书山·番茄只读" }
         if id == "engine" { return "原生 v1 子集" }
         if id == "purify" { return nil }
+        if id == "browser" { return nil }
+        if id == "network" { return "原生 v1" }
         if ["systemTTS","backgroundAudio","aiConfig","links","pdf","comic","archive","covers"].contains(id) { return nil }
         if live.contains(id) { return nil }
         if ["sources", "sourceEdit", "sourceLogin", "search"].contains(id) { return "固定书源" }

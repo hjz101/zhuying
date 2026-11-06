@@ -61,7 +61,7 @@ struct ReaderView: View {
     private var commentContext: ShushanCommentContext? {
         guard !store.isDemo,let metadata = store.remoteMetadata(book.id),let record = store.chapterRecord(bookID:book.id,index:chapter),let context = ShushanCommentContext(book:metadata,chapter:record),context.source == "fq" else { return nil }; return context
     }
-    private var commentTaskID: String { StableContentID.make(loaded?.chapterID ?? "",loaded?.version ?? "",loaded?.originVersion ?? "",String(restoreID),shushan.credentialForRequests.map{ShushanCommentsClient(credential:$0).cacheScope} ?? "signed-out",String(store.settings.preferences.showCommentBubbles)) }
+    private var commentTaskID: String { StableContentID.make(loaded?.chapterID ?? "",loaded?.version ?? "",loaded?.originVersion ?? "",String(restoreID),String(store.onlineRevision),shushan.credentialForRequests.map{ShushanCommentsClient(credential:$0).cacheScope} ?? "signed-out",String(store.settings.preferences.showCommentBubbles)) }
     private var paragraphCounts: [Int:Int] {
         guard let loaded else { return [:] }
         return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap { index,paragraph in guard let count = comments.counts[paragraph.id]?.count,count > 0 else { return nil }; return (index,count) })
@@ -197,17 +197,17 @@ struct ReaderView: View {
         }
         .task(id:commentTaskID) {
             comments.reset()
-            if store.settings.preferences.showCommentBubbles,let credential = shushan.credentialForRequests,let context = commentContext,let loaded {
+            if store.settings.preferences.showCommentBubbles,let credential = shushan.credentialForRequests,let client = store.commentClient(credential:credential),let context = commentContext,let loaded {
                 let processed = await store.contentProcessor.context(bookID:book.id,document:loaded)
                 if loaded.originVersion != nil && processed == nil { return }
-                await comments.load(client:ShushanCommentsClient(credential:credential),context:context,document:processed?.raw ?? loaded)
+                await comments.load(client:client,context:context,document:processed?.raw ?? loaded)
                 if !Task.isCancelled,let processed { comments.remap(processed.origins) }
             }
         }
         .sheet(isPresented: Binding(get: { commentParagraph != nil }, set: { if !$0 { commentParagraph = nil } })) {
             NavigationStack {
-                if !store.isDemo,let credential = shushan.credentialForRequests,let context = commentContext,let loaded,let paragraph = loaded.paragraphs[safe:commentParagraph ?? -1],let count = comments.counts[paragraph.id] {
-                    ProductionCommentsView(client:ShushanCommentsClient(credential:credential),context:context,paragraph:count,documentVersion:loaded.originVersion ?? loaded.version,originalText:comments.originalTexts[paragraph.id] ?? paragraph.text)
+                if !store.isDemo,let credential = shushan.credentialForRequests,let client = store.commentClient(credential:credential),let context = commentContext,let loaded,let paragraph = loaded.paragraphs[safe:commentParagraph ?? -1],let count = comments.counts[paragraph.id] {
+                    ProductionCommentsView(client:client,context:context,paragraph:count,documentVersion:loaded.originVersion ?? loaded.version,originalText:comments.originalTexts[paragraph.id] ?? paragraph.text)
                         .id(commentTaskID + paragraph.id)
                         .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("完成") { commentParagraph = nil } } }
                 } else if store.isDemo {

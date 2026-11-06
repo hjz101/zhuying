@@ -217,6 +217,19 @@ final class LibraryStore: ObservableObject {
     private let defaults: UserDefaults
     private var managedSettingsDirectory: URL { workspace?.root ?? productionPersistence?.storageDirectory ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent(AppEnvironment().databaseComponent) }
     lazy var cloudSync = RecordSyncController(library:self,directory:managedSettingsDirectory.appendingPathComponent("CloudSync-v1"),defaults:defaults)
+    lazy var browserSessions = SourceBrowserSessions(defaults:defaults)
+    lazy var networkProfiles = SourceNetworkProfiles(defaults:defaults)
+    func networkTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> SourceNetworkTransport {
+        let origin = try ShushanClient.host(source.url),profile = try networkProfiles.profile(sourceID:source.id,origin:origin)
+        return try SourceNetworkTransport(origin:origin,profile:profile,maximumBytes:maximumBytes)
+    }
+    func sourceTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> any HTTPTransport {
+        BrowserSessionTransport(sourceID:source.id,origin:try ShushanClient.host(source.url),sessions:browserSessions,base:try networkTransport(for:source,maximumBytes:maximumBytes))
+    }
+    func commentClient(credential: ShushanCredential) -> ShushanCommentsClient? {
+        guard let source = sources.first(where:{$0.id == "shushan" && $0.enabled}),let host = try? ShushanClient.host(source.url),host == credential.host,let transport = try? sourceTransport(for:source,maximumBytes:2 * 1024 * 1024) else { return nil }
+        return .init(credential:credential,transport:ResilientSourceTransport(base:transport))
+    }
     private var processingStore: ContentProcessingStore?
     var contentProcessor: ContentProcessingStore {
         if let processingStore { return processingStore }
@@ -719,11 +732,12 @@ final class LibraryStore: ObservableObject {
         let source = sources.first { $0.id == "shushan" && $0.enabled && $0.kind == .novel }
         var providers: [any BookSource] = sources.filter { $0.enabled && $0.kind == .novel && $0.id != "shushan" }.compactMap { source -> (any BookSource)? in
             guard let rules = try? SourcePackages.rules(source) else { return nil }
-            if rules.extraction != nil { return try? ExtractionBookSource(source:source) }
-            return try? ConfigurableBookSource(source:source)
+            guard let transport = try? sourceTransport(for:source,maximumBytes:rules.extraction == nil ? 4 * 1024 * 1024 : 2 * 1024 * 1024) else { return nil }
+            if rules.extraction != nil { return try? ExtractionBookSource(source:source,transport:transport) }
+            return try? ConfigurableBookSource(source:source,transport:transport)
         }
         if let source, let credential, (try? ShushanClient.host(source.url)) == credential.host, !expired {
-            providers.append(ShushanBookSource(credential: credential))
+            if let transport = try? sourceTransport(for:source) { providers.append(ShushanBookSource(credential:credential,transport:ResilientSourceTransport(base:transport))) }
         }
         await service.configure(sources: providers, failure: source == nil ? .sourceDisabled : .authenticationRequired)
         await service.prepareDownloads()

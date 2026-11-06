@@ -43,6 +43,7 @@ targets:
         YueshanSourceRevision: $(YUESHAN_SOURCE_REVISION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        NSLocalNetworkUsageDescription: 用于连接您在书源网络配置中指定的局域网代理或 DNS 服务。
         UIBackgroundModes: [audio]
         CFBundleURLTypes:
           - CFBundleURLName: com.yueshan.import

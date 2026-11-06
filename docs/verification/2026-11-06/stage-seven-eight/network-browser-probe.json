@@ -1,0 +1,29 @@
+{
+  "credentialsUsed" : false,
+  "physicalDeviceAccepted" : false,
+  "samples" : [
+    {
+      "accepted" : true,
+      "bytes" : 577,
+      "case" : "fixed-ip-https",
+      "status" : 200,
+      "tunnels" : 1
+    },
+    {
+      "accepted" : true,
+      "case" : "invalid-certificate",
+      "errorCode" : -1200,
+      "errorDomain" : "NSURLErrorDomain",
+      "tunnels" : 1
+    },
+    {
+      "accepted" : true,
+      "bytes" : 772386,
+      "case" : "native-browser-download-preview",
+      "chapters" : 62,
+      "libraryMutated" : false,
+      "pageCharacters" : 748167
+    }
+  ],
+  "schemaVersion" : 1
+}

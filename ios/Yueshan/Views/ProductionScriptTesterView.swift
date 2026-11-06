@@ -40,7 +40,9 @@ struct ProductionScriptTesterView: View {
         let source = library.sources.first(where:{$0.id == sourceID}),origin = source.flatMap{try? ShushanClient.host($0.url)}
         let account = sourceID == "shushan" ? shushan.credentialForRequests.map{StableContentID.version($0.apiKey)} ?? "signed-out" : "public"
         let policy = ScriptHostPolicy(sourceID:sourceID.isEmpty ? "local-preview" : sourceID,origin:origin,accountID:account,network:network && origin != nil,timeout:network ? 5 : 1.5),program = script
-        let runner = NativeScriptHost(); host = runner; busy = true; output = nil; message = nil
+        let transport: any HTTPTransport
+        do { if let source { transport = try library.networkTransport(for:source,maximumBytes:1024 * 1024) } else { transport = BoundedAudioHTTPTransport(maximumBytes:1024 * 1024) } } catch { message = error.localizedDescription; return }
+        let runner = NativeScriptHost(transport:transport); host = runner; busy = true; output = nil; message = nil
         operation = Task {
             defer { if !Task.isCancelled { busy = false; host = nil } }
             do { let bytes = try await runner.run(program,input:data,policy:policy); try Task.checkCancellation(); output = String(decoding:bytes,as:UTF8.self); message = "执行完成" }

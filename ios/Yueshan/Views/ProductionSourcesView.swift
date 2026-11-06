@@ -7,7 +7,7 @@ struct ProductionSourceAccessView: View {
             VStack(alignment:.leading,spacing:23) {
                 AppPageHeader(title:"访问说明",subtitle:"自定义书源 · 原生 JSON v1",icon:"person.badge.key")
                 AppSettingsCard("公开访问",icon:"info.circle") {
-                    Text("原生 JSON v1 书源使用公开 HTTPS 接口，无需登录。当前不运行导入规则中的脚本、Cookie 或请求头；需要账号的站点请使用已有书山登录入口。")
+                    Text("原生 JSON／提取规则 v1 书源使用 HTTPS 接口。可在内置浏览器登录并为此源明确启用 Cookie 复用；书山原生请求使用已有应用内登录。导入规则不会自动执行脚本。")
                         .font(.system(size:13)).lineSpacing(6)
                 }
             }.padding(22)

@@ -66,4 +66,11 @@ final class ExtensionToolsFlowTests: XCTestCase {
         app.buttons["返回书架"].tap(); app.terminate(); app.launchArguments = ["--ui-testing","--production","--preserve-ui-test-state"]; app.launch(); app.buttons["continueReading"].tap()
         let restored = expectation(for:NSPredicate(format:"value CONTAINS '处理段落'"),evaluatedWith:app.textViews["continuousText"]); wait(for:[restored],timeout:10)
     }
+    @MainActor func testBrowserRejectsNonHTTPSWithoutLoadingOrImporting() {
+        let app = open("browser",title:"内置浏览器")
+        let address = app.textFields["browserAddress"]; XCTAssertTrue(address.waitForExistence(timeout:5)); address.tap(); address.typeText("not-a-url")
+        app.buttons["browserOpen"].tap(); let message = app.staticTexts["browserMessage"]
+        for _ in 0..<7 { if message.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(message.waitForExistence(timeout:5)); XCTAssertTrue(message.label.contains("HTTPS")); XCTAssertFalse(app.buttons["importConfirm"].exists)
+    }
 }

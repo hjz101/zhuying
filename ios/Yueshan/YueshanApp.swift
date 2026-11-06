@@ -16,7 +16,7 @@ struct YueshanApp: App {
         let environment = AppEnvironment()
         let defaults = environment.defaults()
         let credentialService = environment.isUITesting ? "com.yueshan.shushan.ui-tests" : "com.yueshan.shushan.\(environment.mode.rawValue)"
-        _shushan = StateObject(wrappedValue: ShushanAccountStore(defaults: defaults, vault: ShushanKeychain(service: credentialService)))
+        _shushan = StateObject(wrappedValue: ShushanAccountStore(defaults:defaults,client:ShushanClient(transport:ProfiledAccountTransport(profiles:SourceNetworkProfiles(defaults:defaults))),vault:ShushanKeychain(service:credentialService)))
         _featureDemo = StateObject(wrappedValue: FeatureDemoStore(defaults: defaults, seedDemoData: environment.isDemo))
         ReadingFontLibrary.shared.useManagedStorage(!environment.isDemo)
         ReadingFontLibrary.shared.reload(reset: environment.resetsTestState)
@@ -138,6 +138,7 @@ struct RootView: View {
                 let prose = "第一章 星光\n" + String(repeating:"这是一段原创朗读测试正文，读者在山间看见星光。\n",count:80) + "第二章 回声\n回声来自远方。"
                 if let prepared = try? BookImporter.prepare(data:Data(prose.utf8),name:"原创朗读测试.txt") { _ = try? await store.importBookDurably(prepared.book); store.completeReadingGuide() }
             }
+            if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-network-browser") { try? await NetworkBrowserValidation.run() }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-native-narration") { try? await NativeNarrationValidation.run() }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--validate-source-comments") { try? await SourceCommentValidation.run(credential:shushan.credentialForRequests) }
             if !store.isDemo && ProcessInfo.processInfo.arguments.contains("--measure-native-performance") {
@@ -157,6 +158,8 @@ struct RootView: View {
         .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store); demo.updateShushanAccount(shushan.credential, host: shushan.hostText); configureSource() } }
         .onChange(of: store.sources) { _, _ in configureSource() }
         .onReceive(NotificationCenter.default.publisher(for:.contentProcessingChanged)) { _ in if !store.isDemo { store.audio.stop() } }
+        .onReceive(NotificationCenter.default.publisher(for:.sourceBrowserSessionsChanged)) { _ in configureSource() }
+        .onReceive(NotificationCenter.default.publisher(for:.sourceNetworkChanged)) { _ in configureSource() }
         .onChange(of: scenePhase) { _, phase in if phase == .background { Task { await store.onlineService?.downloads?.pauseForBackground(); await store.saveBeforeSuspending() } } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await store.onlineService?.downloads?.returnToForeground() } } }
         .onChange(of: store.reader?.id) { _, id in if id == nil { Task { await store.flushPendingWrites() } } }

@@ -20,8 +20,10 @@ final class SourceHTTPTransport: HTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var cachedSession: URLSession?
     private let makeSession: @Sendable () -> URLSession
-    init(makeSession: (@Sendable () -> URLSession)? = nil) {
+    private let maximumResponseBytes: Int?
+    init(makeSession: (@Sendable () -> URLSession)? = nil,maximumResponseBytes: Int? = nil) {
         self.makeSession = makeSession ?? { Self.makeDefaultSession() }
+        self.maximumResponseBytes = maximumResponseBytes
     }
     deinit { cachedSession?.invalidateAndCancel() }
     private static func makeDefaultSession() -> URLSession {
@@ -40,6 +42,13 @@ final class SourceHTTPTransport: HTTPTransport, @unchecked Sendable {
     }
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         try Task.checkCancellation()
+        if let limit = maximumResponseBytes {
+            let (stream,response) = try await sessionForRequest().bytes(for:request)
+            guard let response = response as? HTTPURLResponse,response.expectedContentLength <= limit else { throw ContentFailure.invalidResponse }
+            var bytes = Data()
+            for try await byte in stream { guard bytes.count < limit else { throw ContentFailure.invalidResponse }; bytes.append(byte); if bytes.count % 65536 == 0 { try Task.checkCancellation() } }
+            try Task.checkCancellation(); return (bytes,response)
+        }
         let (data, response) = try await sessionForRequest().data(for: request)
         try Task.checkCancellation()
         guard let response = response as? HTTPURLResponse else { throw ContentFailure.invalidResponse }

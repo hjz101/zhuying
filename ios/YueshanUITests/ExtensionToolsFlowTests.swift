@@ -32,4 +32,13 @@ final class ExtensionToolsFlowTests: XCTestCase {
         app.swipeUp(); app.buttons["ruleParse"].tap()
         XCTAssertTrue(app.staticTexts["ruleOutput"].waitForExistence(timeout:5)); XCTAssertEqual(app.staticTexts["ruleOutput"].label,"Original story\nMountain")
     }
+    @MainActor func testRecordSyncStaysOffWithoutCloudEntitlement() {
+        let app = open("icloud",title:"iCloud")
+        let entry = app.buttons["cloudRecordSync"]
+        for _ in 0..<5 { if entry.isHittable { break }; app.swipeUp() }
+        entry.tap(); let toggle = app.switches["recordSyncEnabled"]
+        XCTAssertTrue(toggle.waitForExistence(timeout:5)); XCTAssertEqual(toggle.value as? String,"0"); toggle.tap()
+        XCTAssertTrue(app.staticTexts["recordSyncMessage"].waitForExistence(timeout:5)); XCTAssertTrue(app.staticTexts["recordSyncMessage"].label.contains("尚未启用 iCloud 权限"))
+        XCTAssertEqual(toggle.value as? String,"0"); XCTAssertFalse(app.buttons["recordSyncNow"].isEnabled)
+    }
 }

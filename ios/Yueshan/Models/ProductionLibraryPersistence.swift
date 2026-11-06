@@ -20,7 +20,7 @@ struct AppearanceMigrationInput {
     var warnings: [String] = []
 }
 
-private struct LibraryViewPreferences: Codable {
+struct LibraryViewPreferences: Codable {
     var settings: ReadingSettings
     var sort: ShelfSort
     var shelfLayout: String?
@@ -33,6 +33,8 @@ private struct LibraryViewPreferences: Codable {
     var narrationAnchor: ReadingAnchor? = nil
     var mediaLocations: [String:MediaReadingLocation]? = nil
     var mediaBookmarks: [MediaBookmark]? = nil
+    var userSettingsEdited: Bool? = nil
+    var farthestPositions: [String:ReadingAnchor]? = nil
     init(_ snapshot: LibrarySnapshot) {
         settings = snapshot.settings; sort = snapshot.sort
         if settings.preferences.bubbleSVG != nil { settings.preferences.bubbleImageData = nil }
@@ -43,6 +45,8 @@ private struct LibraryViewPreferences: Codable {
         subscribedSourceIDs = snapshot.subscribedSourceIDs; updates = snapshot.updates
         narrationSettings = snapshot.narrationSettings; narrationAnchor = snapshot.narrationAnchor
         mediaLocations = snapshot.mediaLocations; mediaBookmarks = snapshot.mediaBookmarks
+        userSettingsEdited = snapshot.userSettingsEdited
+        farthestPositions = snapshot.farthestPositions
     }
 }
 
@@ -54,7 +58,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
     static let appearanceMigrationKey = "migration.appearance.v1"
     static let themeLibraryKey = "appearance.theme-library.v1"
     static let sourcesKey = "sources.configuration.v1"
-    private static let viewKey = "library.view-preferences.v1"
+    static let viewKey = "library.view-preferences.v1"
     private static let unresolvedKey = "library.unresolved-history.v1"
     private let records: SQLiteLibraryRepository
     private let files: FileChapterRepository
@@ -184,6 +188,17 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
     }
     func backup(fontDirectory: URL) async throws -> LibraryBackup {
         try await serialized { backend in try await backend.performBackup(fontDirectory: fontDirectory) }
+    }
+    func recordSyncDesired() async throws -> [SyncEntry.Kind:[String:Data]] {
+        try await serialized { try LibraryRecordSync.desired(await $0.records.backupArchive()) }
+    }
+    func applyRecordSync(_ state: RecordSyncState) async throws {
+        try await serialized { try await $0.performApplyRecordSync(state) }
+    }
+    private func performApplyRecordSync(_ state: RecordSyncState) async throws {
+        let original = try await records.backupArchive(),value = try LibraryRecordSync.applying(state,to:original)
+        try Task.checkCancellation(); try await records.applyRecordSync(value)
+        catalogs = [:]; savedAnchors = [:]; documents = ChapterMemoryCache(); remoteDocuments = ChapterMemoryCache()
     }
     private func performBackup(fontDirectory: URL) async throws -> LibraryBackup {
         let archive = try await records.backupArchive()
@@ -450,6 +465,8 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             snapshot.subscribedSourceIDs = view.subscribedSourceIDs; snapshot.updates = view.updates
             snapshot.narrationSettings = view.narrationSettings; snapshot.narrationAnchor = view.narrationAnchor
             snapshot.mediaLocations = view.mediaLocations; snapshot.mediaBookmarks = view.mediaBookmarks
+            snapshot.userSettingsEdited = view.userSettingsEdited
+            snapshot.farthestPositions = view.farthestPositions
         }
         var unresolved = Set<String>()
         if let data = try await records.preference(key: Self.unresolvedKey) {

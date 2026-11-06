@@ -33,6 +33,7 @@ struct ProductionCloudView: View {
                 if busy { ProgressView("正在处理云端文件"); Button("取消") { operation?.cancel(); busy = false } }
                 if let message { Text(message).font(.system(size:12)).foregroundStyle(Palette.accent).accessibilityIdentifier("cloudMessage") }
                 NavigationLink { ProductionBackupView() } label: { Label("本地备份与恢复",systemImage:"externaldrive") }
+                NavigationLink { ProductionRecordSyncView(controller:library.cloudSync) } label: { Label("记录同步",systemImage:"arrow.triangle.2.circlepath.icloud") }.accessibilityIdentifier("cloudRecordSync")
                 Text("备份包含正文、页面资源、书架、进度、书签、主题与字体，不包含登录凭据和服务密钥。下载完成并通过完整校验后，仍需确认才替换本地书库；旧书库保留为回滚版本。记录同步单独开关，正文和资源通过显式备份恢复。")
                     .font(.system(size:12)).foregroundStyle(Palette.muted)
             }.padding(22)

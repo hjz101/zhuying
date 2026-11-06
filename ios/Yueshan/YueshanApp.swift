@@ -151,6 +151,7 @@ struct RootView: View {
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(5)) } catch { break }
                 store.readingHeartbeat()
+                if !store.isDemo && scenePhase == .active { store.cloudSync.tick() }
             }
         }
         .onChange(of: store.loadState) { _, state in if state == .ready { demo.connectReader(store); demo.updateShushanAccount(shushan.credential, host: shushan.hostText); configureSource() } }

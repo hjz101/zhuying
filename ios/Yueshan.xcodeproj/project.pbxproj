@@ -65,6 +65,7 @@
 		3DC0BCAC1DB95FDBC90804CC /* ProductionStorageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE4B4E9CCAB2A5C76386DFC /* ProductionStorageViews.swift */; };
 		41B402E76A877C6F23738E9A /* OnlineToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D154B3AF8B64D130FD8380F6 /* OnlineToolsTests.swift */; };
 		43D4380E1111C45966AE5B3B /* PerformanceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701A9EEBDC3E68AA1D9F5536 /* PerformanceFixtures.swift */; };
+		45D8C4781FAAC84786B79ABC /* ProductionRecordSyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC5B2354BCAD76A5C8FBBFC /* ProductionRecordSyncView.swift */; };
 		46FDFEE0283EEDCCE9915546 /* ProductionLibraryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B095C4655905A7745628F3 /* ProductionLibraryStoreTests.swift */; };
 		484DCF51C47DAAC411F8EBCF /* ReadingSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F73D373855F0C8AFAD6103 /* ReadingSessionController.swift */; };
 		48672C1B90E4CA45F5191947 /* ReaderPageFurniture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FA9DA18323FF6E8072A1FC /* ReaderPageFurniture.swift */; };
@@ -121,6 +122,7 @@
 		89FCA41228D68601690B6E29 /* ReaderNativeInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5BCAE6DE524870A1699CD4 /* ReaderNativeInteractionTests.swift */; };
 		8CA6BFCC0BE43ABB7C772ABD /* RuleExtractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0E0A3C464AD62C7C4CECBE /* RuleExtractionTests.swift */; };
 		8E85652A870697E08C5DBD55 /* ReaderTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BB825F2DC4C16BB99E6D89B /* ReaderTextView.swift */; };
+		8E8797B8751CC6D6542A749B /* RecordSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47AD43088642E50C53DB9AA4 /* RecordSyncController.swift */; };
 		91BA2C8A52A294467768B6EB /* SourceHTTPTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 046E28A7087849B10B843EED /* SourceHTTPTransportTests.swift */; };
 		92D4B812129ED67DF265ADB5 /* FileResourceStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7452889DE558C54BC370F822 /* FileResourceStoreTests.swift */; };
 		930F0651C491D367C3B6FEFA /* ReadingPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F629DC6E4B1B42DF2AE80E76 /* ReadingPreferencesView.swift */; };
@@ -190,6 +192,7 @@
 		E29AD2AE1AFB78611852B4CF /* ReadingPreferencesFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 212395DC60F102FEFF5DC879 /* ReadingPreferencesFlowTests.swift */; };
 		E308387BA2AEC4E154E21B85 /* ContentContractsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE6064EED50BC66937B80B36 /* ContentContractsTests.swift */; };
 		E340BF1DB97D4173BB74F660 /* ShushanAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B641452C1C28186DE2ECB09 /* ShushanAccount.swift */; };
+		E342569000C0167330E440C4 /* LibraryRecordSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE79817FB5CC388FA503D43 /* LibraryRecordSync.swift */; };
 		E4D56065AE02C8F7B5FCF08D /* RoleAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4101027F550E5F5D228F0952 /* RoleAnalysis.swift */; };
 		E4E01002AD200DCAE8C12A50 /* ReadingPageEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 096FEB33678F7EF17D5A6BDB /* ReadingPageEditors.swift */; };
 		E8319A44538570CA8C215A86 /* fixed-layout.epub in Resources */ = {isa = PBXBuildFile; fileRef = 2B8BA569718420DB01DAE183 /* fixed-layout.epub */; };
@@ -291,6 +294,7 @@
 		3A8E096FE83A2C5637BB4108 /* ConfigurableSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurableSourceTests.swift; sourceTree = "<group>"; };
 		3C7C8D427E1ECC5E6378C8D0 /* LibraryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryBackupTests.swift; sourceTree = "<group>"; };
 		3D99A02627C92E50865A4E6F /* AppearancePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePersistenceTests.swift; sourceTree = "<group>"; };
+		3DC5B2354BCAD76A5C8FBBFC /* ProductionRecordSyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionRecordSyncView.swift; sourceTree = "<group>"; };
 		3F3C0BBB1E21CD28AA819B0C /* SQLiteLibraryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteLibraryRepository.swift; sourceTree = "<group>"; };
 		3F6764EC735861B92FAF4920 /* FeatureFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureFlowTests.swift; sourceTree = "<group>"; };
 		4101027F550E5F5D228F0952 /* RoleAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleAnalysis.swift; sourceTree = "<group>"; };
@@ -301,6 +305,7 @@
 		4528CFED3A929E851318E867 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
 		465462DCD26C9B2A0C186A8A /* ReaderPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPreferencesTests.swift; sourceTree = "<group>"; };
 		46598064B5EC710B5F635799 /* ShushanAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShushanAccountView.swift; sourceTree = "<group>"; };
+		47AD43088642E50C53DB9AA4 /* RecordSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordSyncController.swift; sourceTree = "<group>"; };
 		4A026FA567ED309787593681 /* ReadingFontLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingFontLibrary.swift; sourceTree = "<group>"; };
 		4ABD61F64E408BBD809A5583 /* OnlineDevelopmentFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineDevelopmentFixtures.swift; sourceTree = "<group>"; };
 		4CCF219A7F726EE30F116597 /* ReaderSelectionFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSelectionFlowTests.swift; sourceTree = "<group>"; };
@@ -384,6 +389,7 @@
 		B1F85F266A45583C22C6B451 /* ReadingAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingAppearanceTests.swift; sourceTree = "<group>"; };
 		B4AA4B13ABD7B24D1AF734EE /* BookFormatParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookFormatParsing.swift; sourceTree = "<group>"; };
 		B77F36AD76D19402C9AFE63C /* ReadingGestureGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingGestureGuideView.swift; sourceTree = "<group>"; };
+		BAE79817FB5CC388FA503D43 /* LibraryRecordSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryRecordSync.swift; sourceTree = "<group>"; };
 		BD17F5A745418D5B16C735E4 /* LibrarySaveLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySaveLifecycle.swift; sourceTree = "<group>"; };
 		BE15643C09149243AC80908C /* ProductionSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionSourcesView.swift; sourceTree = "<group>"; };
 		BF9C7C924D86DAAFD87FE7D9 /* CloudRecordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRecordTests.swift; sourceTree = "<group>"; };
@@ -519,6 +525,7 @@
 				35DDC91280E8C67515EACF78 /* ProductionMediaReader.swift */,
 				3443AEC528BB00C185496C80 /* ProductionNarrationView.swift */,
 				CB1B101B1E76F23E264F3B5F /* ProductionOnlineTools.swift */,
+				3DC5B2354BCAD76A5C8FBBFC /* ProductionRecordSyncView.swift */,
 				2FD3E0081A17C20FE88EB5EA /* ProductionRuleTesterView.swift */,
 				BE15643C09149243AC80908C /* ProductionSourcesView.swift */,
 				1DE4B4E9CCAB2A5C76386DFC /* ProductionStorageViews.swift */,
@@ -569,6 +576,7 @@
 				C9289365055BAF46AB29BE23 /* Library.swift */,
 				88D0CBAF0EC5C8FA065A7E0F /* LibraryAudioCoordinator.swift */,
 				617B9A1D8B0CE92B7E701C7B /* LibraryBackup.swift */,
+				BAE79817FB5CC388FA503D43 /* LibraryRecordSync.swift */,
 				BD17F5A745418D5B16C735E4 /* LibrarySaveLifecycle.swift */,
 				512EBBAD5FACB0ACFDCB2AD1 /* LocalBookFile.swift */,
 				099BEF6DA2F56717351D243E /* MediaBooks.swift */,
@@ -587,6 +595,7 @@
 				03F73D373855F0C8AFAD6103 /* ReadingSessionController.swift */,
 				7B73961E31FCEB70F08C21D6 /* ReadingStyleResolver.swift */,
 				4E1482BB639ECFE16A857DAB /* RecentChapterCache.swift */,
+				47AD43088642E50C53DB9AA4 /* RecordSyncController.swift */,
 				6AABEBF2C6BC92B132D4889D /* ResilientSourceTransport.swift */,
 				4101027F550E5F5D228F0952 /* RoleAnalysis.swift */,
 				252F8ECE6D4436DF5541AA50 /* RuleExtraction.swift */,
@@ -1022,6 +1031,7 @@
 				19C3968A46509CF2B996D29D /* Library.swift in Sources */,
 				D21D1D91E7AA8E120C9AC12D /* LibraryAudioCoordinator.swift in Sources */,
 				AD78CEA86EDACE2523FD7756 /* LibraryBackup.swift in Sources */,
+				E342569000C0167330E440C4 /* LibraryRecordSync.swift in Sources */,
 				B0CFAD6BCD7104459C37394F /* LibrarySaveLifecycle.swift in Sources */,
 				2470B842B3D5B9A41916577C /* LocalBookFile.swift in Sources */,
 				C793E629B8124902F9AA8302 /* MediaBooks.swift in Sources */,
@@ -1050,6 +1060,7 @@
 				89CDAA46D62DE9505711B19C /* ProductionMediaReader.swift in Sources */,
 				4B83E00DDF303CEA63E265B0 /* ProductionNarrationView.swift in Sources */,
 				75691A391886F59DF06A7456 /* ProductionOnlineTools.swift in Sources */,
+				45D8C4781FAAC84786B79ABC /* ProductionRecordSyncView.swift in Sources */,
 				3643EF2D526C3CCCAC119378 /* ProductionRuleTesterView.swift in Sources */,
 				EBE04450DC249ADD92AC2194 /* ProductionSourcesView.swift in Sources */,
 				3DC0BCAC1DB95FDBC90804CC /* ProductionStorageViews.swift in Sources */,
@@ -1071,6 +1082,7 @@
 				484DCF51C47DAAC411F8EBCF /* ReadingSessionController.swift in Sources */,
 				567B38722AB6C3D9E14F3EE0 /* ReadingStyleResolver.swift in Sources */,
 				01CD71BB99401181C5C8735E /* RecentChapterCache.swift in Sources */,
+				8E8797B8751CC6D6542A749B /* RecordSyncController.swift in Sources */,
 				55D8123F2D539DD5F4A59244 /* ResilientSourceTransport.swift in Sources */,
 				E4D56065AE02C8F7B5FCF08D /* RoleAnalysis.swift in Sources */,
 				DFC491CD1FD602D05B90FEE6 /* RuleExtraction.swift in Sources */,

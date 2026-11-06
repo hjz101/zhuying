@@ -149,6 +149,8 @@ struct LibrarySnapshot: Codable {
     var narrationAnchor: ReadingAnchor? = nil
     var mediaLocations: [String:MediaReadingLocation]? = nil
     var mediaBookmarks: [MediaBookmark]? = nil
+    var userSettingsEdited: Bool? = nil
+    var farthestPositions: [String:ReadingAnchor]? = nil
 }
 
 struct ReaderSession: Identifiable {
@@ -175,6 +177,7 @@ final class LibraryStore: ObservableObject {
                 let resolved = ReadingStyleResolver.resolve(settings, previous: oldValue)
                 if resolved != settings { settings = resolved; return }
             }
+            if !suppressPersistence && settings != oldValue { defaults.set(true,forKey:"reader.user-settings-edited.v1") }
             persist()
         }
     }
@@ -212,6 +215,7 @@ final class LibraryStore: ObservableObject {
     private(set) var workspace: LibraryWorkspace?
     private var remoteBooks: [String: LibraryBookRecord] = [:]
     private let defaults: UserDefaults
+    lazy var cloudSync = RecordSyncController(library:self,directory:(workspace?.root ?? FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent(AppEnvironment().databaseComponent)).appendingPathComponent("CloudSync-v1"),defaults:defaults)
     private let importsURL: URL?
     private var importedBooks: [Book] = []
     private var productionPersistence: ProductionLibraryPersistence?
@@ -230,6 +234,7 @@ final class LibraryStore: ObservableObject {
     private var appearancePreparation: (() throws -> AppearanceMigrationInput)?
     private var chapterCatalogs: [String: [ChapterRecord]] = [:]
     private var stableProgress: [String: ReadingAnchor] = [:]
+    private var farthestPositions: [String:ReadingAnchor] = [:]
     private var activeDocuments = ChapterMemoryCache()
 
     init(books: [Book], defaults: UserDefaults = .standard, importsURL: URL? = nil, seedDemoData: Bool = true,
@@ -419,6 +424,12 @@ final class LibraryStore: ObservableObject {
             let document = activeDocuments[record.id] ?? ChapterDocument(chapterID: record.id, paragraphs: paragraphs)
             activeDocuments[record.id] = document
             stableProgress[book.id] = try? ReadingAnchor(bookID: book.id, document: document, paragraph: paragraph, offset: offset, now: now)
+            if let candidate = stableProgress[book.id] {
+                let previous = farthestPositions[book.id]
+                let previousChapter = previous.flatMap{chapterIndex(bookID:book.id,chapterID:$0.chapterID)} ?? -1
+                let rank = [chapter,paragraph,offset],oldRank = [previousChapter,previous?.paragraphIndex ?? 0,previous?.utf16Offset ?? 0]
+                if previous == nil || oldRank.lexicographicallyPrecedes(rank) { farthestPositions[book.id] = candidate }
+            }
         }
         unresolvedBookIDs.remove(book.id)
         if var notice = updates[book.id], chapter >= notice.firstChapter {
@@ -492,7 +503,7 @@ final class LibraryStore: ObservableObject {
 
     private var snapshot: LibrarySnapshot {
         .init(favorites: favorites, progress: progress.filter{mediaLocations[$0.key] == nil}, settings: settings, sort: sort, updates: updates,
-              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted(),narrationSettings:narrationSettings,narrationAnchor:narrationAnchor,mediaLocations:mediaLocations,mediaBookmarks:mediaBookmarks)
+              hasSeenReadingGuide: hasSeenReadingGuide, shelfLayout: shelfLayout.rawValue, importedGroups: importedGroups, groupNames: groupNames, activitySessions: activitySessions, subscribedSourceIDs:subscribedSourceIDs.sorted(),narrationSettings:narrationSettings,narrationAnchor:narrationAnchor,mediaLocations:mediaLocations,mediaBookmarks:mediaBookmarks,userSettingsEdited:defaults.bool(forKey:"reader.user-settings-edited.v1"),farthestPositions:farthestPositions)
     }
 
     func bootstrapProductionIfNeeded(prepareAppearance: (() throws -> AppearanceMigrationInput)? = nil, forceReload: Bool = false) async {
@@ -515,6 +526,7 @@ final class LibraryStore: ObservableObject {
             importedGroups = restored.snapshot.importedGroups ?? [:]
             groupNames = Array(Set((restored.snapshot.groupNames ?? []) + Array(importedGroups.values))).sorted()
             settings = restored.snapshot.settings
+            defaults.set(restored.snapshot.userSettingsEdited ?? false,forKey:"reader.user-settings-edited.v1")
             settings.fontSize = ReaderPreferenceBounds.clamp(settings.fontSize, 14...30, fallback: 20)
             settings.lineSpacing = ReaderPreferenceBounds.clamp(settings.lineSpacing, 0...24, fallback: 12)
             settings.preferences.normalize()
@@ -532,6 +544,7 @@ final class LibraryStore: ObservableObject {
             unresolvedBookIDs = restored.unresolvedBookIDs
             bookmarks = restored.bookmarks
             chapterCatalogs = restored.catalogs; stableProgress = restored.anchors
+            farthestPositions = (restored.snapshot.farthestPositions ?? restored.anchors).filter{ id,_ in books.contains(where:{$0.id == id}) }
             remoteBooks = restored.remoteBooks; sources = restored.sources
             suppressPersistence = false; loadState = .ready
             var messages = restored.warnings
@@ -740,6 +753,23 @@ final class LibraryStore: ObservableObject {
         guard let backend = productionPersistence, let workspace, await flushPendingWrites() else { throw ContentFailure.storageFailure }
         return try await backend.backup(fontDirectory: workspace.fontDirectory()).encoded()
     }
+    func synchronizeRecords(_ records: CloudRecordStore,account: String,transport: any CloudDocumentTransport,resolutions: [String:SyncEntry] = [:]) async throws -> RecordSyncState {
+        guard reader == nil else { throw RecordSyncError.reading }
+        guard let backend = productionPersistence,loadState == .ready,await flushPendingWrites() else { throw ContentFailure.storageFailure }
+        audio.stop(); loadState = .loading
+        do {
+            let desired = try await backend.recordSyncDesired()
+            let result = try await records.synchronize(desired,account:account,resolutions:resolutions) { state in
+                try Task.checkCancellation(); guard try await transport.account() == account else { throw CloudAccessError.accountChanged }
+                try await backend.applyRecordSync(state)
+            }
+            await bootstrapProductionIfNeeded(forceReload:true)
+            guard loadState == .ready else { throw ContentFailure.storageFailure }; return result
+        } catch {
+            await bootstrapProductionIfNeeded(forceReload:true)
+            throw error
+        }
+    }
     func localFiles() async throws -> [LocalBookFile] {
         guard let backend = productionPersistence else { throw ContentFailure.storageFailure }
         return try await backend.localFiles()
@@ -868,6 +898,7 @@ final class LibraryStore: ObservableObject {
             self.remoteBooks.removeValue(forKey: id)
             self.activitySessions.removeAll { $0.bookID == id }
             self.mediaLocations.removeValue(forKey:id); self.mediaBookmarks.removeAll{$0.bookID == id}
+            self.farthestPositions.removeValue(forKey:id)
             if self.narrationAnchor?.bookID == id { self.narrationAnchor = nil }
             if self.followingNarrationAnchor?.bookID == id { self.followingNarrationAnchor = nil }
             if self.reader?.book.id == id { self.reader = nil }

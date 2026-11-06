@@ -69,4 +69,96 @@ final class CloudRecordTests: XCTestCase {
         do { _ = try await store.restore(id,account:account); XCTFail("Changed account") } catch CloudAccessError.accountChanged {}
         do { _ = try await UbiquitousDocuments(enabled:false).account(); XCTFail("No entitlement") } catch CloudAccessError.notConfigured {}
     }
+    func testFailedApplyCannotReusePublishedClockForAnotherPayload() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); defer { try? FileManager.default.removeItem(at:root) }
+        let transport = CloudTransportProbe(),account = await transport.account()
+        let a = CloudRecordStore(directory:root.appendingPathComponent("a"),device:"A",transport:transport)
+        do { _ = try await a.synchronize([.bookmark:["m":Data("before failure".utf8)]],account:account) { _ in throw ContentFailure.storageFailure }; XCTFail("Apply fails") } catch ContentFailure.storageFailure {}
+        let restarted = CloudRecordStore(directory:root.appendingPathComponent("a"),device:"A",transport:transport)
+        _ = try await restarted.synchronize([.bookmark:["m":Data("new local edit".utf8)]],account:account)
+        let b = CloudRecordStore(directory:root.appendingPathComponent("b"),device:"B",transport:transport)
+        let state = try await b.synchronize([.bookmark:[:]],account:account)
+        XCTAssertEqual(state.entries["bookmark:m"]?.payload,Data("new local edit".utf8)); XCTAssertGreaterThan(state.entries["bookmark:m"]?.counter ?? 0,1)
+    }
+    func testConcurrentConflictRetainsChoicesAndExplicitResolutionIsCausal() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); defer { try? FileManager.default.removeItem(at:root) }
+        let transport = CloudTransportProbe(),account = await transport.account()
+        let a = CloudRecordStore(directory:root.appendingPathComponent("a"),device:"A",transport:transport),b = CloudRecordStore(directory:root.appendingPathComponent("b"),device:"B",transport:transport)
+        _ = try await a.synchronize([.settings:["reader":Data("A".utf8)]],account:account)
+        let conflicted = try await b.synchronize([.settings:["reader":Data("B".utf8)]],account:account)
+        XCTAssertEqual(conflicted.alternatives?["settings:reader"]?.count,2)
+        let choice = try XCTUnwrap(conflicted.alternatives?["settings:reader"]?.first(where:{$0.device == "A"}))
+        let resolved = try await b.synchronize([.settings:["reader":conflicted.entries["settings:reader"]!.payload!]],account:account,resolutions:["settings:reader":choice])
+        XCTAssertEqual(resolved.entries["settings:reader"]?.payload,Data("A".utf8)); XCTAssertTrue(resolved.conflicts.isEmpty)
+        let pulled = try await a.synchronize([.settings:["reader":Data("A".utf8)]],account:account)
+        XCTAssertEqual(pulled.entries["settings:reader"]?.payload,Data("A".utf8)); XCTAssertTrue(pulled.conflicts.isEmpty)
+    }
+    func testRecordsApplyToRealDatabaseWithSeparateBodyRecoveryAndDeletion() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); defer { try? FileManager.default.removeItem(at:root) }
+        let transport = CloudTransportProbe(),account = await transport.account()
+        let a = try ProductionLibraryPersistence(directory:root.appendingPathComponent("dbA")),b = try ProductionLibraryPersistence(directory:root.appendingPathComponent("dbB"))
+        _ = try await a.bootstrap(legacySnapshot:nil,archiveURL:nil); _ = try await b.bootstrap(legacySnapshot:nil,archiveURL:nil)
+        let book = try BookImporter.prepare(data:Data("第一章\n原创正文。\n第二章\n山谷中的星光。".utf8),name:"原创.txt").book
+        _ = try await a.importBook(book,group:"原创分组")
+        var settings = ReadingSettings(); settings.fontSize = 25
+        try await a.saveState(.init(favorites:[book.id],progress:[book.id:.init(chapter:1,paragraph:0,updatedAt:Date())],settings:settings,importedGroups:[book.id:"原创分组"]))
+        let ar = CloudRecordStore(directory:root.appendingPathComponent("syncA"),device:"A",transport:transport),br = CloudRecordStore(directory:root.appendingPathComponent("syncB"),device:"B",transport:transport)
+        _ = try await ar.synchronize(a.recordSyncDesired(),account:account)
+        _ = try await br.synchronize(b.recordSyncDesired(),account:account) { state in try await b.applyRecordSync(state) }
+        let state = try await b.bootstrap(legacySnapshot:nil,archiveURL:nil)
+        XCTAssertEqual(state.books.map(\.id),[book.id]); XCTAssertEqual(state.snapshot.favorites,[book.id]); XCTAssertEqual(state.snapshot.importedGroups?[book.id],"原创分组"); XCTAssertEqual(state.snapshot.settings.fontSize,25); XCTAssertEqual(state.snapshot.progress[book.id]?.chapter,1)
+        let chapter = try XCTUnwrap(state.catalogs[book.id]?.first)
+        do { _ = try await b.document(chapterID:chapter.id); XCTFail("Metadata sync must not synthesize prose") } catch {}
+        _ = try await b.deleteBook(id:book.id)
+        _ = try await br.synchronize(b.recordSyncDesired(),account:account)
+        _ = try await ar.synchronize(a.recordSyncDesired(),account:account) { state in try await a.applyRecordSync(state) }
+        let deleted = try await a.bootstrap(legacySnapshot:nil,archiveURL:nil); XCTAssertTrue(deleted.books.isEmpty)
+    }
+    func testPristineDeviceDoesNotPublishDefaultPreferencesButExplicitResetDoes() throws {
+        var original = LibraryDatabaseArchive(books:[],chapters:[],progress:[],bookmarks:[],favorites:[],groups:[:],preferences:[:])
+        let initial = LibraryViewPreferences(.init(favorites:[],progress:[:]))
+        original.preferences[ProductionLibraryPersistence.viewKey] = try JSONEncoder().encode(initial)
+        XCTAssertNil(try LibraryRecordSync.desired(original)[.settings])
+        let edited = LibraryViewPreferences(.init(favorites:[],progress:[:],userSettingsEdited:true))
+        original.preferences[ProductionLibraryPersistence.viewKey] = try JSONEncoder().encode(edited)
+        XCTAssertNotNil(try LibraryRecordSync.desired(original)[.settings]?["reader"])
+    }
+    func testDatabaseSyncFailureRollsBackDeletedAndReplacedRecords() async throws {
+        let repository = try SQLiteLibraryRepository()
+        let original = LibraryBookRecord(id:"original",title:"保留作品",author:"原创",summary:"",addedAt:Date())
+        let chapter = ChapterRecord(id:"original-chapter",bookID:original.id,nativeChapterID:"one",title:"第一章",order:0,access:.readable)
+        try await repository.save(book:original,chapters:[chapter])
+        let invalid = LibraryDatabaseArchive(books:[],chapters:[chapter],progress:[],bookmarks:[],favorites:[],groups:[:],preferences:[:])
+        do { try await repository.applyRecordSync(invalid); XCTFail("Foreign key failure") } catch {}
+        let remaining = try await repository.books(); XCTAssertEqual(remaining,[original])
+        let chapters = try await repository.chapters(bookID:original.id); XCTAssertEqual(chapters,[chapter])
+    }
+    func testInitialCatalogLargerThanOneJournalRoundTripsAndDamagedCheckpointIsRejected() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); defer { try? FileManager.default.removeItem(at:root) }
+        let transport = CloudTransportProbe(),account = await transport.account()
+        let a = CloudRecordStore(directory:root.appendingPathComponent("a"),device:"A",transport:transport),b = CloudRecordStore(directory:root.appendingPathComponent("b"),device:"B",transport:transport)
+        let desired = Dictionary(uniqueKeysWithValues:(0..<5001).map{("chapter-\($0)",Data("original-\($0)".utf8))})
+        _ = try await a.synchronize([.chapter:desired],account:account)
+        let copied = try await b.synchronize([.chapter:[:]],account:account); XCTAssertEqual(copied.entries.count,5001)
+        XCTAssertEqual(copied.entries["chapter:chapter-5000"]?.payload,desired["chapter-5000"])
+        var damaged = copied; damaged.vector = .init(); XCTAssertThrowsError(try damaged.validate())
+    }
+    @MainActor func testReadingBackBeforeNextSyncKeepsDurableFarthestAnchor() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),domain = UUID().uuidString,defaults = UserDefaults(suiteName:domain)!
+        defer { try? FileManager.default.removeItem(at:root); defaults.removePersistentDomain(forName:domain) }
+        let backend = try ProductionLibraryPersistence(directory:root),store = LibraryStore(books:[],defaults:defaults,seedDemoData:false,productionPersistence:backend)
+        await store.bootstrapProductionIfNeeded()
+        let book = try BookImporter.prepare(data:Data("第一章\n原始的来信正文。\n第二章\n山谷中的远方星光。".utf8),name:"原创.txt").book
+        _ = try await store.importBookDurably(book)
+        for index in [1,0] {
+            let request = try store.chapterRequest(for:book,chapter:index),value = try await backend.document(chapterID:request.chapter.id),document = try XCTUnwrap(value)
+            XCTAssertTrue(store.confirmChapter(book,chapter:index,document:document,anchor:.init(paragraph:0,offset:2)))
+        }
+        let saved = await store.flushPendingWrites(); XCTAssertTrue(saved)
+        let values = try await backend.recordSyncDesired()
+        let current = try JSONDecoder().decode(SyncedPosition.self,from:values[.current]![book.id]!),farthest = try JSONDecoder().decode(SyncedPosition.self,from:values[.farthest]![book.id]!)
+        XCTAssertEqual(current.chapterOrder,0); XCTAssertEqual(farthest.chapterOrder,1)
+        let reopened = LibraryStore(books:[],defaults:defaults,seedDemoData:false,productionPersistence:try ProductionLibraryPersistence(directory:root)); await reopened.bootstrapProductionIfNeeded()
+        XCTAssertEqual(reopened.progress[book.id]?.chapter,0)
+    }
 }

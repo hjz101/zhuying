@@ -302,6 +302,25 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
     }
 
     /// One commit point for settings, shelf order, groups and confirmed locations.
+    func applyRecordSync(_ value: LibraryDatabaseArchive) throws {
+        try database.write { db in
+            try Task.checkCancellation()
+            let keep = Set(value.books.map(\.id)),existing = try String.fetchAll(db,sql:"SELECT id FROM book_records")
+            for id in existing where !keep.contains(id) { try db.execute(sql:"DELETE FROM book_records WHERE id=?",arguments:[id]) }
+            for book in value.books { try db.execute(sql:"INSERT INTO book_records(id,payload) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",arguments:[book.id,try JSONEncoder().encode(book)]) }
+            for table in ["source_bindings","chapter_records","reading_progress","bookmarks","shelf_entries","book_groups"] { try db.execute(sql:"DELETE FROM " + table) }
+            for book in value.books { if let source = book.source { try db.execute(sql:"INSERT INTO source_bindings(id,bookID,sourceID,nativeBookID) VALUES (?,?,?,?)",arguments:[source.id,book.id,source.sourceID,source.nativeBookID]) } }
+            for chapter in value.chapters { try db.execute(sql:"INSERT INTO chapter_records(id,bookID,position,payload) VALUES (?,?,?,?)",arguments:[chapter.id,chapter.bookID,chapter.order,try JSONEncoder().encode(chapter)]) }
+            for anchor in value.progress { try db.execute(sql:"INSERT INTO reading_progress(bookID,payload) VALUES (?,?)",arguments:[anchor.bookID,try JSONEncoder().encode(anchor)]) }
+            for mark in value.bookmarks { try db.execute(sql:"INSERT INTO bookmarks(id,bookID,payload) VALUES (?,?,?)",arguments:[mark.id,mark.anchor.bookID,try JSONEncoder().encode(mark)]) }
+            for (position,id) in value.favorites.enumerated() { try db.execute(sql:"INSERT INTO shelf_entries(bookID,addedAt,position) VALUES (?,?,?)",arguments:[id,Date(),position]) }
+            for (id,group) in value.groups { try db.execute(sql:"INSERT INTO book_groups(bookID,name) VALUES (?,?)",arguments:[id,group]) }
+            if let data = value.preferences[ProductionLibraryPersistence.viewKey] { try db.execute(sql:"INSERT INTO preferences(key,payload) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload",arguments:[ProductionLibraryPersistence.viewKey,data]) }
+            try Task.checkCancellation()
+        }
+    }
+
+    /// One commit point for settings, shelf order, groups and confirmed locations.
     /// Missing locations are retained rather than interpreted as a deletion.
     func commitState(favorites: [String], groups: [String: String], progress: [ReadingAnchor], preferences: [String: Data]) throws {
         guard Set(favorites).count == favorites.count else { throw ContentFailure.invalidResponse }

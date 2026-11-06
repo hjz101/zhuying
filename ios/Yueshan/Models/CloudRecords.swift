@@ -133,10 +133,10 @@ struct SyncVector: Codable, Equatable, Sendable {
     var values: [String:UInt64] = [:]
     func dominates(_ other: Self) -> Bool { other.values.allSatisfy { values[$0.key,default:0] >= $0.value } }
     mutating func merge(_ other: Self) { for (id,value) in other.values { values[id] = max(values[id,default:0],value) } }
-    mutating func advance(_ device: String) throws { guard values.count <= 64,values[device,default:0] < UInt64.max - 1 else { throw CloudAccessError.quota }; values[device,default:0] += 1 }
+    mutating func advance(_ device: String) throws { guard values[device] != nil || values.count < 64,values[device,default:0] < UInt64.max - 1 else { throw CloudAccessError.quota }; values[device,default:0] += 1 }
 }
 struct SyncEntry: Codable, Equatable, Sendable {
-    enum Kind: String, Codable, Sendable { case book,favorite,current,farthest,bookmark,settings }
+    enum Kind: String, Codable, CaseIterable, Sendable { case book,chapter,favorite,current,farthest,bookmark,settings,mediaCurrent,mediaBookmark }
     let kind: Kind
     let id: String
     let vector: SyncVector
@@ -161,10 +161,26 @@ struct RecordSyncState: Codable, Sendable {
     var entries: [String:SyncEntry] = [:]
     var conflicts: [String] = []
     var seenJournals: [String:CloudFile] = [:]
+    var alternatives: [String:[SyncEntry]]? = nil
+    func validate() throws {
+        guard entries.count <= 50000,conflicts.count <= 128,Set(conflicts).count == conflicts.count,seenJournals.count <= 4096,
+              entries.values.reduce(0,{$0 + ($1.payload?.count ?? 0)}) <= 24 * 1024 * 1024 else { throw CloudAccessError.quota }
+        for (key,entry) in entries { try entry.validate(); guard key == entry.key,vector.dominates(entry.vector) else { throw CloudAccessError.invalidData } }
+        var alternativeBytes = 0
+        for (key,versions) in alternatives ?? [:] {
+            guard conflicts.contains(key),versions.count <= 8 else { throw CloudAccessError.invalidData }
+            for entry in versions { try entry.validate(); guard entry.key == key,vector.dominates(entry.vector) else { throw CloudAccessError.invalidData }; alternativeBytes += entry.payload?.count ?? 0 }
+        }
+        guard alternativeBytes <= 8 * 1024 * 1024 else { throw CloudAccessError.quota }
+    }
     mutating func edit(kind: SyncEntry.Kind,id: String,payload: Data?,device: String) throws {
+        let key = kind.rawValue + ":" + id
+        if kind == .farthest,let old = entries[key]?.payload,let payload,
+           let previous = try? JSONDecoder().decode(SyncedPosition.self,from:old),let next = try? JSONDecoder().decode(SyncedPosition.self,from:payload),next.rank.lexicographicallyPrecedes(previous.rank) { return }
         try vector.advance(device)
         let entry = SyncEntry(kind:kind,id:id,vector:vector,device:device,counter:vector.values[device]!,deleted:payload == nil,payload:payload)
         try entry.validate(); entries[entry.key] = entry
+        alternatives?.removeValue(forKey:entry.key); conflicts.removeAll{$0 == entry.key}
     }
     mutating func merge(_ incoming: SyncEntry) throws {
         try incoming.validate(); vector.merge(incoming.vector)
@@ -177,8 +193,19 @@ struct RecordSyncState: Codable, Sendable {
             let first = try JSONDecoder().decode(SyncedPosition.self,from:a),second = try JSONDecoder().decode(SyncedPosition.self,from:b)
             if second.rank.lexicographicallyPrecedes(first.rank) { return }
         }
-        if incomingNewer { entries[incoming.key] = incoming; return }
-        if !conflicts.contains(incoming.key) { conflicts.append(incoming.key); conflicts = Array(conflicts.suffix(128)) }
+        if incomingNewer {
+            entries[incoming.key] = incoming
+            if (alternatives?[incoming.key] ?? []).allSatisfy({incoming.vector.dominates($0.vector)}) { alternatives?.removeValue(forKey:incoming.key); conflicts.removeAll{$0 == incoming.key} }
+            else if var versions = alternatives?[incoming.key] { versions.removeAll{incoming.vector.dominates($0.vector)}; versions.append(incoming); alternatives?[incoming.key] = versions }
+            return
+        }
+        if !conflicts.contains(incoming.key) { guard conflicts.count < 128 else { throw CloudAccessError.quota }; conflicts.append(incoming.key) }
+        var versions = alternatives?[incoming.key] ?? []
+        for entry in [old,incoming] where !versions.contains(entry) { versions.append(entry) }
+        guard versions.count <= 8 else { throw CloudAccessError.quota }
+        if alternatives == nil { alternatives = [:] }; alternatives?[incoming.key] = versions
+        let bytes = alternatives?.values.flatMap{$0}.reduce(0,{$0 + ($1.payload?.count ?? 0)}) ?? 0
+        guard bytes <= 8 * 1024 * 1024 else { throw CloudAccessError.quota }
         if old.deleted != incoming.deleted { if incoming.deleted { entries[incoming.key] = incoming }; return }
         if incoming.counter > old.counter || incoming.counter == old.counter && incoming.device > old.device { entries[incoming.key] = incoming }
     }
@@ -196,11 +223,18 @@ actor CloudRecordStore {
         guard account.count == 64,account.allSatisfy({"0123456789abcdef".contains($0)}) else { throw CloudAccessError.invalidData }
         let directory = root.appendingPathComponent(account); try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true); return directory.appendingPathComponent("sync-state.json")
     }
-    func synchronize(_ desired: [SyncEntry.Kind:[String:Data]],account: String,apply: @Sendable (RecordSyncState) async throws -> Void = { _ in }) async throws -> RecordSyncState {
+    func synchronize(_ desired: [SyncEntry.Kind:[String:Data]],account: String,resolutions: [String:SyncEntry] = [:],apply: @Sendable (RecordSyncState) async throws -> Void = { _ in }) async throws -> RecordSyncState {
         guard !syncing else { throw CloudAccessError.unavailable }; syncing = true; defer { syncing = false }
         let file = try location(account)
         if FileManager.default.fileExists(atPath:file.path) { guard (try file.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0) <= 32 * 1024 * 1024 else { throw CloudAccessError.quota } }
         var state = FileManager.default.fileExists(atPath:file.path) ? try JSONDecoder().decode(RecordSyncState.self,from:Data(contentsOf:file)) : .init()
+        try state.validate()
+        let clockFile = file.deletingLastPathComponent().appendingPathComponent("device-clock.json")
+        if FileManager.default.fileExists(atPath:clockFile.path) {
+            guard (try clockFile.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0) <= 4096 else { throw CloudAccessError.invalidData }
+            let floor = try JSONDecoder().decode(UInt64.self,from:Data(contentsOf:clockFile))
+            if floor > 0 { state.vector.values[device] = max(state.vector.values[device,default:0],floor) }
+        }
         let old = state
         // Capture local differences before pulling, so an offline edit remains
         // concurrent with remote edits instead of silently overwriting them.
@@ -210,7 +244,7 @@ actor CloudRecordStore {
             }
             for entry in old.entries.values where entry.kind == kind && !entry.deleted && items[entry.id] == nil { try state.edit(kind:kind,id:entry.id,payload:nil,device:device) }
         }
-        let local = state.entries.values.filter { old.entries[$0.key] != $0 }
+        var local = state.entries.values.filter { old.entries[$0.key] != $0 }
         let list = try await transport.files(folder:"Records-v1",account:account)
         guard list.count <= 4096 else { throw CloudAccessError.quota }
         for item in list {
@@ -224,15 +258,33 @@ actor CloudRecordStore {
             guard state.entries.count <= 50000,state.entries.values.reduce(0,{$0 + ($1.payload?.count ?? 0)}) <= 24 * 1024 * 1024 else { throw CloudAccessError.quota }
             state.seenJournals[item.id] = item
         }
-        guard try await transport.account() == account else { throw CloudAccessError.accountChanged }
-        if !local.isEmpty {
-            let payload = try JSONEncoder().encode(local.sorted { $0.key < $1.key })
-            guard payload.count <= 6 * 1024 * 1024 else { throw CloudAccessError.quota }
-            let journal = Journal(format:"yueshan-records",version:1,digest:FileResourceStore.digest(payload),payload:payload)
-            try await transport.write(JSONEncoder().encode(journal),folder:"Records-v1",id:UUID().uuidString,account:account)
+        for (key,choice) in resolutions {
+            guard key == choice.key,state.alternatives?[key]?.contains(choice) == true else { throw CloudAccessError.invalidData }
+            try state.edit(kind:choice.kind,id:choice.id,payload:choice.payload,device:device)
+            local.removeAll{$0.key == key}; if let resolved = state.entries[key] { local.append(resolved) }
         }
         guard try await transport.account() == account else { throw CloudAccessError.accountChanged }
+        try state.validate()
         let encoded = try JSONEncoder().encode(state); guard encoded.count <= 32 * 1024 * 1024 else { throw CloudAccessError.quota }
+        if !local.isEmpty {
+            // Reserve the clock before publishing. A crash or failed local
+            // apply must never reuse a stamp for a different payload on retry.
+            try writer.write(JSONEncoder().encode(state.vector.values[device,default:0]),to:clockFile)
+            var batches: [[SyncEntry]] = [],batch: [SyncEntry] = [],bytes = 2
+            for entry in local.sorted(by:{$0.key < $1.key}) {
+                let size = try JSONEncoder().encode(entry).count + 1
+                if !batch.isEmpty && (bytes + size > 5 * 1024 * 1024 || batch.count >= 5000) { batches.append(batch); batch = []; bytes = 2 }
+                batch.append(entry); bytes += size
+            }
+            if !batch.isEmpty { batches.append(batch) }
+            for batch in batches {
+                try Task.checkCancellation()
+                let payload = try JSONEncoder().encode(batch)
+                let journal = Journal(format:"yueshan-records",version:1,digest:FileResourceStore.digest(payload),payload:payload)
+                try await transport.write(JSONEncoder().encode(journal),folder:"Records-v1",id:UUID().uuidString,account:account)
+            }
+        }
+        guard try await transport.account() == account else { throw CloudAccessError.accountChanged }
         try await apply(state)
         guard try await transport.account() == account else { throw CloudAccessError.accountChanged }
         try writer.write(encoded,to:file); return state

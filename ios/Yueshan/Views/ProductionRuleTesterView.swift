@@ -12,6 +12,7 @@ struct ProductionRuleTesterView: View {
         ScrollView {
             VStack(alignment:.leading,spacing:23) {
                 AppPageHeader(title:"规则兼容测试",subtitle:"v1 · 本地解析 · 不执行网页脚本",icon:"curlybraces")
+                NavigationLink("JavaScript 宿主与兼容报告") { ProductionScriptTesterView() }.accessibilityIdentifier("openScriptHost")
                 AppSettingsCard("配置与选项",icon:"slider.horizontal.3") {
                     Picker("解析器",selection:$kind) { ForEach(ExtractionRule.Kind.allCases,id:\.self) { Text($0.rawValue).tag($0) } }
                     TextField("表达式",text:$expression).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("ruleExpression")

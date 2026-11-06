@@ -33,6 +33,16 @@ struct ExtractionRule: Codable, Equatable, Sendable {
         }
     }
 }
+extension ExtractionRule {
+    private enum Keys: String,CodingKey { case version,kind,expression,projection,attribute,capture }
+    init(from decoder: Decoder) throws {
+        let box = try decoder.container(keyedBy:Keys.self)
+        version = try box.decodeIfPresent(Int.self,forKey:.version) ?? 1
+        kind = try box.decode(Kind.self,forKey:.kind); expression = try box.decode(String.self,forKey:.expression)
+        projection = try box.decodeIfPresent(Projection.self,forKey:.projection) ?? .text
+        attribute = try box.decodeIfPresent(String.self,forKey:.attribute); capture = try box.decodeIfPresent(Int.self,forKey:.capture) ?? 0
+    }
+}
 enum RuleExtraction {
     static let support = [
         "CSS v1：元素、class、id、属性选择、后代／子代／相邻／兄弟组合；输出文字、HTML 或属性。",

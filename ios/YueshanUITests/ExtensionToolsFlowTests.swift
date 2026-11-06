@@ -41,4 +41,12 @@ final class ExtensionToolsFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["recordSyncMessage"].waitForExistence(timeout:5)); XCTAssertTrue(app.staticTexts["recordSyncMessage"].label.contains("尚未启用 iCloud 权限"))
         XCTAssertEqual(toggle.value as? String,"0"); XCTAssertFalse(app.buttons["recordSyncNow"].isEnabled)
     }
+    @MainActor func testScriptHostRunsActualUserProgramWithNetworkOff() {
+        let app = open("engine",title:"书源兼容引擎")
+        XCTAssertTrue(app.buttons["openScriptHost"].waitForExistence(timeout:5)); app.buttons["openScriptHost"].tap()
+        XCTAssertEqual(app.switches["scriptNetwork"].value as? String,"0")
+        let program = app.textViews["scriptProgram"]; XCTAssertTrue(program.waitForExistence(timeout:5)); program.tap(); program.typeText("return 1 + 2;")
+        let run = app.buttons["scriptRun"]; for _ in 0..<5 { if run.isHittable { break }; app.swipeUp() }; run.tap()
+        XCTAssertTrue(app.staticTexts["scriptOutput"].waitForExistence(timeout:10)); XCTAssertEqual(app.staticTexts["scriptOutput"].label,"3")
+    }
 }

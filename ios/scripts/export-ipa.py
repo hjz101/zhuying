@@ -6,17 +6,20 @@ import fnmatch
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import plistlib
 import re
 import secrets
 import shlex
 import shutil
+import stat
+import struct
 import subprocess
 import tempfile
 import urllib.parse
 import urllib.request
 import zipfile
+from xml.parsers.expat import ExpatError
 
 
 def invoke(args, *, data=None, label='Signing operation'):
@@ -78,16 +81,96 @@ def application_brand(info):
             'executable': info['CFBundleExecutable']}
 
 
+def device_info_bytes(info):
+    # Keep the same binary plist representation as an Xcode device build.
+    return plistlib.dumps(info, fmt=plistlib.FMT_BINARY)
+
+
+def validate_ipa(output):
+    with zipfile.ZipFile(output) as archive:
+        entries = archive.infolist()
+        names = [entry.filename for entry in entries]
+        if len(names) != len(set(names)):
+            raise ValueError('Duplicate IPA archive paths')
+        for entry in entries:
+            parts = PurePosixPath(entry.filename).parts
+            if (not parts or parts[0] != 'Payload' or '..' in parts or '\\' in entry.filename
+                    or any(p.startswith('._') or p in ('.DS_Store', '__MACOSX') for p in parts)):
+                raise ValueError('Unexpected path or macOS metadata in IPA')
+            if stat.S_ISLNK(entry.external_attr >> 16) or entry.flag_bits & 9:
+                raise ValueError('IPA must use regular, unencrypted ZIP entries with complete local headers')
+        apps = {PurePosixPath(n).parts[1] for n in names if len(PurePosixPath(n).parts) > 1}
+        if len(apps) != 1 or not next(iter(apps)).endswith('.app'):
+            raise ValueError('IPA must contain exactly one Payload/App.app')
+        app = 'Payload/' + next(iter(apps)) + '/'
+        info_path = app + 'Info.plist'
+        if info_path not in names or archive.getinfo(info_path).file_size > 4 * 1024 * 1024:
+            raise ValueError('Missing or oversized primary application Info.plist')
+        try:
+            raw = archive.read(info_path)
+            info = plistlib.loads(raw)
+        except (ValueError, plistlib.InvalidFileException, ExpatError) as error:
+            raise ValueError('Primary application Info.plist cannot be parsed') from error
+        required = ['CFBundleIdentifier', 'CFBundleExecutable', 'CFBundleName',
+                    'CFBundleShortVersionString', 'CFBundleVersion', 'MinimumOSVersion']
+        if (not isinstance(info, dict) or any(not isinstance(info.get(k), str) or not info[k] for k in required)
+                or info.get('CFBundlePackageType') != 'APPL'
+                or info.get('CFBundleSupportedPlatforms') != ['iPhoneOS']):
+            raise ValueError('Primary application Info.plist has incomplete device metadata')
+        executable = info['CFBundleExecutable']
+        if '/' in executable or '\\' in executable or executable in ('.', '..'):
+            raise ValueError('Invalid application executable name')
+        for path in [app + executable, app + 'embedded.mobileprovision', app + '_CodeSignature/CodeResources']:
+            if path not in names or archive.getinfo(path).file_size == 0:
+                raise ValueError('Missing application executable, provisioning profile or signature resources')
+        with archive.open(app + executable) as executable_file:
+            header = executable_file.read(32)
+        if (len(header) != 32 or header[:4] != b'\xcf\xfa\xed\xfe'
+                or struct.unpack_from('<I', header, 4)[0] != 0x0100000c
+                or struct.unpack_from('<I', header, 12)[0] != 2):
+            raise ValueError('IPA requires an arm64 device Mach-O executable')
+        if not ((archive.getinfo(app + executable).external_attr >> 16) & stat.S_IXUSR):
+            raise ValueError('Application executable permission is missing')
+        # Check the local headers too: lightweight importers may read them directly.
+        with output.open('rb') as stream:
+            for entry in entries:
+                stream.seek(entry.header_offset)
+                header = struct.unpack('<4s5H3I2H', stream.read(30))
+                if (header[0] != b'PK\x03\x04' or header[2] != entry.flag_bits
+                        or header[6:9] != (entry.CRC, entry.compress_size, entry.file_size)):
+                    raise ValueError('Incomplete or inconsistent IPA local ZIP header')
+        if archive.testzip() is not None:
+            raise ValueError('IPA archive CRC check failed')
+        return {'primaryInfoPlist': info_path, 'infoPlistFormat': 'binary' if raw.startswith(b'bplist00') else 'xml',
+                'entryCount': len(names), 'macOSMetadataEntries': 0, 'completeLocalHeaders': True,
+                'arm64Executable': True, 'zipCRCVerified': True}
+
+
 def archive_payload(payload, output):
     if output.exists():
         raise ValueError('Refusing to overwrite an existing IPA')
-    invoke(['/usr/bin/ditto','-c','-k','--keepParent',str(payload),str(output)],label='IPA archive')
-    with zipfile.ZipFile(output) as archive:
-        if archive.testzip() is not None:
-            raise ValueError('IPA archive CRC check failed')
-        names = archive.namelist()
-        if not any(n.startswith('Payload/') and n.endswith('.app/Info.plist') for n in names):
-            raise ValueError('IPA must contain Payload/App.app')
+    apps = [p for p in payload.iterdir() if p.is_dir() and p.suffix == '.app']
+    if payload.name != 'Payload' or len(apps) != 1:
+        raise ValueError('Expected one application in the Payload directory')
+    app = apps[0]
+    primary = app / 'Info.plist'
+    paths = sorted(payload.rglob('*'), key=lambda p: (0 if p == app else 1 if p == primary else 2,
+                                                    len(p.parts), p.as_posix()))
+    try:
+        # A seekable, standard ZIP has complete local headers and no AppleDouble
+        # resource forks. Put the primary plist before dependency bundle plists.
+        with zipfile.ZipFile(output, 'x', compression=zipfile.ZIP_DEFLATED, compresslevel=9, allowZip64=False) as archive:
+            archive.write(payload, 'Payload/')
+            for path in paths:
+                if any(p.startswith('._') or p in ('.DS_Store', '__MACOSX') for p in path.relative_to(payload).parts):
+                    continue
+                if path.is_symlink():
+                    raise ValueError('Device application archive cannot contain symbolic links')
+                archive.write(path, path.relative_to(payload.parent).as_posix())
+        return validate_ipa(output)
+    except Exception:
+        output.unlink(missing_ok=True)
+        raise
 
 
 def mac_compatible_p12(material, work, openssl, temporary_password):
@@ -163,7 +246,7 @@ def main():
         if list(app.rglob('*.appex')) or list(app.rglob('*.app')):
             raise ValueError('Nested applications/extensions require their own provisioning profiles')
         info = dict(original_info);info['CFBundleIdentifier'] = bundle_id
-        (app/'Info.plist').write_bytes(plistlib.dumps(info))
+        (app/'Info.plist').write_bytes(device_info_bytes(info))
         shutil.copy2(profile_path,app/'embedded.mobileprovision')
         entitlement_file = work/'entitlements.plist';entitlement_file.write_bytes(plistlib.dumps(entitlement))
         keychain = work/'signing.keychain-db'
@@ -204,11 +287,23 @@ def main():
             if signed != entitlement:
                 raise ValueError('Signed entitlements do not match the verified profile')
             args.output.parent.mkdir(parents=True,exist_ok=True)
-            archive_payload(payload,args.output)
+            archive_validation = archive_payload(payload,args.output)
+            try:
+                extracted = work/'ArchiveVerification'
+                invoke(['/usr/bin/ditto','-x','-k',str(args.output),str(extracted)],label='IPA extraction verification')
+                extracted_app = extracted/'Payload'/app.name
+                invoke(['codesign','--verify','--deep','--strict',str(extracted_app)],label='Extracted IPA signature verification')
+                if (plistlib.loads((extracted_app/'Info.plist').read_bytes()) != info
+                        or signed_entitlements(extracted_app) != entitlement):
+                    raise ValueError('Extracted IPA metadata or entitlements changed')
+            except Exception:
+                args.output.unlink(missing_ok=True)
+                raise
             result = {**brand,'schemaVersion':1,'kind':'adhoc-device','version':info['CFBundleShortVersionString'],
                       'build':info['CFBundleVersion'],'appSourceRevision':info['ZhuyingSourceRevision'],
                       'exporterRevision':exporter_revision,'originalBundleIdentifier':original_info['CFBundleIdentifier'],
                       'bundleIdentifier':bundle_id,'signatureVerified':True,'profileCMSVerified':True,
+                      'archiveValidation':archive_validation,'extractedSignatureVerified':True,
                       'certificateExpires':parse(dates['notAfter']).isoformat(),
                       'profileExpires':profile['ExpirationDate'].isoformat(),'registeredDeviceCount':len(profile.get('ProvisionedDevices',[])),
                       'iCloudEnabled':False,'releaseGate':'not-approved','uploaded':False,

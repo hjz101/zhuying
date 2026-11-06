@@ -214,17 +214,24 @@ struct DemoSourceRows: View {
                 rowLabel(source)
             }.buttonStyle(.plain).accessibilityIdentifier("source-row-\(source.id)")
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button { open("sourceLogin", source) } label: { ThemeLabel(source.loginStatus.action, systemImage: "person.badge.key") }.tint(appAppearance.palette.primary)
+                    // UIKit extracts native swipe buttons from standard
+                    // labels. Reset the app's custom feedback button style.
+                    Button(source.loginStatus.action, systemImage: "person.badge.key") { open("sourceLogin", source) }
+                        .buttonStyle(.automatic).tint(appAppearance.palette.primary)
                         .accessibilityIdentifier("source-login-\(source.id)")
-                    Button { open("sourceEdit", source) } label: { ThemeLabel("编辑", systemImage: "square.and.pencil") }.tint(appAppearance.palette.accent)
+                    Button("编辑", systemImage: "square.and.pencil") { open("sourceEdit", source) }
+                        .buttonStyle(.automatic).tint(appAppearance.palette.accent)
                         .accessibilityIdentifier("source-edit-\(source.id)")
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    Button { open("sourceLogin", source) } label: { ThemeLabel(source.loginStatus.action, systemImage: "person.badge.key") }.tint(appAppearance.palette.primary)
+                    Button(source.loginStatus.action, systemImage: "person.badge.key") { open("sourceLogin", source) }
+                        .buttonStyle(.automatic).tint(appAppearance.palette.primary)
                         .accessibilityIdentifier("source-leading-login-\(source.id)")
-                    Button { refresh(source) } label: { ThemeLabel("刷新书源", systemImage: "arrow.clockwise") }.tint(appAppearance.palette.accent)
+                    Button("刷新书源", systemImage: "arrow.clockwise") { refresh(source) }
+                        .buttonStyle(.automatic).tint(appAppearance.palette.accent)
                         .disabled(refreshingSourceID != nil).accessibilityIdentifier("source-refresh-\(source.id)")
-                    Button { open("browser", source) } label: { ThemeLabel("浏览器打开", systemImage: "globe") }.tint(appAppearance.palette.green)
+                    Button("浏览器打开", systemImage: "globe") { open("browser", source) }
+                        .buttonStyle(.automatic).tint(appAppearance.palette.green)
                         .accessibilityIdentifier("source-browser-\(source.id)")
                 }
                 .contextMenu {

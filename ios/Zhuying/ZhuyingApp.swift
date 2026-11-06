@@ -64,6 +64,9 @@ struct ZhuyingApp: App {
             }
             var rejectFirstOpen = testing && ProcessInfo.processInfo.arguments.contains("--storage-retry-fixture")
             #if DEBUG
+            if testing && ProcessInfo.processInfo.arguments.contains("--legado-fixtures") {
+                try LegadoDevelopmentFixtures.write(to: manager.urls(for: .documentDirectory, in: .userDomainMask)[0])
+            }
             if testing && ProcessInfo.processInfo.arguments.contains("--media-fixtures") {
                 try MediaDevelopmentFixtures.write(to:manager.urls(for:.documentDirectory,in:.userDomainMask)[0])
             }

@@ -2,7 +2,37 @@ import XCTest
 import WebKit
 @testable import Zhuying
 
+private actor BrowserCookieProbe: HTTPTransport {
+    private(set) var headers: [String?] = []
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        headers.append(request.value(forHTTPHeaderField: "Cookie"))
+        return (Data("{}".utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
 final class SourceBrowserTests: XCTestCase {
+    @MainActor func testBrowserCookieReuseDoesNotOverwriteRefreshedSourceSessionCookie() async throws {
+        let domain = "com.zhuying.cookie-precedence." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let sessions = SourceBrowserSessions(defaults: defaults), origin = URL(string: "https://source.test")!
+        let cookie = try XCTUnwrap(HTTPCookie(properties: [.domain: "source.test", .path: "/", .name: "sid", .value: "browser-old", .secure: "TRUE"]))
+        await sessions.store(sourceID: "A", origin: origin).httpCookieStore.setCookie(cookie)
+        sessions.setNativeCookies(true, sourceID: "A", origin: origin)
+        let probe = BrowserCookieProbe(), transport = BrowserSessionTransport(sourceID: "A", origin: origin, sessions: sessions, base: probe)
+        var request = URLRequest(url: origin.appendingPathComponent("chapter"))
+        request.setValue("sid=source-refreshed", forHTTPHeaderField: "Cookie")
+        _ = try await transport.send(request)
+        request.setValue(nil, forHTTPHeaderField: "Cookie")
+        _ = try await transport.send(request)
+        let values = await probe.headers
+        XCTAssertEqual(values, ["sid=source-refreshed", "sid=browser-old"])
+        let unrelated = BrowserSessionTransport(sourceID: "B", origin: origin, sessions: sessions, base: probe)
+        _ = try await unrelated.send(request)
+        let last = await probe.headers.last
+        XCTAssertNil(last.flatMap { $0 })
+        await sessions.clear(sourceID: "A", origin: origin)
+    }
     @MainActor func testActualWebKitStoresSeparateSourcesHostsAndPreserveScopeOnRestart() async throws {
         let domain = UUID().uuidString,defaults = UserDefaults(suiteName:domain)!; defer { defaults.removePersistentDomain(forName:domain) }
         let sessions = SourceBrowserSessions(defaults:defaults),origin = URL(string:"https://source.test")!

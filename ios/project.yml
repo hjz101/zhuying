@@ -26,10 +26,33 @@ settings:
     CURRENT_PROJECT_VERSION: '9'
     ZHUYING_SOURCE_REVISION: unrecorded
 targets:
+  ZhuyingScriptCore:
+    type: library.static
+    platform: iOS
+    sources:
+      - path: ZhuyingScriptCore
+      - path: Vendor/QuickJS/quickjs.c
+      - path: Vendor/QuickJS/libregexp.c
+      - path: Vendor/QuickJS/libunicode.c
+      - path: Vendor/QuickJS/cutils.c
+      - path: Vendor/QuickJS/dtoa.c
+    settings:
+      base:
+        DEFINES_MODULE: YES
+        PRODUCT_MODULE_NAME: ZhuyingScriptCore
+        MODULEMAP_FILE: $(SRCROOT)/ZhuyingScriptCore/include/module.modulemap
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/Vendor/QuickJS
+          - $(SRCROOT)/ZhuyingScriptCore/include
+        GCC_C_LANGUAGE_STANDARD: gnu11
+        GCC_PREPROCESSOR_DEFINITIONS:
+          - $(inherited)
+          - CONFIG_VERSION=\"2026-06-04\"
   Zhuying:
     type: application
     platform: iOS
     dependencies:
+      - target: ZhuyingScriptCore
       - package: GRDB
       - package: ZIPFoundation
       - package: Fuzi

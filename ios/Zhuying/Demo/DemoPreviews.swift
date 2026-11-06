@@ -227,7 +227,7 @@ struct DemoSourceRows: View {
                     Text(SourcePackages.accountTitle(source,isDemo:demo.isDemo)).font(.system(size: 10))
                         .foregroundStyle(source.loginStatus == .expired ? Palette.accent : Palette.muted)
                 }
-                Text("\(source.detail) · \(source.enabled ? "已启用" : "已停用")")
+                Text("\(SourcePackages.executionDetail(source, isDemo: demo.isDemo)) · \(source.enabled ? "已启用" : "已停用")")
                     .font(.system(size: 10)).foregroundStyle(source.hasFailure ? Palette.accent : Palette.muted).lineLimit(1)
             }
         }.foregroundStyle(Palette.green).padding(.vertical, compact ? 15 : 16).padding(.horizontal, compact ? 0 : 15)
@@ -247,7 +247,7 @@ struct DemoSourceDetail: View {
                     AppPageHeader(title: source.name, subtitle: source.url, icon: "externaldrive")
                     if demo.isDemo { DemoNotice() }
                     AppSettingsCard("书源信息", icon: "info.circle") {
-                        Text(source.detail).font(.system(size: 12))
+                        Text(SourcePackages.executionDetail(source, isDemo: demo.isDemo)).font(.system(size: 12))
                         Text("分组：\(source.group)").font(.system(size: 12))
                         Text("\(SourcePackages.accountTitle(source,isDemo:demo.isDemo))\(demo.isDemo ? " · 演示登录状态" : "")").font(.system(size: 12)).accessibilityIdentifier("sourceLoginStatus")
                         Toggle("启用书源", isOn: Binding(get: { demo.sources.first { $0.id == sourceID }?.enabled ?? false }, set: { value in

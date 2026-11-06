@@ -42,7 +42,19 @@ enum SourcePackages {
     }
     static func accountTitle(_ source: DemoSource,isDemo: Bool) -> String {
         if isDemo || source.id == "shushan" { return source.loginStatus.title }
+        if (try? legadoDefinition(source)) != nil { return "阅读 3.0" }
         return (try? rules(source)) != nil ? "公开接口" : "规则未支持运行"
+    }
+    static func legadoDefinition(_ source: DemoSource) throws -> LegadoSourceDefinition {
+        guard source.kind == .novel else { throw LegadoCompatibilityError.unsupported("漫画或音频书源") }
+        return try LegadoSourceDefinition.decode(source)
+    }
+    static func isRunnable(_ source: DemoSource) -> Bool {
+        source.id == "shushan" || (try? rules(source)) != nil || (try? legadoDefinition(source)) != nil
+    }
+    static func executionDetail(_ source: DemoSource, isDemo: Bool = false) -> String {
+        if !isDemo, (try? legadoDefinition(source)) != nil { return "阅读 3.0 · 基础兼容 · 待实测" }
+        return source.detail
     }
     static func rules(_ source: DemoSource) throws -> NativeSourceRules {
         guard let data = source.configuration, let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -87,16 +99,28 @@ enum SourcePackages {
             source.configuration = config
             if source.id == "shushan" { source.detail = "固定原生适配器 · 需登录" }
             else if let rules = try? rules(source) { source.detail = rules.extraction == nil ? "原生 JSON v1 · 待实测" : "原生解析规则 v1 · 待实测" }
+            else if (try? legadoDefinition(source)) != nil { source.detail = executionDetail(source) }
             result.append(source)
         }
         return .init(sources: result, duplicates: duplicates, invalid: invalid)
     }
     private static func scrub(_ value: Any) -> Any {
         if let object = value as? [String:Any] {
-            return object.filter { key, _ in
+            var cleaned = object.filter { key, _ in
                 let normalized = key.lowercased().filter { $0.isLetter || $0.isNumber }
-                return !["password","apikey","xapikey","authorization","cookie","cookies","headers","token","accesstoken","refreshtoken","secret","clientsecret"].contains(normalized)
+                return !["password","apikey","xapikey","authorization","cookie","cookies","token","accesstoken","refreshtoken","secret","clientsecret"].contains(normalized)
             }.mapValues(scrub)
+            // Static request metadata is part of the rule dialect. Strip
+            // credentials inside it while retaining User-Agent/Accept, etc.
+            for key in ["header", "headers"] {
+                if let text = cleaned[key] as? String,
+                   let bytes = text.data(using: .utf8),
+                   let headers = (try? JSONSerialization.jsonObject(with: bytes)) as? [String: Any],
+                   let data = try? JSONSerialization.data(withJSONObject: scrub(headers), options: .sortedKeys) {
+                    cleaned[key] = String(decoding: data, as: UTF8.self)
+                }
+            }
+            return cleaned
         }
         if let array = value as? [Any] { return array.map(scrub) }
         return value

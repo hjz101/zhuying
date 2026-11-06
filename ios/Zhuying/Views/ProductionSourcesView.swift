@@ -6,9 +6,9 @@ struct ProductionSourceAccessView: View {
     var body: some View {
         ScrollView {
             VStack(alignment:.leading,spacing:23) {
-                AppPageHeader(title:"访问说明",subtitle:"自定义书源 · 原生 JSON v1",icon:"person.badge.key")
+                AppPageHeader(title:"访问说明",subtitle:"自定义书源 · 阅读 3.0 基础兼容",icon:"person.badge.key")
                 AppSettingsCard("公开访问",icon:"info.circle") {
-                    Text("原生 JSON／提取规则 v1 书源使用 HTTPS 接口。可在内置浏览器登录并为此源明确启用 Cookie 复用；书山原生请求使用已有应用内登录。导入规则不会自动执行脚本。")
+                    Text("原生 JSON／提取规则和阅读 3.0 基础兼容书源使用 HTTPS 接口。导入预览不会执行脚本；发起搜索或阅读时才运行规则。可在内置浏览器登录并为此源启用 Cookie 复用；需要 Android 界面或额外宿主接口的规则仍需适配。")
                         .font(.system(size:13)).lineSpacing(6)
                 }
             }.padding(22)
@@ -51,9 +51,13 @@ struct ProductionSourceImportView: View {
                 if let preview {
                     AppSettingsCard("导入预览", icon: "list.bullet") {
                         Text("可添加 \(preview.sources.count) · 重复 \(preview.duplicates) · 无效 \(preview.invalid)").font(.system(size: 12))
-                        if preview.sources.contains(where: { $0.id != "shushan" && (try? SourcePackages.rules($0)) == nil }) {
+                        if preview.sources.contains(where: { !SourcePackages.isRunnable($0) }) {
                             Text("部分书源使用其他阅读器的脚本宿主：可以保存和导出原始规则，当前尚不能用于搜索或阅读。")
                                 .font(.system(size: 12)).foregroundStyle(Palette.accent).accessibilityIdentifier("sourcePackageCompatibility")
+                        }
+                        if preview.sources.contains(where: { (try? SourcePackages.legadoDefinition($0)) != nil }) {
+                            Text("阅读 3.0 基础兼容：确认后可通过搜索和书源调试验证实际结果；登录脚本和高级接口可能仍需适配。")
+                                .font(.system(size: 12)).foregroundStyle(Palette.muted).accessibilityIdentifier("sourcePackageLegado")
                         }
                         ForEach(preview.sources) { source in VStack(alignment: .leading) { Text(source.name); Text(source.detail).font(.system(size: 11)).foregroundStyle(Palette.muted) } }
                     }
@@ -104,7 +108,7 @@ struct ProductionSourceRuleEditor: View {
             VStack(alignment: .leading, spacing: 23) {
                 AppPageHeader(title: "书源编辑", subtitle: "基本信息 · 规则字段 · JSON 校验", icon: "square.and.pencil")
                 AppSettingsCard("JSON 源码", icon: "curlybraces") { TextEditor(text: $json).frame(minHeight: 300).font(.system(size: 12, design: .monospaced)).accessibilityIdentifier("sourceRulesJSON") }
-                Text("支持原生 JSON v1 和 extract-v1 的搜索、详情、目录、正文接口；解析规则支持 CSS／XPath／JSONPath／正则的已声明子集。其他阅读器方言可以保存导出，不会自动执行。修改后需点击保存，返回即取消。")
+                Text("支持原生 JSON v1、extract-v1 和阅读 3.0 基础兼容规则。导入和校验不执行脚本，搜索与阅读时按规则运行；未支持接口会报错。修改后需点击保存，返回即取消。")
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
                 Button("校验 JSON") { validate(save: false) }.buttonStyle(PrimaryButtonStyle(filled: false))
                 Button("保存书源") { validate(save: true) }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("sourceRulesSave")

@@ -167,8 +167,7 @@ struct ProductionSourceDiagnosticsView: View {
             var providers: [any BookSource] = []
             for source in library.sources where source.enabled && (batch || source.id == selection) {
                 if source.id == "shushan",let credential = shushan.credentialForRequests,let transport = try? library.sourceTransport(for:source) { providers.append(ShushanBookSource(credential:credential,transport:ResilientSourceTransport(base:transport))) }
-                else if let rules = try? SourcePackages.rules(source),rules.extraction != nil,let transport = try? library.sourceTransport(for:source,maximumBytes:2 * 1024 * 1024),let provider = try? ExtractionBookSource(source:source,transport:transport) { providers.append(provider) }
-                else if let transport = try? library.sourceTransport(for:source,maximumBytes:4 * 1024 * 1024),let provider = try? ConfigurableBookSource(source:source,transport:transport) { providers.append(provider) }
+                else if let provider = try? library.configuredBookSource(source) { providers.append(provider) }
                 else { reports.append(.init(sourceID:source.id,step:"配置",status:"未运行：需登录或规则未支持",milliseconds:0,count:0)) }
             }
             do {

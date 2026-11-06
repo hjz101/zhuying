@@ -13,7 +13,7 @@ struct ProductionSubscriptionsView: View {
                     ForEach(library.sources) { source in
                         VStack(alignment:.leading,spacing:7) {
                             Toggle(source.name,isOn:Binding(get:{library.subscribedSourceIDs.contains(source.id)},set:{library.subscribe(sourceID:source.id,enabled:$0)}))
-                                .disabled(!source.enabled || (source.id != "shushan" && (try? SourcePackages.rules(source)) == nil))
+                                .disabled(!source.enabled || !SourcePackages.isRunnable(source))
                             Text((try? SourcePackages.rules(source))?.discover != nil ? "支持分类发现和书架更新" : "分类发现未支持；可用来源支持书架更新检查")
                                 .font(.system(size:11)).foregroundStyle(Palette.muted)
                         }

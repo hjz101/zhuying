@@ -51,7 +51,8 @@ struct BrowserSessionTransport: HTTPTransport {
     func send(_ request: URLRequest) async throws -> (Data,HTTPURLResponse) {
         guard let url = request.url,SourceBrowserSessions.sameOrigin(url,origin) else { throw ContentFailure.sourceDisabled }
         var request = request
-        if let header = try await sessions.cookieHeader(sourceID:sourceID,origin:origin,url:url) { request.setValue(header,forHTTPHeaderField:"Cookie") }
+        if request.value(forHTTPHeaderField: "Cookie") == nil,
+           let header = try await sessions.cookieHeader(sourceID:sourceID,origin:origin,url:url) { request.setValue(header,forHTTPHeaderField:"Cookie") }
         try Task.checkCancellation(); return try await base.send(request)
     }
 }

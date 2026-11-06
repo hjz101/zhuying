@@ -237,6 +237,19 @@ final class LibraryStore: ObservableObject {
     func sourceTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> any HTTPTransport {
         BrowserSessionTransport(sourceID:source.id,origin:try ShushanClient.host(source.url),sessions:browserSessions,base:try requestTransport(for:source,maximumBytes:maximumBytes))
     }
+    func configuredBookSource(_ source: DemoSource) throws -> any BookSource {
+        #if DEBUG
+        if LegadoDevelopmentFixtures.isEnabled(source) { return try LegadoBookSource(source: source, transport: LegadoDevelopmentTransport()) }
+        #endif
+        if let definition = try? SourcePackages.legadoDefinition(source) {
+            var routing = source; routing.url = try ShushanClient.host(definition.baseURL.absoluteString).absoluteString
+            return try LegadoBookSource(source: source, transport: sourceTransport(for: routing, maximumBytes: 2 * 1024 * 1024))
+        }
+        let rules = try SourcePackages.rules(source)
+        let transport = try sourceTransport(for: source, maximumBytes: rules.extraction == nil ? 4 * 1024 * 1024 : 2 * 1024 * 1024)
+        if rules.extraction != nil { return try ExtractionBookSource(source: source, transport: transport) }
+        return try ConfigurableBookSource(source: source, transport: transport)
+    }
     func commentClient(credential: ShushanCredential) -> ShushanCommentsClient? {
         guard let source = sources.first(where:{$0.id == "shushan" && $0.enabled}),let host = try? ShushanClient.host(source.url),host == credential.host,let transport = try? sourceTransport(for:source,maximumBytes:2 * 1024 * 1024) else { return nil }
         return .init(credential:credential,transport:ResilientSourceTransport(base:transport))
@@ -754,10 +767,7 @@ final class LibraryStore: ObservableObject {
         let source = sources.first { $0.id == "shushan" && $0.enabled && $0.kind == .novel }
         var configuredFailure: ContentFailure = source == nil ? .sourceDisabled : .authenticationRequired
         var providers: [any BookSource] = sources.filter { $0.enabled && $0.kind == .novel && $0.id != "shushan" }.compactMap { source -> (any BookSource)? in
-            guard let rules = try? SourcePackages.rules(source) else { return nil }
-            guard let transport = try? sourceTransport(for:source,maximumBytes:rules.extraction == nil ? 4 * 1024 * 1024 : 2 * 1024 * 1024) else { return nil }
-            if rules.extraction != nil { return try? ExtractionBookSource(source:source,transport:transport) }
-            return try? ConfigurableBookSource(source:source,transport:transport)
+            try? configuredBookSource(source)
         }
         if let source, let credential, (try? ShushanClient.host(source.url)) == credential.host, !expired {
             if let transport = try? sourceTransport(for:source) { providers.append(ShushanBookSource(credential:credential,transport:ResilientSourceTransport(base:transport))) }

@@ -21,10 +21,69 @@ private final class LegadoCompletion<Value>: @unchecked Sendable {
     }
 }
 
+private final class LegadoBlockingResult<Value>: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var result: Result<Value, Error>?
+    func complete(_ result: Result<Value, Error>) { condition.lock(); self.result = result; condition.broadcast(); condition.unlock() }
+    func wait(control: LegadoOperationControl) throws -> Value {
+        while true {
+            try control.check(); condition.lock()
+            if let result { condition.unlock(); return try result.get() }
+            _ = condition.wait(until: Date().addingTimeInterval(0.025)); condition.unlock()
+        }
+    }
+}
+
 private final class LegadoSourceSession: @unchecked Sendable {
     let cookies = LegadoCookieJar()
+    let runtime = QuickJSScriptSession()
+    let queue = DispatchQueue(label: "com.zhuying.legado.worker", qos: .userInitiated)
+    let state: LegadoPersistentState?
+    private var references: [String: LegadoReference] = [:]
+    private var runtimeRevision: UInt64 = 0
+    var lastMessage = ""
+    var inheritedHeaderOrigin: URL?
+    init(state: LegadoPersistentState?) { self.state = state }
+    func prepareRuntime() {
+        let revision = state?.sessionRevision ?? 0
+        if revision != runtimeRevision { runtime.reset(); runtimeRevision = revision }
+        lastMessage = ""
+    }
+    func referenceKey(_ reference: LegadoReference, role: String, sourceID: String) throws -> String {
+        if reference.kind == .https, reference.options.isEmpty, reference.requestURL?.query == nil { return reference.requestURL!.absoluteString }
+        return "legado-ref:" + (state == nil ? "" : "legado-ref-v2-") + (try reference.stableID(sourceIdentity: state?.scope.sourceID ?? sourceID, role: role))
+    }
+    func registerBatch(_ refs: [LegadoReference], role: String, sourceID: String) throws {
+        let opaque = refs.filter { $0.kind != .https || !$0.options.isEmpty || $0.requestURL?.query != nil }
+        guard !opaque.isEmpty else { return }
+        if let state { _ = try state.registerReferences(opaque, role: role) }
+        else {
+            var next = references
+            for ref in opaque { next[try ref.stableID(sourceIdentity: sourceID, role: role)] = ref }
+            guard next.count <= 4096, next.values.reduce(0, { $0 + $1.descriptor.utf8.count }) <= 8 * 1024 * 1024 else { throw LegadoRequestError.limit }
+            references = next
+        }
+    }
+    func register(_ reference: LegadoReference, role: String, sourceID: String) throws -> String {
+        let key = try referenceKey(reference, role: role, sourceID: sourceID)
+        try registerBatch([reference], role: role, sourceID: sourceID)
+        return key
+    }
+    func resolve(_ value: String, baseURL: URL?) throws -> LegadoReference {
+        guard value.hasPrefix("legado-ref:") else { return try .parse(value, baseURL: baseURL) }
+        let key = String(value.dropFirst(11))
+        if let state { return try state.resolveReference(key) }
+        guard let reference = references[key] else { throw ContentFailure.missingChapter }; return reference
+    }
     private let lock = NSLock()
     private var values: [String: String] = [:]
+    private var controls: [ObjectIdentifier: LegadoOperationControl] = [:]
+    func track(_ control: LegadoOperationControl) { lock.lock(); controls[ObjectIdentifier(control)] = control; lock.unlock() }
+    func untrack(_ control: LegadoOperationControl) { lock.lock(); controls[ObjectIdentifier(control)] = nil; lock.unlock() }
+    func reset() {
+        lock.lock(); let active = Array(controls.values); lock.unlock()
+        active.forEach { $0.cancel() }; runtime.reset()
+    }
     private var valueBytes = 0
     private var catalogs: [String: Set<String>] = [:]
     private var catalogOrder: [String] = []
@@ -32,8 +91,9 @@ private final class LegadoSourceSession: @unchecked Sendable {
     private var searchPages: [String: [Int: String]] = [:]
     private var searchOrder: [String] = []
     private var searchPageBytes = 0
-    func get(_ key: String) -> String { lock.lock(); defer { lock.unlock() }; return values[key] ?? "" }
+    func get(_ key: String) throws -> String { if let state { return try state.getVariable(key) }; lock.lock(); defer { lock.unlock() }; return values[key] ?? "" }
     func set(_ key: String, _ value: String) throws {
+        if let state { try state.setVariable(value, key: key); return }
         guard key.utf8.count <= 512, value.utf8.count <= 128 * 1024 else { throw LegadoRequestError.limit }
         lock.lock(); defer { lock.unlock() }
         guard values.count < 512 || values[key] != nil else { throw LegadoRequestError.limit }
@@ -83,30 +143,34 @@ private final class LegadoSourceSession: @unchecked Sendable {
 struct LegadoBookSource: BookSource, @unchecked Sendable {
     let sourceID: String
     let definition: LegadoSourceDefinition
-    private let origin: URL
+    private let origin: URL?
     private let transport: any HTTPTransport
     private let session: LegadoSourceSession
     private let maximumPages: Int
     private let timeout: TimeInterval
 
-    init(source: DemoSource, transport: any HTTPTransport = SourceHTTPTransport(maximumResponseBytes: 2 * 1024 * 1024), maximumPages: Int = 8, deadline: TimeInterval = 25) throws {
+    init(source: DemoSource, transport: any HTTPTransport = SourceHTTPTransport(maximumResponseBytes: 2 * 1024 * 1024), maximumPages: Int = 8, deadline: TimeInterval = 25, state: LegadoPersistentState? = nil) throws {
         sourceID = source.id; definition = try LegadoSourceDefinition.decode(source)
-        origin = definition.baseURL; self.transport = transport; session = LegadoSourceSession()
+        origin = definition.baseURL; self.transport = transport; session = LegadoSourceSession(state: state)
         self.maximumPages = min(32, max(1, maximumPages)); timeout = min(90, max(0.1, deadline))
     }
 
     private func operation<Value>(_ body: @escaping (LegadoSourceWorker) throws -> Value) async throws -> Value {
         try Task.checkCancellation()
         let control = LegadoOperationControl(timeout: timeout)
+        session.track(control); defer { session.untrack(control) }
         return try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { continuation in
                 let completion = LegadoCompletion(continuation)
                 control.installCancellation { completion.finish(.failure($0)) }
-                DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + timeout) { control.cancel(ContentFailure.timedOut) }
-                DispatchQueue(label: "com.zhuying.legado." + sourceID, qos: .userInitiated).async {
+                control.startWatchdog()
+                session.queue.async {
                     do {
                         try control.check()
-                        let http = LegadoHTTPExecutor(origin: origin, transport: transport, control: control, cookies: session.cookies)
+                        session.prepareRuntime()
+                        var policy = definition.policy
+                        for origin in try session.state?.allowedOrigins() ?? [] { policy = try policy.addingOrigin(origin.absoluteString) }
+                        let http = LegadoHTTPExecutor(origin: origin, policy: policy, state: session.state, inheritedHeaderOrigin: session.inheritedHeaderOrigin, rememberHeaderOrigin: { session.inheritedHeaderOrigin = $0 }, transport: transport, control: control, cookies: session.cookies)
                         let worker = LegadoSourceWorker(sourceID: sourceID, definition: definition, http: http, shared: session, maximumPages: maximumPages)
                         let result = try body(worker)
                         try control.check(); completion.finish(.success(result))
@@ -119,6 +183,10 @@ struct LegadoBookSource: BookSource, @unchecked Sendable {
         }, onCancel: { control.cancel() })
     }
 
+    func login(action: String, values: [String: String]) async throws -> LegadoLoginActionResult {
+        try await operation { try $0.login(action: action, values: values) }
+    }
+    func resetRuntime() { session.reset() }
     func search(query: String, page: Int) async throws -> BookSearchPage {
         guard (1...100).contains(page), !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, query.utf8.count <= 1024 else { throw ContentFailure.invalidResponse }
         return try await operation { try $0.search(query: query, page: page) }
@@ -144,13 +212,15 @@ private final class LegadoSourceWorker {
     private var bindings: [String: Any] = [:]
     private var scriptDepth = 0
     private var scriptCalls = 0
+    private var bookIdentity = ""
+    private var chapterIdentity = ""
     private var engine: LegadoRuleEngine { LegadoRuleEngine(context: context) }
 
     init(sourceID: String, definition: LegadoSourceDefinition, http: LegadoHTTPExecutor, shared: LegadoSourceSession, maximumPages: Int) {
         self.sourceID = sourceID; self.definition = definition; self.http = http; self.shared = shared; self.maximumPages = maximumPages
         if let sourceURL = URL(string: definition.sourceURL), sourceURL.user == nil, sourceURL.password == nil,
-           LegadoHTTPExecutor.sameOrigin(sourceURL, http.origin) { currentURL = sourceURL }
-        else { currentURL = http.origin }
+           http.policy.allows(sourceURL) { currentURL = sourceURL }
+        else { currentURL = http.origin ?? URL(string: "zhuying-source://" + StableContentID.make(sourceID) + "/")! }
         bindings = ["source": definition.raw, "key": "", "page": 1, "book": [:], "chapter": [:]]
         context.bindings = bindings
         context.evaluateJS = { [weak self] script, values in
@@ -165,20 +235,40 @@ private final class LegadoSourceWorker {
             let previousContent = self.scriptContent
             self.scriptContent = values["src"] as? String ?? values["result"] as? String ?? self.currentContent
             defer { self.scriptContent = previousContent }
-            return try QuickJSScriptRuntime.evaluate(script, bindings: self.bindings.merging(values) { _, value in value }, library: self.definition.jsLib, policy: policy) { [weak self] method, args in
+            return try self.shared.runtime.evaluate(script, bindings: self.bindings.merging(values) { _, value in value }, library: self.libraryScript, policy: policy) { [weak self] method, args in
                 guard let self else { throw CancellationError() }
                 return try self.bridge(method, args: args)
             }
         }
     }
 
+    private var libraryScript: String {
+        let login = definition.raw["loginUrl"] as? String ?? ""
+        let program = login.hasPrefix("@js:") ? String(login.dropFirst(4)) : login
+        if program.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("https://") || program.isEmpty { return definition.jsLib }
+        return definition.jsLib + "\n;\n" + program
+    }
+    func login(action: String, values: [String: String]) throws -> LegadoLoginActionResult {
+        try http.control.mutateSession { try shared.state?.setLoginInfo(values) }
+        shared.prepareRuntime()
+        bindings["result"] = values
+        try configure()
+        guard action.utf8.count <= 64 * 1024 else { throw LegadoRequestError.limit }
+        var script = action.trimmingCharacters(in: .whitespacesAndNewlines)
+        if script.hasPrefix("@js:") { script = String(script.dropFirst(4)) }
+        if script.hasPrefix("<js>"), script.hasSuffix("</js>") { script = String(script.dropFirst(4).dropLast(5)) }
+        _ = try context.evaluateJS?(script, bindings)
+        return .init(message: shared.lastMessage.isEmpty ? "操作已完成，登录状态尚未验证。" : shared.lastMessage)
+    }
+
     private func configure(book: LibraryBookRecord? = nil, chapter: ChapterRecord? = nil) throws {
         if let book {
+            bookIdentity = book.id
             let reference = try reference(book)
-            bindings["book"] = ["bookUrl": reference.bookURL, "name": book.title, "author": book.author, "intro": book.summary, "tocUrl": reference.remoteBookID, "origin": reference.origin ?? ""]
-            currentURL = try http.absolute(reference.bookURL)
+            bindings["book"] = ["bookUrl": try shared.resolve(reference.bookURL, baseURL: currentURL).resolvedDescriptor, "name": book.title, "author": book.author, "intro": book.summary, "tocUrl": reference.remoteBookID.isEmpty ? "" : try shared.resolve(reference.remoteBookID, baseURL: currentURL).resolvedDescriptor, "origin": reference.origin ?? "", "variable": try shared.get("book:" + StableContentID.make(book.id, "") + ":variable")]
+            currentURL = try referenceURL(shared.resolve(reference.bookURL, baseURL: currentURL))
         }
-        if let chapter { bindings["chapter"] = ["url": chapter.nativeChapterID, "title": chapter.title, "index": chapter.order] }
+        if let chapter { chapterIdentity = chapter.id; bindings["chapter"] = ["url": try shared.resolve(chapter.nativeChapterID, baseURL: currentURL).resolvedDescriptor, "title": chapter.title, "index": chapter.order] }
         context.bindings = bindings
         if definition.header.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("@js:") {
             let value = try context.evaluateJS?(String(definition.header.dropFirst(4)), context.bindings) ?? NSNull()
@@ -188,13 +278,22 @@ private final class LegadoSourceWorker {
         }
     }
     private func reference(_ book: LibraryBookRecord) throws -> SourceBookReference {
-        guard let reference = book.source, reference.sourceID == sourceID, reference.origin == http.origin.absoluteString else { throw ContentFailure.sourceDisabled }
+        guard let reference = book.source, reference.sourceID == sourceID, reference.origin == identityOrigin else { throw ContentFailure.sourceDisabled }
         return reference
+    }
+    private var identityOrigin: String { definition.baseURL?.absoluteString ?? "zhuying-source://" + StableContentID.make(sourceID) + "/" }
+    private func referenceURL(_ ref: LegadoReference) throws -> URL {
+        guard let url = ref.requestURL ?? URL(string: ref.address) else { throw ContentFailure.invalidResponse }; return url
     }
     private func fetch(_ value: String, baseURL: URL? = nil) throws -> LegadoHTTPPage {
         try http.control.check()
-        let template = try renderRequest(value, baseURL: baseURL ?? currentURL)
-        let response = try http.request(template, baseURL: baseURL ?? currentURL, headers: headers)
+        let resolved = value.hasPrefix("legado-ref:") ? try shared.resolve(value, baseURL: baseURL ?? currentURL).resolvedDescriptor : value
+        let template = try renderRequest(resolved, baseURL: baseURL ?? currentURL)
+        let ref = try LegadoReference.parse(template, baseURL: baseURL ?? currentURL)
+        let response: LegadoHTTPPage
+        if ref.kind == .inline {
+            response = .init(text: ref.inlineHex ?? "", url: try referenceURL(ref), status: 200, headers: [:])
+        } else { response = try http.request(ref.resolvedDescriptor, baseURL: baseURL ?? currentURL, headers: headers) }
         currentURL = response.url; currentContent = response.text
         bindings["baseUrl"] = response.url.absoluteString
         context.bindings = bindings
@@ -237,12 +336,17 @@ private final class LegadoSourceWorker {
         return result
     }
     private func url(_ value: String, baseURL: URL) throws -> String {
-        let (address, options) = try LegadoHTTPExecutor.split(value)
-        guard options.isEmpty else { throw LegadoRequestError.unsupported("书籍、目录或章节地址附带请求选项") }
-        let components = URLComponents(url: try http.absolute(address, baseURL: baseURL), resolvingAgainstBaseURL: false)
-        guard components?.fragment?.isEmpty ?? true else { throw LegadoRequestError.unsupported("依赖 URL fragment 的书籍或章节地址") }
-        guard let result = components?.url else { throw ContentFailure.invalidResponse }
-        return result.absoluteString
+        let ref = try LegadoReference.parse(value, baseURL: baseURL)
+        if let url = ref.requestURL { _ = try http.policy.requireOrigin(for: url); if url.fragment != nil { throw LegadoRequestError.unsupported("依赖 URL fragment 的书籍或章节地址") } }
+        return ref.resolvedDescriptor
+    }
+    private func coverURL(_ value: String, baseURL: URL) -> String? {
+        guard !value.isEmpty, let ref = try? LegadoReference.parse(value, baseURL: baseURL), ref.options.isEmpty,
+              let url = ref.requestURL, http.policy.allows(url) else { return nil }
+        return url.absoluteString
+    }
+    private func registered(_ value: String, role: String, baseURL: URL) throws -> String {
+        try shared.register(.parse(value, baseURL: baseURL), role: role, sourceID: definition.sourceURL)
     }
     private func yes(_ value: String) -> Bool { ["true", "1", "yes"].contains(value.lowercased()) }
     private func rejectUnsupported(_ rules: [String: String], section: String, fields: [String]) throws {
@@ -268,18 +372,19 @@ private final class LegadoSourceWorker {
         let rowRule = rules["bookList"] ?? ""
         let rows = rowRule.isEmpty ? [response.text] : try engine.elements(rowRule, in: response.text, baseURL: response.url)
         guard rows.count <= 500 else { throw LegadoRequestError.limit }
-        var books: [LibraryBookRecord] = [], seen = Set<String>(), budget = LegadoMetadataBudget()
+        var books: [LibraryBookRecord] = [], seen = Set<String>(), budget = LegadoMetadataBudget(), bookReferences: [LegadoReference] = []
         for row in rows {
             let title = try field(rules["name"], in: row, baseURL: response.url, structured: true)
             let address = try field(rules["bookUrl"], in: row, baseURL: response.url, structured: true)
             guard !title.isEmpty, !address.isEmpty else { continue }
-            let bookURL = try url(address, baseURL: response.url)
-            let reference = SourceBookReference(sourceID: sourceID, nativeBookID: bookURL, provider: definition.name, bookURL: bookURL, origin: http.origin.absoluteString)
+            let bookReference = try LegadoReference.parse(url(address, baseURL: response.url), baseURL: response.url)
+            let bookURL = try shared.referenceKey(bookReference, role: "book", sourceID: definition.sourceURL)
+            let reference = SourceBookReference(sourceID: sourceID, nativeBookID: bookURL, provider: definition.name, bookURL: bookURL, origin: identityOrigin)
             guard seen.insert(reference.id).inserted else { continue }
             let cover = try field(rules["coverUrl"], in: row, baseURL: response.url, structured: true)
             let book = LibraryBookRecord(id: "remote-" + reference.id, title: title, author: try field(rules["author"], in: row, baseURL: response.url, structured: true),
-                                         summary: try field(rules["intro"], in: row, baseURL: response.url, structured: true), coverURL: cover.isEmpty ? nil : try url(cover, baseURL: response.url), source: reference, addedAt: Date())
-            try budget.add(book); books.append(book)
+                                         summary: try field(rules["intro"], in: row, baseURL: response.url, structured: true), coverURL: coverURL(cover, baseURL: response.url), source: reference, addedAt: Date())
+            try budget.add(book); books.append(book); bookReferences.append(bookReference)
         }
         let next = try field(rules["nextPageUrl"], in: response.text, baseURL: response.url)
         var nextPage: Int?
@@ -289,6 +394,7 @@ private final class LegadoSourceWorker {
                 nextPage = page + 1
             } else if rules["nextPageUrl"] == nil && templateHasPage { nextPage = page + 1 }
         }
+        try shared.registerBatch(bookReferences, role: "book", sourceID: definition.sourceURL)
         return .init(books: books, nextPage: nextPage)
     }
 
@@ -308,9 +414,9 @@ private final class LegadoSourceWorker {
         if !author.isEmpty { result.author = author }
         result.summary = try field(rules["intro"], in: input, baseURL: response.url, fallback: result.summary)
         let cover = try field(rules["coverUrl"], in: input, baseURL: response.url)
-        if !cover.isEmpty { result.coverURL = try url(cover, baseURL: response.url) }
+        if !cover.isEmpty { result.coverURL = coverURL(cover, baseURL: response.url) }
         let toc = try field(rules["tocUrl"], in: input, baseURL: response.url)
-        if !toc.isEmpty { result.source?.remoteBookID = try url(toc, baseURL: response.url) }
+        if !toc.isEmpty { result.source?.remoteBookID = try registered(url(toc, baseURL: response.url), role: "toc", baseURL: response.url) }
         return result
     }
 
@@ -321,7 +427,7 @@ private final class LegadoSourceWorker {
         let reference = try reference(book)
         try configure(book: book)
         var pending = [reference.remoteBookID.isEmpty ? reference.bookURL : reference.remoteBookID], visited = Set<String>()
-        var chapters: [ChapterRecord] = [], seen = Set<String>(), initialBudget = LegadoMetadataBudget()
+        var chapters: [ChapterRecord] = [], seen = Set<String>(), initialBudget = LegadoMetadataBudget(), chapterReferences: [LegadoReference] = []
         var rowsRule = definition.toc["chapterList"] ?? ""
         let reversed = rowsRule.hasPrefix("-")
         if reversed { rowsRule.removeFirst() }
@@ -338,12 +444,13 @@ private final class LegadoSourceWorker {
                 let isVolume = yes(try field(definition.toc["isVolume"], in: row, baseURL: response.url, structured: true))
                 let address = try field(definition.toc["chapterUrl"], in: row, baseURL: response.url, structured: true)
                 guard isVolume || !address.isEmpty else { continue }
-                let chapterURL = isVolume && address.isEmpty ? response.url.absoluteString + "#volume-" + StableContentID.make(title) : try url(address, baseURL: response.url)
+                let ref = isVolume && address.isEmpty ? nil : try LegadoReference.parse(url(address, baseURL: response.url), baseURL: response.url)
+                let chapterURL = try ref.map { try shared.referenceKey($0, role: "chapter", sourceID: definition.sourceURL) } ?? "legado-volume:" + StableContentID.make(book.id, title)
                 guard seen.insert(chapterURL).inserted else { continue }
                 let restricted = yes(try field(definition.toc["isVip"] ?? definition.toc["isPay"], in: row, baseURL: response.url, structured: true))
                 let chapter = ChapterRecord(id: StableContentID.make(book.id, chapterURL), bookID: book.id, nativeChapterID: chapterURL, title: title, order: chapters.count,
                                             access: isVolume ? .volume : restricted ? .restricted : .readable)
-                try initialBudget.add(chapter); chapters.append(chapter)
+                try initialBudget.add(chapter); chapters.append(chapter); if let ref { chapterReferences.append(ref) }
                 guard chapters.count <= 50_000 else { throw LegadoRequestError.limit }
             }
             if let nextRule = definition.toc["nextTocUrl"], !nextRule.isEmpty {
@@ -353,6 +460,7 @@ private final class LegadoSourceWorker {
                 }
             }
         }
+        try shared.registerBatch(chapterReferences, role: "chapter", sourceID: definition.sourceURL)
         if reversed { chapters.reverse() }
         var previousURL: String?
         for index in chapters.indices {
@@ -378,13 +486,25 @@ private final class LegadoSourceWorker {
         guard chapter.bookID == book.id, chapter.access == .readable else { throw ContentFailure.restricted }
         try configure(book: book, chapter: chapter)
         let knownChapters = shared.catalog(bookID: book.id).union([chapter.requestParameters["legado.nextChapterURL"], chapter.requestParameters["legado.previousChapterURL"]].compactMap { $0 })
+        let own = try shared.resolve(chapter.nativeChapterID, baseURL: currentURL)
+        var otherURLs = Set<String>()
+        for key in knownChapters where key != chapter.nativeChapterID {
+            let ref = try shared.resolve(key, baseURL: currentURL)
+            if let url = ref.requestURL, url != own.requestURL { otherURLs.insert(url.absoluteString) }
+        }
+        func isAnotherChapter(_ descriptor: String, baseURL: URL) throws -> Bool {
+            let ref = try shared.resolve(descriptor, baseURL: baseURL)
+            let key = try shared.referenceKey(ref, role: "chapter", sourceID: definition.sourceURL)
+            if key != chapter.nativeChapterID, knownChapters.contains(key) { return true }
+            return ref.requestURL.map { otherURLs.contains($0.absoluteString) } ?? false
+        }
         var pending = [chapter.nativeChapterID], visited = Set<String>(), paragraphs: [String] = []
         while !pending.isEmpty {
             let address = pending.removeFirst()
             guard visited.insert(address).inserted else { continue }
             guard visited.count <= maximumPages else { throw LegadoRequestError.limit }
             let response = try fetch(address)
-            if response.url.absoluteString != chapter.nativeChapterID, knownChapters.contains(response.url.absoluteString) { break }
+            if otherURLs.contains(response.url.absoluteString) { break }
             let raw = try field(definition.content["content"], in: response.text, baseURL: response.url)
             let extracted = try Self.paragraphs(raw)
             // Split pages commonly repeat a paragraph at their boundary. Keep
@@ -396,7 +516,7 @@ private final class LegadoSourceWorker {
             if let next = definition.content["nextContentUrl"], !next.isEmpty {
                 for value in try engine.list(next, in: response.text, baseURL: response.url) where !value.isEmpty {
                     let next = try url(value, baseURL: response.url)
-                    if next != chapter.nativeChapterID, knownChapters.contains(next) { continue }
+                    if try isAnotherChapter(next, baseURL: response.url) { continue }
                     if !visited.contains(next), !pending.contains(next) { pending.append(next) }
                 }
             }
@@ -424,7 +544,7 @@ private final class LegadoSourceWorker {
         func string(_ index: Int, fallback: String = "") -> String { args.indices.contains(index) ? (args[index] as? String ?? String(describing: args[index])) : fallback }
         switch method {
         case "java.ajax", "java.get", "java.post", "java.head", "java.connect":
-            if method == "java.get", args.count == 1, !string(0).contains("://"), !string(0).hasPrefix("/") { return context.variables[string(0)] ?? shared.get(string(0)) }
+            if method == "java.get", args.count == 1, !string(0).contains("://"), !string(0).hasPrefix("/") { return try context.variables[string(0)] ?? shared.get(javaVariableKey(string(0))) }
             var options: [String: Any] = [:]
             if method == "java.post" { options = ["method": "POST", "body": args.indices.contains(1) ? args[1] : ""] }
             if method == "java.head" { options["method"] = "HEAD" }
@@ -433,12 +553,12 @@ private final class LegadoSourceWorker {
             let response = try http.request(try renderRequest(string(0), baseURL: currentURL), baseURL: currentURL, headers: headers, override: options)
             return method == "java.ajax" ? response.text : response.bridgeValue
         case "java.put":
-            let key = string(0), value = string(1); try shared.set(key, value); context.variables[key] = value; return value
+            let key = string(0), value = string(1); try shared.set(javaVariableKey(key), value); context.variables[key] = value; return value
         case "java.getString": return try engine.text(string(0), in: scriptContent ?? currentContent, baseURL: currentURL)
         case "java.getStringList": return try engine.list(string(0), in: scriptContent ?? currentContent, baseURL: currentURL)
         case "java.getElements": return try engine.elements(string(0), in: scriptContent ?? currentContent, baseURL: currentURL)
         case "source.getVariable", "book.getVariable", "chapter.getVariable":
-            return shared.get(variableScope(method) + (args.isEmpty ? "variable" : string(0)))
+            return try shared.get(variableScope(method) + (args.isEmpty ? "variable" : string(0)))
         case "source.setVariable", "book.setVariable", "chapter.setVariable":
             let key = args.count == 1 ? "variable" : string(0), value = args.count == 1 ? string(0) : string(1)
             try shared.set(variableScope(method) + key, value); return value
@@ -449,26 +569,59 @@ private final class LegadoSourceWorker {
             let parts = method.components(separatedBy: "."), kind = parts[0]
             let aliases = ["getName": kind == "chapter" ? "title" : "name", "getTitle": kind == "chapter" ? "title" : "name", "getAuthor": "author", "getTocUrl": "tocUrl", "getBookUrl": "bookUrl", "getUrl": kind == "chapter" ? "url" : "bookUrl", "getChapterUrl": "url", "getChapterIndex": "index", "getIndex": "index"]
             return (bindings[kind] as? [String: Any])?[aliases[parts[1]] ?? ""] ?? NSNull()
-        case "source.get", "book.get", "chapter.get": return shared.get(variableScope(method) + string(0))
+        case "source.get", "book.get", "chapter.get": return try shared.get(variableScope(method) + string(0))
         case "source.put", "book.put", "chapter.put":
             try shared.set(variableScope(method) + string(0), string(1)); return string(1)
-        case "cookie.getCookie":
-            let url = try http.absolute(string(0, fallback: currentURL.absoluteString), baseURL: currentURL)
-            guard LegadoHTTPExecutor.sameOrigin(url, http.origin) else { throw LegadoRequestError.unsupported("跨来源 Cookie") }
-            let value = shared.cookies.header(for: url) ?? ""
+        case "source.getLoginInfo": return try shared.state?.getLoginInfo() ?? ""
+        case "source.getLoginInfoMap": return try shared.state?.getLoginInfoMap() ?? [:]
+        case "source.putLoginInfo": try http.control.mutateSession { try requiredState().putLoginInfo(string(0)) }; return true
+        case "source.deleteLoginInfo": try http.control.mutateSession { try requiredState().logout() }; return true
+        case "source.getLoginHeader", "source.getHeaderMap":
+            let value = try shared.get(loginHeaderKey)
+            return value.isEmpty ? [:] : try LegadoHTTPExecutor.headers(value)
+        case "source.setLoginHeader", "source.putLoginHeader":
+            let value = args.first is [String: Any] ? String(decoding: try JSONSerialization.data(withJSONObject: args[0], options: [.sortedKeys]), as: UTF8.self) : string(0)
+            _ = try LegadoHTTPExecutor.headers(value); try shared.set(loginHeaderKey, value); return true
+        case "cache.get", "cache.getFromMemory": return try requiredState().cacheGet(string(0), memory: method == "cache.getFromMemory") ?? NSNull()
+        case "cache.put", "cache.putMemory":
+            try requiredState().cachePut(string(1), key: string(0), ttl: args.count > 2 ? (args[2] as? NSNumber)?.doubleValue : nil, memory: method == "cache.putMemory"); return true
+        case "cache.delete", "cache.remove": try requiredState().cachePut("", key: string(0), ttl: 0); return true
+        case "cookie.getCookie", "cookie.getKey", "java.getCookie":
+            let url = try cookieURL(string(0, fallback: currentURL.absoluteString))
+            let values = try shared.state?.cookies(for: url)
+            let value = values.map { HTTPCookie.requestHeaderFields(with: $0)["Cookie"] ?? "" } ?? shared.cookies.header(for: url) ?? ""
             if args.count > 1 {
                 return value.components(separatedBy: ";").map { $0.trimmingCharacters(in: .whitespaces) }.first { $0.hasPrefix(string(1) + "=") }.map { String($0.dropFirst(string(1).count + 1)) } ?? ""
             }
             return value
         case "cookie.setCookie":
-            let url = try http.absolute(string(0), baseURL: currentURL)
-            guard LegadoHTTPExecutor.sameOrigin(url, http.origin) else { throw LegadoRequestError.unsupported("跨来源 Cookie") }
-            shared.cookies.set(string(1), url: url); return true
-        case "cookie.removeCookie": shared.cookies.remove(); return true
-        case "java.base64Encode": return Data(string(0).utf8).base64EncodedString()
+            let url = try cookieURL(string(0))
+            shared.cookies.set(string(1), url: url)
+            try shared.state?.setCookies(HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": string(1)], for: url), for: url, expectedSessionRevision: http.control.sessionRevision); return true
+        case "cookie.removeCookie":
+            let url = args.isEmpty ? nil : try cookieURL(string(0))
+            try shared.state?.clearCookies(origin: url); shared.cookies.remove(url: url); return true
+        case "java.deviceID", "java.androidId": return try requiredState().deviceIdentifier()
+        case "java.getWebViewUA":
+            let os = ProcessInfo.processInfo.operatingSystemVersion
+            return "Mozilla/5.0 (iPhone; CPU iPhone OS \(os.majorVersion)_\(os.minorVersion) like Mac OS X) AppleWebKit/605.1.15 Mobile Safari/604.1 Zhuying"
+        case "java.timeFormat", "java.timeFormatUTC":
+            guard let milliseconds = args.first as? NSNumber, milliseconds.doubleValue.isFinite, abs(milliseconds.doubleValue) <= 8.64e15 else { throw LegadoRequestError.invalid("时间戳") }
+            let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = method == "java.timeFormatUTC" ? string(1) : "yyyy-MM-dd HH:mm:ss"
+            if method == "java.timeFormatUTC" {
+                guard args.count > 2, let offset = args[2] as? NSNumber, let zone = TimeZone(secondsFromGMT: offset.intValue / 1000) else { throw LegadoRequestError.invalid("UTC 时区偏移") }; formatter.timeZone = zone
+            }
+            return formatter.string(from: Date(timeIntervalSince1970: milliseconds.doubleValue / 1000))
+        case "java.toast", "java.longToast", "java.log":
+            if method != "java.log" { shared.lastMessage = String(string(0).prefix(4096)) }; return NSNull()
+        case "java.startBrowserAwait", "java.startBrowser", "java.showBrowser", "java.showReadingBrowser", "java.startBrowserDp": return try browser(method, args: args)
+        case "crypto.encrypt", "crypto.decrypt", "crypto.decodeText", "android.base64Encode", "android.base64Decode": return try LegadoCryptoHost.evaluate(method, args: args)
+        case "java.base64Encode": return try LegadoCryptoHost.base64Encode(Data(string(0).utf8), flags: args.count > 1 ? (args[1] as? NSNumber)?.intValue ?? 2 : 2)
         case "java.base64Decode":
-            guard let data = Data(base64Encoded: string(0), options: .ignoreUnknownCharacters) else { throw LegadoRequestError.invalid("Base64") }
-            return try LegadoHTTPExecutor.decode(data, charset: args.count > 1 ? string(1) : nil)
+            let flags = args.count > 1 ? (args[1] as? NSNumber)?.intValue ?? 0 : 0
+            let data = try LegadoCryptoHost.base64Decode(string(0), flags: flags)
+            return try LegadoHTTPExecutor.decode(data, charset: args.count > 1 && args[1] is String ? string(1) : "utf-8")
         case "java.encodeURI": return string(0).addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? ""
         case "java.decodeURI": return string(0).removingPercentEncoding ?? string(0)
         case "java.md5Encode": return StableContentID.hex(Insecure.MD5.hash(data: Data(string(0).utf8)))
@@ -480,10 +633,52 @@ private final class LegadoSourceWorker {
         default: throw LegadoRequestError.unsupported("脚本宿主方法 \(method)")
         }
     }
+    private func requiredState() throws -> LegadoPersistentState {
+        guard let state = shared.state else { throw LegadoRequestError.unsupported("此书源缺少持久会话") }; return state
+    }
+    private func cookieURL(_ value: String) throws -> URL {
+        let address = value.contains("://") ? value : "https://" + value.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        let url = try http.absolute(address, baseURL: currentURL)
+        _ = try http.policy.requireOrigin(for: url); return url
+    }
+    private func browser(_ method: String, args: [Any]) throws -> Any {
+        guard let address = args.first as? String else { throw LegadoInteractionError.invalidRequest }
+        var html: String?, script: String?, title = args.count > 1 ? args[1] as? String ?? "书源网页" : "书源网页"
+        let target: URL
+        if address.hasPrefix("data:text/html;base64,") {
+            let data = try LegadoCryptoHost.base64Decode(String(address.dropFirst(22)), flags: 0)
+            guard data.count <= 2 * 1024 * 1024, let value = String(data: data, encoding: .utf8) else { throw LegadoInteractionError.invalidRequest }
+            html = value; target = URL(string: "about:blank")!
+        } else { target = try http.absolute(address, baseURL: currentURL); _ = try http.policy.requireOrigin(for: target) }
+        if method == "java.showBrowser" {
+            html = args.count > 1 ? args[1] as? String : nil; script = args.count > 2 ? args[2] as? String : nil; title = "书源网页"
+        }
+        let request = LegadoBrowserRequest(sourceID: sourceID, accountID: shared.state?.accountID ?? "default", libraryProfile: shared.state?.scope.libraryProfile ?? "production", url: target, title: title, html: html, javaScript: script, allowedOrigins: http.policy.allowedOrigins)
+        try request.validate(); try http.control.beginInteraction(); defer { http.control.endInteraction() }
+        let waiter = LegadoBlockingResult<LegadoBrowserResult>(), identifier = UUID(), control = http.control
+        let task = Task.detached { [request] in
+            defer { control.remove(identifier) }
+            do { waiter.complete(.success(try await LegadoInteractionCoordinator.shared.requestBrowser(request))) }
+            catch { waiter.complete(.failure(error)) }
+        }
+        control.add(task, id: identifier)
+        defer { task.cancel(); control.remove(identifier) }
+        let result = try waiter.wait(control: control)
+        for (origin, cookies) in result.cookiesByOrigin {
+            guard let url = URL(string: origin) else { throw LegadoInteractionError.invalidRequest }
+            _ = try http.policy.requireOrigin(for: url); try shared.state?.replaceCookies(cookies, for: url, expectedSessionRevision: http.control.sessionRevision)
+        }
+        return ["body": result.html, "url": result.finalURL.absoluteString, "statusCode": 200, "headers": [:]] as [String: Any]
+    }
+    private var loginHeaderKey: String {
+        let origin = try? LegadoSourcePolicy.canonicalOrigin(currentURL)
+        return "source:loginHeader:" + (origin?.absoluteString ?? "unbound")
+    }
+    private func javaVariableKey(_ key: String) -> String { "java:" + (bookIdentity.isEmpty ? "source" : bookIdentity) + ":" + key }
     private func variableScope(_ method: String) -> String {
         let kind = method.components(separatedBy: ".")[0]
-        let book = (bindings["book"] as? [String: Any])?["bookUrl"] as? String ?? ""
-        let chapter = (bindings["chapter"] as? [String: Any])?["url"] as? String ?? ""
-        return kind + ":" + (kind == "source" ? "" : StableContentID.make(book, kind == "chapter" ? chapter : "")) + ":"
+        let book = bookIdentity
+        let chapter = chapterIdentity
+        return kind == "source" ? "source:" : kind + ":" + StableContentID.make(book, kind == "chapter" ? chapter : "") + ":"
     }
 }

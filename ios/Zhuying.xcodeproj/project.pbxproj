@@ -18,6 +18,7 @@
 		0978D201CA8EB16E652929DA /* NativePerformanceValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AF5B45BC4C9F1F696E44456 /* NativePerformanceValidation.swift */; };
 		0AB5E8ADCAD5122664B1AA4B /* ShareImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED615F83F2CE5DA1CD903F9 /* ShareImportView.swift */; };
 		0BF7B3653BA4F936E1CD0241 /* ShushanBookSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2689A99737229D6D3580455A /* ShushanBookSource.swift */; };
+		0D577578E080969F90816C64 /* LegadoSourcePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66400C19A2FDF511860FCDAD /* LegadoSourcePolicyTests.swift */; };
 		0E0499A43DE42465D015E9D8 /* ProductionTextSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E9FBC577C48FD98C528E87 /* ProductionTextSearchView.swift */; };
 		103E02867616671C00C59B58 /* OnlineBookPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CEFC6BE563884DF1C03CABA /* OnlineBookPresentation.swift */; };
 		11262E9C6D7AA6B4744EE496 /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A93AE885500B55B20750E1B /* ReaderView.swift */; };
@@ -37,6 +38,7 @@
 		1CD440CF4E586064A0A42D36 /* SmartImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B818E692BFB62576A2815A06 /* SmartImportView.swift */; };
 		1CD80E629F5AF3345A7BB036 /* AudioConfigurationFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C8721C69EEA17BB7CC39A2A /* AudioConfigurationFlowTests.swift */; };
 		1CFD87F570BC78AA840F02EC /* ReadingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1BF657DD8D51316C3DCE618 /* ReadingHistoryView.swift */; };
+		1D49B5600262529F1838EC13 /* LegadoBrowserInteractionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 695835993C109D518500EAEC /* LegadoBrowserInteractionView.swift */; };
 		1DBF4EC010BDBD9760B2C15E /* ShushanAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC77899A527CB1D904857C9 /* ShushanAccountView.swift */; };
 		1DC0263914FC2408B87DA4F4 /* LaunchBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 752488FA7F0AD895E3AD9DE2 /* LaunchBaselineTests.swift */; };
 		1E4B1C48F07D11DD99EE968B /* ReaderPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF9F36A322C9326961A8102 /* ReaderPreferences.swift */; };
@@ -63,6 +65,7 @@
 		33D20127E5E23F5D52E5FA67 /* ToolboxStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACFB7223F3F92ADFD97F55F3 /* ToolboxStoreTests.swift */; };
 		33D6F3EDFD2551A8533A48AE /* OnlineToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB41DD0644E753FF690AF2F4 /* OnlineToolsTests.swift */; };
 		37B9D1984A499FA3F1510BCF /* ShushanAccountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAC0464C63A46D38AA0CB1B7 /* ShushanAccountTests.swift */; };
+		3A0E205C7C377FDD0AF7A5EF /* LegadoHostInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1E3E40B8DB113892B45CCC /* LegadoHostInteractionTests.swift */; };
 		3A5027F5E4F33A61FB083514 /* BrandCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B38C68BB09C400AA65A4D2C /* BrandCompatibility.swift */; };
 		3ABA67F78F313E330E1682E1 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5F94EA7F69FF996C093B58CA /* README.md */; };
 		3C72F8E238530A9AE3FB910B /* LibraryAudioCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16DCA0F7003F5E2E6F2D1135 /* LibraryAudioCoordinator.swift */; };
@@ -70,6 +73,7 @@
 		3DBEAF723E100D04F38FBA03 /* FileResourceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69E493A28E4546D4792DE5D /* FileResourceStore.swift */; };
 		3E59183507B64ABD7FC301ED /* ProductionNarrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6290D45233FE56CC6DFB4C /* ProductionNarrationView.swift */; };
 		3EAA4596D91C374E7A78116B /* LegadoSourceDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C777D6ADCD7112F4C03D26A /* LegadoSourceDefinition.swift */; };
+		3ED6A3DCC7B2C4B7B976F674 /* LegadoReferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D39F9CDCC3AF8E357C76447A /* LegadoReferenceTests.swift */; };
 		3F59D798F104ABAB068C97AA /* NativeFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E0D9C52F578EA3E053BDA9 /* NativeFileExporter.swift */; };
 		40BA344C56DDA4FFB5B04B4A /* LibraryBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A449C4CC298077B2E22C7E2A /* LibraryBackup.swift */; };
 		40E221E0F6CF58574F8351B3 /* missing-resource.epub in Resources */ = {isa = PBXBuildFile; fileRef = B657DE46B77AE1CFCF6D7CA4 /* missing-resource.epub */; };
@@ -78,6 +82,7 @@
 		435BE3004D7D1CFF1365F10F /* ManagedFontLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4644EE8A9846573C714384CF /* ManagedFontLibraryTests.swift */; };
 		45D2D3892C8A854236AC3ACD /* performance-budget.json in Resources */ = {isa = PBXBuildFile; fileRef = 90A4379FB09E0EADE44B1210 /* performance-budget.json */; };
 		466F5B72D138F03E396983DF /* ProductionRecordSyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 579CC4082A317D2E7B242D2D /* ProductionRecordSyncView.swift */; };
+		468405D934258F2DD63870AF /* LegadoCryptoHostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3DC4C57BB44309EB6D3CD6A /* LegadoCryptoHostTests.swift */; };
 		47540BDE1EAAFFC52A8C286B /* DemoPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6ED9E3B0E2FECB6E291285 /* DemoPreviews.swift */; };
 		4766055E1ED249C84D792045 /* live-books.json in Resources */ = {isa = PBXBuildFile; fileRef = BD75BEBC827FFEA765930B36 /* live-books.json */; };
 		47CED3DF095C7657D62B43B7 /* unsafe-archive.zip in Resources */ = {isa = PBXBuildFile; fileRef = 7D17928D4DEF09839E3BD904 /* unsafe-archive.zip */; };
@@ -91,6 +96,7 @@
 		4E25345517A9C9FC46A61E07 /* SourcePackageFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3649E6099CCDCFD3B9D1724 /* SourcePackageFlowTests.swift */; };
 		4E3E59295273E3E15BB0558E /* ReaderTestFont.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D19D37EB6BEA9C87F0B7AD1D /* ReaderTestFont.ttf */; };
 		50592336CB0326EE05EAE026 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42783A997E66D18C9C617E3 /* BookDetailView.swift */; };
+		52B1ABE7C6857499AC1B144B /* LegadoPersistentStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5544B63B53AC0A5D088AB61E /* LegadoPersistentStateTests.swift */; };
 		53F25A740956C98B1C3DB1E6 /* ReadingSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58DC905CB9A7F393D3229EAC /* ReadingSessionController.swift */; };
 		5465B59E41ECE0D54245A03F /* ShushanAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B99C01D3D0F540F53366E00 /* ShushanAccount.swift */; };
 		546EB8CA35D01ED019BB2539 /* ContentToolsFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC390E67BD269D93E431FE5B /* ContentToolsFlowTests.swift */; };
@@ -103,6 +109,8 @@
 		5A129BB69A121D067F8F5293 /* ScopedRulesAndShareTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FBE98A265DC518CC437014 /* ScopedRulesAndShareTests.swift */; };
 		5B3550896A166D987495FB29 /* NativeNarrationValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D61FB4B37F1EF6370D563C26 /* NativeNarrationValidation.swift */; };
 		5B4C4B806839E74D22E0CD7E /* SourceCommentValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F071EC1C89BF0276A1D9833E /* SourceCommentValidation.swift */; };
+		5B8D9DDDC4C5DA977840E8AE /* LegadoInteractionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BFAD676A0693D4D0DC9038C /* LegadoInteractionCoordinator.swift */; };
+		5BDDAD33D9AFD5BD4DFCBCD6 /* LegadoSourcePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC0825D681B6E1E5231650FC /* LegadoSourcePolicy.swift */; };
 		5C6ACAD6601C4162EE616815 /* ReaderNativeInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9821B290E91C945A52ECD02F /* ReaderNativeInteractionTests.swift */; };
 		5E94545DF5C0B1C79C9C211E /* AppearancePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123BCFE608D0B5DA5AF4CBCE /* AppearancePersistenceTests.swift */; };
 		60472C29556ADB33486451A9 /* ReaderFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C6F2A2A1FF6492719137E76 /* ReaderFlowTests.swift */; };
@@ -149,6 +157,7 @@
 		865C1683F488B1EA12493952 /* ThemeStylePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12848F95C4318687F2D637C8 /* ThemeStylePreview.swift */; };
 		875D6A775EA117EE116176A6 /* ProductionBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29DC09BDDC08244A32483749 /* ProductionBrowserView.swift */; };
 		8807E0212AE1C776EA4F9D58 /* BookImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B12B1C6128CC481F9909C6F /* BookImport.swift */; };
+		886A785C8F1CAF54AF21441A /* LegadoBrowserSessionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D4427F462A37D79068ECF2 /* LegadoBrowserSessionSupport.swift */; };
 		887593BDA67B5FF4B54B82CF /* ReaderNarrationFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46DD93AE8157BECEA12D25D3 /* ReaderNarrationFlowTests.swift */; };
 		88B2CA73CE8A18CD96FB349F /* OnlineDevelopmentFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE4EB36577A9C3A1F59FAFE /* OnlineDevelopmentFixtures.swift */; };
 		8A3F84ECFC14D451CF46B4FC /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = E4C03D325D03F8640A99F271 /* ThirdPartyNotices.txt */; };
@@ -157,6 +166,7 @@
 		8C179FCF350C466C441BAF53 /* OfflineDownloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 659DCB75182DA7CE8783CC09 /* OfflineDownloads.swift */; };
 		8C85ADBCB0D04E98CEF1EE44 /* LegadoRuleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02C0F6B465DA033233B95B54 /* LegadoRuleEngine.swift */; };
 		8CCD2CF26506FAFD118C9DD0 /* ProductionLibraryPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B018503D61CF809C9B0034 /* ProductionLibraryPersistenceTests.swift */; };
+		8CE9E359FF9476D2C7E3B7C9 /* LegadoAdvancedSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4568A6208F1158F4F762170C /* LegadoAdvancedSourceTests.swift */; };
 		8D57170ACB129ABB4EA72E7A /* ExtensionToolsFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8982549165C6B2CCED5E38B4 /* ExtensionToolsFlowTests.swift */; };
 		8DB2C5E8F51D3492EB2CBE41 /* ProductionCommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F9AA67965659ABBE978417 /* ProductionCommentsView.swift */; };
 		8E240DFAF30249E4D3363FDA /* ProductionRuleTesterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75BE823D016BD04D8B202D2 /* ProductionRuleTesterView.swift */; };
@@ -166,7 +176,10 @@
 		92FD431E7B2F4F694EFB007D /* ShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80B0B543CC934A99A58A576 /* ShelfView.swift */; };
 		9317327996D6BA8F2871CE5B /* FeatureDemoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6E62B19039D26D5248EA2D /* FeatureDemoStore.swift */; };
 		93D4D14FFB5118173EFEF281 /* ShushanComments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0987C13467A65651F8569966 /* ShushanComments.swift */; };
+		953C86F84BD3AEFCF494F713 /* LegadoSessionInvalidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D63B4C00167B874C0CEAD1 /* LegadoSessionInvalidationTests.swift */; };
+		96700BCEE4C59D50E96BFB13 /* LegadoPersistentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC3FBCE901E71B4D93A04FE9 /* LegadoPersistentState.swift */; };
 		96CF5895C84E513C7EA43C0A /* PerformanceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBB380A00A79D053E548C7B /* PerformanceFixtures.swift */; };
+		96F7320F93D13FDEAD462C7E /* LegadoNetworkOrigins.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D68131EE3BE4B5995DE4125 /* LegadoNetworkOrigins.swift */; };
 		97D7EF4A916D0A5969328A7A /* LocalBookFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48DAD79520FF36E0E328700 /* LocalBookFile.swift */; };
 		981196ED7C4A511317147AEB /* SourceDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1039CDD66DF5FE4411C1E61 /* SourceDiagnostics.swift */; };
 		98E6943921F901931DA9A0D1 /* SourceFeasibilityValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2553037F4ECA87816D260455 /* SourceFeasibilityValidation.swift */; };
@@ -200,21 +213,26 @@
 		AEC21C942133516B07713F8F /* encrypted.epub in Resources */ = {isa = PBXBuildFile; fileRef = 4AD8C9D1E0FC0366DFFAF866 /* encrypted.epub */; };
 		AED1E0C37307A63361774916 /* ArchiveAndMediaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B990C8DE5244B678EB0EBB3 /* ArchiveAndMediaTests.swift */; };
 		B01BDDF084A5A8DC0640824B /* FootprintsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 185BF25728964D5BAC5D2B6F /* FootprintsView.swift */; };
+		B08C58347E99335C22FD3F24 /* LegadoReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30D707BDFE2013D0AA3434F /* LegadoReference.swift */; };
 		B10D4FDFC3EE19E18E19700A /* LegadoDevelopmentFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C04B6D8278FBFDABA6B48A9 /* LegadoDevelopmentFixtures.swift */; };
 		B184724B70F5BE6B59963E58 /* NarrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADED54FBEFD579743803B8CC /* NarrationTests.swift */; };
 		B1928A9C8F960E3EE1D93D51 /* ToolboxStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172CBE89DE22E369B9895C0B /* ToolboxStore.swift */; };
 		B1CABAFE541AA9BBE10D6B0D /* ThemeReadingBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B85E195C81E66B3AA9319FE9 /* ThemeReadingBridge.swift */; };
 		B6325AF49ADDF6F854B1A5D1 /* TextSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 924B6E1AB1B3DD1200A254A8 /* TextSearchIndex.swift */; };
+		B6D4C29D3EFFD4305A8040FE /* QuickJSScriptSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAE4030F953A22C6ABE25C1 /* QuickJSScriptSessionTests.swift */; };
 		B87C9FAF9194D278C65079B2 /* original-stored.rar in Resources */ = {isa = PBXBuildFile; fileRef = CF00AAB38C7AF9A7418B93B6 /* original-stored.rar */; };
+		B9164BCD6D69AC7D8CEFF0A1 /* LegadoLoginFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D93EE0539044FAFE8EB5D5 /* LegadoLoginFlowTests.swift */; };
 		B9884A9C002F1DD27BA0FEE4 /* LibraryRecordSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E25B9E33D3B30F1F16FD87 /* LibraryRecordSync.swift */; };
 		BB422437FA55036F28006EB9 /* NativeFileExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90035D0AFC35B8A8639D36A /* NativeFileExporterTests.swift */; };
 		BC616FD684B931216149BADC /* LegadoSourceFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023C46948F440DC9D5CE4961 /* LegadoSourceFlowTests.swift */; };
 		BDC249D6307CDA273EB724BB /* ShareImportRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CC4F16095C495F36852470B /* ShareImportRouting.swift */; };
+		BDC375616F6C67E8829014D3 /* LegadoInteractionPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3C22A16BD371DD1D8EFFAE /* LegadoInteractionPresenter.swift */; };
 		BEA07328EC3F28BE9C936795 /* ARCHIVE-SAMPLES.md in Resources */ = {isa = PBXBuildFile; fileRef = D41C910ADCB0FE63B8D51AF7 /* ARCHIVE-SAMPLES.md */; };
 		C0BD9DB0A0CE913166AD51E4 /* NavigationFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03AB6B345CD0CB110C4E47F5 /* NavigationFlowTests.swift */; };
 		C2B388D9B13AF795A0E6BEF6 /* NetworkBrowserValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7373BAB8C52A1CBF7EC3838 /* NetworkBrowserValidation.swift */; };
 		C376A1AE35A6C0728D2F772C /* SourceConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189F192AF3F0F9B4F90FBDFE /* SourceConfigurationView.swift */; };
 		C39633A48A1957288EF5942C /* ProductionArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135F6378C55FB7CFF0037F3A /* ProductionArchiveView.swift */; };
+		C492C1AFBAD127F8AC3C0492 /* LegadoLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD8A3C4A7200F7BE4EB4B78 /* LegadoLoginView.swift */; };
 		C4A3B3667D97E39869348F44 /* ExtractionBookSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 722E04AA74521C891699E90F /* ExtractionBookSource.swift */; };
 		C5C60FDEF8C063A4240B9A73 /* LibraryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20639B30B27A6DAC043BEB3 /* LibraryBackupTests.swift */; };
 		C5DFF6B869852B5F40F4759C /* LegadoSourceDefinitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30DA82A7AE268D0C96D3847 /* LegadoSourceDefinitionTests.swift */; };
@@ -226,7 +244,9 @@
 		CA2C8C755DAF4CED7EC12479 /* ReadingStyleResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECFA026B6423B9E1B7A23FF3 /* ReadingStyleResolver.swift */; };
 		CAD7577231449F95DFCDFFCE /* NavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B77E0FC0C379BD148A1C6013 /* NavigationStore.swift */; };
 		CCB3E8A46A303965501076E4 /* FileResourceStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E55CCDC12CF737D7563B81D /* FileResourceStoreTests.swift */; };
+		CD388166CAFEE1A9CA35B5D2 /* LegadoLoginUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DC0AB834E8C138D361F11E /* LegadoLoginUI.swift */; };
 		CDB4E3F900080145240CA8C3 /* ProductionCoverSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0363D7754F248212EF36C2D5 /* ProductionCoverSearchView.swift */; };
+		D0E33345B2A405B86986757D /* LegadoInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E358DE0ABB5353317D5C1BCE /* LegadoInteractionTests.swift */; };
 		D0FA3128AA0659AABBC7CE71 /* ChapterMemoryCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16B8D271D7D71CE04809BB83 /* ChapterMemoryCacheTests.swift */; };
 		D1885984B3ED9E23AF58CE5B /* ContentToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55104029C726FFA83FA9477 /* ContentToolsTests.swift */; };
 		D19D4D4BC9FF3E42F7A98446 /* LibraryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E644E82B9EC199C64F19DC /* LibraryStoreTests.swift */; };
@@ -266,6 +286,7 @@
 		FEBCCAC17CC3A1734EDEE17E /* ProductionCloudView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6DD3454C0CC0B2C2095B83 /* ProductionCloudView.swift */; };
 		FF6DF6A64EB96FC8D9F098DE /* ThemeAssetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2F28CD3424D64CB8EBDA58 /* ThemeAssetsTests.swift */; };
 		FF79999EFB425E7273FCB137 /* ReadingFontLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB8FE83112E233156C40682 /* ReadingFontLibraryTests.swift */; };
+		FFD81EA2260EAF21B4E78D36 /* LegadoCryptoHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD4BDF0F076B27253F6584B /* LegadoCryptoHost.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -356,6 +377,7 @@
 		188FBBED590507B6139B514C /* SQLiteLibraryRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteLibraryRepositoryTests.swift; sourceTree = "<group>"; };
 		189F192AF3F0F9B4F90FBDFE /* SourceConfigurationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceConfigurationView.swift; sourceTree = "<group>"; };
 		199AD6E02BA3A07F2639F00A /* NativeFileImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeFileImporterTests.swift; sourceTree = "<group>"; };
+		1BD8A3C4A7200F7BE4EB4B78 /* LegadoLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoLoginView.swift; sourceTree = "<group>"; };
 		1C2BE2350802B3587378B2F1 /* ThemeLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeLibraryView.swift; sourceTree = "<group>"; };
 		1C777D6ADCD7112F4C03D26A /* LegadoSourceDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoSourceDefinition.swift; sourceTree = "<group>"; };
 		1D5AF4CEFCBE1C708D6D2027 /* SourceHTTPTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceHTTPTransportTests.swift; sourceTree = "<group>"; };
@@ -372,6 +394,7 @@
 		2A7902FFD6153144D0209F8E /* ProductionLibraryTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionLibraryTools.swift; sourceTree = "<group>"; };
 		2AB20AAD1D209794E12CD59F /* SourceSwitching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceSwitching.swift; sourceTree = "<group>"; };
 		2C5DDAEEB79EC7215E54C8B6 /* CoverSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverSearchTests.swift; sourceTree = "<group>"; };
+		2D68131EE3BE4B5995DE4125 /* LegadoNetworkOrigins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoNetworkOrigins.swift; sourceTree = "<group>"; };
 		2D7702FBDF385F9C436DA067 /* BoundedArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoundedArchive.swift; sourceTree = "<group>"; };
 		2D8CC1017DC71E2CFF1A4D67 /* ZhuyingUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ZhuyingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D8E7E118EF56161924E7E3A /* RecordSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordSyncController.swift; sourceTree = "<group>"; };
@@ -394,6 +417,7 @@
 		3ED615F83F2CE5DA1CD903F9 /* ShareImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImportView.swift; sourceTree = "<group>"; };
 		44E644E82B9EC199C64F19DC /* LibraryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStoreTests.swift; sourceTree = "<group>"; };
 		4549E6C1D9C8D2FA725F9B2E /* RoleAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleAnalysis.swift; sourceTree = "<group>"; };
+		4568A6208F1158F4F762170C /* LegadoAdvancedSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoAdvancedSourceTests.swift; sourceTree = "<group>"; };
 		4610339A466E8238472D2C0C /* CompatibleAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibleAudioTests.swift; sourceTree = "<group>"; };
 		4644EE8A9846573C714384CF /* ManagedFontLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedFontLibraryTests.swift; sourceTree = "<group>"; };
 		46DD93AE8157BECEA12D25D3 /* ReaderNarrationFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderNarrationFlowTests.swift; sourceTree = "<group>"; };
@@ -410,6 +434,7 @@
 		53E24074526BAF1D3BAF2797 /* library.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = library.json; sourceTree = "<group>"; };
 		545AF53F81763D1535D8865B /* ContentProcessing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentProcessing.swift; sourceTree = "<group>"; };
 		55290E1437037F8706A1048A /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		5544B63B53AC0A5D088AB61E /* LegadoPersistentStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoPersistentStateTests.swift; sourceTree = "<group>"; };
 		55EC2B76E1EC48D325D3DDA1 /* BookImportQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookImportQueueTests.swift; sourceTree = "<group>"; };
 		56D88DB8FFC43AC5CB88FAB7 /* ReaderEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderEngineTests.swift; sourceTree = "<group>"; };
 		579CC4082A317D2E7B242D2D /* ProductionRecordSyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionRecordSyncView.swift; sourceTree = "<group>"; };
@@ -420,9 +445,11 @@
 		61939E66ED4027736A7B1D60 /* MediaFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaFlowTests.swift; sourceTree = "<group>"; };
 		630752D4D63F94A62C2E58B2 /* ZhuyingPerformanceUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ZhuyingPerformanceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		659DCB75182DA7CE8783CC09 /* OfflineDownloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineDownloads.swift; sourceTree = "<group>"; };
+		66400C19A2FDF511860FCDAD /* LegadoSourcePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoSourcePolicyTests.swift; sourceTree = "<group>"; };
 		66E2599AB855928DE1DD0CB8 /* ReadingFontLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingFontLibrary.swift; sourceTree = "<group>"; };
 		682B761518413C871D25C713 /* PerformanceFixtureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceFixtureTests.swift; sourceTree = "<group>"; };
 		6934620FABF77A972200414F /* BookFormatParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookFormatParsing.swift; sourceTree = "<group>"; };
+		695835993C109D518500EAEC /* LegadoBrowserInteractionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoBrowserInteractionView.swift; sourceTree = "<group>"; };
 		69BF42C04CABB54243196480 /* unsafe-path.epub */ = {isa = PBXFileReference; path = "unsafe-path.epub"; sourceTree = "<group>"; };
 		6ADDD9E2E3AEF4CAFBD1930D /* LIBARCHIVE-RAR5-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LIBARCHIVE-RAR5-LICENSE.txt"; sourceTree = "<group>"; };
 		6AF5B45BC4C9F1F696E44456 /* NativePerformanceValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativePerformanceValidation.swift; sourceTree = "<group>"; };
@@ -438,6 +465,8 @@
 		752488FA7F0AD895E3AD9DE2 /* LaunchBaselineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchBaselineTests.swift; sourceTree = "<group>"; };
 		775502AF8925A724993A828F /* LIBARCHIVE-RAR-ENCRYPTION-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LIBARCHIVE-RAR-ENCRYPTION-LICENSE.txt"; sourceTree = "<group>"; };
 		78FF4D3579155834465B3E1B /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
+		79D93EE0539044FAFE8EB5D5 /* LegadoLoginFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoLoginFlowTests.swift; sourceTree = "<group>"; };
+		7AAE4030F953A22C6ABE25C1 /* QuickJSScriptSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickJSScriptSessionTests.swift; sourceTree = "<group>"; };
 		7D17928D4DEF09839E3BD904 /* unsafe-archive.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = "unsafe-archive.zip"; sourceTree = "<group>"; };
 		7F0CC014E8D537DCC709BF8C /* ThemeAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeAssets.swift; sourceTree = "<group>"; };
 		7F2F28CD3424D64CB8EBDA58 /* ThemeAssetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeAssetsTests.swift; sourceTree = "<group>"; };
@@ -451,6 +480,7 @@
 		867C39965C435D75F28149DE /* ThemeLibraryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeLibraryRepository.swift; sourceTree = "<group>"; };
 		8982549165C6B2CCED5E38B4 /* ExtensionToolsFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionToolsFlowTests.swift; sourceTree = "<group>"; };
 		8B2EEB7311DCB2B2D3248E50 /* ProductionContentRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionContentRulesView.swift; sourceTree = "<group>"; };
+		8BFAD676A0693D4D0DC9038C /* LegadoInteractionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoInteractionCoordinator.swift; sourceTree = "<group>"; };
 		8C6F2A2A1FF6492719137E76 /* ReaderFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFlowTests.swift; sourceTree = "<group>"; };
 		8CC4F16095C495F36852470B /* ShareImportRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImportRouting.swift; sourceTree = "<group>"; };
 		8DCA386027782724D9BC12D2 /* RecentChapterCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentChapterCache.swift; sourceTree = "<group>"; };
@@ -486,6 +516,8 @@
 		A4F1035896C8886196292E21 /* original-lzma.7z */ = {isa = PBXFileReference; path = "original-lzma.7z"; sourceTree = "<group>"; };
 		A57294D646B8B16476743BEA /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		A7373BAB8C52A1CBF7EC3838 /* NetworkBrowserValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkBrowserValidation.swift; sourceTree = "<group>"; };
+		A9DC0AB834E8C138D361F11E /* LegadoLoginUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoLoginUI.swift; sourceTree = "<group>"; };
+		AB3C22A16BD371DD1D8EFFAE /* LegadoInteractionPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoInteractionPresenter.swift; sourceTree = "<group>"; };
 		AC390E67BD269D93E431FE5B /* ContentToolsFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentToolsFlowTests.swift; sourceTree = "<group>"; };
 		ACAE1BA8C6F014A76BEEED63 /* ScriptCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptCache.swift; sourceTree = "<group>"; };
 		ACFB7223F3F92ADFD97F55F3 /* ToolboxStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolboxStoreTests.swift; sourceTree = "<group>"; };
@@ -519,8 +551,10 @@
 		C1A314AF94C1AB1FD7EB3553 /* ToolboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolboxView.swift; sourceTree = "<group>"; };
 		C1F9AA67965659ABBE978417 /* ProductionCommentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionCommentsView.swift; sourceTree = "<group>"; };
 		C2D13F6CC8621B829DB5ED67 /* BrandCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandCompatibilityTests.swift; sourceTree = "<group>"; };
+		C30D707BDFE2013D0AA3434F /* LegadoReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoReference.swift; sourceTree = "<group>"; };
 		C329FC9EF1883E0DF687BB8A /* SourceBrowserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceBrowserTests.swift; sourceTree = "<group>"; };
 		C395E95C26D6A6B15C3BDC80 /* ProductionLibraryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionLibraryStoreTests.swift; sourceTree = "<group>"; };
+		C3DC4C57BB44309EB6D3CD6A /* LegadoCryptoHostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoCryptoHostTests.swift; sourceTree = "<group>"; };
 		C5E9FBC577C48FD98C528E87 /* ProductionTextSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionTextSearchView.swift; sourceTree = "<group>"; };
 		C5ED920DE42D76F14AA32B4A /* original-comic.cbz */ = {isa = PBXFileReference; path = "original-comic.cbz"; sourceTree = "<group>"; };
 		C6411E04515347793146AED5 /* ProductionScriptTesterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionScriptTesterView.swift; sourceTree = "<group>"; };
@@ -529,6 +563,7 @@
 		C8A9EA5D3D5ADD82472BD088 /* ResilientSourceTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResilientSourceTransportTests.swift; sourceTree = "<group>"; };
 		C9060547ABAF3D911AE0AF12 /* RemoteBackendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteBackendTests.swift; sourceTree = "<group>"; };
 		C9CB96D1F09144BFAE6ACDE8 /* ImportedFileReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportedFileReader.swift; sourceTree = "<group>"; };
+		CC3FBCE901E71B4D93A04FE9 /* LegadoPersistentState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoPersistentState.swift; sourceTree = "<group>"; };
 		CD3B085F7B2CDED4F3240AA2 /* OnlineReadingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineReadingService.swift; sourceTree = "<group>"; };
 		CDB9922848732E375F1994EF /* ReaderEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderEngine.swift; sourceTree = "<group>"; };
 		CDC970AA77DE8AA90553C953 /* AppEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironmentTests.swift; sourceTree = "<group>"; };
@@ -541,6 +576,7 @@
 		D1BF657DD8D51316C3DCE618 /* ReadingHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingHistoryView.swift; sourceTree = "<group>"; };
 		D1FBE98A265DC518CC437014 /* ScopedRulesAndShareTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopedRulesAndShareTests.swift; sourceTree = "<group>"; };
 		D20639B30B27A6DAC043BEB3 /* LibraryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryBackupTests.swift; sourceTree = "<group>"; };
+		D39F9CDCC3AF8E357C76447A /* LegadoReferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoReferenceTests.swift; sourceTree = "<group>"; };
 		D400F2DA727675628E731142 /* upstream-rar5-compressed.rar */ = {isa = PBXFileReference; path = "upstream-rar5-compressed.rar"; sourceTree = "<group>"; };
 		D41C910ADCB0FE63B8D51AF7 /* ARCHIVE-SAMPLES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "ARCHIVE-SAMPLES.md"; sourceTree = "<group>"; };
 		D42B0DCB9E55A1163DE96691 /* ReadingPageEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPageEditors.swift; sourceTree = "<group>"; };
@@ -559,8 +595,10 @@
 		E128A50627804CF2F00F5293 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E19807D3743FA079F4567F58 /* FileChapterRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileChapterRepository.swift; sourceTree = "<group>"; };
 		E1C545EA320D9A746E1D475F /* ResilientSourceTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResilientSourceTransport.swift; sourceTree = "<group>"; };
+		E1D4427F462A37D79068ECF2 /* LegadoBrowserSessionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoBrowserSessionSupport.swift; sourceTree = "<group>"; };
 		E2C7011DD0855EBA6E3BD97D /* MediaDevelopmentFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDevelopmentFixtures.swift; sourceTree = "<group>"; };
 		E34A59EB2D6D77028C016AE7 /* ReadingShelfPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingShelfPromptTests.swift; sourceTree = "<group>"; };
+		E358DE0ABB5353317D5C1BCE /* LegadoInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoInteractionTests.swift; sourceTree = "<group>"; };
 		E3649E6099CCDCFD3B9D1724 /* SourcePackageFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourcePackageFlowTests.swift; sourceTree = "<group>"; };
 		E43B00AB1710566728E4A42B /* CloudRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRecords.swift; sourceTree = "<group>"; };
 		E4C03D325D03F8640A99F271 /* ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdPartyNotices.txt; sourceTree = "<group>"; };
@@ -580,12 +618,16 @@
 		F0F7F63EE70DA8E421FC2D7B /* ReadingShelfPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingShelfPrompt.swift; sourceTree = "<group>"; };
 		F1018716105C8EABFEB9152B /* ProductionNetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionNetworkView.swift; sourceTree = "<group>"; };
 		F1D66B36522A3E222B98F30D /* reflow-long.epub */ = {isa = PBXFileReference; path = "reflow-long.epub"; sourceTree = "<group>"; };
+		F2D63B4C00167B874C0CEAD1 /* LegadoSessionInvalidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoSessionInvalidationTests.swift; sourceTree = "<group>"; };
 		F56141D1899AAA061C1AF831 /* AudioServiceConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioServiceConfiguration.swift; sourceTree = "<group>"; };
 		F75BE823D016BD04D8B202D2 /* ProductionRuleTesterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionRuleTesterView.swift; sourceTree = "<group>"; };
 		F82CA3451DFDAE3EB5CF7535 /* RuleExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleExtraction.swift; sourceTree = "<group>"; };
 		F908AEC9EB7B2B0F0F4BB730 /* ReaderPageFurniture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPageFurniture.swift; sourceTree = "<group>"; };
+		FA1E3E40B8DB113892B45CCC /* LegadoHostInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoHostInteractionTests.swift; sourceTree = "<group>"; };
 		FB3BB4950FFB200487875BFF /* libunicode.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = libunicode.c; sourceTree = "<group>"; };
+		FC0825D681B6E1E5231650FC /* LegadoSourcePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoSourcePolicy.swift; sourceTree = "<group>"; };
 		FEBB380A00A79D053E548C7B /* PerformanceFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceFixtures.swift; sourceTree = "<group>"; };
+		FFD4BDF0F076B27253F6584B /* LegadoCryptoHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegadoCryptoHost.swift; sourceTree = "<group>"; };
 		FFE17020550E6E35B1234835 /* libZhuyingScriptCore.a */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = archive.ar; path = libZhuyingScriptCore.a; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -621,6 +663,7 @@
 				AC390E67BD269D93E431FE5B /* ContentToolsFlowTests.swift */,
 				8982549165C6B2CCED5E38B4 /* ExtensionToolsFlowTests.swift */,
 				832D9784FDC9B06BF8B3E058 /* FeatureFlowTests.swift */,
+				79D93EE0539044FAFE8EB5D5 /* LegadoLoginFlowTests.swift */,
 				023C46948F440DC9D5CE4961 /* LegadoSourceFlowTests.swift */,
 				61939E66ED4027736A7B1D60 /* MediaFlowTests.swift */,
 				03AB6B345CD0CB110C4E47F5 /* NavigationFlowTests.swift */,
@@ -731,9 +774,17 @@
 				D69E493A28E4546D4792DE5D /* FileResourceStore.swift */,
 				C9CB96D1F09144BFAE6ACDE8 /* ImportedFileReader.swift */,
 				3CD4257F1EE15F87069EDD86 /* LegadoBookSource.swift */,
+				E1D4427F462A37D79068ECF2 /* LegadoBrowserSessionSupport.swift */,
+				FFD4BDF0F076B27253F6584B /* LegadoCryptoHost.swift */,
 				A3EDF2285559A4E1E7CDE1AC /* LegadoHTTPRequest.swift */,
+				8BFAD676A0693D4D0DC9038C /* LegadoInteractionCoordinator.swift */,
+				A9DC0AB834E8C138D361F11E /* LegadoLoginUI.swift */,
+				2D68131EE3BE4B5995DE4125 /* LegadoNetworkOrigins.swift */,
+				CC3FBCE901E71B4D93A04FE9 /* LegadoPersistentState.swift */,
+				C30D707BDFE2013D0AA3434F /* LegadoReference.swift */,
 				02C0F6B465DA033233B95B54 /* LegadoRuleEngine.swift */,
 				1C777D6ADCD7112F4C03D26A /* LegadoSourceDefinition.swift */,
+				FC0825D681B6E1E5231650FC /* LegadoSourcePolicy.swift */,
 				17C05E8097BF489242D4CFC3 /* Library.swift */,
 				16DCA0F7003F5E2E6F2D1135 /* LibraryAudioCoordinator.swift */,
 				A449C4CC298077B2E22C7E2A /* LibraryBackup.swift */,
@@ -869,10 +920,18 @@
 				BEAEA6FA50AC40DF8EF16563 /* FeatureDemoTests.swift */,
 				4F7E61C558892F340FE97F27 /* FileChapterRepositoryTests.swift */,
 				0E55CCDC12CF737D7563B81D /* FileResourceStoreTests.swift */,
+				4568A6208F1158F4F762170C /* LegadoAdvancedSourceTests.swift */,
 				3923B94F62C67287FA85A76F /* LegadoBookSourceTests.swift */,
+				C3DC4C57BB44309EB6D3CD6A /* LegadoCryptoHostTests.swift */,
+				FA1E3E40B8DB113892B45CCC /* LegadoHostInteractionTests.swift */,
 				090B098EDD06691EE5559B7C /* LegadoIntegrationTests.swift */,
+				E358DE0ABB5353317D5C1BCE /* LegadoInteractionTests.swift */,
+				5544B63B53AC0A5D088AB61E /* LegadoPersistentStateTests.swift */,
+				D39F9CDCC3AF8E357C76447A /* LegadoReferenceTests.swift */,
 				D13BB30AC4B1F3E183A32A58 /* LegadoRuleEngineTests.swift */,
+				F2D63B4C00167B874C0CEAD1 /* LegadoSessionInvalidationTests.swift */,
 				A30DA82A7AE268D0C96D3847 /* LegadoSourceDefinitionTests.swift */,
+				66400C19A2FDF511860FCDAD /* LegadoSourcePolicyTests.swift */,
 				D20639B30B27A6DAC043BEB3 /* LibraryBackupTests.swift */,
 				44E644E82B9EC199C64F19DC /* LibraryStoreTests.swift */,
 				4644EE8A9846573C714384CF /* ManagedFontLibraryTests.swift */,
@@ -888,6 +947,7 @@
 				23B018503D61CF809C9B0034 /* ProductionLibraryPersistenceTests.swift */,
 				C395E95C26D6A6B15C3BDC80 /* ProductionLibraryStoreTests.swift */,
 				E536FD3AADB8EA4E92CB310E /* QuickJSScriptRuntimeTests.swift */,
+				7AAE4030F953A22C6ABE25C1 /* QuickJSScriptSessionTests.swift */,
 				56D88DB8FFC43AC5CB88FAB7 /* ReaderEngineTests.swift */,
 				9821B290E91C945A52ECD02F /* ReaderNativeInteractionTests.swift */,
 				9813565B17E3E2E2F934EDFD /* ReaderPreferencesTests.swift */,
@@ -962,6 +1022,9 @@
 				ED80E05D53A862ED0DC56A3E /* Components.swift */,
 				78FF4D3579155834465B3E1B /* DiscoverView.swift */,
 				185BF25728964D5BAC5D2B6F /* FootprintsView.swift */,
+				695835993C109D518500EAEC /* LegadoBrowserInteractionView.swift */,
+				AB3C22A16BD371DD1D8EFFAE /* LegadoInteractionPresenter.swift */,
+				1BD8A3C4A7200F7BE4EB4B78 /* LegadoLoginView.swift */,
 				05E0D9C52F578EA3E053BDA9 /* NativeFileExporter.swift */,
 				01C600B67185ACE5981BD8B8 /* NativeFileImporter.swift */,
 				74C32EE1746D8315F1E2E350 /* NavigationSettingsView.swift */,
@@ -1318,10 +1381,21 @@
 				B01BDDF084A5A8DC0640824B /* FootprintsView.swift in Sources */,
 				81668074248E14303313A652 /* ImportedFileReader.swift in Sources */,
 				2CB05BC2E0268A308CD8BB7F /* LegadoBookSource.swift in Sources */,
+				1D49B5600262529F1838EC13 /* LegadoBrowserInteractionView.swift in Sources */,
+				886A785C8F1CAF54AF21441A /* LegadoBrowserSessionSupport.swift in Sources */,
+				FFD81EA2260EAF21B4E78D36 /* LegadoCryptoHost.swift in Sources */,
 				B10D4FDFC3EE19E18E19700A /* LegadoDevelopmentFixtures.swift in Sources */,
 				E46D92F1D3C87B5C2C23F7F8 /* LegadoHTTPRequest.swift in Sources */,
+				5B8D9DDDC4C5DA977840E8AE /* LegadoInteractionCoordinator.swift in Sources */,
+				BDC375616F6C67E8829014D3 /* LegadoInteractionPresenter.swift in Sources */,
+				CD388166CAFEE1A9CA35B5D2 /* LegadoLoginUI.swift in Sources */,
+				C492C1AFBAD127F8AC3C0492 /* LegadoLoginView.swift in Sources */,
+				96F7320F93D13FDEAD462C7E /* LegadoNetworkOrigins.swift in Sources */,
+				96700BCEE4C59D50E96BFB13 /* LegadoPersistentState.swift in Sources */,
+				B08C58347E99335C22FD3F24 /* LegadoReference.swift in Sources */,
 				8C85ADBCB0D04E98CEF1EE44 /* LegadoRuleEngine.swift in Sources */,
 				3EAA4596D91C374E7A78116B /* LegadoSourceDefinition.swift in Sources */,
+				5BDDAD33D9AFD5BD4DFCBCD6 /* LegadoSourcePolicy.swift in Sources */,
 				1FC295D7304A8AB74F3B9165 /* Library.swift in Sources */,
 				3C72F8E238530A9AE3FB910B /* LibraryAudioCoordinator.swift in Sources */,
 				40BA344C56DDA4FFB5B04B4A /* LibraryBackup.swift in Sources */,
@@ -1441,6 +1515,7 @@
 				546EB8CA35D01ED019BB2539 /* ContentToolsFlowTests.swift in Sources */,
 				8D57170ACB129ABB4EA72E7A /* ExtensionToolsFlowTests.swift in Sources */,
 				C9DE9936816C9817B61F7199 /* FeatureFlowTests.swift in Sources */,
+				B9164BCD6D69AC7D8CEFF0A1 /* LegadoLoginFlowTests.swift in Sources */,
 				BC616FD684B931216149BADC /* LegadoSourceFlowTests.swift in Sources */,
 				557EE4287A4355D93114699D /* MediaFlowTests.swift in Sources */,
 				C0BD9DB0A0CE913166AD51E4 /* NavigationFlowTests.swift in Sources */,
@@ -1513,10 +1588,18 @@
 				D40DC9F690FD5213909B1CAB /* FeatureDemoTests.swift in Sources */,
 				059C1385E25333A5EDB5FF5F /* FileChapterRepositoryTests.swift in Sources */,
 				CCB3E8A46A303965501076E4 /* FileResourceStoreTests.swift in Sources */,
+				8CE9E359FF9476D2C7E3B7C9 /* LegadoAdvancedSourceTests.swift in Sources */,
 				917186BE9232E8EB03EBED16 /* LegadoBookSourceTests.swift in Sources */,
+				468405D934258F2DD63870AF /* LegadoCryptoHostTests.swift in Sources */,
+				3A0E205C7C377FDD0AF7A5EF /* LegadoHostInteractionTests.swift in Sources */,
 				E447C14873876FCDD82C5D0A /* LegadoIntegrationTests.swift in Sources */,
+				D0E33345B2A405B86986757D /* LegadoInteractionTests.swift in Sources */,
+				52B1ABE7C6857499AC1B144B /* LegadoPersistentStateTests.swift in Sources */,
+				3ED6A3DCC7B2C4B7B976F674 /* LegadoReferenceTests.swift in Sources */,
 				646C0D49DB751A93C82844B9 /* LegadoRuleEngineTests.swift in Sources */,
+				953C86F84BD3AEFCF494F713 /* LegadoSessionInvalidationTests.swift in Sources */,
 				C5DFF6B869852B5F40F4759C /* LegadoSourceDefinitionTests.swift in Sources */,
+				0D577578E080969F90816C64 /* LegadoSourcePolicyTests.swift in Sources */,
 				C5C60FDEF8C063A4240B9A73 /* LibraryBackupTests.swift in Sources */,
 				D19D4D4BC9FF3E42F7A98446 /* LibraryStoreTests.swift in Sources */,
 				435BE3004D7D1CFF1365F10F /* ManagedFontLibraryTests.swift in Sources */,
@@ -1533,6 +1616,7 @@
 				8CCD2CF26506FAFD118C9DD0 /* ProductionLibraryPersistenceTests.swift in Sources */,
 				F8FE34FEEF567936A67A155B /* ProductionLibraryStoreTests.swift in Sources */,
 				EC3461F19B05A743191DA38D /* QuickJSScriptRuntimeTests.swift in Sources */,
+				B6D4C29D3EFFD4305A8040FE /* QuickJSScriptSessionTests.swift in Sources */,
 				8EAADA5E59F88BC39FB5428A /* ReaderEngineTests.swift in Sources */,
 				5C6ACAD6601C4162EE616815 /* ReaderNativeInteractionTests.swift in Sources */,
 				425B9C3E16F64C22279289D4 /* ReaderPreferencesTests.swift in Sources */,

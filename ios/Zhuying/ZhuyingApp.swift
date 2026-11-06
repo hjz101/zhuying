@@ -116,6 +116,7 @@ struct RootView: View {
 
     var body: some View {
         navigationTabs
+        .legadoInteractionPresenter()
         .allowsHitTesting(store.loadState == .ready)
         .overlay {
             if store.loadState != .ready {

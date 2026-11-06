@@ -200,26 +200,41 @@ final class LegadoBookSourceTests: XCTestCase {
         XCTAssertEqual(String(data: try XCTUnwrap(request.httpBody), encoding: .utf8), "key=" + keyword)
     }
 
-    func testBookAndChapterRequestOptionsAreExplicitlyRejectedInsteadOfSilentlyDropped() async throws {
+    func testBookAndChapterRequestDescriptorsRetainPOSTOptionsOutsideBookMetadata() async throws {
         for section in ["ruleSearch", "ruleToc"] {
             var configured = try source()
             var package = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(configured.configuration)) as? [String: Any])
             var rules = try XCTUnwrap(package[section] as? [String: String])
-            rules[section == "ruleSearch" ? "bookUrl" : "chapterUrl"] = #"@js:'/chapter/one,{"method":"POST","body":"chapter=1"}'"#
-            package[section] = rules
-            configured.configuration = try JSONSerialization.data(withJSONObject: package)
+            let path = section == "ruleSearch" ? "/book/1" : "/chapter/one"
+            rules[section == "ruleSearch" ? "bookUrl" : "chapterUrl"] = "@js:" + String(decoding: try JSONSerialization.data(withJSONObject: path + #",{"method":"POST","body":"chapter=1"}"#, options: .fragmentsAllowed), as: UTF8.self)
+            package[section] = rules; configured.configuration = try JSONSerialization.data(withJSONObject: package)
             let transport = LegadoFixtureTransport(), adapter = try LegadoBookSource(source: configured, transport: transport)
-            do {
-                let results = try await adapter.search(query: "request options", page: 1)
-                let book = try await adapter.details(for: XCTUnwrap(results.books.first))
-                _ = try await adapter.chapters(for: book)
-                XCTFail("URL request options must not be discarded")
-            } catch {
-                XCTAssertEqual(error as? LegadoRequestError, .unsupported("书籍、目录或章节地址附带请求选项"))
-            }
+            let results = try await adapter.search(query: "request options", page: 1)
+            let book = try await adapter.details(for: XCTUnwrap(results.books.first))
+            let chapters = try await adapter.chapters(for: book)
+            _ = try await adapter.document(for: XCTUnwrap(chapters.first), book: book)
             let requests = await transport.requests
-            XCTAssertFalse(requests.contains { $0.url?.path == "/chapter/one" })
+            let request = try XCTUnwrap(requests.first { $0.url?.path == path && $0.httpMethod == "POST" })
+            XCTAssertEqual(request.httpBody, Data("chapter=1".utf8))
+            XCTAssertFalse(book.source?.bookURL.contains("chapter=1") ?? true)
+            XCTAssertFalse(chapters.contains { $0.nativeChapterID.contains("chapter=1") })
         }
+    }
+
+    func testOptionalCoverRequestCredentialsNeverEnterPersistentBookMetadata() async throws {
+        var configured = try source()
+        var package = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(configured.configuration)) as? [String: Any])
+        let descriptor = #"https://fixture.test/cover,{"headers":{"Authorization":"original-private-fixture-value"}}"#
+        let rule = "@js:" + String(decoding: try JSONSerialization.data(withJSONObject: descriptor, options: .fragmentsAllowed), as: UTF8.self)
+        for section in ["ruleSearch", "ruleBookInfo"] {
+            var rules = try XCTUnwrap(package[section] as? [String: String]); rules["coverUrl"] = rule; package[section] = rules
+        }
+        configured.configuration = try JSONSerialization.data(withJSONObject: package)
+        let adapter = try LegadoBookSource(source: configured, transport: LegadoFixtureTransport())
+        let searched = try await adapter.search(query: "原创封面", page: 1)
+        let book = try await adapter.details(for: XCTUnwrap(searched.books.first))
+        XCTAssertNil(book.coverURL)
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(book), as: UTF8.self).contains("original-private-fixture-value"))
     }
 
     func testUnsupportedContentTransformsNeverReturnUnprocessedProseAsSuccess() async throws {
@@ -239,7 +254,11 @@ final class LegadoBookSourceTests: XCTestCase {
 
     func testContentPaginationStopsBeforeNextKnownChapterIncludingAfterAdapterRecreation() async throws {
         let transport = LegadoFixtureTransport(nextChapterLink: true), configured = try source()
-        let adapter = try LegadoBookSource(source: configured, transport: transport)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let vault = LegadoPaginationVault()
+        let state = try LegadoPersistentState(sourceID: configured.id, directory: directory, vault: vault)
+        let adapter = try LegadoBookSource(source: configured, transport: transport, state: state)
         let results = try await adapter.search(query: "pages", page: 1)
         let book = try await adapter.details(for: XCTUnwrap(results.books.first))
         let chapters = try await adapter.chapters(for: book)
@@ -248,7 +267,8 @@ final class LegadoBookSourceTests: XCTestCase {
         XCTAssertEqual(chapters[0].requestParameters["legado.nextChapterURL"], chapters[1].nativeChapterID)
         let first = try await adapter.document(for: chapters[0], book: book)
         XCTAssertEqual(first.paragraphs.map(\.text), ["午后，竹影落在信笺上。", "接续段落。", "这封信来自山谷。"])
-        let recreated = try LegadoBookSource(source: configured, transport: transport)
+        let restored = try LegadoPersistentState(sourceID: configured.id, directory: directory, vault: vault)
+        let recreated = try LegadoBookSource(source: configured, transport: transport, state: restored)
         let reopened = try await recreated.document(for: chapters[0], book: book)
         XCTAssertEqual(reopened, first)
         let requests = await transport.requests
@@ -295,7 +315,7 @@ final class LegadoBookSourceTests: XCTestCase {
         let transport = LegadoFixtureTransport(), adapter = try LegadoBookSource(source: configured, transport: transport)
         let start = ProcessInfo.processInfo.systemUptime
         do { _ = try await adapter.search(query: "recursive", page: 1); XCTFail("Recursive native reentry must hit a source quota") }
-        catch { XCTAssertTrue(error.localizedDescription.contains("超过限制"), error.localizedDescription) }
+        catch { XCTAssertTrue(error.localizedDescription.contains("重入"), error.localizedDescription) }
         XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - start, 1)
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)
@@ -389,4 +409,11 @@ final class LegadoBookSourceTests: XCTestCase {
         XCTAssertEqual(requests.first?.url?.path, "/books/search")
         XCTAssertEqual(result.books.first?.source?.origin, "https://fixture.test/")
     }
+}
+
+private final class LegadoPaginationVault: LegadoSecretVault {
+    private var values: [String: Data] = [:]
+    func read(id: String) throws -> Data? { values[id] }
+    func save(_ data: Data, id: String) throws { values[id] = data }
+    func remove(id: String) throws { values[id] = nil }
 }

@@ -237,13 +237,49 @@ final class LibraryStore: ObservableObject {
     func sourceTransport(for source: DemoSource,maximumBytes: Int = 20 * 1024 * 1024) throws -> any HTTPTransport {
         BrowserSessionTransport(sourceID:source.id,origin:try ShushanClient.host(source.url),sessions:browserSessions,base:try requestTransport(for:source,maximumBytes:maximumBytes))
     }
+    private var legadoAdapters: [String: (Data?, LegadoBookSource)] = [:]
+    private var legadoStates: [String: LegadoPersistentState] = [:]
+    func legadoLoginState(for source: DemoSource) throws -> LegadoPersistentState {
+        if let state = legadoStates[source.id] { return state }
+        let profile = (isDemo ? "demo:" : "production:") + managedSettingsDirectory.path
+        let state = try LegadoPersistentState(sourceID: source.id, libraryProfile: profile,
+            directory: managedSettingsDirectory.appendingPathComponent("LegadoSessions-v2"))
+        legadoStates[source.id] = state; return state
+    }
+    func runLegadoLoginAction(sourceID: String, action: String, values: [String: String]) async throws -> LegadoLoginActionResult {
+        guard let source = sources.first(where: { $0.id == sourceID && $0.enabled }),
+              let adapter = try configuredBookSource(source) as? LegadoBookSource else { throw ContentFailure.sourceDisabled }
+        return try await adapter.login(action: action, values: values)
+    }
+    private func legadoRequest(_ request: URLRequest, source: DemoSource, state: LegadoPersistentState) async throws -> (Data, HTTPURLResponse) {
+        guard let url = request.url else { throw ContentFailure.invalidResponse }
+        var policy = try LegadoSourceDefinition.decode(source).policy
+        for origin in try state.allowedOrigins() { policy = try policy.addingOrigin(origin.absoluteString) }
+        let origin = try policy.requireOrigin(for: url)
+        var routing = source; routing.url = origin.absoluteString
+        // Routing policies belong to the source; WebKit stores additionally
+        // include the account. The executor supplies the protected cookie jar.
+        let transport = try requestTransport(for: routing, maximumBytes: 2 * 1024 * 1024)
+        return try await transport.send(request)
+    }
     func configuredBookSource(_ source: DemoSource) throws -> any BookSource {
-        #if DEBUG
-        if LegadoDevelopmentFixtures.isEnabled(source) { return try LegadoBookSource(source: source, transport: LegadoDevelopmentTransport()) }
-        #endif
-        if let definition = try? SourcePackages.legadoDefinition(source) {
-            var routing = source; routing.url = try ShushanClient.host(definition.baseURL.absoluteString).absoluteString
-            return try LegadoBookSource(source: source, transport: sourceTransport(for: routing, maximumBytes: 2 * 1024 * 1024))
+        if (try? SourcePackages.legadoDefinition(source)) != nil {
+            if let cached = legadoAdapters[source.id], cached.0 == source.configuration { return cached.1 }
+            legadoAdapters[source.id]?.1.resetRuntime()
+            let state = try legadoLoginState(for: source)
+            let transport: any HTTPTransport
+            #if DEBUG
+            if LegadoDevelopmentFixtures.isEnabled(source) { transport = LegadoDevelopmentTransport() }
+            else { transport = LegadoRoutingTransport { [weak self] request in
+                guard let self else { throw CancellationError() }; return try await self.legadoRequest(request, source: source, state: state)
+            } }
+            #else
+            transport = LegadoRoutingTransport { [weak self] request in
+                guard let self else { throw CancellationError() }; return try await self.legadoRequest(request, source: source, state: state)
+            }
+            #endif
+            let adapter = try LegadoBookSource(source: source, transport: transport, state: state)
+            legadoAdapters[source.id] = (source.configuration, adapter); return adapter
         }
         let rules = try SourcePackages.rules(source)
         let transport = try sourceTransport(for: source, maximumBytes: rules.extraction == nil ? 4 * 1024 * 1024 : 2 * 1024 * 1024)
@@ -757,6 +793,8 @@ final class LibraryStore: ObservableObject {
         reader = .init(book:presentation,chapter:chapter,resume:false,anchor:anchor)
     }
     func configureOnline(credential: ShushanCredential?, expired: Bool = false) async {
+        let enabled = Set(sources.filter(\.enabled).map(\.id))
+        for key in Array(legadoAdapters.keys) where !enabled.contains(key) { legadoAdapters.removeValue(forKey: key)?.1.resetRuntime() }
         guard let service = onlineService else { return }
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
@@ -1073,4 +1111,9 @@ final class LibraryStore: ObservableObject {
             if revision == queueRevision && !hasPendingChanges { return true }
         }
     }
+}
+
+private struct LegadoRoutingTransport: HTTPTransport {
+    let operation: @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) { try await operation(request) }
 }

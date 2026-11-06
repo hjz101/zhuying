@@ -15,16 +15,51 @@ enum LegadoRequestError: LocalizedError, Equatable {
 /// Every operation has its own deadline and cancellation signal. Synchronous
 /// Java bridges wait only on a dedicated queue, never on an actor executor.
 final class LegadoOperationControl: @unchecked Sendable {
-    let deadline: TimeInterval
+    private var end: TimeInterval
+    private var interactionStart: TimeInterval?
+    var deadline: TimeInterval { lock.lock(); defer { lock.unlock() }; return interactionStart.map { end + ProcessInfo.processInfo.systemUptime - $0 } ?? end }
     private let lock = NSLock()
     private var failure: Error?
+    private var sessionState: LegadoPersistentState?
+    private var expectedRevision: UInt64?
+    private var changingSession = false
+    var sessionRevision: UInt64? { lock.lock(); defer { lock.unlock() }; return expectedRevision }
+    func bindSession(_ state: LegadoPersistentState?) {
+        let revision = state?.sessionRevision
+        lock.lock(); sessionState = state; expectedRevision = revision; lock.unlock()
+    }
+    func mutateSession<Value>(_ body: () throws -> Value) throws -> Value {
+        try check()
+        lock.lock(); let state = sessionState, expected = expectedRevision; changingSession = true; lock.unlock()
+        defer { lock.lock(); changingSession = false; lock.unlock() }
+        guard let state else { return try body() }
+        let (value, revision) = try state.withSessionMutation(expectedSessionRevision: expected, body)
+        lock.lock(); expectedRevision = revision; lock.unlock()
+        return value
+    }
     private var tasks: [UUID: Task<Void, Never>] = [:]
     private var cancellation: ((Error) -> Void)?
-    init(timeout: TimeInterval) { deadline = ProcessInfo.processInfo.systemUptime + timeout }
+    init(timeout: TimeInterval) { end = ProcessInfo.processInfo.systemUptime + timeout }
     func check() throws {
-        lock.lock(); let error = failure; lock.unlock()
+        lock.lock(); let error = failure, state = sessionState, expected = expectedRevision, changing = changingSession; lock.unlock()
         if let error { throw error }
+        if !changing, let state, state.sessionRevision != expected { throw CancellationError() }
         if ProcessInfo.processInfo.systemUptime >= deadline { throw ContentFailure.timedOut }
+    }
+    func beginInteraction() throws {
+        try check(); lock.lock(); defer { lock.unlock() }
+        guard interactionStart == nil else { throw LegadoRequestError.unsupported("嵌套网页交互") }
+        interactionStart = ProcessInfo.processInfo.systemUptime
+    }
+    func endInteraction() {
+        lock.lock(); defer { lock.unlock() }
+        if let start = interactionStart { end += ProcessInfo.processInfo.systemUptime - start; interactionStart = nil }
+    }
+    func startWatchdog() {
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self else { return }
+            do { try self.check(); self.startWatchdog() } catch { self.cancel(error) }
+        }
     }
     func installCancellation(_ action: @escaping (Error) -> Void) {
         lock.lock(); let error = failure; if error == nil { cancellation = action }; lock.unlock()
@@ -56,12 +91,13 @@ private final class LegadoHTTPResult: @unchecked Sendable {
 /// cookie store, and the request executor rejects other origins before sending.
 final class LegadoCookieJar: @unchecked Sendable {
     private let lock = NSLock()
-    private var cookies: [HTTPCookie] = []
+    private var cookies: [(origin: String, cookie: HTTPCookie)] = []
+    private func scope(_ url: URL) -> String { (url.scheme ?? "") + "://" + (url.host?.lowercased() ?? "") + ":" + String(url.port ?? (url.scheme == "https" ? 443 : 80)) }
     func header(for url: URL) -> String? {
         lock.lock(); defer { lock.unlock() }
-        cookies.removeAll { $0.expiresDate.map { $0 <= Date() } ?? false }
+        cookies.removeAll { $0.cookie.expiresDate.map { $0 <= Date() } ?? false }
         let host = url.host?.lowercased() ?? "", path = url.path.isEmpty ? "/" : url.path
-        let applicable = cookies.filter {
+        let applicable = cookies.filter { $0.origin == scope(url) }.map(\.cookie).filter {
             let domain = $0.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
             let cookiePath = $0.path
             let matchesPath = path == cookiePath || path.hasPrefix(cookiePath.hasSuffix("/") ? cookiePath : cookiePath + "/")
@@ -74,14 +110,14 @@ final class LegadoCookieJar: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         for cookie in incoming {
             guard cookie.name.utf8.count <= 512, cookie.value.utf8.count <= 8192 else { continue }
-            cookies.removeAll { $0.name == cookie.name && $0.domain == cookie.domain && $0.path == cookie.path }
-            if cookie.expiresDate.map({ $0 > Date() }) ?? true { cookies.append(cookie) }
+            cookies.removeAll { $0.origin == scope(url) && $0.cookie.name == cookie.name && $0.cookie.domain == cookie.domain && $0.cookie.path == cookie.path }
+            if cookie.expiresDate.map({ $0 > Date() }) ?? true { cookies.append((scope(url), cookie)) }
         }
         if cookies.count > 256 { cookies.removeFirst(cookies.count - 256) }
-        while cookies.reduce(0, { $0 + $1.name.utf8.count + $1.value.utf8.count + $1.domain.utf8.count + $1.path.utf8.count }) > 128 * 1024 { cookies.removeFirst() }
+        while cookies.reduce(0, { $0 + $1.cookie.name.utf8.count + $1.cookie.value.utf8.count + $1.cookie.domain.utf8.count + $1.cookie.path.utf8.count }) > 128 * 1024 { cookies.removeFirst() }
     }
     func set(_ value: String, url: URL) { store(["Set-Cookie": value], url: url) }
-    func remove() { lock.lock(); cookies = []; lock.unlock() }
+    func remove(url: URL? = nil) { lock.lock(); defer { lock.unlock() }; if let url { cookies.removeAll { $0.origin == scope(url) } } else { cookies = [] } }
 }
 
 struct LegadoHTTPPage {
@@ -93,14 +129,25 @@ struct LegadoHTTPPage {
 }
 
 final class LegadoHTTPExecutor {
-    let origin: URL
+    let origin: URL?
+    let policy: LegadoSourcePolicy
+    let state: LegadoPersistentState?
     let control: LegadoOperationControl
     let cookies: LegadoCookieJar
     private let transport: any HTTPTransport
     private var requestCount = 0
     private var responseBytes = 0
+    private var inheritedHeaderOrigin: URL?
+    private let rememberHeaderOrigin: ((URL) -> Void)?
     init(origin: URL, transport: any HTTPTransport, control: LegadoOperationControl, cookies: LegadoCookieJar) {
         self.origin = origin; self.transport = transport; self.control = control; self.cookies = cookies
+        policy = try! LegadoSourcePolicy(sourceID: "legacy", declaredOrigins: [origin]); state = nil
+        inheritedHeaderOrigin = origin; rememberHeaderOrigin = nil
+    }
+    init(origin: URL?, policy: LegadoSourcePolicy, state: LegadoPersistentState?, inheritedHeaderOrigin: URL? = nil, rememberHeaderOrigin: ((URL) -> Void)? = nil, transport: any HTTPTransport, control: LegadoOperationControl, cookies: LegadoCookieJar) {
+        self.origin = origin; self.policy = policy; self.state = state; self.transport = transport; self.control = control; self.cookies = cookies
+        self.inheritedHeaderOrigin = inheritedHeaderOrigin ?? origin; self.rememberHeaderOrigin = rememberHeaderOrigin
+        control.bindSession(state)
     }
     static func sameOrigin(_ left: URL, _ right: URL) -> Bool {
         left.scheme?.lowercased() == right.scheme?.lowercased() && left.host?.lowercased() == right.host?.lowercased() &&
@@ -153,7 +200,7 @@ final class LegadoHTTPExecutor {
             throw LegadoRequestError.unsupported("URL 请求选项 \(key)")
         }
         let url = try absolute(address, baseURL: baseURL)
-        guard Self.sameOrigin(url, origin) else { throw LegadoRequestError.unsupported("跨来源网络请求：\(url.host ?? "")") }
+        _ = try policy.requireOrigin(for: url)
         let method = (options["method"] as? String ?? "GET").uppercased()
         guard ["GET", "POST", "HEAD"].contains(method) else { throw LegadoRequestError.unsupported("HTTP \(method)") }
         let charset = options["charset"] as? String
@@ -161,8 +208,20 @@ final class LegadoHTTPExecutor {
         request.httpMethod = method; request.httpShouldHandleCookies = false
         request.timeoutInterval = max(0.1, min(20, control.deadline - ProcessInfo.processInfo.systemUptime))
         var allHeaders = try Self.headers(headers)
+        if inheritedHeaderOrigin == nil, !allHeaders.isEmpty {
+            inheritedHeaderOrigin = try policy.requireOrigin(for: url); rememberHeaderOrigin?(inheritedHeaderOrigin!)
+        }
+        if let owner = inheritedHeaderOrigin, !Self.sameOrigin(url, owner) {
+            // Only public HTTP negotiation fields inherit across hosts. A
+            // source can explicitly attach credentials to this request's URL
+            // options; source-wide private headers belong to their first host.
+            allHeaders = allHeaders.filter { ["accept", "accept-language", "user-agent", "content-type"].contains($0.key) }
+        }
         for (key, value) in try Self.headers(options["headers"] ?? options["header"]) { allHeaders[key] = value }
-        if allHeaders["cookie"] == nil, let value = cookies.header(for: url) { allHeaders["cookie"] = value }
+        if allHeaders["cookie"] == nil {
+            if let state { let saved = try state.cookies(for: url); if !saved.isEmpty { allHeaders["cookie"] = HTTPCookie.requestHeaderFields(with: saved)["Cookie"] } }
+            else if let value = cookies.header(for: url) { allHeaders["cookie"] = value }
+        }
         for (key, value) in allHeaders { request.setValue(value, forHTTPHeaderField: key) }
         if let body = options["body"] {
             guard method == "POST" else { throw LegadoRequestError.invalid("只有 POST 可以设置 body") }
@@ -180,13 +239,16 @@ final class LegadoHTTPExecutor {
         try control.check()
         responseBytes += data.count
         guard data.count <= 2 * 1024 * 1024, responseBytes <= 8 * 1024 * 1024,
-              let finalURL = response.url, Self.sameOrigin(finalURL, origin) else { throw LegadoRequestError.limit }
+              let finalURL = response.url else { throw LegadoRequestError.limit }
+        _ = try policy.requireOrigin(for: finalURL)
+        guard Self.sameOrigin(url, finalURL) else { throw LegadoRequestError.unsupported("跨主机重定向，请使用书源明确返回的线路") }
         var responseHeaders: [String: String] = [:]
         for (key, value) in response.allHeaderFields { responseHeaders[String(describing: key)] = String(describing: value) }
         cookies.store(responseHeaders, url: finalURL)
+        try state?.setCookies(HTTPCookie.cookies(withResponseHeaderFields: responseHeaders, for: finalURL), for: finalURL, expectedSessionRevision: control.sessionRevision)
         switch response.statusCode {
         case 200..<300: break
-        case 401, 403: throw ContentFailure.authenticationRequired
+        case 401, 403: try control.mutateSession { try state?.expire() }; throw ContentFailure.authenticationRequired
         case 429: throw ContentFailure.rateLimited
         case 404: throw ContentFailure.missingChapter
         default: throw ContentFailure.unavailable

@@ -101,6 +101,12 @@ struct RichDiscoverySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             if !routes.isEmpty { categoryControls }
+            else {
+                ForEach(browseCategories) { category in
+                    Text(category.title).font(.subheadline).foregroundStyle(appAppearance.palette.muted)
+                        .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+                }
+            }
             if !filters.isEmpty { filterControls }
             HStack {
                 SectionHeading(title: model.selected?.title ?? "来源发现", subtitle: "\(model.books.count) 部作品")
@@ -135,7 +141,8 @@ struct RichDiscoverySection: View {
         .onDisappear { model.cancel() }
         .sheet(isPresented: $showCategories) { categoriesPanel }
         .sheet(item: $activeFilter) { category in filterPanel(category) }
-        .onChange(of: sourceID) { _, _ in activeFilter = nil; showCategories = false; expandedFilters = true }
+        .onChange(of: key) { _, _ in activeFilter = nil; showCategories = false }
+        .onChange(of: sourceID) { _, _ in expandedFilters = true }
     }
 
     private var categoryControls: some View {

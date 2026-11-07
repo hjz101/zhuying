@@ -95,18 +95,36 @@ private extension DiscoveryFlowTests {
             let clearance = min(22, frame.height / 2)
             return !frame.isEmpty && frame.midY - clearance >= visible.minY && frame.midY + clearance <= visible.maxY
         }
-        // Only vertical gestures are used: no filter or category may depend on
-        // horizontal swiping. Scan both ways for lazily instantiated rows.
-        for _ in 0..<10 {
-            if safelyHittable() { return }
-            if element.exists && element.frame.midY < viewport().minY + 22 { app.swipeDown() }
-            else { app.swipeUp() }
+        func shortVerticalDrag(upward: Bool) {
+            let visible = viewport(), screen = app.frame
+            let origin = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            func point(_ fraction: CGFloat) -> XCUICoordinate {
+                origin.withOffset(CGVector(dx: visible.midX - screen.minX, dy: visible.minY + visible.height * fraction - screen.minY))
+            }
+            // Stay inside the content, move only 30% of its height and stop
+            // while still touching it so a short screen cannot fling past a row.
+            point(upward ? 0.65 : 0.35).press(forDuration: 0.05,
+                thenDragTo: point(upward ? 0.35 : 0.65), withVelocity: .slow, thenHoldForDuration: 0.2)
         }
-        for _ in 0..<12 {
+        var recentFrames: [String] = []
+        // Only vertical gestures are used. Existing rows guide each step;
+        // absent lazy rows get a bounded upward scan followed by a downward scan.
+        for attempt in 0..<24 {
             if safelyHittable() { return }
-            app.swipeDown()
+            let visible = viewport()
+            let frame = element.exists ? element.frame : .zero
+            recentFrames.append("\(attempt): frame=\(frame), viewport=\(visible)")
+            if recentFrames.count > 4 { recentFrames.removeFirst() }
+            let upward: Bool
+            if !frame.isEmpty {
+                let clearance = min(22, frame.height / 2)
+                if frame.midY - clearance < visible.minY { upward = false }
+                else if frame.midY + clearance > visible.maxY { upward = true }
+                else { upward = frame.midY >= visible.midY }
+            } else { upward = attempt < 12 }
+            shortVerticalDrag(upward: upward)
         }
-        XCTAssertTrue(safelyHittable(), "Element frame: \(element.frame); safe viewport: \(viewport())\n" + app.debugDescription)
+        XCTAssertTrue(safelyHittable(), "Element frame: \(element.frame); safe viewport: \(viewport()); last steps: \(recentFrames)\n" + app.debugDescription)
     }
     @MainActor func assertDiscoveryControlFits(_ element: XCUIElement, app: XCUIApplication) {
         revealDiscoveryControl(element, app: app)

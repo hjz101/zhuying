@@ -74,19 +74,39 @@ private extension DiscoveryFlowTests {
         return app
     }
     @MainActor func revealDiscoveryControl(_ element: XCUIElement, app: XCUIApplication) {
+        // A scrolled-away SwiftUI button can report isHittable even when its
+        // frame is under the status/search bars. Require a real 44pt tap area
+        // inside the visible content before using its center.
+        func viewport() -> CGRect {
+            let screen = app.frame
+            let navigationBars = app.navigationBars.allElementsBoundByIndex
+            let foregroundBars = navigationBars.filter(\.isHittable)
+            let bars = (foregroundBars.isEmpty ? Array(navigationBars.suffix(1)) : foregroundBars).map(\.frame)
+                .filter { !$0.isEmpty && $0.intersects(screen) }
+            let top = max(screen.minY + 44, (bars.map(\.maxY).max() ?? screen.minY) + 8)
+            let tabs = app.tabBars.allElementsBoundByIndex.filter(\.isHittable).map(\.frame)
+                .filter { !$0.isEmpty && $0.intersects(screen) }
+            let bottom = min(screen.maxY - 24, (tabs.map(\.minY).min() ?? screen.maxY) - 8)
+            return CGRect(x: screen.minX, y: top, width: screen.width, height: max(0, bottom - top))
+        }
+        func safelyHittable() -> Bool {
+            guard element.exists, element.isHittable else { return false }
+            let frame = element.frame, visible = viewport()
+            let clearance = min(22, frame.height / 2)
+            return !frame.isEmpty && frame.midY - clearance >= visible.minY && frame.midY + clearance <= visible.maxY
+        }
         // Only vertical gestures are used: no filter or category may depend on
         // horizontal swiping. Scan both ways for lazily instantiated rows.
         for _ in 0..<10 {
-            if element.exists && element.isHittable { return }
-            let top = app.navigationBars.firstMatch.frame.maxY
-            if element.exists && element.frame.maxY < top { app.swipeDown() }
+            if safelyHittable() { return }
+            if element.exists && element.frame.midY < viewport().minY + 22 { app.swipeDown() }
             else { app.swipeUp() }
         }
         for _ in 0..<12 {
-            if element.exists && element.isHittable { return }
+            if safelyHittable() { return }
             app.swipeDown()
         }
-        XCTAssertTrue(element.isHittable, app.debugDescription)
+        XCTAssertTrue(safelyHittable(), "Element frame: \(element.frame); safe viewport: \(viewport())\n" + app.debugDescription)
     }
     @MainActor func assertDiscoveryControlFits(_ element: XCUIElement, app: XCUIApplication) {
         revealDiscoveryControl(element, app: app)

@@ -85,8 +85,9 @@ struct ReaderView: View {
             let layout = ReaderLayout(settings: store.settings, size: geo.size)
             ZStack(alignment: .topLeading) {
                 if initialized && rendered != nil && store.settings.mode == .scroll {
-                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID + narrationRestoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { commentParagraph = $0 }, onManualScroll: { detachNarration() })
+                    ContinuousReaderText(document: document, anchor: anchor, layoutID: key, restoreID: restoreID + narrationRestoreID, turn: turn, onAnchor: updateAnchor, onTap: handleTap, onBoundary: { goChapter(chapter + ($0 ? 1 : -1), atEnd: !$0) }, insets: layout.scrollInsets, onComment: { commentParagraph = $0 }, onManualScroll: { detachNarration(); controlsVisible = false })
                         .frame(width: layout.scrollFrame.width, height: layout.scrollFrame.height)
+                        .clipped()
                         .position(x: layout.scrollFrame.midX, y: layout.scrollFrame.midY)
                 } else if initialized && !ranges.isEmpty {
                     if ranges.indices.contains(page) {

@@ -180,7 +180,12 @@ struct ThemePageStyle: ViewModifier {
     @Environment(\.themeAppearance) private var appearance
     var role: String
     func body(content: Content) -> some View {
-        content.background(ThemeSurface(role: role).ignoresSafeArea()).background(ThemeNavigationAppearance().frame(width: 0, height: 0)).foregroundStyle(appearance.palette.green)
+        content
+            .contentMargins(.vertical, 12, for: .scrollContent)
+            // Only the backdrop extends behind native chrome. Scrolling rows
+            // stay inside the page's safe viewport, including overscroll.
+            .clipped()
+            .background(ThemeSurface(role: role).ignoresSafeArea()).background(ThemeNavigationAppearance().frame(width: 0, height: 0)).foregroundStyle(appearance.palette.green)
             .tint(appearance.palette.primary)
             .toolbarBackground(appearance.palette.background, for: .navigationBar, .tabBar)
             .toolbarBackground(.visible, for: .navigationBar, .tabBar)

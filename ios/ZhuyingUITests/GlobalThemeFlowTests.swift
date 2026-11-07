@@ -2,6 +2,24 @@ import XCTest
 import UIKit
 
 final class GlobalThemeFlowTests: XCTestCase {
+    @MainActor func testPageEndsRemainVisibleBetweenNativeBarsAfterScrolling() {
+        let app = launch()
+        app.tabBars.buttons["我的"].tap()
+        let first = app.staticTexts["profileEditorialTitle"]
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        for _ in 0..<5 { app.swipeUp() }
+        let last = app.buttons["allTools"]
+        XCTAssertTrue(last.exists, app.debugDescription)
+        XCTAssertGreaterThanOrEqual(last.frame.minY, app.navigationBars.firstMatch.frame.maxY)
+        XCTAssertLessThanOrEqual(last.frame.maxY, app.tabBars.firstMatch.frame.minY)
+        XCTAssertTrue(last.isHittable)
+        capture(app, "竹影-页面底部安全边界")
+        for _ in 0..<5 { app.swipeDown() }
+        XCTAssertGreaterThanOrEqual(first.frame.minY, app.navigationBars.firstMatch.frame.maxY)
+        XCTAssertLessThanOrEqual(first.frame.maxY, app.tabBars.firstMatch.frame.minY)
+        XCTAssertTrue(first.isHittable)
+        capture(app, "竹影-页面顶部安全边界")
+    }
     @MainActor private func launch(preserve: Bool = false, inkMountain: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()

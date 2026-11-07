@@ -684,12 +684,8 @@ final class ReaderFlowTests: XCTestCase {
         assertFloatingToolbar(in: app)
         capture(app, name: "FloatingReaderToolbar")
         text.swipeUp()
-        let frame = text.frame
-        let progress = app.staticTexts["readerPageStatus"].label
-        // UITextView.tap() can choose its top-left accessibility hit point,
-        // which now sits under the overlaid back button. Tap the actual center.
-        text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         assertReaderControlsHidden(in: app)
+        let frame = text.frame
         XCTAssertGreaterThan(text.frame.height, app.frame.height * 0.82, "Hidden controls must not reserve space above or below the text")
         XCTAssertGreaterThan(text.frame.maxY, app.frame.maxY - 65, "The text viewport must reach the bottom safe area")
         XCTAssertEqual(text.frame, frame, "Toggling the overlay must not resize or reflow the text")
@@ -700,6 +696,10 @@ final class ReaderFlowTests: XCTestCase {
         text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         assertFloatingToolbar(in: app)
         XCTAssertEqual(text.frame, frame)
+        let progress = app.staticTexts["readerPageStatus"].label
+        text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        assertReaderControlsHidden(in: app)
+        text.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertEqual(app.staticTexts["readerPageStatus"].label, progress)
 
         // Safe-area layout also fills the shorter viewport after rotation.

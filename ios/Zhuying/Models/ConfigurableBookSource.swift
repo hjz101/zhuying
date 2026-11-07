@@ -133,8 +133,12 @@ protocol DiscoveryBookSource: BookSource {
     var supportsDiscovery: Bool { get }
     func discover(category: String,page: Int) async throws -> BookSearchPage
     func discoveryCategories() async throws -> [SourceDiscoveryCategory]
+    func applyDiscoveryFilter(category: SourceDiscoveryCategory, value: String) async throws -> SourceDiscoveryFilterResult
 }
 extension DiscoveryBookSource {
+    func applyDiscoveryFilter(category: SourceDiscoveryCategory, value: String) async throws -> SourceDiscoveryFilterResult {
+        throw SourceImportError.message("此书源暂不支持发现筛选操作。")
+    }
     func discoveryCategories() async throws -> [SourceDiscoveryCategory] { [.init(title: "全部", request: "全部")] }
 }
 struct ConfigurableBookSource: DiscoveryBookSource {

@@ -90,6 +90,14 @@ actor OnlineReadingService {
         let categories = try await provider.discoveryCategories()
         try Task.checkCancellation(); guard revision == generation else { throw CancellationError() }; return categories
     }
+    func applyDiscoveryFilter(sourceID: String, category: SourceDiscoveryCategory, value: String) async throws -> SourceDiscoveryFilterResult {
+        guard let provider = providers[sourceID] as? any DiscoveryBookSource, provider.supportsDiscovery else {
+            throw SourceImportError.message("此书源暂不支持发现筛选操作。")
+        }
+        let revision = generation
+        let result = try await provider.applyDiscoveryFilter(category: category, value: value)
+        try Task.checkCancellation(); guard revision == generation else { throw CancellationError() }; return result
+    }
     func discover(category: String,page: Int,subscribed: Set<String>) async throws -> BookSearchPage {
         let enabled: [any BookSource] = providers.values.compactMap { source in
             guard subscribed.contains(source.sourceID), let provider = source as? any DiscoveryBookSource, provider.supportsDiscovery else { return nil }

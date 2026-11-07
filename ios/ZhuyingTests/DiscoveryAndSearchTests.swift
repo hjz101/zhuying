@@ -41,6 +41,27 @@ private actor SearchSelectionFixture: DiscoveryBookSource {
     func document(for chapter: ChapterRecord, book: LibraryBookRecord) async throws -> ChapterDocument { .init(chapterID: chapter.id, paragraphs: ["原创正文"]) }
 }
 
+private final class DiscoveryFilterVault: LegadoSecretVault {
+    private var values: [String: Data] = [:]
+    private let lock = NSLock()
+    func read(id: String) throws -> Data? { lock.lock(); defer { lock.unlock() }; return values[id] }
+    func save(_ data: Data, id: String) throws { lock.lock(); defer { lock.unlock() }; values[id] = data }
+    func remove(id: String) throws { lock.lock(); defer { lock.unlock() }; values[id] = nil }
+}
+private actor DiscoveryFilterTransport: HTTPTransport {
+    private(set) var requests: [URLRequest] = []
+    var fails = false
+    func fail(_ value: Bool) { fails = value }
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        requests.append(request)
+        if fails { throw ContentFailure.unavailable }
+        let url = request.url!
+        let mode = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "mode" }?.value ?? "不限"
+        let object: [String: Any] = ["books": [["name": "筛选作品·" + mode, "author": "原创作者", "url": "/book/" + (mode == "不限" ? "all" : "filtered")]]]
+        return (try JSONSerialization.data(withJSONObject: object), HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!)
+    }
+}
+
 final class DiscoveryAndSearchTests: XCTestCase {
     private func makeService(_ sources: [any BookSource]) async throws -> (OnlineReadingService, URL) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -53,6 +74,133 @@ final class DiscoveryAndSearchTests: XCTestCase {
                                   "ruleSearch": list, "ruleExplore": list, "ruleToc": ["chapterList": "$.chapters[*]", "chapterName": "$.name", "chapterUrl": "$.url"], "ruleContent": ["content": "$.text"]]
         var value = DemoSource(id: "discovery-source", name: "竹影原创发现", detail: "", url: "https://discovery.fixture/")
         value.configuration = try JSONSerialization.data(withJSONObject: row); return value
+    }
+    private func filterSource(action: String? = nil) throws -> DemoSource {
+        let action = action ?? "show(infoMap['任意维度'],'mode')"
+        let encoded = String(decoding: try JSONEncoder().encode(action), as: UTF8.self)
+        let choices = String(decoding: try JSONEncoder().encode(["不限", "选项\"\\换行\n内容';throw new Error('不得作为脚本')"]), as: UTF8.self)
+        var value = try source(explore: """
+        @js:
+        if(!source.getVariable()) source.setVariable(JSON.stringify({mode:'不限',keep:'保留字段'}));
+        var filterConfig=JSON.parse(source.getVariable());
+        JSON.stringify([
+          {title:'任意分组'},
+          {title:'任意维度',type:'select',chars:\(choices),default:filterConfig.mode,action:\(encoded)},
+          {title:'辅助维度',type:'select',choices:filterConfig.mode==='不限'?['辅助甲','辅助乙']:['变化后的平台'],default:filterConfig.mode==='不限'?'辅助甲':'变化后的平台',action:'java.toast(infoMap["辅助维度"])'},
+          {title:'榜单',url:'/rank?mode='+encodeURIComponent(filterConfig.mode)+'&page={{page}}'}
+        ])
+        """)
+        var row = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(value.configuration)) as? [String: Any])
+        row["jsLib"] = """
+        function show(m,t){
+          var data=JSON.parse(source.getVariable());
+          data[t]=m; data.actionCount=(data.actionCount||0)+1;
+          data.otherBinding=infoMap['辅助维度'];
+          data.resultBinding=result; data.valueBinding=value;
+          source.setVariable(JSON.stringify(data)); java.refreshExplore();
+        }
+        """
+        value.configuration = try JSONSerialization.data(withJSONObject: row)
+        return value
+    }
+    func testSelectFilterParserKeepsSourceChoicesDefaultsAndActionsWithoutInventingHeaders() throws {
+        let json = #"[{"title":"自定义维度","type":"select","chars":["不限","选项甲","选项甲"],"default":"选项甲","action":"show(infoMap['自定义维度'],'customKey')"},{"title":"另一个维度","type":"select","choices":["甲","乙"],"default":"源提供的默认值","action":"java.toast(result)"},{"title":"纯说明"}]"#
+        let categories = try SourceDiscoveryCategory.parse(json)
+        XCTAssertTrue(categories[0].isFilter); XCTAssertFalse(categories[0].isHeader); XCTAssertFalse(categories[0].readable)
+        XCTAssertEqual(categories[0].filter?.choices, ["不限", "选项甲"])
+        XCTAssertEqual(categories[0].filter?.selectedValue, "选项甲")
+        XCTAssertEqual(categories[0].filter?.action, "show(infoMap['自定义维度'],'customKey')")
+        XCTAssertEqual(categories[1].filter?.selectedValue, "源提供的默认值")
+        XCTAssertTrue(categories[2].isHeader)
+        let empty = try XCTUnwrap(SourceDiscoveryCategory.parse(#"[{"title":"当前无平台","type":"select","chars":[],"default":"","action":"noop()"}]"#).first)
+        XCTAssertTrue(empty.isFilter); XCTAssertFalse(empty.isHeader)
+        XCTAssertEqual(empty.filter?.choices, []); XCTAssertEqual(empty.filter?.selectedValue, "")
+        for invalid in [
+            #"[{"title":"筛选","type":"select","chars":"甲乙","action":"noop()"}]"#,
+            #"[{"title":"筛选","type":"select","chars":["甲",3],"action":"noop()"}]"#,
+            #"[{"title":"筛选","type":"select","chars":["甲"],"action":""}]"#
+        ] { XCTAssertThrowsError(try SourceDiscoveryCategory.parse(invalid)) }
+    }
+    @MainActor func testConfirmedFilterActionBindsStringAndAllFieldsPersistsWithoutLoginAndReloadsCurrentBooks() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let vault = DiscoveryFilterVault()
+        let state = try LegadoPersistentState(sourceID: "filter-source", accountID: "reader", libraryProfile: "tests", directory: directory, vault: vault)
+        let transport = DiscoveryFilterTransport(), source = try filterSource()
+        let adapter = try LegadoBookSource(source: source, transport: transport, state: state)
+        let (service, root) = try await makeService([adapter]); defer { try? FileManager.default.removeItem(at: root) }
+        let store = OnlineDiscoveryStore(); store.open(sourceID: adapter.sourceID, service: service)
+        try await wait { !store.busy }
+        XCTAssertEqual(store.books.first?.title, "筛选作品·不限")
+        let filter = try XCTUnwrap(store.categories.first { $0.isFilter })
+        let value = try XCTUnwrap(filter.filter?.choices.last)
+        let epoch = state.sessionRevision, status = state.authStatus
+        store.applyFilter(filter, value: "不存在的选项", service: service)
+        XCTAssertFalse(store.busy); XCTAssertEqual(store.books.first?.title, "筛选作品·不限")
+        store.applyFilter(filter, value: value, service: service)
+        XCTAssertEqual(store.books.first?.title, "筛选作品·不限", "Keep accepted books until the new request succeeds")
+        try await wait { !store.busy }
+        XCTAssertNil(store.message); XCTAssertEqual(store.selected?.title, "榜单")
+        XCTAssertEqual(store.books.first?.title, "筛选作品·" + value)
+        XCTAssertEqual(store.categories.first { $0.isFilter }?.filter?.selectedValue, value)
+        XCTAssertEqual(store.categories.first { $0.title == "辅助维度" }?.filter?.choices, ["变化后的平台"])
+        XCTAssertEqual(store.categories.first { $0.title == "辅助维度" }?.filter?.selectedValue, "变化后的平台")
+        XCTAssertEqual(state.sessionRevision, epoch); XCTAssertEqual(state.authStatus, status)
+        XCTAssertTrue(try state.getLoginInfo().isEmpty)
+        let reopened = try LegadoPersistentState(sourceID: "filter-source", accountID: "reader", libraryProfile: "tests", directory: directory, vault: vault)
+        let variables = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(reopened.getVariable("source:variable").utf8)) as? [String: Any])
+        XCTAssertEqual(variables["mode"] as? String, value); XCTAssertEqual(variables["keep"] as? String, "保留字段")
+        XCTAssertEqual(variables["actionCount"] as? Int, 1)
+        XCTAssertEqual(variables["otherBinding"] as? String, "辅助甲")
+        XCTAssertEqual(variables["resultBinding"] as? String, value); XCTAssertEqual(variables["valueBinding"] as? String, value)
+        let newAdapter = try LegadoBookSource(source: source, transport: transport, state: reopened)
+        let reopenedCategories = try await newAdapter.discoveryCategories()
+        XCTAssertEqual(reopenedCategories.first { $0.isFilter }?.filter?.selectedValue, value)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 2, "refreshExplore only regenerates controls; it makes no hidden HTTP request")
+    }
+    @MainActor func testFilterActionAndReloadErrorsKeepAcceptedCategoriesAndBooks() async throws {
+        let transport = DiscoveryFilterTransport()
+        let adapter = try LegadoBookSource(source: filterSource(action: "throw new Error('original fixture failure')"), transport: transport)
+        let (service, root) = try await makeService([adapter]); defer { try? FileManager.default.removeItem(at: root) }
+        let store = OnlineDiscoveryStore(); store.open(sourceID: adapter.sourceID, service: service)
+        try await wait { !store.busy }
+        let oldBooks = store.books, oldCategories = store.categories, oldSelected = store.selected
+        let filter = try XCTUnwrap(store.categories.first { $0.isFilter })
+        store.applyFilter(filter, value: try XCTUnwrap(filter.filter?.choices.last), service: service)
+        try await wait { !store.busy }
+        XCTAssertNotNil(store.message); XCTAssertNil(store.feedback)
+        XCTAssertEqual(store.books, oldBooks); XCTAssertEqual(store.categories, oldCategories); XCTAssertEqual(store.selected, oldSelected)
+        let successfulAdapter = try LegadoBookSource(source: filterSource(), transport: transport)
+        await service.configure(sources: [successfulAdapter])
+        store.open(sourceID: successfulAdapter.sourceID, service: service)
+        try await wait { !store.busy }
+        let beforeFailure = store.books, beforeCategories = store.categories
+        let nextFilter = try XCTUnwrap(store.categories.first { $0.isFilter })
+        await transport.fail(true)
+        store.applyFilter(nextFilter, value: try XCTUnwrap(nextFilter.filter?.choices.last), service: service)
+        try await wait { !store.busy }
+        XCTAssertNotNil(store.message); XCTAssertNil(store.feedback)
+        XCTAssertEqual(store.books, beforeFailure); XCTAssertEqual(store.categories, beforeCategories)
+    }
+    @MainActor func testCancelBeforeConfirmedFilterTaskStartsDoesNotExecuteActionOrChangeSourceVariable() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let state = try LegadoPersistentState(sourceID: "filter-cancel", accountID: "reader", libraryProfile: "tests", directory: directory, vault: DiscoveryFilterVault())
+        let transport = DiscoveryFilterTransport(), adapter = try LegadoBookSource(source: filterSource(), transport: transport, state: state)
+        let (service, root) = try await makeService([adapter]); defer { try? FileManager.default.removeItem(at: root) }
+        let store = OnlineDiscoveryStore(); store.open(sourceID: adapter.sourceID, service: service)
+        try await wait { !store.busy }
+        let before = try state.getVariable("source:variable"), books = store.books
+        let filter = try XCTUnwrap(store.categories.first { $0.isFilter })
+        let value = try XCTUnwrap(filter.filter?.choices.last)
+        store.applyFilter(filter, value: value, service: service); store.cancel()
+        // This queued operation has not crossed its explicit cancellation check.
+        let pending = Task { try await adapter.applyDiscoveryFilter(category: filter, value: value) }; pending.cancel()
+        do { _ = try await pending.value; XCTFail("Cancelled filter action must not run") } catch is CancellationError { }
+        XCTAssertEqual(try state.getVariable("source:variable"), before); XCTAssertEqual(store.books, books)
+        XCTAssertNil(store.feedback); XCTAssertFalse(store.busy)
+        let requests = await transport.requests; XCTAssertEqual(requests.count, 1)
     }
     func testStaticAndJSONExploreCategoriesPreserveRequestDescriptorsAndBounds() throws {
         let staticRows = try SourceDiscoveryCategory.parse("排行榜::/rank?page={{page}}&&推荐::/hot\n登录::@js:java.toast('已打开')")

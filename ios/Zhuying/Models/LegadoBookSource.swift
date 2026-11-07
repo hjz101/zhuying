@@ -204,6 +204,12 @@ struct LegadoBookSource: DiscoveryBookSource, @unchecked Sendable {
     func discoveryCategories() async throws -> [SourceDiscoveryCategory] {
         try await operation { try $0.discoveryCategories() }
     }
+    func applyDiscoveryFilter(category: SourceDiscoveryCategory, value: String) async throws -> SourceDiscoveryFilterResult {
+        guard let filter = category.filter, filter.choices.contains(value), value.utf8.count <= 16 * 1024 else {
+            throw LegadoCompatibilityError.invalid("exploreUrl 筛选选值")
+        }
+        return try await operation { try $0.applyDiscoveryFilter(category: category, value: value) }
+    }
     func discover(category: String, page: Int) async throws -> BookSearchPage {
         guard supportsDiscovery, (1...100).contains(page), category.utf8.count <= 64 * 1024 else { throw ContentFailure.invalidResponse }
         return try await operation { try $0.discover(category: category, page: page) }
@@ -238,6 +244,7 @@ private final class LegadoSourceWorker {
     private var bookIdentity = ""
     private var chapterIdentity = ""
     private var useReplaceRule: Bool?
+    private var exploreRefreshRequested = false
     private var engine: LegadoRuleEngine { LegadoRuleEngine(context: context) }
 
     init(sourceID: String, definition: LegadoSourceDefinition, http: LegadoHTTPExecutor, shared: LegadoSourceSession, maximumPages: Int) {
@@ -403,6 +410,30 @@ private final class LegadoSourceWorker {
         try configure()
         let value = try withRuleField(.exploreURL) { try engine.template(definition.exploreURL, baseURL: currentURL) }
         return try SourceDiscoveryCategory.parse(value)
+    }
+    func applyDiscoveryFilter(category: SourceDiscoveryCategory, value: String) throws -> SourceDiscoveryFilterResult {
+        let available = try discoveryCategories()
+        guard let current = available.first(where: { $0.id == category.id }), let filter = current.filter,
+              filter.choices.contains(value) else { throw LegadoCompatibilityError.invalid("exploreUrl 筛选选值") }
+        var infoMap: [String: String] = [:]
+        for item in available { if let filter = item.filter { infoMap[item.title] = filter.selectedValue } }
+        infoMap[current.title] = value
+        bindings["infoMap"] = infoMap; bindings["result"] = value; bindings["value"] = value
+        context.bindings = bindings
+        defer {
+            bindings.removeValue(forKey: "infoMap"); bindings.removeValue(forKey: "result"); bindings.removeValue(forKey: "value")
+            context.bindings = bindings
+        }
+        var script = filter.action.trimmingCharacters(in: .whitespacesAndNewlines)
+        if script.hasPrefix("@js:") { script = String(script.dropFirst(4)) }
+        if script.hasPrefix("<js>"), script.hasSuffix("</js>") { script = String(script.dropFirst(4).dropLast(5)) }
+        _ = try withRuleField(.exploreURL) { try context.evaluateJS?(script, bindings) }
+        try http.control.check()
+        // refreshExplore requests no network itself. Regenerating after the
+        // confirmed action picks up its updated source variables in one place.
+        let categories = try discoveryCategories()
+        let feedback = shared.lastMessage.isEmpty ? (exploreRefreshRequested ? "已更新发现筛选。" : nil) : shared.lastMessage
+        return .init(categories: categories, feedback: feedback)
     }
     func discover(category: String, page: Int) throws -> BookSearchPage {
         let request: String
@@ -696,6 +727,7 @@ private final class LegadoSourceWorker {
                 guard args.count > 2, let offset = args[2] as? NSNumber, let zone = TimeZone(secondsFromGMT: offset.intValue / 1000) else { throw LegadoRequestError.invalid("UTC 时区偏移") }; formatter.timeZone = zone
             }
             return formatter.string(from: Date(timeIntervalSince1970: milliseconds.doubleValue / 1000))
+        case "java.refreshExplore": exploreRefreshRequested = true; return NSNull()
         case "java.toast", "java.longToast", "java.log":
             if method != "java.log" { shared.lastMessage = String(string(0).prefix(4096)) }; return NSNull()
         case "java.startBrowserAwait", "java.startBrowser", "java.showBrowser", "java.showReadingBrowser", "java.startBrowserDp": return try browser(method, args: args)

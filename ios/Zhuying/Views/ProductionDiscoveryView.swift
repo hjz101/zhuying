@@ -87,29 +87,21 @@ struct RichDiscoverySection: View {
     @StateObject private var model = OnlineDiscoveryStore()
     let sourceID: String
     @Binding var feedback: String?
+    @Environment(\.dynamicTypeSize) private var textSize
+    @State private var expandedFilters = true
+    @State private var showCategories = false
+    @State private var activeFilter: SourceDiscoveryCategory?
     private var key: String { sourceID + ":" + String(library.onlineRevision) }
+    private var filters: [SourceDiscoveryCategory] { model.categories.filter(\.isFilter) }
+    private var browseCategories: [SourceDiscoveryCategory] { model.categories.filter { !$0.isFilter } }
+    private var routes: [SourceDiscoveryCategory] { browseCategories.filter(\.readable) }
+    private var filterColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 10), count: textSize.isAccessibilitySize ? 1 : 2)
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 9) {
-                    ForEach(model.categories) { category in
-                        if category.isHeader {
-                            Text(category.title).font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(appAppearance.palette.muted)
-                                .padding(.horizontal, 17).frame(minHeight: 44)
-                                .accessibilityAddTraits(.isHeader)
-                                .accessibilityIdentifier("discovery-header-" + category.title)
-                        } else {
-                            Button { if let service = library.onlineService { model.select(category, service: service) } } label: {
-                                Text(category.title).font(.system(size: 13, weight: model.selected == category ? .semibold : .regular))
-                                    .padding(.horizontal, 17).frame(minHeight: 44)
-                                    .background(appAppearance.palette.primary.opacity(model.selected == category ? 0.17 : 0.06), in: Capsule())
-                            }.accessibilityAddTraits(model.selected == category ? .isSelected : [])
-                                .accessibilityIdentifier("discovery-category-" + category.title)
-                        }
-                    }
-                }
-            }
+            if !routes.isEmpty { categoryControls }
+            if !filters.isEmpty { filterControls }
             HStack {
                 SectionHeading(title: model.selected?.title ?? "来源发现", subtitle: "\(model.books.count) 部作品")
                 Spacer()
@@ -117,7 +109,7 @@ struct RichDiscoverySection: View {
                     ThemeIcon(systemName: "arrow.clockwise").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
                 }.disabled(model.busy).accessibilityLabel("刷新发现分类").accessibilityIdentifier("refreshDiscovery")
             }
-            if model.busy && model.books.isEmpty { ProgressView("正在读取书源发现") }
+            if model.busy { ProgressView(model.books.isEmpty ? "正在读取书源发现" : "正在更新筛选结果") }
             if let message = model.message {
                 Text(message).font(.system(size: 12)).foregroundStyle(appAppearance.palette.accent).accessibilityIdentifier("discoveryError")
                 Button("重试") { if let service = library.onlineService { model.refresh(service: service) } }
@@ -141,6 +133,163 @@ struct RichDiscoverySection: View {
         .task(id: key) { if let service = library.onlineService { model.open(sourceID: sourceID, service: service) } }
         .onChange(of: model.feedback) { _, message in feedback = message }
         .onDisappear { model.cancel() }
+        .sheet(isPresented: $showCategories) { categoriesPanel }
+        .sheet(item: $activeFilter) { category in filterPanel(category) }
+        .onChange(of: sourceID) { _, _ in activeFilter = nil; showCategories = false; expandedFilters = true }
+    }
+
+    private var categoryControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("浏览分类").font(.subheadline.weight(.semibold))
+                Spacer()
+                Button { showCategories = true } label: {
+                    HStack(spacing: 5) {
+                        Text("全部分类（\(routes.count)）")
+                        ThemeIcon(systemName: "square.grid.2x2")
+                    }.font(.subheadline).frame(minHeight: 44).contentShape(Rectangle())
+                }.accessibilityIdentifier("discoveryAllCategories")
+            }
+            DiscoveryFlowLayout(spacing: 8) {
+                ForEach(Array(routes.prefix(6))) { category in categoryButton(category) }
+            }
+            if let selected = model.selected, !routes.prefix(6).contains(where: { $0.id == selected.id }) {
+                Text("当前：" + selected.title).font(.footnote).foregroundStyle(appAppearance.palette.muted)
+                    .accessibilityIdentifier("discoveryCurrentCategory")
+            }
+        }.foregroundStyle(appAppearance.palette.green)
+    }
+    private func categoryButton(_ category: SourceDiscoveryCategory) -> some View {
+        Button { chooseCategory(category) } label: {
+            Text(category.title).font(.subheadline.weight(model.selected?.id == category.id ? .semibold : .regular))
+                .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16).padding(.vertical, 10).frame(minHeight: 44)
+                .background(appAppearance.palette.primary.opacity(model.selected?.id == category.id ? 0.17 : 0.06), in: Capsule())
+                .contentShape(Capsule())
+        }.disabled(model.busy).accessibilityAddTraits(model.selected?.id == category.id ? .isSelected : [])
+            .accessibilityIdentifier("discovery-category-" + category.title)
+    }
+    private var filterControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button { expandedFilters.toggle() } label: {
+                HStack(spacing: 8) {
+                    ThemeIcon(systemName: "line.3.horizontal.decrease")
+                    Text("筛选").font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(expandedFilters ? "收起" : "展开").font(.footnote)
+                    ThemeIcon(systemName: expandedFilters ? "chevron.up" : "chevron.down").font(.footnote)
+                }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+            }.accessibilityIdentifier("discoveryFiltersToggle").accessibilityValue(expandedFilters ? "已展开" : "已收起")
+            if expandedFilters {
+                LazyVGrid(columns: filterColumns, alignment: .leading, spacing: 10) {
+                    ForEach(filters) { category in
+                        Button { activeFilter = category } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(category.title).font(.caption).foregroundStyle(appAppearance.palette.muted)
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(category.filter?.choices.isEmpty == true ? "暂无选项" : (category.filter?.selectedValue.isEmpty == false ? category.filter!.selectedValue : "请选择"))
+                                        .font(.subheadline.weight(.medium)).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 0)
+                                    ThemeIcon(systemName: "chevron.down").font(.caption)
+                                }
+                            }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .padding(12).background(appAppearance.palette.primary.opacity(0.06), in: .rect(cornerRadius: 12))
+                                .contentShape(Rectangle())
+                        }.disabled(model.busy || category.filter?.choices.isEmpty == true).accessibilityLabel(category.title)
+                            .accessibilityValue(category.filter?.selectedValue ?? "请选择")
+                            .accessibilityIdentifier("discovery-filter-" + category.title)
+                    }
+                }
+            } else {
+                Text(filters.compactMap { item in item.filter.map { item.title + "：" + $0.selectedValue } }.joined(separator: " · "))
+                    .font(.footnote).foregroundStyle(appAppearance.palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }.padding(16).foregroundStyle(appAppearance.palette.green)
+            .background(appAppearance.palette.card, in: .rect(cornerRadius: 16))
+    }
+    private var categoriesPanel: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    ForEach(browseCategories) { category in
+                        if category.isHeader {
+                            Text(category.title).font(.subheadline.weight(.semibold))
+                                .foregroundStyle(appAppearance.palette.muted).padding(.top, 12)
+                                .accessibilityAddTraits(.isHeader)
+                        } else {
+                            Button { chooseCategory(category); showCategories = false } label: {
+                                HStack(spacing: 12) {
+                                    Text(category.title).fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 8)
+                                    if model.selected?.id == category.id { ThemeIcon(systemName: "checkmark") }
+                                }.font(.body).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .padding(12).background(appAppearance.palette.primary.opacity(model.selected?.id == category.id ? 0.14 : 0.05), in: .rect(cornerRadius: 12))
+                                    .contentShape(Rectangle())
+                            }.disabled(model.busy).accessibilityIdentifier("discovery-category-" + category.title)
+                                .accessibilityAddTraits(model.selected?.id == category.id ? .isSelected : [])
+                        }
+                    }
+                }.padding(20)
+            }.appPageStyle().navigationTitle("全部分类").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showCategories = false } } }
+        }.presentationDetents([.large]).presentationDragIndicator(.visible)
+            .presentationBackground(appAppearance.palette.background)
+    }
+    private func filterPanel(_ category: SourceDiscoveryCategory) -> some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    ForEach(category.filter?.choices ?? [], id: \.self) { value in
+                        Button {
+                            activeFilter = nil
+                            if let service = library.onlineService { model.applyFilter(category, value: value, service: service) }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(value).fixedSize(horizontal: false, vertical: true)
+                                Spacer(minLength: 8)
+                                if value == category.filter?.selectedValue { ThemeIcon(systemName: "checkmark.circle.fill") }
+                            }.font(.body).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .padding(12).background(appAppearance.palette.primary.opacity(value == category.filter?.selectedValue ? 0.14 : 0.05), in: .rect(cornerRadius: 12))
+                                .contentShape(Rectangle())
+                        }.accessibilityIdentifier("discovery-option-" + value)
+                            .accessibilityAddTraits(value == category.filter?.selectedValue ? .isSelected : [])
+                    }
+                }.padding(20)
+            }.appPageStyle().navigationTitle(category.title).navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("取消") { activeFilter = nil } } }
+        }.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+            .presentationBackground(appAppearance.palette.background)
+    }
+    private func chooseCategory(_ category: SourceDiscoveryCategory) {
+        if let service = library.onlineService { model.select(category, service: service) }
+    }
+}
+
+/// Category labels wrap to the available width, including larger text sizes.
+private struct DiscoveryFlowLayout: Layout {
+    var spacing: CGFloat = 8
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrange(width: proposal.width ?? 320, subviews: subviews).size
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let layout = arrange(width: bounds.width, subviews: subviews)
+        for (index, frame) in layout.frames.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
+        }
+    }
+    private func arrange(width: CGFloat, subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
+        let limit = max(1, width)
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        var frames: [CGRect] = []
+        for view in subviews {
+            var size = view.sizeThatFits(ProposedViewSize(width: limit, height: nil))
+            size.width = min(size.width, limit)
+            if x > 0 && x + size.width > limit { x = 0; y += rowHeight + spacing; rowHeight = 0 }
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            x += size.width + spacing; rowHeight = max(rowHeight, size.height)
+        }
+        return (CGSize(width: limit, height: y + rowHeight), frames)
     }
 }
 

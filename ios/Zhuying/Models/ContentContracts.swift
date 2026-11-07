@@ -107,8 +107,11 @@ struct ChapterDocument: Codable, Equatable, Sendable {
     let version: String
     let paragraphs: [ContentParagraph]
     let originVersion: String?
+    /// Optional for compatibility with chapters cached before source comments.
+    /// Keys are prose paragraph IDs, never display offsets or generated cards.
+    let sourceComments: [String: SourceReaderComment]?
 
-    init(chapterID: String, paragraphs texts: [String],originVersion: String? = nil) {
+    init(chapterID: String, paragraphs texts: [String],originVersion: String? = nil, sourceComments: [Int: SourceReaderComment]? = nil) {
         self.chapterID = chapterID
         self.originVersion = originVersion
         version = StableContentID.list(texts)
@@ -118,6 +121,23 @@ struct ChapterDocument: Codable, Equatable, Sendable {
             let occurrence = occurrences[digest, default: 0]
             occurrences[digest] = occurrence + 1
             return ContentParagraph(id: StableContentID.make(chapterID, digest, String(occurrence)), text: text)
+        }
+        let stableParagraphs = paragraphs
+        self.sourceComments = sourceComments.map { comments in
+            Dictionary(uniqueKeysWithValues: comments.compactMap { index, comment in
+                stableParagraphs.indices.contains(index) ? (stableParagraphs[index].id, comment) : nil
+            })
+        }
+    }
+    var isCanonicalRawDocument: Bool {
+        let canonical = ChapterDocument(chapterID: chapterID, paragraphs: paragraphs.map(\.text))
+        guard originVersion == nil, version == canonical.version, paragraphs == canonical.paragraphs else { return false }
+        guard let sourceComments else { return true }
+        let ids = Set(paragraphs.map(\.id))
+        return sourceComments.count <= 5000 && sourceComments.allSatisfy { id, value in
+            ids.contains(id) && (0...1_000_000).contains(value.count) &&
+                (value.hotComment.map { $0.text.count <= 2000 && $0.author.count <= 256 } ?? true) &&
+                (value.url.map { ["http", "https"].contains($0.scheme ?? "") && $0.host != nil && $0.user == nil && $0.password == nil && $0.absoluteString.utf8.count <= 16 * 1024 } ?? true)
         }
     }
 }

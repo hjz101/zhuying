@@ -85,6 +85,35 @@ private actor LegadoGeneratedMetadataTransport: HTTPTransport {
 }
 
 final class LegadoBookSourceTests: XCTestCase {
+    func testScriptedContentPreservesParagraphCommentsThroughFileAndRecentCaches() async throws {
+        var source = try source(json: true)
+        var definition = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(source.configuration)) as? [String: Any])
+        let html = "<p>脚本返回的原创正文。<comment ident='https://fixture.test/paragraph?para=0' count='18'/></p><note text='原创神评文字' ident='https://fixture.test/paragraph?para=0'/>"
+        let literal = String(decoding: try JSONEncoder().encode(html), as: UTF8.self)
+        definition["ruleContent"] = ["content": "@js:" + literal]
+        source.configuration = try JSONSerialization.data(withJSONObject: definition)
+        let adapter = try LegadoBookSource(source: source, transport: LegadoFixtureTransport(json: true))
+        let search = try await adapter.search(query: "原创", page: 1)
+        let book = try await adapter.details(for: XCTUnwrap(search.books.first))
+        let catalog = try await adapter.chapters(for: book)
+        let chapter = try XCTUnwrap(catalog.first)
+        let document = try await adapter.document(for: chapter, book: book)
+        XCTAssertEqual(document.paragraphs.map(\.text), ["脚本返回的原创正文。"])
+        let paragraph = try XCTUnwrap(document.paragraphs.first)
+        XCTAssertEqual(document.sourceComments?[paragraph.id]?.count, 18)
+        XCTAssertEqual(document.sourceComments?[paragraph.id]?.hotComment?.text, "原创神评文字")
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let files = try FileChapterRepository(directory: root.appendingPathComponent("files"))
+        try await files.save(document)
+        let reopened = try FileChapterRepository(directory: root.appendingPathComponent("files"))
+        let restored = try await reopened.document(chapterID: document.chapterID)
+        XCTAssertEqual(restored, document)
+        let recent = try RecentChapterCache(directory: root.appendingPathComponent("recent"))
+        _ = try await recent.save(document, bookID: book.id, fingerprint: "original", protecting: nil)
+        let cached = try await recent.document(bookID: book.id, chapterID: chapter.id, fingerprint: "original")
+        XCTAssertEqual(cached, document)
+    }
     private func source(json: Bool = false, id: String = "original-legado", searchURL: String? = nil) throws -> DemoSource {
         var row: [String: Any] = [
             "bookSourceName": "竹影原创阅读规则回归", "bookSourceUrl": "https://fixture.test/",

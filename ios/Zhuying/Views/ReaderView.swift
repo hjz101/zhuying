@@ -51,6 +51,7 @@ struct ReaderView: View {
     @State private var showShelfPrompt = false
     @State private var showNarration = false
     @StateObject private var comments = ReaderCommentsModel()
+    @State private var commentUpgradeAttempts = Set<String>()
     private let readingTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     init(book: Book, initialChapter: Int, resume: Bool = true, startingAnchor: ReadingAnchor? = nil, repository: (any ChapterDocumentLoading)? = nil) {
@@ -72,11 +73,14 @@ struct ReaderView: View {
     private var commentTaskID: String { StableContentID.make(loaded?.chapterID ?? "",loaded?.version ?? "",loaded?.originVersion ?? "",String(restoreID),String(store.onlineRevision),shushan.credentialForRequests.map{ShushanCommentsClient(credential:$0).cacheScope} ?? "signed-out",String(store.settings.preferences.showCommentBubbles),String(store.settings.preferences.showGodComments)) }
     private var paragraphCounts: [Int:Int] {
         guard let loaded else { return [:] }
-        return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap { index,paragraph in guard let count = comments.counts[paragraph.id]?.count,count > 0 else { return nil }; return (index,count) })
+        return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap { index,paragraph in
+            let count = loaded.sourceComments?[paragraph.id]?.count ?? comments.counts[paragraph.id]?.count ?? 0
+            return count > 0 ? (index, count) : nil
+        })
     }
 
     private var paragraphHotComments: [Int:SourceComment] {
-        guard let loaded else { return [:] }; return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap{index,paragraph in comments.hotComments[paragraph.id].map{(index,$0)} })
+        guard let loaded else { return [:] }; return Dictionary(uniqueKeysWithValues:loaded.paragraphs.enumerated().compactMap{index,paragraph in (loaded.sourceComments?[paragraph.id]?.hotComment ?? comments.hotComments[paragraph.id]).map{(index,$0)} })
     }
 
     var body: some View {
@@ -228,6 +232,15 @@ struct ReaderView: View {
         }
         .task(id:commentTaskID) {
             comments.reset()
+            // Upgrade old, stripped Legado cache entries once. A failed refresh
+            // leaves the readable chapter intact and never loops requests.
+            if !store.isDemo, store.settings.preferences.showCommentBubbles || store.settings.preferences.showGodComments,
+               let loaded, loaded.sourceComments == nil, let sourceID = store.remoteMetadata(book.id)?.source?.sourceID,
+               let source = store.sources.first(where: { $0.id == sourceID && $0.enabled }),
+               (try? SourcePackages.legadoDefinition(source)) != nil, commentUpgradeAttempts.insert(loaded.chapterID).inserted {
+                refreshChapter()
+                return
+            }
             if store.settings.preferences.showCommentBubbles || store.settings.preferences.showGodComments,let credential = shushan.credentialForRequests,let client = store.commentClient(credential:credential),let context = commentContext,let loaded {
                 let processed = await store.contentProcessor.context(bookID:book.id,document:loaded)
                 if loaded.originVersion != nil && processed == nil { return }
@@ -237,7 +250,10 @@ struct ReaderView: View {
         }
         .sheet(isPresented: Binding(get: { commentParagraph != nil }, set: { if !$0 { commentParagraph = nil } })) {
             NavigationStack {
-                if !store.isDemo,let credential = shushan.credentialForRequests,let client = store.commentClient(credential:credential),let context = commentContext,let loaded,let paragraph = loaded.paragraphs[safe:commentParagraph ?? -1],let count = comments.counts[paragraph.id] {
+                if !store.isDemo, let loaded, let paragraph = loaded.paragraphs[safe: commentParagraph ?? -1], let annotation = loaded.sourceComments?[paragraph.id], let sourceID = store.remoteMetadata(book.id)?.source?.sourceID {
+                    SourceReaderCommentsView(sourceID: sourceID, paragraph: paragraph.text, annotation: annotation)
+                        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { commentParagraph = nil } } }
+                } else if !store.isDemo,let credential = shushan.credentialForRequests,let client = store.commentClient(credential:credential),let context = commentContext,let loaded,let paragraph = loaded.paragraphs[safe:commentParagraph ?? -1],let count = comments.counts[paragraph.id] {
                     ProductionCommentsView(client:client,context:context,paragraph:count,documentVersion:loaded.originVersion ?? loaded.version,originalText:comments.originalTexts[paragraph.id] ?? paragraph.text)
                         .id(commentTaskID + paragraph.id)
                         .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("完成") { commentParagraph = nil } } }

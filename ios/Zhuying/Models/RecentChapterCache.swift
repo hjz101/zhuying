@@ -45,7 +45,7 @@ actor RecentChapterCache {
         guard let bytes = try? Data(contentsOf: url), bytes.count == entry.bytes,
               FileResourceStore.digest(bytes) + ".json" == entry.filename,
               let document = try? JSONDecoder().decode(ChapterDocument.self, from: bytes), document.chapterID == chapterID,
-              document == ChapterDocument(chapterID: chapterID, paragraphs: document.paragraphs.map(\.text)) else { return nil }
+              document.isCanonicalRawDocument else { return nil }
         entry.accessedAt = now(); manifest.entries[chapterID] = entry
         return document
     }

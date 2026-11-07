@@ -51,7 +51,7 @@ actor FileChapterRepository: ChapterContentRepository {
         guard Self.digest(data) + ".json" == filename else { throw ContentFailure.storageFailure }
         let result = try JSONDecoder().decode(ChapterDocument.self, from: data)
         guard result.chapterID == chapterID,
-              result == ChapterDocument(chapterID: chapterID, paragraphs: result.paragraphs.map(\.text)) else { throw ContentFailure.storageFailure }
+              result.isCanonicalRawDocument else { throw ContentFailure.storageFailure }
         return result
     }
 
@@ -75,7 +75,7 @@ actor FileChapterRepository: ChapterContentRepository {
         for document in documents {
           guard !document.chapterID.isEmpty, !document.paragraphs.isEmpty,
               document.paragraphs.allSatisfy({ !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
-              document == ChapterDocument(chapterID: document.chapterID, paragraphs: document.paragraphs.map(\.text)) else { throw ContentFailure.invalidResponse }
+              document.isCanonicalRawDocument else { throw ContentFailure.invalidResponse }
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys

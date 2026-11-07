@@ -108,7 +108,10 @@ actor ContentProcessingStore {
             }
             guard !pairs.isEmpty else { throw RuleExtractionError.invalid("净化结果为空，保留有效正文。") }
             try Task.checkCancellation(); guard try revision() == version else { throw CancellationError() }
-            let document = ChapterDocument(chapterID:raw.chapterID,paragraphs:pairs.map(\.1),originVersion:raw.version),origins = Dictionary(uniqueKeysWithValues:document.paragraphs.enumerated().map{($0.element.id,pairs[$0.offset].0)})
+            let annotations = raw.sourceComments.map { comments in
+                Dictionary(uniqueKeysWithValues: pairs.enumerated().compactMap { index, pair in comments[pair.0].map { (index, $0) } })
+            }
+            let document = ChapterDocument(chapterID:raw.chapterID,paragraphs:pairs.map(\.1),originVersion:raw.version,sourceComments:annotations),origins = Dictionary(uniqueKeysWithValues:document.paragraphs.enumerated().map{($0.element.id,pairs[$0.offset].0)})
             let result = ProcessedChapter(raw:raw,document:document,origins:origins,rulesVersion:version),bytes = raw.paragraphs.reduce(0,{$0 + $1.text.utf16.count * 2}) + document.paragraphs.reduce(0,{$0 + $1.text.utf16.count * 2})
             cached[key] = .init(chapter:result,bytes:bytes); order.removeAll{$0 == key}; order.append(key)
             while order.count > 1 && (order.count > 3 || cached.values.reduce(0,{$0 + $1.bytes}) > 6 * 1024 * 1024) { cached.removeValue(forKey:order.removeFirst()) }

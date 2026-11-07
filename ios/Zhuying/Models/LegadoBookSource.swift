@@ -605,6 +605,8 @@ private final class LegadoSourceWorker {
             return ref.requestURL.map { otherURLs.contains($0.absoluteString) } ?? false
         }
         var pending = [chapter.nativeChapterID], visited = Set<String>(), paragraphs: [String] = []
+        var comments: [Int: SourceReaderComment] = [:]
+        var commentImageBytes = 0
         while !pending.isEmpty {
             let address = pending.removeFirst()
             guard visited.insert(address).inserted else { continue }
@@ -612,11 +614,19 @@ private final class LegadoSourceWorker {
             let response = try fetch(address)
             if otherURLs.contains(response.url.absoluteString) { break }
             let raw = try field(definition.content["content"], in: response.text, baseURL: response.url, location: .content)
-            let extracted = try Self.paragraphs(raw)
+            let extracted = try LegadoReaderContent.parse(raw, baseURL: response.url, allowedOrigins: http.policy.allowedOrigins) { imageURL in
+                guard commentImageBytes < 1024 * 1024 else { return "" }
+                let svg = try self.http.request(imageURL.absoluteString, baseURL: response.url, headers: self.headers).text
+                commentImageBytes += svg.utf8.count
+                return svg.utf8.count <= 256 * 1024 ? svg : ""
+            }
             // Split pages commonly repeat a paragraph at their boundary. Keep
             // repetitions elsewhere, where they may be intentional prose.
-            var additions = extracted
-            if let first = additions.first, paragraphs.last == first { additions.removeFirst() }
+            var additions = extracted.paragraphs
+            let repeated = additions.first.map { paragraphs.last == $0 } ?? false
+            let offset = paragraphs.count - (repeated ? 1 : 0)
+            if repeated { additions.removeFirst() }
+            for (index, comment) in extracted.comments { comments[offset + index] = comment }
             paragraphs += additions
             guard paragraphs.reduce(0, { $0 + $1.utf8.count }) <= 2 * 1024 * 1024 else { throw LegadoRequestError.limit }
             if let next = definition.content["nextContentUrl"], !next.isEmpty {
@@ -628,21 +638,7 @@ private final class LegadoSourceWorker {
             }
         }
         guard !paragraphs.isEmpty else { throw ContentFailure.missingChapter }
-        return .init(chapterID: chapter.id, paragraphs: paragraphs)
-    }
-
-    private static func paragraphs(_ value: String) throws -> [String] {
-        let broken = value.replacingOccurrences(of: #"(?i)<br\s*/?>|</(?:p|div|li|h[1-6])\s*>"#, with: "\n", options: .regularExpression)
-        let plain: String
-        if broken.contains("<"), broken.contains(">") {
-            // Fuzi nodes keep an unowned document reference. A temporary
-            // document can free the libxml tree before stringValue is read.
-            let parsed = try HTMLDocument(string: "<div>" + broken + "</div>")
-            plain = withExtendedLifetime(parsed) { parsed.root?.stringValue ?? broken }
-        }
-        else { plain = broken }
-        return plain.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
-            .components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return .init(chapterID: chapter.id, paragraphs: paragraphs, sourceComments: comments)
     }
 
     private func bridge(_ method: String, args: [Any]) throws -> Any {

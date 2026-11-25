@@ -154,15 +154,24 @@ struct ReaderDocument {
 
     func index(for anchor: ReaderAnchor) -> Int {
         guard !paragraphRanges.isEmpty else { return 0 }
+        let first = paragraphRanges[0].location
+        if anchor.offset < 0 {
+            // The rendered chapter opens with a title and attribution block that
+            // precedes paragraphRanges. A negative offset counts UTF-16 units
+            // back from the first paragraph so that position stays representable.
+            return max(0, first - min(-anchor.offset, first))
+        }
         let range = paragraphRanges[min(max(0, anchor.paragraph), paragraphRanges.count - 1)]
-        return ReadingAnchor.safeOffset(range.location + min(max(0, anchor.offset), max(0, range.length - 1)), in: text.string as NSString)
+        return ReadingAnchor.safeOffset(range.location + min(anchor.offset, max(0, range.length - 1)), in: text.string as NSString)
     }
 
     func anchor(at index: Int) -> ReaderAnchor {
-        guard !paragraphRanges.isEmpty else { return .init() }
+        guard index >= 0, !paragraphRanges.isEmpty else { return .init() }
+        let first = paragraphRanges[0].location
+        if index < first { return ReaderAnchor(paragraph: 0, offset: index - first) }
         let paragraph = paragraphRanges.lastIndex { $0.location <= index } ?? 0
         let range = paragraphRanges[paragraph]
-        let bounded = range.location + min(max(0, index - range.location), max(0, range.length - 1))
+        let bounded = range.location + min(index - range.location, max(0, range.length - 1))
         return ReaderAnchor(paragraph: paragraph, offset: ReadingAnchor.safeOffset(bounded, in: text.string as NSString) - range.location)
     }
 
@@ -352,6 +361,8 @@ enum ReaderPaginator {
         // The zero anchor represents a chapter start in both reading modes,
         // including a custom title that may itself occupy more than one page.
         if anchor == ReaderAnchor() { return 0 }
+        // Pre-first-paragraph anchors use a negative offset, which index(for:)
+        // resolves back to the exact rendered offset of the title block.
         let index = document.index(for: anchor)
         return ranges.lastIndex { $0.location <= index } ?? 0
     }

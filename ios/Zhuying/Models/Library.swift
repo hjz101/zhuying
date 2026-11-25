@@ -440,7 +440,10 @@ final class LibraryStore: ObservableObject {
                 let count = book.content.indices.contains(chapter) ? book.content[chapter].count : 0
                 let paragraph = min(max(0, entry.value.paragraph), max(0, count - 1))
                 let length = count > 0 ? (book.content[chapter][paragraph] as NSString).length : 0
-                result[entry.key] = ReadingProgress(chapter: chapter, paragraph: paragraph, updatedAt: entry.value.updatedAt, characterOffset: min(max(0, entry.value.characterOffset), max(0, length - 1)))
+                let offset = entry.value.characterOffset < 0 && paragraph == 0
+                    ? max(entry.value.characterOffset, -ReadingAnchor.maximumOffset)
+                    : min(max(0, entry.value.characterOffset), max(0, length - 1))
+                result[entry.key] = ReadingProgress(chapter: chapter, paragraph: paragraph, updatedAt: entry.value.updatedAt, characterOffset: offset)
             }
             sort = snapshot.sort
             shelfLayout = ShelfLayout(rawValue: snapshot.shelfLayout ?? "") ?? .standard
@@ -568,7 +571,9 @@ final class LibraryStore: ObservableObject {
         guard !paragraphs.isEmpty else { return false }
         let changedChapter = progress[book.id]?.chapter != chapter
         let paragraph = min(max(0, paragraph), paragraphs.count - 1)
-        let offset = ReadingAnchor.safeOffset(characterOffset, in: paragraphs[paragraph] as NSString)
+        let offset = characterOffset < 0 && paragraph == 0
+            ? max(characterOffset, -ReadingAnchor.maximumOffset)
+            : ReadingAnchor.safeOffset(characterOffset, in: paragraphs[paragraph] as NSString)
         progress[book.id] = .init(chapter: chapter, paragraph: paragraph, updatedAt: now, characterOffset: offset)
         if let record = chapterCatalogs[book.id]?[safe: chapter] {
             let document = activeDocuments[record.id] ?? ChapterDocument(chapterID: record.id, paragraphs: paragraphs)

@@ -51,7 +51,10 @@ enum LibraryRecordSync {
         }.sorted{$0.1 == $1.1 ? $0.0 < $1.0 : $0.1 < $1.1}.map(\.0)
         result.progress = try entries(.current).compactMap { entry in
             let value = try decode(entry,as:SyncedPosition.self)
-            guard entry.id == value.anchor.bookID,value.anchor.paragraphIndex >= 0,value.anchor.utf16Offset >= 0 else { throw CloudAccessError.invalidData }
+            // Negative offsets are only valid on the first paragraph, where they
+            // count back into the rendered chapter title before the prose.
+            guard entry.id == value.anchor.bookID,value.anchor.paragraphIndex >= 0,
+                  value.anchor.utf16Offset >= (value.anchor.paragraphIndex == 0 ? -ReadingAnchor.maximumOffset : 0) else { throw CloudAccessError.invalidData }
             // Keep a removed chapter's anchor for explicit recovery, as the
             // regular catalog refresh path does; never substitute another ID.
             return ids.contains(value.anchor.bookID) ? value.anchor : nil

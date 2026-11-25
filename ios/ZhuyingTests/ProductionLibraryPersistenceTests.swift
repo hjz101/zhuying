@@ -208,11 +208,12 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         var state = LibrarySnapshot(favorites: [], progress: [book.id: .init(chapter: 1, paragraph: 0, updatedAt: Date(timeIntervalSince1970: 20))])
         try await backend.saveState(state)
         state.progress[book.id]?.chapter = 999
-        do { try await backend.saveState(state); XCTFail("Invalid index") } catch { XCTAssertEqual(error as? ContentFailure, .missingChapter) }
+        let unresolved = try await backend.saveState(state)
+        XCTAssertEqual(unresolved, [book.id], "An invalid chapter is reported instead of aborting unrelated books")
         let reopened = try ProductionLibraryPersistence(directory: root)
         let loaded = try await reopened.bootstrap(legacySnapshot: nil, archiveURL: nil)
         XCTAssertTrue(loaded.snapshot.favorites.isEmpty)
-        XCTAssertEqual(loaded.snapshot.progress[book.id]?.chapter, 1)
+        XCTAssertEqual(loaded.snapshot.progress[book.id]?.chapter, 1, "The last valid location is retained")
         XCTAssertEqual(loaded.books, [book.metadataOnly()])
     }
 
@@ -232,5 +233,48 @@ final class ProductionLibraryPersistenceTests: XCTestCase {
         let recoveredFiles = try FileChapterRepository(directory: root.appendingPathComponent("chapters"))
         let ids = await recoveredFiles.chapterIDs()
         XCTAssertFalse(ids.contains("interrupted-import"))
+    }
+
+    func testOneMismatchedConfirmedAnchorDoesNotBlockOtherBooksProgress() async throws {
+        let root = try directory()
+        let first = try makeBook("甲"), second = try makeBook("乙", extra: "不同正文")
+        let backend = try ProductionLibraryPersistence(directory: root)
+        _ = try await backend.bootstrap(legacySnapshot: nil, archiveURL: nil)
+        _ = try await backend.importBook(first, group: "待读")
+        _ = try await backend.importBook(second, group: "待读")
+        let records = try SQLiteLibraryRepository(url: root.appendingPathComponent("library.sqlite"))
+        let firstChapters = try await records.chapters(bookID: first.id)
+        let secondChapters = try await records.chapters(bookID: second.id)
+        let firstChapter = try XCTUnwrap(firstChapters.first)
+        let secondChapter = try XCTUnwrap(secondChapters.first)
+        let firstDocumentValue = try await backend.document(chapterID: firstChapter.id)
+        let secondDocumentValue = try await backend.document(chapterID: secondChapter.id)
+        let firstDocument = try XCTUnwrap(firstDocumentValue)
+        let secondDocument = try XCTUnwrap(secondDocumentValue)
+
+        let initial = LibrarySnapshot(favorites: [first.id, second.id],
+                                      progress: [first.id: .init(chapter: 0, paragraph: 0, updatedAt: Date(timeIntervalSince1970: 10)),
+                                                 second.id: .init(chapter: 0, paragraph: 0, updatedAt: Date(timeIntervalSince1970: 10))],
+                                      importedGroups: [first.id: "待读", second.id: "待读"])
+        try await backend.saveState(initial)
+
+        // The second book's UI anchor disagrees with its saved position. Only
+        // that book is skipped; the first book's newer position still persists.
+        let firstAnchor = try ReadingAnchor(bookID: first.id, document: firstDocument, paragraph: 0, offset: 2, now: Date(timeIntervalSince1970: 40))
+        let staleSecond = try ReadingAnchor(bookID: second.id, document: secondDocument, paragraph: 0, offset: 0, now: Date(timeIntervalSince1970: 10))
+        var changed = initial
+        changed.progress[first.id] = .init(chapter: 0, paragraph: 0, updatedAt: firstAnchor.updatedAt, characterOffset: 2)
+        changed.progress[second.id] = .init(chapter: 0, paragraph: 0, updatedAt: Date(timeIntervalSince1970: 50), characterOffset: 3)
+        let unresolved = try await backend.saveState(changed, confirmedAnchors: [firstAnchor, staleSecond])
+        XCTAssertEqual(unresolved, [second.id])
+
+        let reopened = try ProductionLibraryPersistence(directory: root)
+        let loaded = try await reopened.bootstrap(legacySnapshot: nil, archiveURL: nil)
+        XCTAssertEqual(loaded.snapshot.progress[first.id]?.characterOffset, 2)
+        XCTAssertEqual(loaded.snapshot.progress[first.id]?.updatedAt, Date(timeIntervalSince1970: 40))
+        XCTAssertEqual(loaded.snapshot.progress[second.id]?.characterOffset, 0, "A mismatched book keeps its previous row")
+        XCTAssertEqual(loaded.snapshot.progress[second.id]?.updatedAt, Date(timeIntervalSince1970: 10))
+        XCTAssertEqual(Set(loaded.books.map(\.id)), [first.id, second.id])
+        XCTAssertTrue(loaded.unresolvedBookIDs.isEmpty, "The stored state stays readable after reload")
     }
 }

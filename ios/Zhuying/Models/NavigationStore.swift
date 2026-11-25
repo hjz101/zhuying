@@ -139,6 +139,29 @@ struct ActivitySession: Codable, Equatable, Sendable {
     }
 }
 
+/// Activity retention policy: keep the most recent 90 days, capped at 5000
+/// sessions, and always keep the newest session even if it is older than the
+/// window. Reports only promise totals for the retained period.
+enum ActivitySessionRetention {
+    static let retentionDays = 90
+    static let maximumSessions = 5000
+    static var retentionInterval: TimeInterval { TimeInterval(retentionDays) * 86_400 }
+
+    static func retained(_ sessions: [ActivitySession], now: Date = Date()) -> [ActivitySession] {
+        guard !sessions.isEmpty else { return [] }
+        let cutoff = now.addingTimeInterval(-retentionInterval)
+        var result = sessions.filter { $0.end >= cutoff }
+        if let newest = sessions.max(by: { $0.start < $1.start }), !result.contains(newest) {
+            result.append(newest)
+        }
+        if result.count > maximumSessions {
+            result.sort { $0.start == $1.start ? $0.bookID < $1.bookID : $0.start < $1.start }
+            result = Array(result.suffix(maximumSessions))
+        }
+        return result
+    }
+}
+
 struct ActivityBookTotal: Identifiable {
     let id: String
     let seconds: TimeInterval

@@ -28,6 +28,35 @@ final class LibraryStoreTests: XCTestCase {
         }
     }
 
+    func testActivityRetentionKeepsTheNewestSessionEvenOutsideTheWindow() {
+        let now = Date()
+        let old = ActivitySession(bookID: "old", start: now.addingTimeInterval(-200 * 86_400), seconds: 60)
+        XCTAssertEqual(ActivitySessionRetention.retained([old], now: now), [old], "The current session is never silently dropped")
+    }
+
+    func testActivityRetentionDropsExpiredSessionsWithoutChangingWindowTotals() {
+        let now = Date()
+        let expired = (0..<20).map { ActivitySession(bookID: "old", start: now.addingTimeInterval(-Double(120 + $0) * 86_400), seconds: 120) }
+        let recent = (0..<20).map { ActivitySession(bookID: "recent", start: now.addingTimeInterval(-Double($0 + 1) * 3_600), seconds: 90) }
+        let retained = ActivitySessionRetention.retained(expired + recent, now: now)
+        XCTAssertEqual(retained.count, recent.count)
+        XCTAssertTrue(retained.allSatisfy { $0.bookID == "recent" })
+        let window = DateInterval(start: now.addingTimeInterval(-ActivitySessionRetention.retentionInterval), end: now)
+        let before = ActivityReport(sessions: expired + recent, now: now, period: .year)
+        let after = ActivityReport(sessions: retained, now: now, period: .year)
+        XCTAssertEqual(after.total(in: window), before.total(in: window), accuracy: 0.001)
+        XCTAssertEqual(after.total(in: window), 20 * 90, accuracy: 0.001)
+    }
+
+    func testActivityRetentionCapsSessionCountAndKeepsNewest() {
+        let now = Date()
+        let sessions = (0..<5_100).map { ActivitySession(bookID: "b\($0 % 3)", start: now.addingTimeInterval(-Double($0) * 60), seconds: 30) }
+        let retained = ActivitySessionRetention.retained(sessions, now: now)
+        XCTAssertEqual(retained.count, ActivitySessionRetention.maximumSessions)
+        XCTAssertEqual(retained.last?.start, sessions.first?.start)
+        XCTAssertEqual(retained.reduce(0) { $0 + $1.seconds }, Double(ActivitySessionRetention.maximumSessions) * 30)
+    }
+
     func testShelfLayoutsPersistWithoutChangingReadingData() {
         let store = LibraryStore(books: books, defaults: defaults)
         XCTAssertEqual(store.shelfLayout, .standard)

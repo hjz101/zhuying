@@ -318,6 +318,37 @@ final class ProductionLibraryStoreTests: XCTestCase {
         XCTAssertEqual(restored.importedGroups[second.id], "新分组")
     }
 
+    func testActivitySessionsArePrunedOnLoadAndAfterAppend() async throws {
+        let library = try store()
+        await library.bootstrapProductionIfNeeded()
+        let book = try prepare()
+        _ = try await library.importBookDurably(book)
+        let now = Date()
+        let expired = (0..<30).map { ActivitySession(bookID: book.id, start: now.addingTimeInterval(-Double(120 + $0) * 86_400), seconds: 120) }
+        let recent = (0..<30).map { ActivitySession(bookID: book.id, start: now.addingTimeInterval(-Double($0 + 1) * 3_600), seconds: 90) }
+        let snapshot = LibrarySnapshot(favorites: [book.id], progress: [:], activitySessions: expired + recent)
+        let backend = try ProductionLibraryPersistence(directory: root.appendingPathComponent("database"))
+        try await backend.saveState(snapshot)
+
+        let reopened = try store()
+        await reopened.bootstrapProductionIfNeeded()
+        XCTAssertEqual(reopened.activitySessions.count, recent.count, "Loading prunes sessions outside the retention window")
+        XCTAssertFalse(reopened.activitySessions.contains { $0.start < now.addingTimeInterval(-ActivitySessionRetention.retentionInterval) })
+        let window = DateInterval(start: now.addingTimeInterval(-ActivitySessionRetention.retentionInterval), end: now)
+        XCTAssertEqual(ActivityReport(sessions: reopened.activitySessions, now: now, period: .year).total(in: window),
+                       Double(recent.count) * 90, accuracy: 0.001, "Totals for the retained period stay correct")
+
+        reopened.trackReading(book.id, interacted: true, now: now, uptime: 500)
+        reopened.trackReading(nil, now: now.addingTimeInterval(2), uptime: 502)
+        XCTAssertEqual(reopened.activitySessions.count, recent.count + 1, "Appending prunes again and keeps the current session")
+        XCTAssertEqual(reopened.activitySessions.last?.start, now)
+        let saved = await reopened.flushPendingWrites()
+        XCTAssertTrue(saved)
+        let restored = try store()
+        await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.activitySessions.count, recent.count + 1)
+    }
+
     func testInvalidAppearanceUpdateKeepsValidOverridesAndSavesNormalizedSettings() async throws {
         let library = try store()
         await library.bootstrapProductionIfNeeded()

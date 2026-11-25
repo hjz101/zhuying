@@ -86,7 +86,8 @@ final class ContentToolsTests: XCTestCase {
     @MainActor func testListeningTransitionDoesNotAlsoCountAsReadingTime() {
         let domain = UUID().uuidString, defaults = UserDefaults(suiteName:domain)!
         defer { defaults.removePersistentDomain(forName:domain) }
-        let library = LibraryStore(books:[],defaults:defaults,seedDemoData:false), date = Date(timeIntervalSince1970:100000)
+        // Sessions must sit inside the activity retention window for this totals check.
+        let library = LibraryStore(books:[],defaults:defaults,seedDemoData:false), date = Date()
         library.trackReading("book",interacted:true,now:date,uptime:0)
         library.narrationPlaybackChanged(true,now:date.addingTimeInterval(5),uptime:5)
         library.trackReading("book",now:date.addingTimeInterval(10),uptime:10)

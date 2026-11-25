@@ -437,7 +437,7 @@ final class LibraryStore: ObservableObject {
             let snapshot = try JSONDecoder().decode(LibrarySnapshot.self, from: JSONSerialization.data(withJSONObject: object))
             guard snapshot.version == 1 else { throw CocoaError(.coderReadCorrupt) }
             hasSeenReadingGuide = snapshot.hasSeenReadingGuide ?? false
-            activitySessions = snapshot.activitySessions ?? []
+            activitySessions = ActivitySessionRetention.retained(snapshot.activitySessions ?? [])
             narrationSettings = snapshot.narrationSettings ?? .init(); narrationAnchor = snapshot.narrationAnchor
             mediaLocations = snapshot.mediaLocations ?? [:]; mediaBookmarks = snapshot.mediaBookmarks ?? []
             var seen = Set<String>()
@@ -724,7 +724,7 @@ final class LibraryStore: ObservableObject {
             sort = restored.snapshot.sort
             shelfLayout = ShelfLayout(rawValue: restored.snapshot.shelfLayout ?? "") ?? .standard
             hasSeenReadingGuide = restored.snapshot.hasSeenReadingGuide ?? false
-            activitySessions = restored.snapshot.activitySessions ?? []
+            activitySessions = ActivitySessionRetention.retained(restored.snapshot.activitySessions ?? [])
             narrationSettings = restored.snapshot.narrationSettings ?? .init(); narrationAnchor = restored.snapshot.narrationAnchor
             mediaLocations = (restored.snapshot.mediaLocations ?? [:]).filter { id,_ in books.contains(where:{$0.id == id && $0.media != nil}) }
             mediaBookmarks = (restored.snapshot.mediaBookmarks ?? []).filter { mark in books.contains(where:{$0.id == mark.bookID && $0.media != nil}) }
@@ -823,6 +823,7 @@ final class LibraryStore: ObservableObject {
            abs(last.end.timeIntervalSince(session.start)) < 0.01, last.seconds + session.seconds <= 900 {
             activitySessions[activitySessions.count - 1] = .init(bookID: last.bookID, start: last.start, seconds: last.seconds + session.seconds, kind: last.kind)
         } else { activitySessions.append(session) }
+        activitySessions = ActivitySessionRetention.retained(activitySessions)
         persist()
     }
     func followNarration(_ anchor: ReadingAnchor) { followingNarrationAnchor = anchor }

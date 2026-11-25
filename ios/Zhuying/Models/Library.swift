@@ -374,11 +374,21 @@ final class LibraryStore: ObservableObject {
     private var pendingSave: Task<Void, Never>?
     private var writeTail: Task<Void, Never>?
     private var saveQueued = false
+    private var pendingPositions: [String: ReadingAnchor] = [:]
+    private var pendingPositionSave: Task<Void, Never>?
+    private var positionSaveQueued = false
+    private var pendingDerivedMetadata = false
     private var hasPendingChanges = false
     private var changeRevision = 0
     private var queueRevision = 0
     private var lastWriteFailed = false
     private var lastWriteMessage: String?
+    // Baselines let a cold save write only the parts that actually changed.
+    private var lastCommittedFavorites: [String]?
+    private var lastCommittedGroups: [String: String]?
+    private var lastCommittedViewPreferences: Data?
+    private var lastCommittedSources: [DemoSource]?
+    private var lastCommittedThemeLibrary: ThemeLibrarySnapshot?
     private var appearancePreparation: (() throws -> AppearanceMigrationInput)?
     private var chapterCatalogs: [String: [ChapterRecord]] = [:]
     private var stableProgress: [String: ReadingAnchor] = [:]
@@ -570,6 +580,8 @@ final class LibraryStore: ObservableObject {
         let paragraphs = prose(book, chapter: chapter)
         guard !paragraphs.isEmpty else { return false }
         let changedChapter = progress[book.id]?.chapter != chapter
+        let previousNotice = updates[book.id]
+        let previousFarthest = farthestPositions[book.id]
         let paragraph = min(max(0, paragraph), paragraphs.count - 1)
         let offset = characterOffset < 0 && paragraph == 0
             ? max(characterOffset, -ReadingAnchor.maximumOffset)
@@ -594,8 +606,13 @@ final class LibraryStore: ObservableObject {
         if let chapterID = chapterCatalogs[book.id]?[safe:chapter]?.id, var notice = updates[book.id], let unread = notice.unreadChapterIDs {
             notice.unreadChapterIDs = unread.filter { $0 != chapterID }; updates[book.id] = notice
         }
-        persist()
-        if changedChapter && productionPersistence != nil { enqueueSave() }
+        if farthestPositions[book.id] != previousFarthest { pendingDerivedMetadata = true }
+        if usesProductionStorage, let anchor = stableProgress[book.id] {
+            // Positions are the hot path: they upsert one progress row and leave
+            // shelf order, groups and the view-preferences blob alone.
+            enqueuePosition(anchor)
+            if changedChapter || previousNotice != updates[book.id] { persist() }
+        } else { persist() }
         return true
     }
 
@@ -721,6 +738,7 @@ final class LibraryStore: ObservableObject {
             farthestPositions = (restored.snapshot.farthestPositions ?? restored.anchors).filter{ id,_ in books.contains(where:{$0.id == id}) }
             remoteBooks = restored.remoteBooks; sources = restored.sources
             suppressPersistence = false; loadState = .ready
+            resetCommittedBaselines()
             var messages = restored.warnings
             if !unresolvedBookIDs.intersection(Set(books.map(\.id))).isEmpty { messages.append("部分旧阅读位置无法定位，历史记录已保留，请从章节目录重新选章。") }
             storageMessage = messages.isEmpty ? nil : messages.joined(separator: "\n")
@@ -1153,6 +1171,23 @@ final class LibraryStore: ObservableObject {
     }
     func removeMediaBookmark(_ id: String) { mediaBookmarks.removeAll{$0.id == id}; persist() }
 
+    /// A restored library is already durable, so the first cold save only
+    /// needs to write parts that differ from this baseline.
+    private func resetCommittedBaselines() {
+        lastCommittedFavorites = favorites
+        lastCommittedGroups = importedGroups
+        lastCommittedViewPreferences = viewPreferencesData(snapshot)
+        lastCommittedSources = sources
+        lastCommittedThemeLibrary = themeLibrary
+    }
+
+    /// Sorted keys keep the encoded blob stable, so an unchanged preference set
+    /// is never rewritten merely because dictionary ordering shifted.
+    private func viewPreferencesData(_ value: LibrarySnapshot) -> Data? {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        return try? encoder.encode(LibraryViewPreferences(value))
+    }
+
     private func scheduleSave() {
         guard pendingSave == nil, !saveQueued, hasPendingChanges else { return }
         // Throttle rather than postpone forever while the reader keeps scrolling.
@@ -1161,6 +1196,54 @@ final class LibraryStore: ObservableObject {
             guard let self else { return }
             self.pendingSave = nil
             self.enqueueSave()
+        }
+    }
+
+    private func enqueuePosition(_ anchor: ReadingAnchor) {
+        pendingPositions[anchor.bookID] = anchor
+        guard productionPersistence != nil else { return }
+        schedulePositionSave()
+    }
+
+    private func schedulePositionSave() {
+        guard pendingPositionSave == nil, !positionSaveQueued, !pendingPositions.isEmpty else { return }
+        // Coalesce a burst of scroll-driven positions into one row update.
+        pendingPositionSave = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            guard let self else { return }
+            self.pendingPositionSave = nil
+            self.enqueuePositionSave()
+        }
+    }
+
+    private func enqueuePositionSave() {
+        guard let backend = productionPersistence, loadState == .ready, !pendingPositions.isEmpty, !positionSaveQueued else { return }
+        pendingPositionSave?.cancel(); pendingPositionSave = nil
+        positionSaveQueued = true
+        let anchors = Array(pendingPositions.values)
+        pendingPositions.removeAll()
+        let previous = writeTail
+        queueRevision += 1
+        writeTail = Task { @MainActor [weak self] in
+            await previous?.value
+            guard let self else { return }
+            do {
+                let unresolved = try await backend.saveReadingPositions(anchors)
+                self.lastWriteFailed = false
+                if self.storageMessage == self.lastWriteMessage { self.storageMessage = nil }
+                self.lastWriteMessage = nil
+                self.reportUnresolved(unresolved)
+            } catch {
+                self.lastWriteFailed = true
+                for anchor in anchors {
+                    if let pending = self.pendingPositions[anchor.bookID], pending.updatedAt > anchor.updatedAt { continue }
+                    self.pendingPositions[anchor.bookID] = anchor
+                }
+                self.lastWriteMessage = "阅读位置保存失败，已有记录保留，请稍后重试。"
+                self.storageMessage = self.lastWriteMessage
+            }
+            self.positionSaveQueued = false
+            if !self.pendingPositions.isEmpty && !self.lastWriteFailed { self.schedulePositionSave() }
         }
     }
 
@@ -1178,14 +1261,38 @@ final class LibraryStore: ObservableObject {
             let current = self.snapshot
             let themes = self.themeLibrary
             let sources = self.sources
-            let anchors = Array(self.stableProgress.values)
+            let anchors = Array(self.pendingPositions.values)
+            self.pendingPositions.removeAll()
+            let viewPreferences = self.viewPreferencesData(current)
+            let writesShelf = self.lastCommittedFavorites != current.favorites
+            let writesGroups = self.lastCommittedGroups != (current.importedGroups ?? [:])
+            let writesViewPreferences = viewPreferences != nil && viewPreferences != self.lastCommittedViewPreferences
+            let writesSources = self.lastCommittedSources != sources
+            let writesTheme = self.lastCommittedThemeLibrary != themes
             do {
-                try await backend.saveState(current, themeLibrary: themes, sources: sources, confirmedAnchors: anchors)
-                if self.changeRevision == revision { self.hasPendingChanges = false }
+                let unresolved = try await backend.saveChanges(current, anchorUpdates: anchors,
+                                                               themeLibrary: writesTheme ? themes : nil,
+                                                               sources: writesSources ? sources : nil,
+                                                               writesShelf: writesShelf, writesGroups: writesGroups,
+                                                               writesViewPreferences: writesViewPreferences)
+                self.lastCommittedFavorites = current.favorites
+                self.lastCommittedGroups = current.importedGroups ?? [:]
+                if writesViewPreferences { self.lastCommittedViewPreferences = viewPreferences }
+                if writesSources { self.lastCommittedSources = sources }
+                if writesTheme { self.lastCommittedThemeLibrary = themes }
+                if self.changeRevision == revision {
+                    self.hasPendingChanges = false
+                    self.pendingDerivedMetadata = false
+                }
                 self.lastWriteFailed = false
                 if self.storageMessage == self.lastWriteMessage { self.storageMessage = nil }
                 self.lastWriteMessage = nil
+                self.reportUnresolved(unresolved)
             } catch {
+                for anchor in anchors {
+                    if let pending = self.pendingPositions[anchor.bookID], pending.updatedAt > anchor.updatedAt { continue }
+                    self.pendingPositions[anchor.bookID] = anchor
+                }
                 self.lastWriteFailed = true
                 self.lastWriteMessage = "阅读记录保存失败，已有记录保留，请检查设备空间后重试。"
                 self.storageMessage = self.lastWriteMessage
@@ -1195,17 +1302,30 @@ final class LibraryStore: ObservableObject {
         }
     }
 
+    private func reportUnresolved(_ ids: Set<String>) {
+        guard !ids.isEmpty else { return }
+        let titles = ids.compactMap { id in books.first(where: { $0.id == id })?.title }.sorted()
+        let label = titles.isEmpty ? "部分作品" : titles.prefix(3).joined(separator: "、") + (titles.count > 3 ? "等" : "")
+        lastWriteMessage = "无法确认《\(label)》的阅读位置，已保留原位置。请从目录重新选择章节。"
+        storageMessage = lastWriteMessage
+    }
+
     @discardableResult
     func flushPendingWrites() async -> Bool {
         guard usesProductionStorage else { persist(); return true }
         guard loadState == .ready else { return false }
         while true {
             pendingSave?.cancel(); pendingSave = nil
+            pendingPositionSave?.cancel(); pendingPositionSave = nil
+            // Farthest-position bookkeeping rides along with the next cold save,
+            // so a flush still persists it without a per-scroll cold write.
+            if pendingDerivedMetadata && !hasPendingChanges { hasPendingChanges = true; changeRevision += 1 }
+            enqueuePositionSave()
             enqueueSave()
             let revision = queueRevision
             await writeTail?.value
             if lastWriteFailed { return false }
-            if revision == queueRevision && !hasPendingChanges { return true }
+            if revision == queueRevision && !hasPendingChanges && pendingPositions.isEmpty { return true }
         }
     }
 }

@@ -38,6 +38,17 @@ final class ProductionLibraryStoreTests: XCTestCase {
         defer { sqlite3_close(database) }
         guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else { throw ContentFailure.storageFailure }
     }
+    private func scalar(_ sql: String) throws -> Int64 {
+        var database: OpaquePointer?
+        let path = root.appendingPathComponent("database/library.sqlite").path
+        guard sqlite3_open(path, &database) == SQLITE_OK else { throw ContentFailure.storageFailure }
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else { throw ContentFailure.storageFailure }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { return 0 }
+        return sqlite3_column_int64(statement, 0)
+    }
 
     func testImportSessionUsesDurableBackendAndRestoresReadingAndPreferencesWithoutLegacyWrites() async throws {
         let library = try store()
@@ -170,7 +181,7 @@ final class ProductionLibraryStoreTests: XCTestCase {
         library.record(book, chapter: 0)
         let initial = await library.flushPendingWrites()
         XCTAssertTrue(initial)
-        try execute("CREATE TRIGGER deny_state BEFORE UPDATE ON preferences WHEN NEW.key = 'library.view-preferences.v1' BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
+        try execute("CREATE TRIGGER deny_progress BEFORE UPDATE ON reading_progress BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
         library.record(book, chapter: 1)
         let failed = await library.flushPendingWrites()
         XCTAssertFalse(failed)
@@ -179,7 +190,7 @@ final class ProductionLibraryStoreTests: XCTestCase {
         let old = try await records.progress(bookID: book.id)
         let catalog = try await records.chapters(bookID: book.id)
         XCTAssertEqual(old?.chapterID, catalog[0].id)
-        try execute("DROP TRIGGER deny_state")
+        try execute("DROP TRIGGER deny_progress")
         let retried = await library.flushPendingWrites()
         XCTAssertTrue(retried)
         XCTAssertNil(library.storageMessage)
@@ -206,6 +217,105 @@ final class ProductionLibraryStoreTests: XCTestCase {
         }
         XCTAssertTrue(savedWhileActive, "Continuous changes must not postpone every save until the reader stops")
         _ = await library.flushPendingWrites()
+    }
+
+    func testReadingPositionInsideOversizedTitleSurvivesRestart() async throws {
+        let library = try store()
+        await library.bootstrapProductionIfNeeded()
+        let book = try prepare()
+        _ = try await library.importBookDurably(book)
+        try await confirm(library, book: book, chapter: 0)
+        // A page that starts inside the rendered title block is stored as a
+        // negative offset on the first paragraph.
+        XCTAssertTrue(library.record(book, chapter: 0, paragraph: 0, characterOffset: -37))
+        XCTAssertEqual(library.progress[book.id]?.characterOffset, -37)
+        let saved = await library.flushPendingWrites()
+        XCTAssertTrue(saved)
+        let restored = try store()
+        await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.progress[book.id]?.characterOffset, -37)
+        let reopened = try XCTUnwrap(restored.books.first)
+        let request = try restored.chapterRequest(for: reopened, chapter: 0, resume: true)
+        XCTAssertEqual(request.anchor?.utf16Offset, -37, "Continue reading must restore the title-block page")
+    }
+
+    func testPositionOnlySaveDoesNotRewriteShelfGroupsOrViewPreferences() async throws {
+        let library = try store()
+        await library.bootstrapProductionIfNeeded()
+        let first = try prepare()
+        let second = try BookImporter.prepare(data: Data("第一章 山\n第二本书的正文。".utf8), name: "山.txt").book
+        _ = try await library.importBookDurably(first)
+        _ = try await library.importBookDurably(second)
+        library.moveBooks([first.id, second.id], toGroup: "待读")
+        library.record(first, chapter: 1, characterOffset: 3)
+        let initialSave = await library.flushPendingWrites()
+        XCTAssertTrue(initialSave)
+
+        try execute("CREATE TRIGGER deny_shelf_delete BEFORE DELETE ON shelf_entries BEGIN SELECT RAISE(ABORT, 'shelf rewrite'); END")
+        try execute("CREATE TRIGGER deny_group_delete BEFORE DELETE ON book_groups BEGIN SELECT RAISE(ABORT, 'group rewrite'); END")
+        try execute("CREATE TRIGGER deny_view_write BEFORE UPDATE ON preferences WHEN OLD.key = 'library.view-preferences.v1' BEGIN SELECT RAISE(ABORT, 'preferences rewrite'); END")
+
+        // Move backwards so only the progress row changes, not derived metadata.
+        XCTAssertTrue(library.record(first, chapter: 1, characterOffset: 2))
+        let positionSave = await library.flushPendingWrites()
+        XCTAssertTrue(positionSave, "A position save must not touch shelf, groups or view preferences")
+        let records = try SQLiteLibraryRepository(url: root.appendingPathComponent("database/library.sqlite"))
+        let savedPosition = try await records.progress(bookID: first.id)
+        XCTAssertEqual(savedPosition?.utf16Offset, 2)
+
+        for trigger in ["deny_shelf_delete", "deny_group_delete", "deny_view_write"] { try execute("DROP TRIGGER \(trigger)") }
+        let restored = try store()
+        await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.favorites, library.favorites)
+        XCTAssertEqual(restored.importedGroups, library.importedGroups)
+        XCTAssertEqual(restored.settings, library.settings)
+        XCTAssertEqual(restored.progress[first.id]?.characterOffset, 2)
+    }
+
+    func testTwoPositionSavesForTheSameBookCoalesceIntoOneRowUpdate() async throws {
+        let library = try store()
+        await library.bootstrapProductionIfNeeded()
+        let book = try prepare()
+        _ = try await library.importBookDurably(book)
+        library.record(book, chapter: 0, characterOffset: 1)
+        let initialSave = await library.flushPendingWrites()
+        XCTAssertTrue(initialSave)
+        try execute("CREATE TABLE progress_writes (id INTEGER PRIMARY KEY AUTOINCREMENT, note TEXT)")
+        try execute("CREATE TRIGGER count_progress AFTER UPDATE ON reading_progress BEGIN INSERT INTO progress_writes(note) VALUES ('x'); END")
+
+        library.record(book, chapter: 0, characterOffset: 3)
+        library.record(book, chapter: 0, characterOffset: 7)
+        let coalescedSave = await library.flushPendingWrites()
+        XCTAssertTrue(coalescedSave)
+        XCTAssertEqual(try scalar("SELECT COUNT(*) FROM progress_writes"), 1, "Two positions in one debounce window are one row update")
+        let records = try SQLiteLibraryRepository(url: root.appendingPathComponent("database/library.sqlite"))
+        let savedPosition = try await records.progress(bookID: book.id)
+        XCTAssertEqual(savedPosition?.utf16Offset, 7)
+    }
+
+    func testShelfReorderAndGroupChangeStillPersistFully() async throws {
+        let library = try store()
+        await library.bootstrapProductionIfNeeded()
+        let first = try prepare()
+        let second = try BookImporter.prepare(data: Data("第一章 山\n第二本书的正文。".utf8), name: "山.txt").book
+        _ = try await library.importBookDurably(first)
+        _ = try await library.importBookDurably(second)
+        library.record(first, chapter: 1, characterOffset: 3)
+        let initialSave = await library.flushPendingWrites()
+        XCTAssertTrue(initialSave)
+
+        XCTAssertEqual(library.favorites, [second.id, first.id])
+        XCTAssertFalse(library.toggleFavorite(first))   // remove from the shelf
+        XCTAssertTrue(library.toggleFavorite(first))    // re-add at the front: new order
+        library.moveBooks([second.id], toGroup: "新分组")
+        let changedSave = await library.flushPendingWrites()
+        XCTAssertTrue(changedSave)
+
+        let restored = try store()
+        await restored.bootstrapProductionIfNeeded()
+        XCTAssertEqual(restored.favorites, library.favorites)
+        XCTAssertEqual(restored.importedGroups, library.importedGroups)
+        XCTAssertEqual(restored.importedGroups[second.id], "新分组")
     }
 
     func testInvalidAppearanceUpdateKeepsValidOverridesAndSavesNormalizedSettings() async throws {

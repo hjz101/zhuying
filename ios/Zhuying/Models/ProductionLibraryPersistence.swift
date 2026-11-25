@@ -132,8 +132,30 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             } catch { media.files.discard(created); throw error }
     }
 
-    func saveState(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot? = nil, sources: [DemoSource]? = nil, confirmedAnchors: [ReadingAnchor]? = nil) async throws {
+    /// Returns the books whose progress could not be confirmed and were skipped.
+    @discardableResult
+    func saveState(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot? = nil, sources: [DemoSource]? = nil, confirmedAnchors: [ReadingAnchor]? = nil) async throws -> Set<String> {
         try await serialized { try await $0.performSave(snapshot, themeLibrary: themeLibrary, sources: sources, confirmedAnchors: confirmedAnchors) }
+    }
+
+    /// Hot path: upserts only the supplied reading positions. Shelf order,
+    /// groups and view preferences stay untouched. Unconfirmed books are
+    /// returned instead of failing the whole batch.
+    @discardableResult
+    func saveReadingPositions(_ anchors: [ReadingAnchor]) async throws -> Set<String> {
+        try await serialized { try await $0.performPositionSave(anchors) }
+    }
+
+    /// Cold path with an explicit change set. `nil` shelf or group values are
+    /// left as stored, and view preferences are only encoded when requested.
+    @discardableResult
+    func saveChanges(_ snapshot: LibrarySnapshot, anchorUpdates: [ReadingAnchor], themeLibrary: ThemeLibrarySnapshot? = nil,
+                     sources: [DemoSource]? = nil, writesShelf: Bool, writesGroups: Bool,
+                     writesViewPreferences: Bool) async throws -> Set<String> {
+        try await serialized {
+            try await $0.performChanges(snapshot, anchorUpdates: anchorUpdates, themeLibrary: themeLibrary, sources: sources,
+                                        writesShelf: writesShelf, writesGroups: writesGroups, writesViewPreferences: writesViewPreferences)
+        }
     }
 
     func document(chapterID: String) async throws -> ChapterDocument? {
@@ -429,7 +451,44 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         return result
     }
 
-    private func performSave(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot?, sources: [DemoSource]?, confirmedAnchors: [ReadingAnchor]?) async throws {
+    @discardableResult
+    private func performPositionSave(_ anchors: [ReadingAnchor]) async throws -> Set<String> {
+        guard !anchors.isEmpty else { return [] }
+        let unresolved = try await records.saveProgressRows(anchors)
+        for anchor in anchors where !unresolved.contains(anchor.bookID) { savedAnchors[anchor.bookID] = anchor }
+        return unresolved
+    }
+
+    @discardableResult
+    private func performChanges(_ snapshot: LibrarySnapshot, anchorUpdates: [ReadingAnchor], themeLibrary: ThemeLibrarySnapshot?,
+                                sources: [DemoSource]?, writesShelf: Bool, writesGroups: Bool, writesViewPreferences: Bool) async throws -> Set<String> {
+        var unresolved = Set<String>()
+        var progress: [ReadingAnchor] = []
+        for anchor in anchorUpdates {
+            let chapters = try await catalog(anchor.bookID)
+            guard chapters.contains(where: { $0.id == anchor.chapterID && $0.access == .readable }) else { unresolved.insert(anchor.bookID); continue }
+            progress.append(anchor)
+        }
+        var preferences: [String: Data] = [:]
+        if writesViewPreferences { preferences[Self.viewKey] = try JSONEncoder().encode(LibraryViewPreferences(snapshot)) }
+        if let sources { try Self.validateSources(sources); preferences[Self.sourcesKey] = try JSONEncoder().encode(sources) }
+        let staged = try themeLibrary.map { value -> ThemeLibraryRepository.Staged in
+            guard let themes else { throw ContentFailure.storageFailure }
+            return try themes.stage(value)
+        }
+        if let staged { preferences[Self.themeLibraryKey] = staged.data }
+        guard writesShelf || writesGroups || !progress.isEmpty || !preferences.isEmpty else { return unresolved }
+        do {
+            try await records.commitPartialState(favorites: writesShelf ? snapshot.favorites : nil,
+                                                groups: writesGroups ? (snapshot.importedGroups ?? [:]) : nil,
+                                                progress: progress, preferences: preferences)
+            for anchor in progress { savedAnchors[anchor.bookID] = anchor }
+            if let staged { themes?.commit(staged) }
+        } catch { if let staged { themes?.rollback(staged) }; throw error }
+        return unresolved
+    }
+
+    private func performSave(_ snapshot: LibrarySnapshot, themeLibrary: ThemeLibrarySnapshot?, sources: [DemoSource]?, confirmedAnchors: [ReadingAnchor]?) async throws -> Set<String> {
         var unresolved = Set<String>()
         let progress: [ReadingAnchor]
         if let confirmedAnchors {
@@ -457,6 +516,7 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
             for anchor in progress { savedAnchors[anchor.bookID] = anchor }
             if let staged { themes?.commit(staged) }
         } catch { if let staged { themes?.rollback(staged) }; throw error }
+        return unresolved
     }
 
     private func loadState() async throws -> ProductionLibraryState {

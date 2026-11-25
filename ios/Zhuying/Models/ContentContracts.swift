@@ -161,13 +161,19 @@ struct ReadingAnchor: Codable, Equatable, Sendable {
         paragraphID = content.id; paragraphIndex = paragraph
         paragraphCount = document.paragraphs.count
         let text = content.text as NSString
-        utf16Offset = Self.safeOffset(offset, in: text)
-        let start = Self.safeOffset(max(0, utf16Offset - 24), in: text)
-        let proposedEnd = min(text.length, utf16Offset + 48)
+        // A negative offset on the first paragraph counts UTF-16 units before
+        // the rendered chapter title and attribution block, so a page that
+        // starts inside an oversized title keeps its position across reflow.
+        utf16Offset = offset < 0 && paragraph == 0 ? max(offset, -Self.maximumOffset) : Self.safeOffset(offset, in: text)
+        let base = max(0, utf16Offset)
+        let start = Self.safeOffset(max(0, base - 24), in: text)
+        let proposedEnd = min(text.length, base + 48)
         let end = proposedEnd == text.length ? proposedEnd : Self.safeOffset(proposedEnd, in: text)
         quote = text.substring(with: NSRange(location: start, length: end - start))
-        offsetInQuote = utf16Offset - start; updatedAt = now
+        offsetInQuote = base - start; updatedAt = now
     }
+
+    static let maximumOffset = 100_000
 
     static func safeOffset(_ offset: Int, in text: NSString) -> Int {
         guard text.length > 0 else { return 0 }
@@ -189,7 +195,9 @@ enum ReadingAnchorResolver {
         if let index = document.paragraphs.firstIndex(where: { $0.id == anchor.paragraphID }) {
             if anchor.contentVersion != document.version,
                document.paragraphs.filter({ $0.text == document.paragraphs[index].text }).count > 1 { return .unresolved }
-            let offset = ReadingAnchor.safeOffset(anchor.utf16Offset, in: document.paragraphs[index].text as NSString)
+            let offset = anchor.utf16Offset < 0 && index == 0
+                ? anchor.utf16Offset
+                : ReadingAnchor.safeOffset(anchor.utf16Offset, in: document.paragraphs[index].text as NSString)
             return anchor.contentVersion == document.version ? .exact(paragraph: index, offset: offset) : .recovered(paragraph: index, offset: offset)
         }
         guard !anchor.quote.isEmpty else { return .unresolved }

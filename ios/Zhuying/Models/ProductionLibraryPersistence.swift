@@ -492,18 +492,19 @@ actor ProductionLibraryPersistence: ChapterDocumentLoading {
         var unresolved = Set<String>()
         let progress: [ReadingAnchor]
         if let confirmedAnchors {
-            let byBook = Dictionary(uniqueKeysWithValues: confirmedAnchors.map { ($0.bookID, $0) })
+            var byBook: [String: ReadingAnchor] = [:]
+            for anchor in confirmedAnchors { byBook[anchor.bookID] = anchor }
             var locations: [ReadingAnchor] = []
             for (id, value) in snapshot.progress {
                 let chapters = try await self.catalog(id)
+                // One book whose confirmed anchor disagrees must not block every
+                // other book's progress. Keep its stored row and report it.
                 guard let saved = byBook[id], chapters[safe: value.chapter]?.id == saved.chapterID,
-                      saved.paragraphIndex == value.paragraph, saved.utf16Offset == value.characterOffset else { throw ContentFailure.missingChapter }
+                      saved.paragraphIndex == value.paragraph, saved.utf16Offset == value.characterOffset else { unresolved.insert(id); continue }
                 locations.append(saved)
             }
             progress = locations
         } else { progress = try await anchors(from: snapshot.progress, unresolved: &unresolved) }
-        // A UI bug must not replace valid locations with guessed chapter indices.
-        guard unresolved.isEmpty else { throw ContentFailure.missingChapter }
         var preferences = [Self.viewKey: try JSONEncoder().encode(LibraryViewPreferences(snapshot))]
         if let sources { try Self.validateSources(sources); preferences[Self.sourcesKey] = try JSONEncoder().encode(sources) }
         let staged = try themeLibrary.map { value -> ThemeLibraryRepository.Staged in

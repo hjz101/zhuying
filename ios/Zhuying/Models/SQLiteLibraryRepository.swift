@@ -141,6 +141,25 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
         }
     }
 
+    /// Hot path for reading positions: one row upsert per changed book and no
+    /// shelf, group or preference rewrites. Invalid locations are skipped so a
+    /// single inconsistent book cannot block every other book's position.
+    func saveProgressRows(_ anchors: [ReadingAnchor]) throws -> Set<String> {
+        guard !anchors.isEmpty else { return [] }
+        let rows = try anchors.map { ($0, try JSONEncoder().encode($0)) }
+        var unresolved = Set<String>()
+        try database.write { db in
+            for (anchor, data) in rows {
+                guard let chapter = try Data.fetchOne(db, sql: "SELECT payload FROM chapter_records WHERE id = ? AND bookID = ?", arguments: [anchor.chapterID, anchor.bookID]),
+                      try JSONDecoder().decode(ChapterRecord.self, from: chapter).access == .readable else {
+                    unresolved.insert(anchor.bookID); continue
+                }
+                try db.execute(sql: "INSERT INTO reading_progress(bookID, payload) VALUES (?, ?) ON CONFLICT(bookID) DO UPDATE SET payload=excluded.payload", arguments: [anchor.bookID, data])
+            }
+        }
+        return unresolved
+    }
+
     func setFavorite(bookID: String, enabled: Bool, now: Date = Date()) throws {
         try database.write { db in
             if enabled {
@@ -323,7 +342,12 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
     /// One commit point for settings, shelf order, groups and confirmed locations.
     /// Missing locations are retained rather than interpreted as a deletion.
     func commitState(favorites: [String], groups: [String: String], progress: [ReadingAnchor], preferences: [String: Data]) throws {
-        guard Set(favorites).count == favorites.count else { throw ContentFailure.invalidResponse }
+        try commitPartialState(favorites: favorites, groups: groups, progress: progress, preferences: preferences)
+    }
+
+    /// One atomic commit for any changed subset of shelf order, groups, progress and preferences.
+    func commitPartialState(favorites: [String]?, groups: [String: String]?, progress: [ReadingAnchor], preferences: [String: Data]) throws {
+        if let favorites { guard Set(favorites).count == favorites.count else { throw ContentFailure.invalidResponse } }
         let anchors = try progress.map { ($0, try JSONEncoder().encode($0)) }
         try database.write { db in
             let dates = Dictionary(uniqueKeysWithValues: try Row.fetchAll(db, sql: "SELECT bookID, addedAt FROM shelf_entries").map { ($0["bookID"] as String, $0["addedAt"] as Date) })
@@ -331,13 +355,17 @@ actor SQLiteLibraryRepository: LibraryRecordRepository {
                 guard let data = try Data.fetchOne(db, sql: "SELECT payload FROM chapter_records WHERE id = ? AND bookID = ?", arguments: [anchor.chapterID, anchor.bookID]),
                       try JSONDecoder().decode(ChapterRecord.self, from: data).access == .readable else { throw ContentFailure.missingChapter }
             }
-            try db.execute(sql: "DELETE FROM shelf_entries")
-            for (index, id) in favorites.enumerated() {
-                try db.execute(sql: "INSERT INTO shelf_entries(bookID, addedAt, position) VALUES (?, ?, ?)", arguments: [id, dates[id] ?? Date(), index])
+            if let favorites {
+                try db.execute(sql: "DELETE FROM shelf_entries")
+                for (index, id) in favorites.enumerated() {
+                    try db.execute(sql: "INSERT INTO shelf_entries(bookID, addedAt, position) VALUES (?, ?, ?)", arguments: [id, dates[id] ?? Date(), index])
+                }
             }
-            try db.execute(sql: "DELETE FROM book_groups")
-            for (id, name) in groups {
-                try db.execute(sql: "INSERT INTO book_groups(bookID, name) VALUES (?, ?)", arguments: [id, name])
+            if let groups {
+                try db.execute(sql: "DELETE FROM book_groups")
+                for (id, name) in groups {
+                    try db.execute(sql: "INSERT INTO book_groups(bookID, name) VALUES (?, ?)", arguments: [id, name])
+                }
             }
             for (anchor, data) in anchors {
                 try db.execute(sql: "INSERT INTO reading_progress(bookID, payload) VALUES (?, ?) ON CONFLICT(bookID) DO UPDATE SET payload=excluded.payload", arguments: [anchor.bookID, data])
